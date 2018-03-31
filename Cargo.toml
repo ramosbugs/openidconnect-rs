@@ -1,0 +1,8 @@
+[package]
+name = "openidconnect"
+version = "0.0.0"
+authors = ["David A. Ramos <ramos@cs.stanford.edu>"]
+description = "OpenID Connect library for Relying Parties"
+license = "MIT"
+
+[dependencies]
