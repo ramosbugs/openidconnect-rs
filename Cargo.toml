@@ -6,3 +6,9 @@ description = "OpenID Connect library for Relying Parties"
 license = "MIT"
 
 [dependencies]
+jsonwebtoken = "4.0"
+oauth2 = { git = "file:///Users/daramos/Documents/Projects/oauth2-rs", branch = "overhaul" }
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+url = "1.0"
