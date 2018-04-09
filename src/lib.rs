@@ -4,13 +4,36 @@
 //! [OpenID Connect](http://openid.net/specs/openid-connect-core-1_0.html) support.
 //!
 
-extern crate oauth2;
+extern crate curl;
+extern crate failure;
+#[macro_use] extern crate failure_derive;
+#[macro_use] extern crate oauth2;
 extern crate serde;
 #[macro_use] extern crate serde_derive;
 extern crate serde_json;
 extern crate url;
 
-use oauth2::*;
+use std::convert::From;
+use std::fmt::{Debug, Display, Error as FormatterError, Formatter};
+use std::marker::PhantomData;
+use std::time::Duration;
+
+use curl::easy::Easy;
+use oauth2::prelude::*;
+use oauth2::{
+    AccessToken,
+    AuthType,
+    AuthUrl,
+    ClientId,
+    ClientSecret,
+    CsrfToken,
+    ErrorResponseType,
+    RedirectUrl,
+    RefreshToken,
+    Scope,
+    TokenType,
+    TokenUrl,
+};
 use oauth2::basic::{
     BasicClient,
     BasicErrorResponse,
@@ -19,112 +42,91 @@ use oauth2::basic::{
     BasicToken,
     BasicTokenType,
 };
+use oauth2::helpers::{deserialize_url, serialize_url};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use std::convert::From;
-use std::fmt::{Debug, Display, Formatter};
-use std::fmt::Error as FormatterError;
-use std::marker::PhantomData;
-use std::ops::Deref;
-use std::time::Duration;
 use url::Url;
 
-///
-/// How the Authorization Server displays the authentication and consent user interface pages to
-/// the End-User.
-///
-pub trait OpenIdConnectAuthDisplay : Display + PartialEq {
-    fn to_str(&self) -> &str;
-}
+use http::{HttpRequest, HttpRequestMethod, HttpResponse};
+use macros::TraitStructExtract;
 
-///
-/// Whether the Authorization Server should prompt the End-User for reauthentication and consent.
-///
-pub trait OpenIdConnectAuthPrompt : Display + PartialEq {
-    fn to_str(&self) -> &str;
-}
+// Defined first since other modules need the macros, and definition order is significant for
+// macros.
+#[macro_use] pub mod macros;
 
-pub struct LanguageTag(String);
-impl LanguageTag {
-    pub fn new(s: &str) -> Self {
-        LanguageTag(s.to_string())
-    }
-}
-impl Deref for LanguageTag {
-    type Target = String;
-    fn deref(&self) -> &String {
-        &self.0
-    }
-}
-impl ToString for LanguageTag {
-    fn to_string(&self) -> String { (*self).clone() }
-}
+pub mod core;
+pub mod discovery;
+pub mod types;
 
-pub struct AuthenticationContextClass(String);
-impl AuthenticationContextClass {
-    pub fn new(s: &str) -> Self {
-        AuthenticationContextClass(s.to_string())
-    }
-}
-impl Deref for AuthenticationContextClass {
-    type Target = String;
-    fn deref(&self) -> &String {
-        &self.0
-    }
-}
-impl ToString for AuthenticationContextClass {
-    fn to_string(&self) -> String { (*self).clone() }
-}
+use discovery::DiscoveryError;
 
-pub struct CsrfToken(String);
-impl CsrfToken {
-    pub fn new(s: &str) -> Self {
-        CsrfToken(s.to_string())
-    }
-}
-impl Deref for CsrfToken {
-    type Target = String;
-    fn deref(&self) -> &String {
-        &self.0
-    }
-}
+// Flatten the module hierarchy involving types. They're only separated to improve code
+// organization.
+pub use types::*;
 
-pub struct Nonce(String);
-impl Nonce {
-    pub fn new(s: &str) -> Self {
-        Nonce(s.to_string())
-    }
-}
+mod http;
 
-pub struct LoginHint(String);
 
-pub struct OpenIdConnectClient<
+const ACCEPT_JSON: (&str, &str) = ("Accept", CONTENT_TYPE_JSON);
+const CONFIG_URL_SUFFIX: &str = ".well-known/openid-configuration";
+const CONTENT_TYPE_JSON: &str = "application/json";
+const OPENID_SCOPE: &str = "openid";
+
+
+pub struct Client<
     TT: TokenType,
-    T: Token<TT>,
+    T: oauth2::Token<TT>,
     TE: ErrorResponseType,
-    ID: OpenIdConnectIdToken
+    ID: IdToken
 >(
-    Client<TT, T, TE>,
+    oauth2::Client<TT, T, TE>,
     PhantomData<ID>,
 );
 
-impl<TT, T, TE, ID> OpenIdConnectClient<TT, T, TE, ID>
-where TT: TokenType, T: Token<TT>, TE: ErrorResponseType, ID: OpenIdConnectIdToken {
-    pub fn new<I, S, A, U>(
-        client_id: I, client_secret: Option<S>, auth_url: A, token_url: U
-    ) -> Result<OpenIdConnectClient<TT, T, TE, ID>, url::ParseError>
-    where I: Into<String>, S: Into<String>, A: AsRef<str>, U: AsRef<str> {
+impl<TT, T, TE, ID> Client<TT, T, TE, ID>
+where TT: TokenType, T: oauth2::Token<TT>, TE: ErrorResponseType, ID: IdToken {
+    pub fn new(
+        client_id: ClientId,
+        client_secret: Option<ClientSecret>,
+        auth_url: AuthUrl,
+        token_url: TokenUrl
+    ) -> Client<TT, T, TE, ID> {
         let client =
-            Client::new(client_id, client_secret, auth_url, token_url)?
-                .add_scope("openid");
-        Ok(OpenIdConnectClient(client, PhantomData))
+            oauth2::Client::new(client_id, client_secret, auth_url, token_url)
+                .add_scope(Scope::new(OPENID_SCOPE.to_string()));
+        Client(client, PhantomData)
+    }
+
+    pub fn discover(
+        client_id: ClientId,
+        client_secret: Option<ClientSecret>,
+        issuer_url: IssuerUrl
+    ) -> Result<()/*Client<TT, T, TE, ID>*/, DiscoveryError> {
+        let discover_url =
+            issuer_url
+                .join(CONFIG_URL_SUFFIX)
+                .map_err(DiscoveryError::UrlParse)?;
+        let discover_response =
+            HttpRequest {
+                url: discover_url,
+                method: HttpRequestMethod::Get,
+                headers: vec![ACCEPT_JSON],
+                post_body: vec![],
+            }
+            .request()
+            .map_err(DiscoveryError::Request)?;
+
+        discover_response
+            .check_content_type(CONTENT_TYPE_JSON)
+            .map_err(DiscoveryError::Other)?;
+
+        Ok(())
     }
 
     ///
     /// Appends a new scope to the authorization URL.
     ///
-    // FIXME: change to a Scope newtype in oauth2
-    pub fn add_scope(mut self, scope: &str) -> Self {
+    pub fn add_scope(mut self, scope: Scope) -> Self {
         self.0 = self.0.add_scope(scope);
         self
     }
@@ -144,32 +146,30 @@ where TT: TokenType, T: Token<TT>, TE: ErrorResponseType, ID: OpenIdConnectIdTok
     ///
     /// Sets the the redirect URL used by the authorization endpoint.
     ///
-    // FIXME: change to a RedirectUrl newtype in auth2, which should convert to a valid URL type
-    // while instantiating the RedirectUrl
-    pub fn set_redirect_url(mut self, redirect_url: &str) -> Self {
+    pub fn set_redirect_url(mut self, redirect_url: RedirectUrl) -> Self {
         self.0 = self.0.set_redirect_url(redirect_url);
         self
     }
 
     pub fn authorize_url<D, P>(
         &self,
-        auth_options: &OpenIdConnectAuthOptions<D, P>,
+        auth_options: &AuthOptions<D, P>,
         state: &CsrfToken,
         nonce: &Nonce
     ) -> Url
-    where D: OpenIdConnectAuthDisplay, P: OpenIdConnectAuthPrompt {
+    where D: AuthDisplay, P: AuthPrompt {
         self.authorize_url_with_hint(auth_options, state, nonce, None, None)
     }
 
     pub fn authorize_url_with_hint<D, P>(
         &self,
-        auth_options: &OpenIdConnectAuthOptions<D, P>,
+        auth_options: &AuthOptions<D, P>,
         state: &CsrfToken,
         nonce: &Nonce,
         id_token_hint_opt: Option<&ID>,
         login_hint_opt: Option<&LoginHint>,
     ) -> Url
-    where D: OpenIdConnectAuthDisplay, P: OpenIdConnectAuthPrompt {
+    where D: AuthDisplay, P: AuthPrompt {
         // Create string versions of any options that need to be converted. This must be done
         // before creating extra_params so that the lifetimes extend beyond extra_params's lifetime.
         let id_token_hint_raw_opt = id_token_hint_opt.map(|id_token_hint| id_token_hint.raw());
@@ -179,11 +179,11 @@ where TT: TokenType, T: Token<TT>, TE: ErrorResponseType, ID: OpenIdConnectIdTok
         let acr_values_opt = join_optional_vec(auth_options.acr_values());
 
         let mut extra_params: Vec<(&str, &str)> = vec![
-            ("state", &state.0),
-            ("nonce", &nonce.0),
+            ("state", state.secret()),
+            ("nonce", nonce.secret()),
         ];
 
-        if let &Some(ref display) = auth_options.display() {
+        if let Some(display) = auth_options.display() {
             extra_params.push(("display", display.to_str()));
         }
 
@@ -199,19 +199,19 @@ where TT: TokenType, T: Token<TT>, TE: ErrorResponseType, ID: OpenIdConnectIdTok
             extra_params.push(("ui_locales", ui_locales));
         }
 
-        if let Some(ref id_token_hint_raw) = id_token_hint_raw_opt {
+        if let Some(id_token_hint_raw) = id_token_hint_raw_opt {
             extra_params.push(("id_token_hint", id_token_hint_raw));
         }
 
-        if let Some(ref login_hint) = login_hint_opt {
-            extra_params.push(("login_hint", &login_hint.0));
+        if let Some(login_hint) = login_hint_opt {
+            extra_params.push(("login_hint", login_hint.secret()));
         }
 
         if let Some(ref acr_values) = acr_values_opt {
             extra_params.push(("acr_values", acr_values));
         }
 
-        self.0.authorize_url_extension("code", extra_params)
+        self.0.authorize_url_extension(&core::CoreResponseType::Code.to_oauth2(), &extra_params)
     }
 }
 
@@ -225,8 +225,11 @@ where TT: TokenType, T: Token<TT>, TE: ErrorResponseType, ID: OpenIdConnectIdTok
 /// `authorize_url_with_hint`.
 ///
 // FIXME: convert to a trait?
-pub struct OpenIdConnectAuthOptions<D, P>
-where D: OpenIdConnectAuthDisplay, P: OpenIdConnectAuthPrompt {
+// FIXME: what's the rationale for this being separate from the Client interface? why do scopes
+// go in the client but these things go here? putting everything in the client seems unclean, but
+// then we should have a clear way to delineate the interfaces.
+pub struct AuthOptions<D, P>
+where D: AuthDisplay, P: AuthPrompt {
     _display: Option<D>,
     _prompts: Option<Vec<P>>,
     _max_age: Option<Duration>,
@@ -234,10 +237,10 @@ where D: OpenIdConnectAuthDisplay, P: OpenIdConnectAuthPrompt {
     _acr_values: Option<Vec<AuthenticationContextClass>>,
 }
 
-impl<D, P> OpenIdConnectAuthOptions<D, P>
-where D: OpenIdConnectAuthDisplay, P: OpenIdConnectAuthPrompt {
+impl<D, P> AuthOptions<D, P>
+where D: AuthDisplay, P: AuthPrompt {
     pub fn new() -> Self {
-        OpenIdConnectAuthOptions::<D, P> {
+        AuthOptions::<D, P> {
             _display: None,
             _prompts: None,
             _max_age: None,
@@ -250,11 +253,11 @@ where D: OpenIdConnectAuthDisplay, P: OpenIdConnectAuthPrompt {
     /// How the Authorization Server displays the authentication and/or consent user interface pages
     /// to the End-User.
     ///
-    pub fn display(&self) -> &Option<D> { &self._display }
+    pub fn display(&self) -> Option<&D> { self._display.as_ref() }
 
     ///
     /// Have the Authorization Server use the default authentication and/or consent display. This
-    /// is equivalent to `CoreOpenIdConnectAuthDisplay::Page`.
+    /// is equivalent to `CoreAuthDisplay::Page`.
     ///
     pub fn clear_display(mut self) -> Self {
         self._display = None;
@@ -272,11 +275,11 @@ where D: OpenIdConnectAuthDisplay, P: OpenIdConnectAuthPrompt {
     ///
     /// Whether the Authorization Server prompts the End-User for reauthentication and/or consent.
     ///
-    pub fn prompts(&self) -> &Option<Vec<P>> { &self._prompts }
+    pub fn prompts(&self) -> Option<&Vec<P>> { self._prompts.as_ref() }
 
     ///
     /// Have the Authorization Server choose whether to prompt the End-User for reauthentication
-    /// and/or consent. This is *not* equivalent to `CoreOpenIdConnectAuthPrompt::None`, which
+    /// and/or consent. This is *not* equivalent to `CoreAuthPrompt::None`, which
     /// forces the Authorization Server not to show any prompts.
     ///
     pub fn clear_prompts(mut self) -> Self {
@@ -287,7 +290,7 @@ where D: OpenIdConnectAuthDisplay, P: OpenIdConnectAuthPrompt {
     ///
     /// Specify a prompt that the Authorization Server should present to the End-User.
     ///
-    /// NOTE: The Authorization Server will return an error if `CoreOpenIdConnectAuthPrompt::None`
+    /// NOTE: The Authorization Server will return an error if `CoreAuthPrompt::None`
     /// is combined with any other prompts.
     ///
     pub fn add_prompt(mut self, prompt: P) -> Self {
@@ -307,7 +310,7 @@ where D: OpenIdConnectAuthDisplay, P: OpenIdConnectAuthPrompt {
     /// actively authenticated by the OP. If the elapsed time is greater than this value, the OP
     /// MUST attempt to actively re-authenticate the End-User.
     ///
-    pub fn max_age(&self) -> &Option<Duration> { &self._max_age }
+    pub fn max_age(&self) -> Option<&Duration> { self._max_age.as_ref() }
 
     ///
     /// Allow the Authorization Server to choose its own maximum authentication age.
@@ -331,7 +334,7 @@ where D: OpenIdConnectAuthDisplay, P: OpenIdConnectAuthPrompt {
     /// An error SHOULD NOT result if some or all of the requested locales are not supported by the
     /// OpenID Provider.
     ///
-    pub fn ui_locales(&self) -> &Option<Vec<LanguageTag>> { &self._ui_locales }
+    pub fn ui_locales(&self) -> Option<&Vec<LanguageTag>> { self._ui_locales.as_ref() }
 
     ///
     /// Allow the Authorization Server to choose the languages and scripts for the user interface.
@@ -366,7 +369,9 @@ where D: OpenIdConnectAuthDisplay, P: OpenIdConnectAuthPrompt {
     /// is requested as a Voluntary Claim by this parameter.
     ///
     // FIXME: update this doc to refer to the ID Token methods we use to access the ACR claim value
-    pub fn acr_values(&self) -> &Option<Vec<AuthenticationContextClass>> { &self._acr_values }
+    pub fn acr_values(&self) -> Option<&Vec<AuthenticationContextClass>> {
+        self._acr_values.as_ref()
+    }
 
     ///
     /// Do not request any Authentication Context Class Reference claims from the Authorization
@@ -396,7 +401,7 @@ where D: OpenIdConnectAuthDisplay, P: OpenIdConnectAuthPrompt {
     // specification.
 }
 
-pub trait OpenIdConnectIdToken : Debug + DeserializeOwned + PartialEq + Serialize {
+pub trait IdToken : Debug + DeserializeOwned + PartialEq + Serialize {
     fn raw(&self) -> &str;
 }
 
@@ -408,177 +413,34 @@ pub trait OpenIdConnectIdToken : Debug + DeserializeOwned + PartialEq + Serializ
 /// The fields are private and should be accessed via the getters.
 ///
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
-pub struct OpenIdConnectToken {
+pub struct Token {
     #[serde(flatten)]
     _basic_token: BasicToken<BasicTokenType>,
     // FIXME: this should probably be something else
     _id_token: String
 }
 
-impl Token<BasicTokenType> for OpenIdConnectToken {
-    fn access_token(&self) -> &str { &self._basic_token.access_token() }
-    fn token_type(&self) -> &BasicTokenType { &self._basic_token.token_type() }
+impl oauth2::Token<BasicTokenType> for Token {
+    fn access_token(&self) -> &AccessToken { self._basic_token.access_token() }
+    fn token_type(&self) -> &BasicTokenType { self._basic_token.token_type() }
     fn expires_in(&self) -> Option<Duration> { self._basic_token.expires_in() }
-    fn refresh_token(&self) -> &Option<String> { &self._basic_token.refresh_token() }
-    fn scopes(&self) -> &Option<Vec<String>> { &self._basic_token.scopes() }
+    fn refresh_token(&self) -> Option<&RefreshToken> { self._basic_token.refresh_token() }
+    fn scopes(&self) -> Option<&Vec<Scope>> { self._basic_token.scopes() }
 
     fn from_json(data: &str) -> Result<Self, serde_json::error::Error> {
         serde_json::from_str(data)
     }
 }
 
-pub mod core {
-    use oauth2::*;
-    use oauth2::basic::{
-        BasicClient,
-        BasicErrorResponse,
-        BasicErrorResponseType,
-        BasicRequestTokenError,
-        BasicToken,
-        BasicTokenType,
-    };
-    use super::*;
-
-    pub type CoreOpenIdConnectClient =
-        OpenIdConnectClient<
-            // FIXME: mixing these OAuth2 and OIDC types is a little messy. See if it makes sense
-            // to use type aliases to make this cleaner.
-            BasicTokenType,
-            OpenIdConnectToken,
-            BasicErrorResponseType,
-            CoreOpenIdConnectIdToken
-        >;
-
-    #[derive(Debug, Deserialize, PartialEq, Serialize)]
-    pub struct CoreOpenIdConnectIdToken {}
-    impl OpenIdConnectIdToken for CoreOpenIdConnectIdToken {
-        fn raw(&self) -> &str {
-            "blah"
-        }
-    }
-
-    ///
-    /// How the Authorization Server displays the authentication and consent user interface pages
-    /// to the End-User.
-    ///
-    /// These values are defined in
-    /// [Section 3.1.2.1](http://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
-    ///
-    #[derive(PartialEq)]
-    pub enum CoreOpenIdConnectAuthDisplay {
-        ///
-        /// The Authorization Server SHOULD display the authentication and consent UI consistent
-        /// with a full User Agent page view. If the display parameter is not specified, this is
-        /// the default display mode.
-        ///
-        Page,
-        ///
-        /// The Authorization Server SHOULD display the authentication and consent UI consistent
-        /// with a popup User Agent window. The popup User Agent window should be of an appropriate
-        /// size for a login-focused dialog and should not obscure the entire window that it is
-        /// popping up over.
-        ///
-        Popup,
-        ///
-        /// The Authorization Server SHOULD display the authentication and consent UI consistent
-        /// with a device that leverages a touch interface.
-        ///
-        Touch,
-        ///
-        /// The Authorization Server SHOULD display the authentication and consent UI consistent
-        /// with a "feature phone" type display.
-        ///
-        Wap,
-    }
-
-    impl OpenIdConnectAuthDisplay for CoreOpenIdConnectAuthDisplay {
-        fn to_str(&self) -> &str {
-            match self {
-                &CoreOpenIdConnectAuthDisplay::Page => "page",
-                &CoreOpenIdConnectAuthDisplay::Popup => "popup",
-                &CoreOpenIdConnectAuthDisplay::Touch => "touch",
-                &CoreOpenIdConnectAuthDisplay::Wap => "wap",
-            }
-        }
-    }
-
-    impl Display for CoreOpenIdConnectAuthDisplay {
-        fn fmt(&self, f: &mut Formatter) -> Result<(), FormatterError> {
-            write!(f, "{}", self.to_str())
-        }
-    }
-
-    ///
-    /// Whether the Authorization Server should prompt the End-User for reauthentication and
-    /// consent.
-    ///
-    /// These values are defined in
-    /// [Section 3.1.2.1](http://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
-    ///
-    #[derive(PartialEq)]
-    pub enum CoreOpenIdConnectAuthPrompt {
-        ///
-        /// The Authorization Server MUST NOT display any authentication or consent user interface
-        /// pages. An error is returned if an End-User is not already authenticated or the Client
-        /// does not have pre-configured consent for the requested Claims or does not fulfill other
-        /// conditions for processing the request. The error code will typically be
-        /// `login_required,` `interaction_required`, or another code defined in
-        /// [Section 3.1.2.6](http://openid.net/specs/openid-connect-core-1_0.html#AuthError).
-        /// This can be used as a method to check for existing authentication and/or consent.
-        ///
-        None,
-        ///
-        /// The Authorization Server SHOULD prompt the End-User for reauthentication. If it cannot
-        /// reauthenticate the End-User, it MUST return an error, typically `login_required`.
-        ///
-        Login,
-        ///
-        /// The Authorization Server SHOULD prompt the End-User for consent before returning
-        /// information to the Client. If it cannot obtain consent, it MUST return an error,
-        /// typically `consent_required`.
-        ///
-        Consent,
-        ///
-        /// The Authorization Server SHOULD prompt the End-User to select a user account. This
-        /// enables an End-User who has multiple accounts at the Authorization Server to select
-        /// amongst the multiple accounts that they might have current sessions for. If it cannot
-        /// obtain an account selection choice made by the End-User, it MUST return an error,
-        /// typically `account_selection_required`.
-        ///
-        SelectAccount,
-    }
-
-    impl OpenIdConnectAuthPrompt for CoreOpenIdConnectAuthPrompt {
-        fn to_str(&self) -> &str {
-            match self {
-                &CoreOpenIdConnectAuthPrompt::None => "none",
-                &CoreOpenIdConnectAuthPrompt::Login => "login",
-                &CoreOpenIdConnectAuthPrompt::Consent => "consent",
-                &CoreOpenIdConnectAuthPrompt::SelectAccount => "select_account",
-            }
-        }
-    }
-
-    impl Display for CoreOpenIdConnectAuthPrompt {
-        fn fmt(&self, f: &mut Formatter) -> Result<(), FormatterError> {
-            write!(f, "{}", self.to_str())
-        }
-    }
-
-    pub type CoreOpenIdConnectAuthOptions =
-        OpenIdConnectAuthOptions<CoreOpenIdConnectAuthDisplay, CoreOpenIdConnectAuthPrompt>;
-}
-
-fn join_optional_vec<X>(vec_opt: &Option<Vec<X>>) -> Option<String>
-where X: ToString {
+fn join_optional_vec<T>(vec_opt: Option<&Vec<T>>) -> Option<String> where T: AsRef<str> {
     match vec_opt {
-        &Some(ref entries) => Some(
+        Some(entries) => Some(
             entries
                 .iter()
-                .map(|entries| entries.to_string())
+                .map(|entries| entries.as_ref())
                 .collect::<Vec<_>>()
                 .join(" ")
         ),
-        &None => None,
+        None => None,
     }
 }
