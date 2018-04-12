@@ -64,12 +64,10 @@ use discovery::DiscoveryError;
 // organization.
 pub use types::*;
 
+// Internal-only module for HTTP(S) utilities.
 mod http;
 
-
-const ACCEPT_JSON: (&str, &str) = ("Accept", CONTENT_TYPE_JSON);
 const CONFIG_URL_SUFFIX: &str = ".well-known/openid-configuration";
-const CONTENT_TYPE_JSON: &str = "application/json";
 const OPENID_SCOPE: &str = "openid";
 
 
@@ -102,23 +100,6 @@ where TT: TokenType, T: oauth2::Token<TT>, TE: ErrorResponseType, ID: IdToken {
         client_secret: Option<ClientSecret>,
         issuer_url: IssuerUrl
     ) -> Result<()/*Client<TT, T, TE, ID>*/, DiscoveryError> {
-        let discover_url =
-            issuer_url
-                .join(CONFIG_URL_SUFFIX)
-                .map_err(DiscoveryError::UrlParse)?;
-        let discover_response =
-            HttpRequest {
-                url: discover_url,
-                method: HttpRequestMethod::Get,
-                headers: vec![ACCEPT_JSON],
-                post_body: vec![],
-            }
-            .request()
-            .map_err(DiscoveryError::Request)?;
-
-        discover_response
-            .check_content_type(CONTENT_TYPE_JSON)
-            .map_err(DiscoveryError::Other)?;
 
         Ok(())
     }

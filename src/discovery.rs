@@ -13,6 +13,15 @@ use oauth2::{
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
+use super::CONFIG_URL_SUFFIX;
+use super::http::{
+    ACCEPT_JSON,
+    CONTENT_TYPE_JSON,
+    HttpRequest,
+    HttpRequestMethod,
+    HttpResponse,
+    HTTP_STATUS_OK
+};
 use super::macros::TraitStructExtract;
 use super::types::{
     AuthDisplay,
@@ -37,6 +46,53 @@ use super::types::{
     SubjectIdentifierType,
     UserInfoUrl,
 };
+
+
+pub fn get_provider_metadata<PM, AD, CA, CN, CT, G, JE, JK, JS, RM, RT, S>(
+    issuer_url: IssuerUrl
+) -> Result<PM, DiscoveryError>
+where AD: AuthDisplay,
+        CA: ClientAuthMethod,
+        CN: ClaimName,
+        CT: ClaimType,
+        G: GrantType,
+        JE: JweContentEncryptionAlgorithm,
+        JK: JweKeyManagementAlgorithm,
+        JS: JwsSigningAlgorithm,
+        RM: ResponseMode,
+        RT: ResponseType,
+        S: SubjectIdentifierType,
+        PM: ProviderMetadata<AD, CA, CN, CT, G, JE, JK, JS, RM, RT, S> {
+    let discover_url =
+        issuer_url
+            .join(CONFIG_URL_SUFFIX)
+            .map_err(DiscoveryError::UrlParse)?;
+    let discover_response =
+        HttpRequest {
+            url: discover_url,
+            method: HttpRequestMethod::Get,
+            headers: vec![ACCEPT_JSON],
+            post_body: vec![],
+        }
+        .request()
+        .map_err(DiscoveryError::Request)?;
+
+    if discover_response.status_code != HTTP_STATUS_OK {
+        return Err(
+            DiscoveryError::Response(
+                discover_response.status_code,
+                format!("Unexpected HTTP status code")
+            )
+        );
+    }
+
+    discover_response
+        .check_content_type(CONTENT_TYPE_JSON)
+        .map_err(|err_msg| DiscoveryError::Response(discover_response.status_code, err_msg))?;
+
+    serde_json::from_slice::<PM>(&discover_response.body)
+        .map_err(DiscoveryError::Json)
+}
 
 trait_struct![
     trait ProviderMetadata[
@@ -211,6 +267,10 @@ pub enum DiscoveryError {
     UrlParse(url::ParseError),
     #[fail(display = "Request error: {}", _0)]
     Request(curl::Error),
+    #[fail(display = "Response error (status={}): {}", _0, _1)]
+    Response(u32, String),
+    #[fail(display = "JSON error: {}", _0)]
+    Json(serde_json::Error),
     #[fail(display = "Other error: {}", _0)]
     Other(String),
 }

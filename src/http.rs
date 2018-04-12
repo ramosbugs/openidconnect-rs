@@ -6,6 +6,9 @@ use std::io::Read;
 use curl::easy::Easy;
 use url::Url;
 
+pub const ACCEPT_JSON: (&str, &str) = ("Accept", CONTENT_TYPE_JSON);
+pub const CONTENT_TYPE_JSON: &str = "application/json";
+pub const HTTP_STATUS_OK: u32 = 200;
 
 pub struct HttpResponse {
     pub status_code: u32,
