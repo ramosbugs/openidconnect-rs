@@ -1,6 +1,7 @@
 
 extern crate oauth2;
 extern crate openidconnect;
+#[macro_use] extern crate pretty_assertions;
 extern crate serde_json;
 extern crate url;
 
