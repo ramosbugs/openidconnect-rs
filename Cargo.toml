@@ -6,10 +6,12 @@ description = "OpenID Connect library for Relying Parties"
 license = "MIT"
 
 [dependencies]
+chrono = "0.4"
 curl = "0.4"
 failure = "0.1"
 failure_derive = "0.1"
 jsonwebtoken = "4.0"
+log = "0.4"
 oauth2 = { git = "https://github.com/ramosbugs/oauth2-rs.git", branch = "stronger_types" }
 serde = "1.0"
 serde_derive = "1.0"
@@ -19,5 +21,5 @@ url = "1.0"
 [dev-dependencies]
 env_logger = "0.5"
 hyper = "0.11"
-log = "0.4"
+itertools = "0.7.8"
 pretty_assertions = "0.5"

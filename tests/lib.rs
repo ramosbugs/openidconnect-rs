@@ -162,5 +162,5 @@ fn test_grant_type_serialize() {
         );
     let serialized_ext = serde_json::to_string(&ext).unwrap();
     assert_eq!("\"urn:ietf:params:oauth:grant-type:foobar\"", serialized_ext);
-    assert_eq!(ext, serde_json::from_str(&serialized_ext).unwrap());
+    assert_eq!(ext, serde_json::from_str::<CoreGrantTypeWrapper>(&serialized_ext).unwrap());
 }

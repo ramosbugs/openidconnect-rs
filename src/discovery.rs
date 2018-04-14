@@ -16,11 +16,10 @@ use serde::de::DeserializeOwned;
 use super::CONFIG_URL_SUFFIX;
 use super::http::{
     ACCEPT_JSON,
-    CONTENT_TYPE_JSON,
     HttpRequest,
     HttpRequestMethod,
-    HttpResponse,
-    HTTP_STATUS_OK
+    HTTP_STATUS_OK,
+    MIME_TYPE_JSON,
 };
 use super::macros::TraitStructExtract;
 use super::types::{
@@ -69,29 +68,33 @@ where AD: AuthDisplay,
             .map_err(DiscoveryError::UrlParse)?;
     let discover_response =
         HttpRequest {
-            url: discover_url,
+            url: &discover_url,
             method: HttpRequestMethod::Get,
-            headers: vec![ACCEPT_JSON],
-            post_body: vec![],
+            headers: &vec![ACCEPT_JSON],
+            post_body: &vec![],
         }
         .request()
         .map_err(DiscoveryError::Request)?;
 
+    // FIXME: improve error handling (i.e., is there a body response?)
     if discover_response.status_code != HTTP_STATUS_OK {
         return Err(
             DiscoveryError::Response(
                 discover_response.status_code,
-                format!("Unexpected HTTP status code")
+                "unexpected HTTP status code".to_string()
             )
         );
     }
 
     discover_response
-        .check_content_type(CONTENT_TYPE_JSON)
+        .check_content_type(MIME_TYPE_JSON)
         .map_err(|err_msg| DiscoveryError::Response(discover_response.status_code, err_msg))?;
 
-    serde_json::from_slice::<PM>(&discover_response.body)
-        .map_err(DiscoveryError::Json)
+    let provider_metadata: PM =
+        serde_json::from_slice(&discover_response.body)
+            .map_err(DiscoveryError::Json)?;
+
+    provider_metadata.validate(&issuer_url)
 }
 
 trait_struct![
@@ -107,7 +110,25 @@ trait_struct![
         RM: ResponseMode,
         RT: ResponseType,
         S: SubjectIdentifierType,
-    ] : [Debug + DeserializeOwned + PartialEq + Serialize]
+    ] : [Debug + DeserializeOwned + PartialEq + Serialize + Sized] {
+        // consumes self so that, if validation fails, it doesn't get used
+        fn validate(self, issuer_uri: &IssuerUrl) -> Result<Self, DiscoveryError> {
+            if self.issuer() != issuer_uri {
+                return Err(
+                    DiscoveryError::Validation(
+                        format!(
+                            "unexpected issuer URI `{:?}` (expected `{:?}`); this may indicate an \
+                                OpenID Provider impersonation attack",
+                            self.issuer(),
+                            issuer_uri
+                        )
+                    )
+                )
+            }
+            Ok(self)
+        }
+    }
+    #[derive(Debug, Deserialize, PartialEq, Serialize)]
     struct Discovery10ProviderMetadata[
         AD: AuthDisplay,
         CA: ClientAuthMethod,
@@ -121,129 +142,60 @@ trait_struct![
         RT: ResponseType,
         S: SubjectIdentifierType,
     ] {
-        #[serde(rename = "issuer")]
-        issuer(&IssuerUrl)
-            <- _issuer(IssuerUrl),
-        #[serde(rename = "authorization_endpoint")]
-        authorization_endpoint(&AuthUrl)
-            <- _authorization_endpoint(AuthUrl),
-        #[serde(rename = "token_endpoint")]
-        token_endpoint(Option<&TokenUrl>)
-            <- _token_endpoint(Option<TokenUrl>),
-        #[serde(rename = "userinfo_endpoint")]
-        userinfo_endpoint(Option<&UserInfoUrl>)
-            <- _userinfo_endpoint(Option<UserInfoUrl>),
-        #[serde(rename = "jwks_uri")]
-        jwks_uri(Option<&JwkSetUrl>)
-            <- _jwks_uri(Option<JwkSetUrl>),
-        #[serde(rename = "registration_endpoint")]
-        registration_endpoint(Option<&RegistrationUrl>)
-            <- _registration_endpoint(Option<RegistrationUrl>),
-        #[serde(rename = "scopes_supported")]
-        scopes_supported(Option<&Vec<Scope>>)
-            <- _scopes_supported(Option<Vec<Scope>>),
-        #[serde(rename = "response_types_supported")]
+        issuer(&IssuerUrl) <- IssuerUrl,
+        authorization_endpoint(&AuthUrl) <- AuthUrl,
+        token_endpoint(Option<&TokenUrl>) <- Option<TokenUrl>,
+        userinfo_endpoint(Option<&UserInfoUrl>) <- Option<UserInfoUrl>,
+        jwks_uri(Option<&JwkSetUrl>) <- Option<JwkSetUrl>,
+        registration_endpoint(Option<&RegistrationUrl>) <- Option<RegistrationUrl>,
+        scopes_supported(Option<&Vec<Scope>>) <- Option<Vec<Scope>>,
         #[serde(bound(deserialize = "RT: ResponseType"))]
-        response_types_supported(&Vec<ResponseTypes<RT>>)
-            <- _response_types_supported(Vec<ResponseTypes<RT>>),
-        #[serde(rename = "response_modes_supported")]
+        response_types_supported(&Vec<ResponseTypes<RT>>) <- Vec<ResponseTypes<RT>>,
         #[serde(bound(deserialize = "RM: ResponseMode"))]
-        response_modes_supported(Option<&Vec<RM>>)
-            <- _response_modes_supported(Option<Vec<RM>>),
-        #[serde(rename = "grant_types_supported")]
+        response_modes_supported(Option<&Vec<RM>>) <- Option<Vec<RM>>,
         #[serde(bound(deserialize = "G: GrantType"))]
-        grant_types_supported(Option<&Vec<G>>)
-            <- _grant_types_supported(Option<Vec<G>>),
-        #[serde(rename = "acr_values_supported")]
+        grant_types_supported(Option<&Vec<G>>) <- Option<Vec<G>>,
         acr_values_supported(Option<&Vec<AuthenticationContextClass>>)
-            <- _acr_values_supported(Option<Vec<AuthenticationContextClass>>),
-        #[serde(rename = "subject_types_supported")]
+            <- Option<Vec<AuthenticationContextClass>>,
         #[serde(bound(deserialize = "S: SubjectIdentifierType"))]
-        subject_types_supported(&Vec<S>)
-            <- _subject_types_supported(Vec<S>),
-        #[serde(rename = "id_token_signing_alg_values_supported")]
+        subject_types_supported(&Vec<S>) <- Vec<S>,
         #[serde(bound(deserialize = "JS: JwsSigningAlgorithm"))]
-        id_token_signing_alg_values_supported(&Vec<JS>)
-            <- _id_token_signing_alg_values_supported(Vec<JS>),
-        #[serde(rename = "id_token_encryption_alg_values_supported")]
+        id_token_signing_alg_values_supported(&Vec<JS>) <- Vec<JS>,
         #[serde(bound(deserialize = "JK: JweKeyManagementAlgorithm"))]
-        id_token_encryption_alg_values_supported(Option<&Vec<JK>>)
-            <- _id_token_encryption_alg_values_supported(Option<Vec<JK>>),
-        #[serde(rename = "id_token_encryption_enc_values_supported")]
+        id_token_encryption_alg_values_supported(Option<&Vec<JK>>) <- Option<Vec<JK>>,
         #[serde(bound(deserialize = "JE: JweContentEncryptionAlgorithm"))]
-        id_token_encryption_enc_values_supported(Option<&Vec<JE>>)
-            <- _id_token_encryption_enc_values_supported(Option<Vec<JE>>),
-        #[serde(rename = "userinfo_signing_alg_values_supported")]
+        id_token_encryption_enc_values_supported(Option<&Vec<JE>>) <- Option<Vec<JE>>,
         #[serde(bound(deserialize = "JS: JwsSigningAlgorithm"))]
-        userinfo_signing_alg_values_supported(Option<&Vec<JS>>)
-            <- _userinfo_signing_alg_values_supported(Option<Vec<JS>>),
-        #[serde(rename = "userinfo_encryption_alg_values_supported")]
+        userinfo_signing_alg_values_supported(Option<&Vec<JS>>) <- Option<Vec<JS>>,
         #[serde(bound(deserialize = "JK: JweKeyManagementAlgorithm"))]
-        userinfo_encryption_alg_values_supported(Option<&Vec<JK>>)
-            <- _userinfo_encryption_alg_values_supported(Option<Vec<JK>>),
-        #[serde(rename = "userinfo_encryption_enc_values_supported")]
+        userinfo_encryption_alg_values_supported(Option<&Vec<JK>>) <- Option<Vec<JK>>,
         #[serde(bound(deserialize = "JE: JweContentEncryptionAlgorithm"))]
-        userinfo_encryption_enc_values_supported(Option<&Vec<JE>>)
-            <- _userinfo_encryption_enc_values_supported(Option<Vec<JE>>),
-        #[serde(rename = "request_object_signing_alg_values_supported")]
+        userinfo_encryption_enc_values_supported(Option<&Vec<JE>>) <- Option<Vec<JE>>,
         #[serde(bound(deserialize = "JS: JwsSigningAlgorithm"))]
-        request_object_signing_alg_values_supported(Option<&Vec<JS>>)
-            <- _request_object_signing_alg_values_supported(Option<Vec<JS>>),
-        #[serde(rename = "request_object_encryption_alg_values_supported")]
+        request_object_signing_alg_values_supported(Option<&Vec<JS>>) <- Option<Vec<JS>>,
         #[serde(bound(deserialize = "JK: JweKeyManagementAlgorithm"))]
-        request_object_encryption_alg_values_supported(Option<&Vec<JK>>)
-            <- _request_object_encryption_alg_values_supported(Option<Vec<JK>>),
-        #[serde(rename = "request_object_encryption_enc_values_supported")]
+        request_object_encryption_alg_values_supported(Option<&Vec<JK>>) <- Option<Vec<JK>>,
         #[serde(bound(deserialize = "JE: JweContentEncryptionAlgorithm"))]
-        request_object_encryption_enc_values_supported(Option<&Vec<JE>>)
-            <- _request_object_encryption_enc_values_supported(Option<Vec<JE>>),
-        #[serde(rename = "token_endpoint_auth_methods_supported")]
+        request_object_encryption_enc_values_supported(Option<&Vec<JE>>) <- Option<Vec<JE>>,
         #[serde(bound(deserialize = "CA: ClientAuthMethod"))]
-        token_endpoint_auth_methods_supported(Option<&Vec<CA>>)
-            <- _token_endpoint_auth_methods_supported(Option<Vec<CA>>),
-        #[serde(rename = "token_endpoint_auth_signing_alg_values_supported")]
+        token_endpoint_auth_methods_supported(Option<&Vec<CA>>) <- Option<Vec<CA>>,
         #[serde(bound(deserialize = "JS: JwsSigningAlgorithm"))]
-        token_endpoint_auth_signing_alg_values_supported(Option<&Vec<JS>>)
-            <- _token_endpoint_auth_signing_alg_values_supported(Option<Vec<JS>>),
-        #[serde(rename = "display_values_supported")]
+        token_endpoint_auth_signing_alg_values_supported(Option<&Vec<JS>>) <- Option<Vec<JS>>,
         #[serde(bound(deserialize = "AD: AuthDisplay"))]
-        display_values_supported(Option<&Vec<AD>>)
-            <- _display_values_supported(Option<Vec<AD>>),
-        #[serde(rename = "claim_types_supported")]
+        display_values_supported(Option<&Vec<AD>>) <- Option<Vec<AD>>,
         #[serde(bound(deserialize = "CT: ClaimType"))]
-        claim_types_supported(Option<&Vec<CT>>)
-            <- _claim_types_supported(Option<Vec<CT>>),
-        #[serde(rename = "claims_supported")]
+        claim_types_supported(Option<&Vec<CT>>) <- Option<Vec<CT>>,
         #[serde(bound(deserialize = "CN: ClaimName"))]
-        claims_supported(Option<&Vec<CN>>)
-            <- _claims_supported(Option<Vec<CN>>),
-        #[serde(rename = "service_documentation")]
-        service_documentation(Option<&ServiceDocUrl>)
-            <- _service_documentation(Option<ServiceDocUrl>),
-        #[serde(rename = "claims_locales_supported")]
-        claims_locales_supported(Option<&Vec<LanguageTag>>)
-            <- _claims_locales_supported(Option<Vec<LanguageTag>>),
-        #[serde(rename = "ui_locales_supported")]
-        ui_locales_supported(Option<&Vec<LanguageTag>>)
-            <- _ui_locales_supported(Option<Vec<LanguageTag>>),
-        #[serde(rename = "claims_parameter_supported")]
-        claims_parameter_supported(Option<bool>)
-            <- _claims_parameter_supported(Option<bool>),
-        #[serde(rename = "request_parameter_supported")]
-        request_parameter_supported(Option<bool>)
-            <- _request_parameter_supported(Option<bool>),
-        #[serde(rename = "request_uri_parameter_supported")]
-        request_uri_parameter_supported(Option<bool>)
-            <- _request_uri_parameter_supported(Option<bool>),
-        #[serde(rename = "require_request_uri_registration")]
-        require_request_uri_registration(Option<bool>)
-            <- _require_request_uri_registration(Option<bool>),
-        #[serde(rename = "op_policy_uri")]
-        op_policy_uri(Option<&OpPolicyUrl>)
-            <- _op_policy_uri(Option<OpPolicyUrl>),
-        #[serde(rename = "op_tos_uri")]
-        op_tos_uri(Option<&OpTosUrl>)
-            <- _op_tos_uri(Option<OpTosUrl>),
+        claims_supported(Option<&Vec<CN>>) <- Option<Vec<CN>>,
+        service_documentation(Option<&ServiceDocUrl>) <- Option<ServiceDocUrl>,
+        claims_locales_supported(Option<&Vec<LanguageTag>>) <- Option<Vec<LanguageTag>>,
+        ui_locales_supported(Option<&Vec<LanguageTag>>) <- Option<Vec<LanguageTag>>,
+        claims_parameter_supported(Option<bool>) <- Option<bool>,
+        request_parameter_supported(Option<bool>) <- Option<bool>,
+        request_uri_parameter_supported(Option<bool>) <- Option<bool>,
+        require_request_uri_registration(Option<bool>) <- Option<bool>,
+        op_policy_uri(Option<&OpPolicyUrl>) <- Option<OpPolicyUrl>,
+        op_tos_uri(Option<&OpTosUrl>) <- Option<OpTosUrl>,
     }
     impl [
         AD: AuthDisplay,
@@ -271,6 +223,8 @@ pub enum DiscoveryError {
     Response(u32, String),
     #[fail(display = "JSON error: {}", _0)]
     Json(serde_json::Error),
+    #[fail(display = "Validation error: {}", _0)]
+    Validation(String),
     #[fail(display = "Other error: {}", _0)]
     Other(String),
 }

@@ -2,7 +2,7 @@
 use std::fmt::{Display, Error as FormatterError, Formatter};
 use std::ops::Deref;
 
-use oauth2;
+use oauth2::{ErrorResponseType, ResponseType as OAuth2ResponseType};
 use oauth2::basic::{
     BasicClient,
     BasicErrorResponse,
@@ -18,6 +18,7 @@ use serde::de::Error;
 use serde_json::{from_value, Value};
 
 use super::{
+    ApplicationType,
     AuthDisplay,
     AuthOptions,
     AuthPrompt,
@@ -29,6 +30,7 @@ use super::{
     IdToken,
     JweContentEncryptionAlgorithm,
     JweKeyManagementAlgorithm,
+    JwkSet,
     JwsSigningAlgorithm,
     ResponseMode,
     ResponseType,
@@ -36,7 +38,12 @@ use super::{
     Token,
 };
 use super::discovery::Discovery10ProviderMetadata;
-
+use super::registration::{
+    RegisterErrorResponseType,
+    Registration10ClientMetadata,
+    Registration10ClientRegistrationRequest,
+    Registration10ClientRegistrationResponse
+};
 
 pub type CoreClient =
     Client<
@@ -48,6 +55,7 @@ pub type CoreClient =
         CoreIdToken
     >;
 
+// FIXME: remove Discovery10
 pub type CoreDiscovery10ProviderMetadata =
     Discovery10ProviderMetadata<
         CoreAuthDisplay,
@@ -63,7 +71,53 @@ pub type CoreDiscovery10ProviderMetadata =
         CoreSubjectIdentifierType
     >;
 
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+// FIXME: remove Registration10
+pub type CoreRegistration10ClientMetadata =
+    Registration10ClientMetadata<
+        CoreApplicationType,
+        CoreClientAuthMethod,
+        CoreGrantTypeWrapper,
+        CoreJweContentEncryptionAlgorithm,
+        CoreJweKeyManagementAlgorithm,
+        CoreJwsSigningAlgorithm,
+        CoreJwkSet,
+        CoreResponseType,
+        CoreSubjectIdentifierType
+    >;
+
+// FIXME: remove Registration10
+pub type CoreRegistration10ClientRegistrationRequest =
+    Registration10ClientRegistrationRequest<
+        CoreApplicationType,
+        CoreClientAuthMethod,
+        CoreRegistration10ClientRegistrationResponse,
+        CoreRegisterErrorResponseType,
+        CoreGrantTypeWrapper,
+        CoreJweContentEncryptionAlgorithm,
+        CoreJweKeyManagementAlgorithm,
+        CoreJwsSigningAlgorithm,
+        CoreJwkSet,
+        CoreResponseType,
+        CoreSubjectIdentifierType
+    >;
+
+// FIXME: remove Registration10
+pub type CoreRegistration10ClientRegistrationResponse =
+    Registration10ClientRegistrationResponse<
+        CoreApplicationType,
+        CoreClientAuthMethod,
+        CoreRegistration10ClientMetadata,
+        CoreGrantTypeWrapper,
+        CoreJweContentEncryptionAlgorithm,
+        CoreJweKeyManagementAlgorithm,
+        CoreJwsSigningAlgorithm,
+        CoreJwkSet,
+        CoreResponseType,
+        CoreSubjectIdentifierType
+    >;
+
+
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CoreIdToken {}
 impl IdToken for CoreIdToken {
     fn raw(&self) -> &str {
@@ -73,13 +127,37 @@ impl IdToken for CoreIdToken {
 }
 
 ///
+/// Kind of client application.
+///
+/// These values are defined in
+/// [Section 2 of OpenID Connect Dynamic Client Registration 1.0](
+///     http://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata).
+///
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CoreApplicationType {
+    ///
+    /// Native Clients MUST only register `redirect_uri`s using custom URI schemes or URLs using
+    /// the `http` scheme with `localhost` as the hostname. Authorization Servers MAY place
+    /// additional constraints on Native Clients.
+    ///
+    Native,
+    ///
+    /// Web Clients using the OAuth Implicit Grant Type MUST only register URLs using the `https`
+    /// scheme as `redirect_uri`s; they MUST NOT use `localhost` as the hostname.
+    ///
+    Web,
+}
+impl ApplicationType for CoreApplicationType {}
+
+///
 /// How the Authorization Server displays the authentication and consent user interface pages
 /// to the End-User.
 ///
 /// These values are defined in
 /// [Section 3.1.2.1](http://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
 ///
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoreAuthDisplay {
     ///
@@ -131,7 +209,7 @@ impl Display for CoreAuthDisplay {
 /// These values are defined in
 /// [Section 3.1.2.1](http://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
 ///
-#[derive(PartialEq)]
+#[derive(Eq, PartialEq)]
 pub enum CoreAuthPrompt {
     ///
     /// The Authorization Server MUST NOT display any authentication or consent user interface
@@ -187,7 +265,7 @@ impl Display for CoreAuthPrompt {
 pub type CoreAuthOptions = AuthOptions<CoreAuthDisplay, CoreAuthPrompt>;
 
 new_type![
-    #[derive(Deserialize, Serialize)]
+    #[derive(Deserialize, Eq, Serialize)]
     CoreClaimName(String)
 ];
 impl ClaimName for CoreClaimName {}
@@ -198,7 +276,7 @@ impl ClaimName for CoreClaimName {}
 /// See [Section 5.6](http://openid.net/specs/openid-connect-core-1_0.html#ClaimTypes) for
 /// further information.
 ///
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoreClaimType {
     ///
@@ -225,7 +303,7 @@ pub enum CoreClaimType {
 }
 impl ClaimType for CoreClaimType {}
 
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoreClientAuthMethod {
     ClientSecretPost,
@@ -238,7 +316,7 @@ impl ClientAuthMethod for CoreClientAuthMethod {}
 // This `enum` intentionally does not implement the `GrantType` trait. Instead, the
 // `CoreGrantTypeWrapper` type should be used to ensure proper serialization/deserialization
 // of extensions.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoreGrantType {
     AuthorizationCode,
@@ -255,9 +333,14 @@ impl From<CoreGrantTypeWrapper> for CoreGrantType {
         grant_type_wrapper.0
     }
 }
+impl PartialEq<CoreGrantTypeWrapper> for CoreGrantType {
+    fn eq(&self, rhs: &CoreGrantTypeWrapper) -> bool {
+        *self == rhs.0
+    }
+}
 
 new_type![
-    #[derive(Deserialize, Serialize)]
+    #[derive(Deserialize, Eq, Serialize)]
     CoreGrantTypeWrapper(
         #[serde(
             deserialize_with = "deserialize_core_grant_type_impl",
@@ -270,6 +353,11 @@ impl GrantType for CoreGrantTypeWrapper {}
 impl From<CoreGrantType> for CoreGrantTypeWrapper {
     fn from(grant_type: CoreGrantType) -> Self {
         CoreGrantTypeWrapper(grant_type)
+    }
+}
+impl PartialEq<CoreGrantType> for CoreGrantTypeWrapper {
+    fn eq(&self, rhs: &CoreGrantType) -> bool {
+        self.0 == *rhs
     }
 }
 
@@ -295,7 +383,7 @@ pub fn serialize_core_grant_type_impl<S>(
 where S: Serializer {
     match *grant_type {
         CoreGrantType::Extension(ref extension) => serializer.serialize_str(extension),
-        _ => grant_type.serialize(serializer)
+        ref variant => variant_name(variant).serialize(serializer)
     }
 }
 
@@ -306,7 +394,7 @@ where S: Serializer {
 /// The values are described in
 /// [Section 5.1 of RFC 7518](https://tools.ietf.org/html/rfc7518#section-5.1).
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum CoreJweContentEncryptionAlgorithm {
     ///
     /// AES-128 CBC HMAC SHA-256 authenticated encryption.
@@ -349,7 +437,7 @@ impl JweContentEncryptionAlgorithm for CoreJweContentEncryptionAlgorithm {}
 /// to use key agreement to agree upon the CEK. The values are described in
 /// [Section 4.1 of RFC 7518](https://tools.ietf.org/html/rfc7518#section-4.1).
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum CoreJweKeyManagementAlgorithm {
     ///
     /// RSAES-PKCS1-V1_5.
@@ -439,6 +527,11 @@ pub enum CoreJweKeyManagementAlgorithm {
 }
 impl JweKeyManagementAlgorithm for CoreJweKeyManagementAlgorithm {}
 
+// FIXME: implement
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct CoreJwkSet {}
+impl JwkSet for CoreJwkSet {}
+
 ///
 /// Core JWS signing algorithms.
 ///
@@ -447,7 +540,7 @@ impl JweKeyManagementAlgorithm for CoreJweKeyManagementAlgorithm {}
 /// the JWS Payload. The values are described in
 /// [Section 3.1 of RFC 7518](https://tools.ietf.org/html/rfc7518#section-3.1).
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum CoreJwsSigningAlgorithm {
     ///
     /// HMAC using SHA-256.
@@ -525,6 +618,29 @@ pub enum CoreJwsSigningAlgorithm {
 }
 impl JwsSigningAlgorithm for CoreJwsSigningAlgorithm {}
 
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CoreRegisterErrorResponseType {
+    ///
+    /// The value of one or more `redirect_uri`s is invalid.
+    ///
+    InvalidRedirectUri,
+    ///
+    /// The value of one of the Client Metadata fields is invalid and the server has rejected this
+    /// request. Note that an Authorization Server MAY choose to substitute a valid value for any
+    /// requested parameter of a Client's Metadata.
+    ///
+    InvalidClientMetadata,
+}
+impl ErrorResponseType for CoreRegisterErrorResponseType {}
+impl RegisterErrorResponseType for CoreRegisterErrorResponseType {}
+impl Display for CoreRegisterErrorResponseType {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), FormatterError> {
+        write!(f, "{}", variant_name(self))
+    }
+}
+
+
 ///
 /// Informs the Authorization Server of the mechanism to be used for returning Authorization
 /// Response parameters from the Authorization Endpoint.
@@ -537,7 +653,7 @@ impl JwsSigningAlgorithm for CoreJwsSigningAlgorithm {}
 /// and [OAuth 2.0 Form Post Response Mode](
 ///     http://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html#FormPostResponseMode).
 ///
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoreResponseMode {
     ///
@@ -580,7 +696,7 @@ impl ResponseMode for CoreResponseMode {}
 /// This type represents a single Response Type. Multiple Response Types are represented via the
 /// `ResponseTypes` type, which wraps a `Vec<ResponseType>`.
 ///
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoreResponseType {
     ///
@@ -613,8 +729,8 @@ pub enum CoreResponseType {
     Token,
 }
 impl ResponseType for CoreResponseType {
-    fn to_oauth2(&self) -> oauth2::ResponseType {
-        oauth2::ResponseType::new(self.as_ref().to_string())
+    fn to_oauth2(&self) -> OAuth2ResponseType {
+        OAuth2ResponseType::new(self.as_ref().to_string())
     }
 }
 impl AsRef<str> for CoreResponseType {
@@ -628,7 +744,7 @@ impl AsRef<str> for CoreResponseType {
 /// See [Section 8](http://openid.net/specs/openid-connect-core-1_0.html#SubjectIDTypes) for
 /// further information.
 ///
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoreSubjectIdentifierType {
     ///

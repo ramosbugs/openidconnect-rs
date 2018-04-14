@@ -4,12 +4,24 @@ extern crate curl;
 use std::io::Read;
 
 use curl::easy::Easy;
+use oauth2::AccessToken;
+use oauth2::prelude::*;
 use url::Url;
 
-pub const ACCEPT_JSON: (&str, &str) = ("Accept", CONTENT_TYPE_JSON);
-pub const CONTENT_TYPE_JSON: &str = "application/json";
-pub const HTTP_STATUS_OK: u32 = 200;
+pub const MIME_TYPE_JSON: &str = "application/json";
 
+// Request headers
+pub const ACCEPT_JSON: (&str, &str) = ("Accept", MIME_TYPE_JSON);
+pub const AUTHORIZATION: &str = "Authorization";
+pub const BEARER: &str = "Bearer";
+pub const CONTENT_TYPE_JSON: (&str, &str) = ("Content-Type", MIME_TYPE_JSON);
+
+// Response status codes
+pub const HTTP_STATUS_OK: u32 = 200;
+pub const HTTP_STATUS_CREATED: u32 = 201;
+pub const HTTP_STATUS_BAD_REQUEST: u32 = 400;
+
+#[derive(Debug)]
 pub struct HttpResponse {
     pub status_code: u32,
     pub content_type: Option<String>,
@@ -36,6 +48,7 @@ impl HttpResponse {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub enum HttpRequestMethod {
     Get,
     Post,
@@ -44,25 +57,40 @@ impl Default for HttpRequestMethod {
     fn default() -> HttpRequestMethod { HttpRequestMethod::Get }
 }
 
+pub fn auth_bearer(access_token: &AccessToken) -> (&str, String) {
+    (AUTHORIZATION,
+     format!("{} {}", BEARER, access_token.secret()))
+}
+
+#[derive(Debug)]
 pub struct HttpRequest<'a> {
-    pub url: Url,
+    pub url: &'a Url,
     pub method: HttpRequestMethod,
-    pub headers: Vec<(&'a str, &'a str)>,
-    pub post_body: Vec<u8>,
+    pub headers: &'a Vec<(&'a str, &'a str)>,
+    pub post_body: &'a Vec<u8>,
 }
 impl<'a> HttpRequest<'a> {
     pub fn request(self) -> Result<HttpResponse, curl::Error> {
         let mut easy = Easy::new();
         easy.url(&self.url.to_string()[..])?;
         match self.method {
-            HttpRequestMethod::Get => {},
+            HttpRequestMethod::Get => {
+                // FIXME: remove
+                trace!("GET {:?}", self.url);
+            },
             HttpRequestMethod::Post => {
+                // FIXME: remove
+                trace!("POST {:?}", self.url);
                 easy.post(true)?;
-                easy.post_field_size(self.post_body.len() as u64)?
+                easy.post_field_size(self.post_body.len() as u64)?;
+                // FIXME: remove
+                trace!("Body: {}", String::from_utf8(self.post_body.to_vec()).unwrap());
             },
         }
 
         if !self.headers.is_empty() {
+            // FIXME: remove
+            trace!("Headers: {:?}", self.headers);
             let mut headers = curl::easy::List::new();
             self.headers
                 .iter()
@@ -96,6 +124,12 @@ impl<'a> HttpRequest<'a> {
                 content_type: easy.content_type()?.map(|s| s.to_lowercase().to_string()),
                 body: response_body,
             };
+        // FIXME: remove
+        trace!(
+            "Response: status_code={}, content_type=`{:?}`, body=`{}`",
+            response.status_code,
+            response.content_type,
+            String::from_utf8(response.body.to_vec()).unwrap());
         Ok(response)
     }
 }

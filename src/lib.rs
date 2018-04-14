@@ -1,12 +1,18 @@
 // FIXME: uncomment
 //#![warn(missing_docs)]
+
+// FIXME: remove
+#![feature(trace_macros)]
+
 //!
 //! [OpenID Connect](http://openid.net/specs/openid-connect-core-1_0.html) support.
 //!
 
+extern crate chrono;
 extern crate curl;
 extern crate failure;
 #[macro_use] extern crate failure_derive;
+#[macro_use] extern crate log;
 #[macro_use] extern crate oauth2;
 extern crate serde;
 #[macro_use] extern crate serde_derive;
@@ -51,11 +57,12 @@ use http::{HttpRequest, HttpRequestMethod, HttpResponse};
 use macros::TraitStructExtract;
 
 // Defined first since other modules need the macros, and definition order is significant for
-// macros.
-#[macro_use] pub mod macros;
+// macros. This module is private.
+#[macro_use] mod macros;
 
 pub mod core;
 pub mod discovery;
+pub mod registration;
 pub mod types;
 
 use discovery::DiscoveryError;
@@ -64,7 +71,7 @@ use discovery::DiscoveryError;
 // organization.
 pub use types::*;
 
-// Internal-only module for HTTP(S) utilities.
+// Private module for HTTP(S) utilities.
 mod http;
 
 const CONFIG_URL_SUFFIX: &str = ".well-known/openid-configuration";
@@ -211,22 +218,22 @@ where TT: TokenType, T: oauth2::Token<TT>, TE: ErrorResponseType, ID: IdToken {
 // then we should have a clear way to delineate the interfaces.
 pub struct AuthOptions<D, P>
 where D: AuthDisplay, P: AuthPrompt {
-    _display: Option<D>,
-    _prompts: Option<Vec<P>>,
-    _max_age: Option<Duration>,
-    _ui_locales: Option<Vec<LanguageTag>>,
-    _acr_values: Option<Vec<AuthenticationContextClass>>,
+    display: Option<D>,
+    prompts: Option<Vec<P>>,
+    max_age: Option<Duration>,
+    ui_locales: Option<Vec<LanguageTag>>,
+    acr_values: Option<Vec<AuthenticationContextClass>>,
 }
 
 impl<D, P> AuthOptions<D, P>
 where D: AuthDisplay, P: AuthPrompt {
     pub fn new() -> Self {
         AuthOptions::<D, P> {
-            _display: None,
-            _prompts: None,
-            _max_age: None,
-            _ui_locales: None,
-            _acr_values: None,
+            display: None,
+            prompts: None,
+            max_age: None,
+            ui_locales: None,
+            acr_values: None,
         }
     }
 
@@ -234,14 +241,14 @@ where D: AuthDisplay, P: AuthPrompt {
     /// How the Authorization Server displays the authentication and/or consent user interface pages
     /// to the End-User.
     ///
-    pub fn display(&self) -> Option<&D> { self._display.as_ref() }
+    pub fn display(&self) -> Option<&D> { self.display.as_ref() }
 
     ///
     /// Have the Authorization Server use the default authentication and/or consent display. This
     /// is equivalent to `CoreAuthDisplay::Page`.
     ///
     pub fn clear_display(mut self) -> Self {
-        self._display = None;
+        self.display = None;
         self
     }
 
@@ -249,14 +256,14 @@ where D: AuthDisplay, P: AuthPrompt {
     /// Set the Authorization Server authentication and/or user consent display.
     ///
     pub fn set_display(mut self, display: D) -> Self {
-        self._display = Some(display);
+        self.display = Some(display);
         self
     }
 
     ///
     /// Whether the Authorization Server prompts the End-User for reauthentication and/or consent.
     ///
-    pub fn prompts(&self) -> Option<&Vec<P>> { self._prompts.as_ref() }
+    pub fn prompts(&self) -> Option<&Vec<P>> { self.prompts.as_ref() }
 
     ///
     /// Have the Authorization Server choose whether to prompt the End-User for reauthentication
@@ -264,7 +271,7 @@ where D: AuthDisplay, P: AuthPrompt {
     /// forces the Authorization Server not to show any prompts.
     ///
     pub fn clear_prompts(mut self) -> Self {
-        self._prompts = None;
+        self.prompts = None;
         self
     }
 
@@ -275,11 +282,11 @@ where D: AuthDisplay, P: AuthPrompt {
     /// is combined with any other prompts.
     ///
     pub fn add_prompt(mut self, prompt: P) -> Self {
-        if let Some(mut prompts) = self._prompts {
+        if let Some(mut prompts) = self.prompts {
             prompts.push(prompt);
-            self._prompts = Some(prompts);
+            self.prompts = Some(prompts);
         } else {
-            self._prompts = Some(vec![prompt]);
+            self.prompts = Some(vec![prompt]);
         }
         self
     }
@@ -291,13 +298,13 @@ where D: AuthDisplay, P: AuthPrompt {
     /// actively authenticated by the OP. If the elapsed time is greater than this value, the OP
     /// MUST attempt to actively re-authenticate the End-User.
     ///
-    pub fn max_age(&self) -> Option<&Duration> { self._max_age.as_ref() }
+    pub fn max_age(&self) -> Option<&Duration> { self.max_age.as_ref() }
 
     ///
     /// Allow the Authorization Server to choose its own maximum authentication age.
     ///
     pub fn clear_max_age(mut self) -> Self {
-        self._max_age = None;
+        self.max_age = None;
         self
     }
 
@@ -305,7 +312,7 @@ where D: AuthDisplay, P: AuthPrompt {
     /// Specify the maximum authentication age. See `max_age` for further information.
     ///
     pub fn set_max_age(mut self, max_age: Duration) -> Self {
-        self._max_age = Some(max_age);
+        self.max_age = Some(max_age);
         self
     }
 
@@ -315,13 +322,13 @@ where D: AuthDisplay, P: AuthPrompt {
     /// An error SHOULD NOT result if some or all of the requested locales are not supported by the
     /// OpenID Provider.
     ///
-    pub fn ui_locales(&self) -> Option<&Vec<LanguageTag>> { self._ui_locales.as_ref() }
+    pub fn ui_locales(&self) -> Option<&Vec<LanguageTag>> { self.ui_locales.as_ref() }
 
     ///
     /// Allow the Authorization Server to choose the languages and scripts for the user interface.
     ///
     pub fn clear_ui_locales(mut self) -> Self {
-        self._ui_locales = None;
+        self.ui_locales = None;
         self
     }
 
@@ -330,11 +337,11 @@ where D: AuthDisplay, P: AuthPrompt {
     /// user interface.
     ///
     pub fn add_ui_locale(mut self, ui_locale: LanguageTag) -> Self {
-        if let Some(mut ui_locales) = self._ui_locales {
+        if let Some(mut ui_locales) = self.ui_locales {
             ui_locales.push(ui_locale);
-            self._ui_locales = Some(ui_locales);
+            self.ui_locales = Some(ui_locales);
         } else {
-            self._ui_locales = Some(vec![ui_locale]);
+            self.ui_locales = Some(vec![ui_locale]);
         }
         self
     }
@@ -351,7 +358,7 @@ where D: AuthDisplay, P: AuthPrompt {
     ///
     // FIXME: update this doc to refer to the ID Token methods we use to access the ACR claim value
     pub fn acr_values(&self) -> Option<&Vec<AuthenticationContextClass>> {
-        self._acr_values.as_ref()
+        self.acr_values.as_ref()
     }
 
     ///
@@ -359,7 +366,7 @@ where D: AuthDisplay, P: AuthPrompt {
     /// Server.
     ///
     pub fn clear_acr_values(mut self) -> Self {
-        self._acr_values = None;
+        self.acr_values = None;
         self
     }
 
@@ -368,11 +375,11 @@ where D: AuthDisplay, P: AuthPrompt {
     /// the Authorization Server.
     ///
     pub fn add_acr_value(mut self, acr_value: AuthenticationContextClass) -> Self {
-        if let Some(mut acr_values) = self._acr_values {
+        if let Some(mut acr_values) = self.acr_values {
             acr_values.push(acr_value);
-            self._acr_values = Some(acr_values);
+            self.acr_values = Some(acr_values);
         } else {
-            self._acr_values = Some(vec![acr_value]);
+            self.acr_values = Some(vec![acr_value]);
         }
         self
     }
@@ -396,17 +403,17 @@ pub trait IdToken : Debug + DeserializeOwned + PartialEq + Serialize {
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 pub struct Token {
     #[serde(flatten)]
-    _basic_token: BasicToken<BasicTokenType>,
+    basic_token: BasicToken<BasicTokenType>,
     // FIXME: this should probably be something else
-    _id_token: String
+    id_token: String
 }
 
 impl oauth2::Token<BasicTokenType> for Token {
-    fn access_token(&self) -> &AccessToken { self._basic_token.access_token() }
-    fn token_type(&self) -> &BasicTokenType { self._basic_token.token_type() }
-    fn expires_in(&self) -> Option<Duration> { self._basic_token.expires_in() }
-    fn refresh_token(&self) -> Option<&RefreshToken> { self._basic_token.refresh_token() }
-    fn scopes(&self) -> Option<&Vec<Scope>> { self._basic_token.scopes() }
+    fn access_token(&self) -> &AccessToken { self.basic_token.access_token() }
+    fn token_type(&self) -> &BasicTokenType { self.basic_token.token_type() }
+    fn expires_in(&self) -> Option<Duration> { self.basic_token.expires_in() }
+    fn refresh_token(&self) -> Option<&RefreshToken> { self.basic_token.refresh_token() }
+    fn scopes(&self) -> Option<&Vec<Scope>> { self.basic_token.scopes() }
 
     fn from_json(data: &str) -> Result<Self, serde_json::error::Error> {
         serde_json::from_str(data)
