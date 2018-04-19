@@ -214,7 +214,7 @@ fn test_discovery_deserialization() {
         ]
     }";
     
-    let provider_metadata: CoreDiscovery10ProviderMetadata =
+    let provider_metadata: CoreProviderMetadata =
         serde_json::from_str(json_response).unwrap();
 
     assert_eq!(
@@ -555,7 +555,7 @@ fn test_discovery_deserialization() {
 
     let serialized_json = serde_json::to_string(&provider_metadata).unwrap();
 
-    let redeserialized_metadata: CoreDiscovery10ProviderMetadata =
+    let redeserialized_metadata: CoreProviderMetadata =
         serde_json::from_str(&serialized_json).unwrap();
     assert_eq!(provider_metadata, redeserialized_metadata);
 }
@@ -607,7 +607,7 @@ fn test_discovery_deserialization_other_fields() {
         \"op_tos_uri\" : \"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/op_tos\"
     }";
 
-    let provider_metadata: CoreDiscovery10ProviderMetadata =
+    let provider_metadata: CoreProviderMetadata =
         serde_json::from_str(json_response).unwrap();
 
     assert_eq!(
@@ -749,7 +749,7 @@ fn test_discovery_deserialization_other_fields() {
 
     let serialized_json = serde_json::to_string(&provider_metadata).unwrap();
 
-    let redeserialized_metadata: CoreDiscovery10ProviderMetadata =
+    let redeserialized_metadata: CoreProviderMetadata =
         serde_json::from_str(&serialized_json).unwrap();
     assert_eq!(provider_metadata, redeserialized_metadata);
 }

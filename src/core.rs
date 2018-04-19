@@ -55,8 +55,7 @@ pub type CoreClient =
         CoreIdToken
     >;
 
-// FIXME: remove Discovery10
-pub type CoreDiscovery10ProviderMetadata =
+pub type CoreProviderMetadata =
     Discovery10ProviderMetadata<
         CoreAuthDisplay,
         CoreClientAuthMethod,
@@ -71,8 +70,7 @@ pub type CoreDiscovery10ProviderMetadata =
         CoreSubjectIdentifierType
     >;
 
-// FIXME: remove Registration10
-pub type CoreRegistration10ClientMetadata =
+pub type CoreClientMetadata =
     Registration10ClientMetadata<
         CoreApplicationType,
         CoreClientAuthMethod,
@@ -85,12 +83,11 @@ pub type CoreRegistration10ClientMetadata =
         CoreSubjectIdentifierType
     >;
 
-// FIXME: remove Registration10
-pub type CoreRegistration10ClientRegistrationRequest =
+pub type CoreClientRegistrationRequest =
     Registration10ClientRegistrationRequest<
         CoreApplicationType,
         CoreClientAuthMethod,
-        CoreRegistration10ClientRegistrationResponse,
+        CoreClientRegistrationResponse,
         CoreRegisterErrorResponseType,
         CoreGrantTypeWrapper,
         CoreJweContentEncryptionAlgorithm,
@@ -101,12 +98,11 @@ pub type CoreRegistration10ClientRegistrationRequest =
         CoreSubjectIdentifierType
     >;
 
-// FIXME: remove Registration10
-pub type CoreRegistration10ClientRegistrationResponse =
+pub type CoreClientRegistrationResponse =
     Registration10ClientRegistrationResponse<
         CoreApplicationType,
         CoreClientAuthMethod,
-        CoreRegistration10ClientMetadata,
+        CoreClientMetadata,
         CoreGrantTypeWrapper,
         CoreJweContentEncryptionAlgorithm,
         CoreJweKeyManagementAlgorithm,

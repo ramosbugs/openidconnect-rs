@@ -60,7 +60,7 @@ fn test_metadata_serialization() {
         \"request_uris\": [\"https://example.com/request-1\", \"https://example.com/request-2\"]
     }";
 
-    let client_metadata: CoreRegistration10ClientMetadata =
+    let client_metadata: CoreClientMetadata =
         serde_json::from_str(json_response).unwrap();
 
     assert_eq!(
@@ -225,7 +225,7 @@ fn test_metadata_serialization() {
 fn test_metadata_serialization_minimal() {
     let json_response = "{\"redirect_uris\": [\"https://example.com/redirect-1\"]}";
 
-    let client_metadata: CoreRegistration10ClientMetadata =
+    let client_metadata: CoreClientMetadata =
         serde_json::from_str(json_response).unwrap();
 
     assert_eq!(
@@ -318,7 +318,7 @@ fn test_response_serialization() {
         \"request_uris\": [\"https://example.com/request-1\", \"https://example.com/request-2\"]
     }";
 
-    let client_metadata: CoreRegistration10ClientRegistrationResponse =
+    let client_metadata: CoreClientRegistrationResponse =
         serde_json::from_str(json_response).unwrap();
 
     assert_eq!(

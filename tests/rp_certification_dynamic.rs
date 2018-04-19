@@ -57,7 +57,7 @@ fn rp_discovery_openid_configuration() {
     INIT_LOG.call_once(init_log);
 
     let _issuer_url = issuer_url(TEST_ID);
-    let provider_metadata: CoreDiscovery10ProviderMetadata =
+    let provider_metadata: CoreProviderMetadata =
         get_provider_metadata(_issuer_url.clone())
             .expect(&format!("Failed to fetch provider metadata from {:?}", _issuer_url));
 
@@ -115,12 +115,12 @@ fn rp_registration_dynamic() {
     INIT_LOG.call_once(init_log);
 
     let _issuer_url = issuer_url(TEST_ID);
-    let provider_metadata: CoreDiscovery10ProviderMetadata =
+    let provider_metadata: CoreProviderMetadata =
         get_provider_metadata(_issuer_url.clone())
             .expect(&format!("Failed to fetch provider metadata from {:?}", _issuer_url));
 
     let registration_request =
-        CoreRegistration10ClientRegistrationRequest::new(
+        CoreClientRegistrationRequest::new(
             vec![RedirectUrl::new(Url::parse("https://example.com/redirect").unwrap())]
         )
         .set_application_type(Some(CoreApplicationType::Web))
