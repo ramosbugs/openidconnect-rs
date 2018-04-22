@@ -4,6 +4,7 @@ extern crate serde;
 extern crate serde_json;
 
 use std::fmt::Debug;
+use std::marker::PhantomData;
 
 use oauth2::{
     AuthUrl,
@@ -30,9 +31,10 @@ use super::types::{
     ClaimType,
     GrantType,
     IssuerUrl,
+    JsonWebKeySetUrl,
+    JsonWebKeyType,
     JweContentEncryptionAlgorithm,
     JweKeyManagementAlgorithm,
-    JwkSetUrl,
     JwsSigningAlgorithm,
     LanguageTag,
     OpPolicyUrl,
@@ -46,9 +48,8 @@ use super::types::{
     UserInfoUrl,
 };
 
-
-pub fn get_provider_metadata<PM, AD, CA, CN, CT, G, JE, JK, JS, RM, RT, S>(
-    issuer_url: IssuerUrl
+pub fn get_provider_metadata<PM, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>(
+    issuer_url: &IssuerUrl
 ) -> Result<PM, DiscoveryError>
 where AD: AuthDisplay,
         CA: ClientAuthMethod,
@@ -57,11 +58,12 @@ where AD: AuthDisplay,
         G: GrantType,
         JE: JweContentEncryptionAlgorithm,
         JK: JweKeyManagementAlgorithm,
-        JS: JwsSigningAlgorithm,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType,
         RM: ResponseMode,
         RT: ResponseType,
         S: SubjectIdentifierType,
-        PM: ProviderMetadata<AD, CA, CN, CT, G, JE, JK, JS, RM, RT, S> {
+        PM: ProviderMetadata<AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S> {
     let discover_url =
         issuer_url
             .join(CONFIG_URL_SUFFIX)
@@ -94,9 +96,10 @@ where AD: AuthDisplay,
         serde_json::from_slice(&discover_response.body)
             .map_err(DiscoveryError::Json)?;
 
-    provider_metadata.validate(&issuer_url)
+    provider_metadata.validate(issuer_url)
 }
 
+// FIXME: switch to embedding a flattened extra_fields struct
 trait_struct![
     trait ProviderMetadata[
         AD: AuthDisplay,
@@ -106,7 +109,8 @@ trait_struct![
         G: GrantType,
         JE: JweContentEncryptionAlgorithm,
         JK: JweKeyManagementAlgorithm,
-        JS: JwsSigningAlgorithm,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType,
         RM: ResponseMode,
         RT: ResponseType,
         S: SubjectIdentifierType,
@@ -128,7 +132,7 @@ trait_struct![
             Ok(self)
         }
     }
-    #[derive(Debug, Deserialize, PartialEq, Serialize)]
+    #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
     struct Discovery10ProviderMetadata[
         AD: AuthDisplay,
         CA: ClientAuthMethod,
@@ -137,7 +141,8 @@ trait_struct![
         G: GrantType,
         JE: JweContentEncryptionAlgorithm,
         JK: JweKeyManagementAlgorithm,
-        JS: JwsSigningAlgorithm,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType,
         RM: ResponseMode,
         RT: ResponseType,
         S: SubjectIdentifierType,
@@ -146,7 +151,7 @@ trait_struct![
         authorization_endpoint(&AuthUrl) <- AuthUrl,
         token_endpoint(Option<&TokenUrl>) <- Option<TokenUrl>,
         userinfo_endpoint(Option<&UserInfoUrl>) <- Option<UserInfoUrl>,
-        jwks_uri(Option<&JwkSetUrl>) <- Option<JwkSetUrl>,
+        jwks_uri(Option<&JsonWebKeySetUrl>) <- Option<JsonWebKeySetUrl>,
         registration_endpoint(Option<&RegistrationUrl>) <- Option<RegistrationUrl>,
         scopes_supported(Option<&Vec<Scope>>) <- Option<Vec<Scope>>,
         #[serde(bound(deserialize = "RT: ResponseType"))]
@@ -159,19 +164,19 @@ trait_struct![
             <- Option<Vec<AuthenticationContextClass>>,
         #[serde(bound(deserialize = "S: SubjectIdentifierType"))]
         subject_types_supported(&Vec<S>) <- Vec<S>,
-        #[serde(bound(deserialize = "JS: JwsSigningAlgorithm"))]
+        #[serde(bound(deserialize = "JS: JwsSigningAlgorithm<JT>"))]
         id_token_signing_alg_values_supported(&Vec<JS>) <- Vec<JS>,
         #[serde(bound(deserialize = "JK: JweKeyManagementAlgorithm"))]
         id_token_encryption_alg_values_supported(Option<&Vec<JK>>) <- Option<Vec<JK>>,
         #[serde(bound(deserialize = "JE: JweContentEncryptionAlgorithm"))]
         id_token_encryption_enc_values_supported(Option<&Vec<JE>>) <- Option<Vec<JE>>,
-        #[serde(bound(deserialize = "JS: JwsSigningAlgorithm"))]
+        #[serde(bound(deserialize = "JS: JwsSigningAlgorithm<JT>"))]
         userinfo_signing_alg_values_supported(Option<&Vec<JS>>) <- Option<Vec<JS>>,
         #[serde(bound(deserialize = "JK: JweKeyManagementAlgorithm"))]
         userinfo_encryption_alg_values_supported(Option<&Vec<JK>>) <- Option<Vec<JK>>,
         #[serde(bound(deserialize = "JE: JweContentEncryptionAlgorithm"))]
         userinfo_encryption_enc_values_supported(Option<&Vec<JE>>) <- Option<Vec<JE>>,
-        #[serde(bound(deserialize = "JS: JwsSigningAlgorithm"))]
+        #[serde(bound(deserialize = "JS: JwsSigningAlgorithm<JT>"))]
         request_object_signing_alg_values_supported(Option<&Vec<JS>>) <- Option<Vec<JS>>,
         #[serde(bound(deserialize = "JK: JweKeyManagementAlgorithm"))]
         request_object_encryption_alg_values_supported(Option<&Vec<JK>>) <- Option<Vec<JK>>,
@@ -179,7 +184,7 @@ trait_struct![
         request_object_encryption_enc_values_supported(Option<&Vec<JE>>) <- Option<Vec<JE>>,
         #[serde(bound(deserialize = "CA: ClientAuthMethod"))]
         token_endpoint_auth_methods_supported(Option<&Vec<CA>>) <- Option<Vec<CA>>,
-        #[serde(bound(deserialize = "JS: JwsSigningAlgorithm"))]
+        #[serde(bound(deserialize = "JS: JwsSigningAlgorithm<JT>"))]
         token_endpoint_auth_signing_alg_values_supported(Option<&Vec<JS>>) <- Option<Vec<JS>>,
         #[serde(bound(deserialize = "AD: AuthDisplay"))]
         display_values_supported(Option<&Vec<AD>>) <- Option<Vec<AD>>,
@@ -196,6 +201,9 @@ trait_struct![
         require_request_uri_registration(Option<bool>) <- Option<bool>,
         op_policy_uri(Option<&OpPolicyUrl>) <- Option<OpPolicyUrl>,
         op_tos_uri(Option<&OpTosUrl>) <- Option<OpTosUrl>,
+        // FIXME: remove trait method
+        #[serde(skip)]
+        _phantom_jt(PhantomData<JT>) <- PhantomData<JT>,
     }
     impl [
         AD: AuthDisplay,
@@ -205,12 +213,13 @@ trait_struct![
         G: GrantType,
         JE: JweContentEncryptionAlgorithm,
         JK: JweKeyManagementAlgorithm,
-        JS: JwsSigningAlgorithm,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType,
         RM: ResponseMode,
         RT: ResponseType,
         S: SubjectIdentifierType,
-    ] trait[AD, CA, CN, CT, G, JE, JK, JS, RM, RT, S] for
-    struct[AD, CA, CN, CT, G, JE, JK, JS, RM, RT, S]
+    ] trait[AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S] for
+    struct[AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S]
 ];
 
 #[derive(Debug, Fail)]

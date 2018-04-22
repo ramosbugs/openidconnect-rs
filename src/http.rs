@@ -75,7 +75,7 @@ impl<'a> HttpRequest<'a> {
         easy.url(&self.url.to_string()[..])?;
         match self.method {
             HttpRequestMethod::Get => {
-                // FIXME: remove
+                // FIXME: make this a flag that gets passed in
                 trace!("GET {:?}", self.url);
             },
             HttpRequestMethod::Post => {

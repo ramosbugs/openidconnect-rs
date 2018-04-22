@@ -1,41 +1,52 @@
 
+extern crate jsonwebtoken;
+extern crate oauth2;
+extern crate ring;
+extern crate serde_json;
+extern crate untrusted;
+
 use std::fmt::{Display, Error as FormatterError, Formatter};
 use std::ops::Deref;
 
-use oauth2::{ErrorResponseType, ResponseType as OAuth2ResponseType};
+use oauth2::{
+    ErrorResponseType,
+    ResponseType as OAuth2ResponseType,
+};
 use oauth2::basic::{
-    BasicClient,
-    BasicErrorResponse,
     BasicErrorResponseType,
-    BasicRequestTokenError,
-    BasicToken,
     BasicTokenType,
 };
 use oauth2::helpers::variant_name;
 use oauth2::prelude::*;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use serde::de::Error;
-use serde_json::{from_value, Value};
+use ring::signature as ring_signature;
+use ring::signature::RSAParameters;
+use untrusted::Input;
 
 use super::{
     ApplicationType,
     AuthDisplay,
-    AuthOptions,
     AuthPrompt,
+    Base64UrlEncodedBytes,
     ClaimName,
     ClaimType,
     Client,
     ClientAuthMethod,
+    EmptyAdditionalClaims,
+    GenderClaim,
     GrantType,
     IdToken,
+    JsonWebKey,
+    JsonWebKeyId,
+    JsonWebKeySet,
+    JsonWebKeyType,
+    JsonWebKeyUse,
     JweContentEncryptionAlgorithm,
     JweKeyManagementAlgorithm,
-    JwkSet,
     JwsSigningAlgorithm,
     ResponseMode,
     ResponseType,
+    SignatureVerificationError,
     SubjectIdentifierType,
-    Token,
 };
 use super::discovery::Discovery10ProviderMetadata;
 use super::registration::{
@@ -49,25 +60,16 @@ pub type CoreClient =
     Client<
         // FIXME: mixing these OAuth2 and OIDC types is a little messy. See if it makes sense
         // to use type aliases to make this cleaner.
-        BasicTokenType,
-        Token,
-        BasicErrorResponseType,
-        CoreIdToken
-    >;
-
-pub type CoreProviderMetadata =
-    Discovery10ProviderMetadata<
+        EmptyAdditionalClaims,
         CoreAuthDisplay,
-        CoreClientAuthMethod,
-        CoreClaimName,
-        CoreClaimType,
-        CoreGrantTypeWrapper,
+        CoreGenderClaim,
         CoreJweContentEncryptionAlgorithm,
-        CoreJweKeyManagementAlgorithm,
         CoreJwsSigningAlgorithm,
-        CoreResponseMode,
-        CoreResponseType,
-        CoreSubjectIdentifierType
+        CoreJsonWebKeyType,
+        CoreAuthPrompt,
+// FIXME: use the right error types for the token response
+        BasicErrorResponseType,
+        BasicTokenType
     >;
 
 pub type CoreClientMetadata =
@@ -78,7 +80,9 @@ pub type CoreClientMetadata =
         CoreJweContentEncryptionAlgorithm,
         CoreJweKeyManagementAlgorithm,
         CoreJwsSigningAlgorithm,
-        CoreJwkSet,
+        CoreJsonWebKeyType,
+        CoreJsonWebKeyUse,
+        CoreJsonWebKey,
         CoreResponseType,
         CoreSubjectIdentifierType
     >;
@@ -93,7 +97,9 @@ pub type CoreClientRegistrationRequest =
         CoreJweContentEncryptionAlgorithm,
         CoreJweKeyManagementAlgorithm,
         CoreJwsSigningAlgorithm,
-        CoreJwkSet,
+        CoreJsonWebKeyType,
+        CoreJsonWebKeyUse,
+        CoreJsonWebKey,
         CoreResponseType,
         CoreSubjectIdentifierType
     >;
@@ -107,20 +113,45 @@ pub type CoreClientRegistrationResponse =
         CoreJweContentEncryptionAlgorithm,
         CoreJweKeyManagementAlgorithm,
         CoreJwsSigningAlgorithm,
-        CoreJwkSet,
+        CoreJsonWebKeyType,
+        CoreJsonWebKeyUse,
+        CoreJsonWebKey,
         CoreResponseType,
         CoreSubjectIdentifierType
     >;
 
+pub type CoreIdToken =
+    IdToken<
+        EmptyAdditionalClaims,
+        CoreGenderClaim,
+        CoreJweContentEncryptionAlgorithm,
+        CoreJwsSigningAlgorithm,
+        CoreJsonWebKeyType
+    >;
 
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct CoreIdToken {}
-impl IdToken for CoreIdToken {
-    fn raw(&self) -> &str {
-        // FIXME
-        "blah"
-    }
-}
+pub type CoreJsonWebKeySet =
+    JsonWebKeySet<
+        CoreJwsSigningAlgorithm,
+        CoreJsonWebKeyType,
+        CoreJsonWebKeyUse,
+        CoreJsonWebKey
+    >;
+
+pub type CoreProviderMetadata =
+    Discovery10ProviderMetadata<
+        CoreAuthDisplay,
+        CoreClientAuthMethod,
+        CoreClaimName,
+        CoreClaimType,
+        CoreGrantTypeWrapper,
+        CoreJweContentEncryptionAlgorithm,
+        CoreJweKeyManagementAlgorithm,
+        CoreJwsSigningAlgorithm,
+        CoreJsonWebKeyType,
+        CoreResponseMode,
+        CoreResponseType,
+        CoreSubjectIdentifierType
+    >;
 
 ///
 /// Kind of client application.
@@ -129,7 +160,7 @@ impl IdToken for CoreIdToken {
 /// [Section 2 of OpenID Connect Dynamic Client Registration 1.0](
 ///     http://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata).
 ///
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoreApplicationType {
     ///
@@ -153,7 +184,7 @@ impl ApplicationType for CoreApplicationType {}
 /// These values are defined in
 /// [Section 3.1.2.1](http://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
 ///
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoreAuthDisplay {
     ///
@@ -205,7 +236,7 @@ impl Display for CoreAuthDisplay {
 /// These values are defined in
 /// [Section 3.1.2.1](http://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
 ///
-#[derive(Eq, PartialEq)]
+#[derive(PartialEq)]
 pub enum CoreAuthPrompt {
     ///
     /// The Authorization Server MUST NOT display any authentication or consent user interface
@@ -258,10 +289,8 @@ impl Display for CoreAuthPrompt {
     }
 }
 
-pub type CoreAuthOptions = AuthOptions<CoreAuthDisplay, CoreAuthPrompt>;
-
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
     CoreClaimName(String)
 ];
 impl ClaimName for CoreClaimName {}
@@ -272,7 +301,7 @@ impl ClaimName for CoreClaimName {}
 /// See [Section 5.6](http://openid.net/specs/openid-connect-core-1_0.html#ClaimTypes) for
 /// further information.
 ///
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoreClaimType {
     ///
@@ -299,7 +328,7 @@ pub enum CoreClaimType {
 }
 impl ClaimType for CoreClaimType {}
 
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoreClientAuthMethod {
     ClientSecretPost,
@@ -309,10 +338,18 @@ pub enum CoreClientAuthMethod {
 }
 impl ClientAuthMethod for CoreClientAuthMethod {}
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CoreGenderClaim{
+    Female,
+    Male,
+}
+impl GenderClaim for CoreGenderClaim {}
+
 // This `enum` intentionally does not implement the `GrantType` trait. Instead, the
 // `CoreGrantTypeWrapper` type should be used to ensure proper serialization/deserialization
 // of extensions.
-#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoreGrantType {
     AuthorizationCode,
@@ -336,12 +373,9 @@ impl PartialEq<CoreGrantTypeWrapper> for CoreGrantType {
 }
 
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
     CoreGrantTypeWrapper(
-        #[serde(
-            deserialize_with = "deserialize_core_grant_type_impl",
-            serialize_with = "serialize_core_grant_type_impl"
-        )]
+        #[serde(with = "serde_core_grant_type")]
         CoreGrantType
     )
 ];
@@ -357,29 +391,38 @@ impl PartialEq<CoreGrantType> for CoreGrantTypeWrapper {
     }
 }
 
-pub fn deserialize_core_grant_type_impl<'de, D>(
-    deserializer: D
-) -> Result<CoreGrantType, D::Error>
-where D: Deserializer<'de> {
-    let value: Value = Deserialize::deserialize(deserializer)?;
+pub mod serde_core_grant_type {
+    use oauth2::helpers::variant_name;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde::de::Error;
+    use serde_json::{from_value, Value};
 
-    match from_value::<CoreGrantType>(value.clone()) {
-        Ok(val) => Ok(val),
-        Err(_) => {
-            let extension: String = from_value(value).map_err(D::Error::custom)?;
-            Ok(CoreGrantType::Extension(extension))
+    use super::CoreGrantType;
+
+    pub fn deserialize<'de, D>(
+        deserializer: D
+    ) -> Result<CoreGrantType, D::Error>
+    where D: Deserializer<'de> {
+        let value: Value = Deserialize::deserialize(deserializer)?;
+
+        match from_value::<CoreGrantType>(value.clone()) {
+            Ok(val) => Ok(val),
+            Err(_) => {
+                let extension: String = from_value(value).map_err(D::Error::custom)?;
+                Ok(CoreGrantType::Extension(extension))
+            }
         }
     }
-}
 
-pub fn serialize_core_grant_type_impl<S>(
-    grant_type: &CoreGrantType,
-    serializer: S
-) -> Result<S::Ok, S::Error>
-where S: Serializer {
-    match *grant_type {
-        CoreGrantType::Extension(ref extension) => serializer.serialize_str(extension),
-        ref variant => variant_name(variant).serialize(serializer)
+    pub fn serialize<S>(
+        grant_type: &CoreGrantType,
+        serializer: S
+    ) -> Result<S::Ok, S::Error>
+    where S: Serializer {
+        match *grant_type {
+            CoreGrantType::Extension(ref extension) => serializer.serialize_str(extension),
+            ref variant => variant_name(variant).serialize(serializer)
+        }
     }
 }
 
@@ -390,7 +433,7 @@ where S: Serializer {
 /// The values are described in
 /// [Section 5.1 of RFC 7518](https://tools.ietf.org/html/rfc7518#section-5.1).
 ///
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum CoreJweContentEncryptionAlgorithm {
     ///
     /// AES-128 CBC HMAC SHA-256 authenticated encryption.
@@ -433,7 +476,7 @@ impl JweContentEncryptionAlgorithm for CoreJweContentEncryptionAlgorithm {}
 /// to use key agreement to agree upon the CEK. The values are described in
 /// [Section 4.1 of RFC 7518](https://tools.ietf.org/html/rfc7518#section-4.1).
 ///
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum CoreJweKeyManagementAlgorithm {
     ///
     /// RSAES-PKCS1-V1_5.
@@ -523,10 +566,159 @@ pub enum CoreJweKeyManagementAlgorithm {
 }
 impl JweKeyManagementAlgorithm for CoreJweKeyManagementAlgorithm {}
 
-// FIXME: implement
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct CoreJwkSet {}
-impl JwkSet for CoreJwkSet {}
+// Other than the 'kty' (key type) parameter, which must be present in all JWKs, Section 4 of RFC
+// 7517 states that "member names used for representing key parameters for different keys types
+// need not be distinct." Therefore, it's possible that future or non-standard key types will supply
+// some of the following parameters but with different types, causing deserialization to fail. To
+// support such key types, we'll need to define a new impl for JsonWebKey. Deserializing the new
+// impl would probably need to involve first deserializing the raw values to access the 'kty'
+// parameter, and then deserializing the fields and types appropriate for that key type.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct CoreJsonWebKey {
+    kty: CoreJsonWebKeyType,
+    #[serde(rename = "use")]
+    use_: Option<CoreJsonWebKeyUse>,
+    kid: Option<JsonWebKeyId>,
+
+    // FIXME: if this doesn't successfully decode as base64url-encoded, make it None
+    // also FIXME: define a custom deserializer for this that takes a string, parses it as
+    // base64url, and either fails or sets it to none if that fails (check the spec)
+    n: Option<Base64UrlEncodedBytes>,
+    e: Option<Base64UrlEncodedBytes>,
+}
+impl CoreJsonWebKey {
+    fn verify_rsa_signature(
+        &self,
+        params: &RSAParameters,
+        msg: &str,
+        signature: &[u8]
+    ) -> Result<(), SignatureVerificationError> {
+        if *self.key_type() != CoreJsonWebKeyType::RSA {
+            return Err(SignatureVerificationError::InvalidKey("RSA key required".to_string()))
+        }
+
+        if let Some(n) = self.n.as_ref() {
+            if let Some(e) = self.e.as_ref() {
+                ring_signature::primitive::verify_rsa(
+                    params,
+                    (Input::from(n), Input::from(e)),
+                    Input::from(msg.as_bytes()),
+                    Input::from(signature),
+                )
+                .map_err(|_|
+                    SignatureVerificationError::CryptoError(
+                        "failed to verify signature".to_string()
+                    )
+                )
+            } else {
+                Err(
+                    SignatureVerificationError::InvalidKey("RSA exponent `e` is `None`".to_string())
+                )
+            }
+        } else {
+            Err(
+                SignatureVerificationError::InvalidKey("RSA modulus `n` is `None`".to_string())
+            )
+        }
+    }
+}
+impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse>
+for CoreJsonWebKey {
+    fn key_id(&self) -> Option<&JsonWebKeyId> { self.kid.as_ref() }
+    fn key_type(&self) -> &CoreJsonWebKeyType { &self.kty }
+    fn key_use(&self) -> Option<&CoreJsonWebKeyUse> { self.use_.as_ref() }
+
+    // FIXME: this should probably move out of Core
+    fn verify_signature(
+        &self,
+        alg: &CoreJwsSigningAlgorithm,
+        msg: &str,
+        signature: &[u8]
+    ) -> Result<(), SignatureVerificationError> {
+
+        if let Some(key_use) = self.key_use() {
+            if *key_use != CoreJsonWebKeyUse::Signature {
+                return Err(
+                    SignatureVerificationError::InvalidKey(
+                        "key not usable for digital signatures".to_string()
+                    )
+                )
+            }
+        }
+
+        // FIXME: add test cases for each of these
+        match *alg {
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256 =>
+                self.verify_rsa_signature(
+                    &ring_signature::RSA_PKCS1_2048_8192_SHA256,
+                    msg,
+                    signature
+                ),
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384 =>
+                self.verify_rsa_signature(
+                    &ring_signature::RSA_PKCS1_2048_8192_SHA384,
+                    msg,signature
+                ),
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512 =>
+                self.verify_rsa_signature(
+                    &ring_signature::RSA_PKCS1_2048_8192_SHA512,
+                    msg,
+                    signature
+                ),
+            CoreJwsSigningAlgorithm::RsaSsaPssSha256 =>
+                self.verify_rsa_signature(
+                    &ring_signature::RSA_PSS_2048_8192_SHA256,
+                    msg,
+                    signature
+                ),
+            CoreJwsSigningAlgorithm::RsaSsaPssSha384 =>
+                self.verify_rsa_signature(
+                    &ring_signature::RSA_PSS_2048_8192_SHA384,
+                    msg,
+                    signature
+                ),
+            CoreJwsSigningAlgorithm::RsaSsaPssSha512 =>
+                self.verify_rsa_signature(
+                    &ring_signature::RSA_PSS_2048_8192_SHA512,
+                    msg,
+                    signature
+                ),
+            ref other =>
+                Err(
+                    SignatureVerificationError::UnsupportedAlg(
+                        format!("unsupported signature algorithm: {}", variant_name(other))
+                    )
+                )
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub enum CoreJsonWebKeyType {
+    #[serde(rename = "EC")]
+    EllipticCurve,
+    #[serde(rename = "RSA")]
+    RSA,
+    #[serde(rename = "oct")]
+    Symmetric,
+}
+impl JsonWebKeyType for CoreJsonWebKeyType {
+    fn is_symmetric(&self) -> bool {
+        match self {
+            &CoreJsonWebKeyType::Symmetric => true,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub enum CoreJsonWebKeyUse {
+    #[serde(rename = "sig")]
+    Signature,
+    #[serde(rename = "enc")]
+    Encryption,
+}
+impl JsonWebKeyUse for CoreJsonWebKeyUse {}
 
 ///
 /// Core JWS signing algorithms.
@@ -536,20 +728,20 @@ impl JwkSet for CoreJwkSet {}
 /// the JWS Payload. The values are described in
 /// [Section 3.1 of RFC 7518](https://tools.ietf.org/html/rfc7518#section-3.1).
 ///
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum CoreJwsSigningAlgorithm {
     ///
-    /// HMAC using SHA-256.
+    /// HMAC using SHA-256 (currently unsupported).
     ///
     #[serde(rename = "HS256")]
     HmacSha256,
     ///
-    /// HMAC using SHA-384.
+    /// HMAC using SHA-384 (currently unsupported).
     ///
     #[serde(rename = "HS384")]
     HmacSha384,
     ///
-    /// HMAC using SHA-512.
+    /// HMAC using SHA-512 (currently unsupported).
     ///
     #[serde(rename = "HS512")]
     HmacSha512,
@@ -569,17 +761,17 @@ pub enum CoreJwsSigningAlgorithm {
     #[serde(rename = "RS512")]
     RsaSsaPkcs1V15Sha512,
     ///
-    /// ECDSA using P-256 and SHA-256.
+    /// ECDSA using P-256 and SHA-256 (currently unsupported).
     ///
     #[serde(rename = "ES256")]
     EcdsaP256Sha256,
     ///
-    /// ECDSA using P-384 and SHA-384.
+    /// ECDSA using P-384 and SHA-384 (currently unsupported).
     ///
     #[serde(rename = "ES384")]
     EcdsaP384Sha384,
     ///
-    /// ECDSA using P-521 and SHA-512.
+    /// ECDSA using P-521 and SHA-512 (currently unsupported).
     ///
     #[serde(rename = "ES512")]
     EcdsaP521Sha512,
@@ -612,9 +804,71 @@ pub enum CoreJwsSigningAlgorithm {
     #[serde(rename = "none")]
     None,
 }
-impl JwsSigningAlgorithm for CoreJwsSigningAlgorithm {}
+impl<> JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
+    // FIXME: delete this
+    fn from_jwt(alg: &jsonwebtoken::Algorithm) -> Result<Self, String> {
+        Ok(
+            match *alg {
+                jsonwebtoken::Algorithm::HS256 => CoreJwsSigningAlgorithm::HmacSha256,
+                jsonwebtoken::Algorithm::HS384 => CoreJwsSigningAlgorithm::HmacSha384,
+                jsonwebtoken::Algorithm::HS512 => CoreJwsSigningAlgorithm::HmacSha512,
+                jsonwebtoken::Algorithm::RS256 => CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
+                jsonwebtoken::Algorithm::RS384 => CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384,
+                jsonwebtoken::Algorithm::RS512 => CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512,
+            }
+        )
+    }
+    // FIXME: return a real error
+    fn to_jwt(&self) -> Result<jsonwebtoken::Algorithm, String> {
+        Ok(
+            match *self {
+                CoreJwsSigningAlgorithm::HmacSha256 => jsonwebtoken::Algorithm::HS256,
+                CoreJwsSigningAlgorithm::HmacSha384 => jsonwebtoken::Algorithm::HS384,
+                CoreJwsSigningAlgorithm::HmacSha512 => jsonwebtoken::Algorithm::HS512,
+                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256 => jsonwebtoken::Algorithm::RS256,
+                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384 => jsonwebtoken::Algorithm::RS384,
+                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512 => jsonwebtoken::Algorithm::RS512,
+                ref other => {
+                    return Err(format!("unsupported JWS algorithm `{:?}`", other));
+                },
+            }
+        )
+    }
 
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+    fn key_type(&self) -> Result<CoreJsonWebKeyType, String> {
+        Ok(
+            match *self {
+                CoreJwsSigningAlgorithm::HmacSha256 => CoreJsonWebKeyType::Symmetric,
+                CoreJwsSigningAlgorithm::HmacSha384 => CoreJsonWebKeyType::Symmetric,
+                CoreJwsSigningAlgorithm::HmacSha512 => CoreJsonWebKeyType::Symmetric,
+                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256 => CoreJsonWebKeyType::RSA,
+                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384 => CoreJsonWebKeyType::RSA,
+                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512 => CoreJsonWebKeyType::RSA,
+                CoreJwsSigningAlgorithm::EcdsaP256Sha256 => CoreJsonWebKeyType::EllipticCurve,
+                CoreJwsSigningAlgorithm::EcdsaP384Sha384 => CoreJsonWebKeyType::EllipticCurve,
+                CoreJwsSigningAlgorithm::EcdsaP521Sha512 => CoreJsonWebKeyType::EllipticCurve,
+                CoreJwsSigningAlgorithm::RsaSsaPssSha256 => CoreJsonWebKeyType::RSA,
+                CoreJwsSigningAlgorithm::RsaSsaPssSha384 => CoreJsonWebKeyType::RSA,
+                CoreJwsSigningAlgorithm::RsaSsaPssSha512 => CoreJsonWebKeyType::RSA,
+                CoreJwsSigningAlgorithm::None => {
+                    return Err(
+                        "signature algorithm `none` has no corresponding key type".to_string()
+                    );
+                },
+            }
+        )
+    }
+
+    fn is_symmetric(&self) -> bool {
+        if let Ok(kty) = self.key_type() {
+            kty == CoreJsonWebKeyType::Symmetric
+        } else {
+            false
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoreRegisterErrorResponseType {
     ///
@@ -649,7 +903,7 @@ impl Display for CoreRegisterErrorResponseType {
 /// and [OAuth 2.0 Form Post Response Mode](
 ///     http://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html#FormPostResponseMode).
 ///
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoreResponseMode {
     ///
@@ -692,7 +946,7 @@ impl ResponseMode for CoreResponseMode {}
 /// This type represents a single Response Type. Multiple Response Types are represented via the
 /// `ResponseTypes` type, which wraps a `Vec<ResponseType>`.
 ///
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoreResponseType {
     ///
@@ -740,7 +994,7 @@ impl AsRef<str> for CoreResponseType {
 /// See [Section 8](http://openid.net/specs/openid-connect-core-1_0.html#SubjectIDTypes) for
 /// further information.
 ///
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoreSubjectIdentifierType {
     ///

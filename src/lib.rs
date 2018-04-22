@@ -2,41 +2,57 @@
 //#![warn(missing_docs)]
 
 // FIXME: remove
-#![feature(trace_macros)]
+//#![feature(trace_macros)]
 
 //!
 //! [OpenID Connect](http://openid.net/specs/openid-connect-core-1_0.html) support.
 //!
 
+// FIXME: specify the backward compatibility contract (e.g., no guarantee that non-JSON
+// serializations will continue to deserialize; fields may be reordered, so assuming a particular
+// order is undefined behavior).
+
+extern crate base64;
 extern crate chrono;
 extern crate curl;
 extern crate failure;
 #[macro_use] extern crate failure_derive;
 #[macro_use] extern crate log;
 #[macro_use] extern crate oauth2;
+extern crate rand;
+extern crate ring;
 extern crate serde;
 #[macro_use] extern crate serde_derive;
 extern crate serde_json;
+extern crate untrusted;
 extern crate url;
 
+use std::collections::HashMap;
 use std::convert::From;
-use std::fmt::{Debug, Display, Error as FormatterError, Formatter};
+use std::fmt::{Debug, Display, Error as FormatterError, Formatter, Result as FormatterResult};
 use std::marker::PhantomData;
+use std::ops::Deref;
 use std::time::Duration;
 
+use chrono::{DateTime, TimeZone, Utc};
 use curl::easy::Easy;
 use oauth2::prelude::*;
 use oauth2::{
     AccessToken,
+    AuthorizationCode,
     AuthType,
     AuthUrl,
     ClientId,
     ClientSecret,
     CsrfToken,
     ErrorResponseType,
+    ExtraTokenFields,
     RedirectUrl,
     RefreshToken,
+    RequestTokenError,
+    ResponseType as OAuth2ResponseType,
     Scope,
+    TokenResponse,
     TokenType,
     TokenUrl,
 };
@@ -45,16 +61,24 @@ use oauth2::basic::{
     BasicErrorResponse,
     BasicErrorResponseType,
     BasicRequestTokenError,
-    BasicToken,
+    BasicTokenResponse,
     BasicTokenType,
 };
-use oauth2::helpers::{deserialize_url, serialize_url};
-use serde::Serialize;
-use serde::de::DeserializeOwned;
+use oauth2::helpers::{deserialize_url, serialize_url, variant_name};
+use serde::{Serialize, Serializer};
+use serde::de::{Deserialize, DeserializeOwned, Deserializer, MapAccess, Visitor};
+use serde::ser::SerializeMap;
+use types::helpers::split_language_tag_key;
 use url::Url;
 
+use discovery::{DiscoveryError, ProviderMetadata};
 use http::{HttpRequest, HttpRequestMethod, HttpResponse};
+use jwt::{JsonWebToken, JsonWebTokenAlgorithm};
 use macros::TraitStructExtract;
+use registration::{ClientMetadata, ClientRegistrationResponse};
+// Flatten the module hierarchy involving types. They're only separated to improve code
+// organization.
+pub use types::*;
 
 // Defined first since other modules need the macros, and definition order is significant for
 // macros. This module is private.
@@ -65,57 +89,100 @@ pub mod discovery;
 pub mod registration;
 pub mod types;
 
-use discovery::DiscoveryError;
-
-// Flatten the module hierarchy involving types. They're only separated to improve code
-// organization.
-pub use types::*;
-
 // Private module for HTTP(S) utilities.
 mod http;
+
+// Private module for JWT utilities.
+mod jwt;
 
 const CONFIG_URL_SUFFIX: &str = ".well-known/openid-configuration";
 const OPENID_SCOPE: &str = "openid";
 
 
-pub struct Client<
-    TT: TokenType,
-    T: oauth2::Token<TT>,
-    TE: ErrorResponseType,
-    ID: IdToken
->(
-    oauth2::Client<TT, T, TE>,
-    PhantomData<ID>,
-);
-
-impl<TT, T, TE, ID> Client<TT, T, TE, ID>
-where TT: TokenType, T: oauth2::Token<TT>, TE: ErrorResponseType, ID: IdToken {
+pub struct Client<AC, D, GC, JE, JS, JT, P, TE, TT>
+where AC: AdditionalClaims,
+        D: AuthDisplay,
+        GC: GenderClaim,
+        JE: JweContentEncryptionAlgorithm,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType,
+        P: AuthPrompt,
+        TE: ErrorResponseType,
+        TT: TokenType {
+    oauth2_client: oauth2::Client<IdTokenFields<AC, GC, JE, JS, JT>, TT, TE>,
+    acr_values: Option<Vec<AuthenticationContextClass>>,
+    claims_locales: Option<Vec<LanguageTag>>,
+    display: Option<D>,
+    max_age: Option<Duration>,
+    prompts: Option<Vec<P>>,
+    ui_locales: Option<Vec<LanguageTag>>,
+    _phantom_jt: PhantomData<JT>,
+    // FIXME: Other parameters MAY be sent. See Sections 3.2.2, 3.3.2, 5.2, 5.5, 6, and 7.2.1 for
+    // additional Authorization Request parameters and parameter values defined by this
+    // specification.
+}
+impl<AC, D, GC, JE, JS, JT, P, TE, TT> Client<AC, D, GC, JE, JS, JT, P, TE, TT>
+where AC: AdditionalClaims,
+        D: AuthDisplay,
+        GC: GenderClaim,
+        JE: JweContentEncryptionAlgorithm,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType,
+        P: AuthPrompt,
+        TE: ErrorResponseType,
+        TT: TokenType {
     pub fn new(
         client_id: ClientId,
         client_secret: Option<ClientSecret>,
         auth_url: AuthUrl,
-        token_url: TokenUrl
-    ) -> Client<TT, T, TE, ID> {
-        let client =
+        token_url: Option<TokenUrl>
+    ) -> Client<AC, D, GC, JE, JS, JT, P, TE, TT> {
+        let oauth2_client =
             oauth2::Client::new(client_id, client_secret, auth_url, token_url)
                 .add_scope(Scope::new(OPENID_SCOPE.to_string()));
-        Client(client, PhantomData)
+        Client {
+            oauth2_client,
+            acr_values: None,
+            claims_locales: None,
+            display: None,
+            max_age: None,
+            prompts: None,
+            ui_locales: None,
+            _phantom_jt: PhantomData,
+        }
     }
 
-    pub fn discover(
-        client_id: ClientId,
-        client_secret: Option<ClientSecret>,
-        issuer_url: IssuerUrl
-    ) -> Result<()/*Client<TT, T, TE, ID>*/, DiscoveryError> {
-
-        Ok(())
+    pub fn from_dynamic_registration<AD, AT, CA, CN, CR, CT, G, JK, JU, K, PM, RM, RT, S>(
+        provider_metadata: &PM,
+        registration_response: &CR
+    ) -> Client<AC, D, GC, JE, JS, JT, P, TE, TT>
+    where AD: AuthDisplay,
+          AT: ApplicationType,
+          CA: ClientAuthMethod,
+          CN: ClaimName,
+          CR: ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+          CT: ClaimType,
+          G: GrantType,
+          JK: JweKeyManagementAlgorithm,
+          JU: JsonWebKeyUse,
+          K: JsonWebKey<JS, JT, JU>,
+          PM: ProviderMetadata<AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
+          RM: ResponseMode,
+          RT: ResponseType,
+          S: SubjectIdentifierType {
+        Self::new(
+            registration_response.client_id().clone(),
+            registration_response.client_secret().cloned(),
+            provider_metadata.authorization_endpoint().clone(),
+            provider_metadata.token_endpoint().cloned(),
+        )
     }
 
     ///
     /// Appends a new scope to the authorization URL.
     ///
     pub fn add_scope(mut self, scope: Scope) -> Self {
-        self.0 = self.0.add_scope(scope);
+        self.oauth2_client = self.oauth2_client.add_scope(scope);
         self
     }
 
@@ -127,270 +194,619 @@ where TT: TokenType, T: oauth2::Token<TT>, TE: ErrorResponseType, ID: IdToken {
     /// [Section 2.3.1 of RFC 6749](https://tools.ietf.org/html/rfc6749#section-2.3.1).
     ///
     pub fn set_auth_type(mut self, auth_type: AuthType) -> Self {
-        self.0 = self.0.set_auth_type(auth_type);
+        self.oauth2_client = self.oauth2_client.set_auth_type(auth_type);
         self
     }
 
     ///
     /// Sets the the redirect URL used by the authorization endpoint.
     ///
-    pub fn set_redirect_url(mut self, redirect_url: RedirectUrl) -> Self {
-        self.0 = self.0.set_redirect_url(redirect_url);
+    pub fn set_redirect_uri(mut self, redirect_uri: RedirectUrl) -> Self {
+        self.oauth2_client = self.oauth2_client.set_redirect_url(redirect_uri);
         self
     }
 
-    pub fn authorize_url<D, P>(
-        &self,
-        auth_options: &AuthOptions<D, P>,
-        state: &CsrfToken,
-        nonce: &Nonce
-    ) -> Url
-    where D: AuthDisplay, P: AuthPrompt {
-        self.authorize_url_with_hint(auth_options, state, nonce, None, None)
-    }
-
-    pub fn authorize_url_with_hint<D, P>(
-        &self,
-        auth_options: &AuthOptions<D, P>,
-        state: &CsrfToken,
-        nonce: &Nonce,
-        id_token_hint_opt: Option<&ID>,
-        login_hint_opt: Option<&LoginHint>,
-    ) -> Url
-    where D: AuthDisplay, P: AuthPrompt {
-        // Create string versions of any options that need to be converted. This must be done
-        // before creating extra_params so that the lifetimes extend beyond extra_params's lifetime.
-        let id_token_hint_raw_opt = id_token_hint_opt.map(|id_token_hint| id_token_hint.raw());
-        let max_age_opt = auth_options.max_age().map(|max_age| max_age.as_secs().to_string());
-        let prompts_opt = join_optional_vec(auth_options.prompts());
-        let ui_locales_opt = join_optional_vec(auth_options.ui_locales());
-        let acr_values_opt = join_optional_vec(auth_options.acr_values());
-
-        let mut extra_params: Vec<(&str, &str)> = vec![
-            ("state", state.secret()),
-            ("nonce", nonce.secret()),
-        ];
-
-        if let Some(display) = auth_options.display() {
-            extra_params.push(("display", display.to_str()));
-        }
-
-        if let Some(ref prompts) = prompts_opt {
-            extra_params.push(("prompt", prompts));
-        }
-
-        if let Some(ref max_age) = max_age_opt {
-            extra_params.push(("max_age", max_age));
-        }
-
-        if let Some(ref ui_locales) = ui_locales_opt {
-            extra_params.push(("ui_locales", ui_locales));
-        }
-
-        if let Some(id_token_hint_raw) = id_token_hint_raw_opt {
-            extra_params.push(("id_token_hint", id_token_hint_raw));
-        }
-
-        if let Some(login_hint) = login_hint_opt {
-            extra_params.push(("login_hint", login_hint.secret()));
-        }
-
-        if let Some(ref acr_values) = acr_values_opt {
-            extra_params.push(("acr_values", acr_values));
-        }
-
-        self.0.authorize_url_extension(&core::CoreResponseType::Code.to_oauth2(), &extra_params)
-    }
-}
-
-///
-/// Authentication Request options.
-///
-/// The fields in this struct are a subset of the parameters defined in
-/// [Section 3.1.2.1](http://openid.net/specs/openid-connect-core-1_0.html#AuthRequest) that are
-/// commonly shared across multiple authentication requests. Parameters that should be unique
-/// to each request (i.e., for security reasons) are passed directly to `authorize_url` or
-/// `authorize_url_with_hint`.
-///
-// FIXME: convert to a trait?
-// FIXME: what's the rationale for this being separate from the Client interface? why do scopes
-// go in the client but these things go here? putting everything in the client seems unclean, but
-// then we should have a clear way to delineate the interfaces.
-pub struct AuthOptions<D, P>
-where D: AuthDisplay, P: AuthPrompt {
-    display: Option<D>,
-    prompts: Option<Vec<P>>,
-    max_age: Option<Duration>,
-    ui_locales: Option<Vec<LanguageTag>>,
-    acr_values: Option<Vec<AuthenticationContextClass>>,
-}
-
-impl<D, P> AuthOptions<D, P>
-where D: AuthDisplay, P: AuthPrompt {
-    pub fn new() -> Self {
-        AuthOptions::<D, P> {
-            display: None,
-            prompts: None,
-            max_age: None,
-            ui_locales: None,
-            acr_values: None,
-        }
-    }
-
-    ///
-    /// How the Authorization Server displays the authentication and/or consent user interface pages
-    /// to the End-User.
-    ///
-    pub fn display(&self) -> Option<&D> { self.display.as_ref() }
-
-    ///
-    /// Have the Authorization Server use the default authentication and/or consent display. This
-    /// is equivalent to `CoreAuthDisplay::Page`.
-    ///
-    pub fn clear_display(mut self) -> Self {
-        self.display = None;
-        self
-    }
-
-    ///
-    /// Set the Authorization Server authentication and/or user consent display.
-    ///
-    pub fn set_display(mut self, display: D) -> Self {
-        self.display = Some(display);
-        self
-    }
-
-    ///
-    /// Whether the Authorization Server prompts the End-User for reauthentication and/or consent.
-    ///
-    pub fn prompts(&self) -> Option<&Vec<P>> { self.prompts.as_ref() }
-
-    ///
-    /// Have the Authorization Server choose whether to prompt the End-User for reauthentication
-    /// and/or consent. This is *not* equivalent to `CoreAuthPrompt::None`, which
-    /// forces the Authorization Server not to show any prompts.
-    ///
-    pub fn clear_prompts(mut self) -> Self {
-        self.prompts = None;
-        self
-    }
-
-    ///
-    /// Specify a prompt that the Authorization Server should present to the End-User.
-    ///
-    /// NOTE: The Authorization Server will return an error if `CoreAuthPrompt::None`
-    /// is combined with any other prompts.
-    ///
-    pub fn add_prompt(mut self, prompt: P) -> Self {
-        if let Some(mut prompts) = self.prompts {
-            prompts.push(prompt);
-            self.prompts = Some(prompts);
-        } else {
-            self.prompts = Some(vec![prompt]);
-        }
-        self
-    }
-
-    ///
-    /// Maximum Authentication Age.
-    ///
-    /// Specifies the allowable elapsed time in seconds since the last time the End-User was
-    /// actively authenticated by the OP. If the elapsed time is greater than this value, the OP
-    /// MUST attempt to actively re-authenticate the End-User.
-    ///
-    pub fn max_age(&self) -> Option<&Duration> { self.max_age.as_ref() }
-
-    ///
-    /// Allow the Authorization Server to choose its own maximum authentication age.
-    ///
-    pub fn clear_max_age(mut self) -> Self {
-        self.max_age = None;
-        self
-    }
-
-    ///
-    /// Specify the maximum authentication age. See `max_age` for further information.
-    ///
-    pub fn set_max_age(mut self, max_age: Duration) -> Self {
-        self.max_age = Some(max_age);
-        self
-    }
-
-    ///
-    /// End-User's preferred languages and scripts for the user interface, in order of preference.
-    ///
-    /// An error SHOULD NOT result if some or all of the requested locales are not supported by the
-    /// OpenID Provider.
-    ///
-    pub fn ui_locales(&self) -> Option<&Vec<LanguageTag>> { self.ui_locales.as_ref() }
-
-    ///
-    /// Allow the Authorization Server to choose the languages and scripts for the user interface.
-    ///
-    pub fn clear_ui_locales(mut self) -> Self {
-        self.ui_locales = None;
-        self
-    }
-
-    ///
-    /// Add a preferred language and/or script that the Authorization Server should use for the
-    /// user interface.
-    ///
-    pub fn add_ui_locale(mut self, ui_locale: LanguageTag) -> Self {
-        if let Some(mut ui_locales) = self.ui_locales {
-            ui_locales.push(ui_locale);
-            self.ui_locales = Some(ui_locales);
-        } else {
-            self.ui_locales = Some(vec![ui_locale]);
-        }
-        self
-    }
-
-    ///
-    /// Requested Authentication Context Class Reference values.
-    ///
-    /// Specifies the `acr` values that the Authorization Server is being requested to use for
-    /// processing this Authentication Request, with the values appearing in order of preference.
-    /// The Authentication Context Class satisfied by the authentication performed is returned as
-    /// the `acr` Claim Value, as specified in
-    /// [Section 2](http://openid.net/specs/openid-connect-core-1_0.html#IDToken). The `acr` Claim
-    /// is requested as a Voluntary Claim by this parameter.
-    ///
-    // FIXME: update this doc to refer to the ID Token methods we use to access the ACR claim value
     pub fn acr_values(&self) -> Option<&Vec<AuthenticationContextClass>> {
         self.acr_values.as_ref()
     }
-
-    ///
-    /// Do not request any Authentication Context Class Reference claims from the Authorization
-    /// Server.
-    ///
-    pub fn clear_acr_values(mut self) -> Self {
-        self.acr_values = None;
+    pub fn set_acr_values(mut self, acr_values: Option<Vec<AuthenticationContextClass>>) -> Self {
+        self.acr_values = acr_values;
         self
     }
 
-    ///
-    /// Add a preferred Authentication Context Class Reference value to request as a claim from
-    /// the Authorization Server.
-    ///
-    pub fn add_acr_value(mut self, acr_value: AuthenticationContextClass) -> Self {
-        if let Some(mut acr_values) = self.acr_values {
-            acr_values.push(acr_value);
-            self.acr_values = Some(acr_values);
-        } else {
-            self.acr_values = Some(vec![acr_value]);
-        }
+    pub fn claims_locales(&self) -> Option<&Vec<LanguageTag>> {
+        self.claims_locales.as_ref()
+    }
+    pub fn set_claims_locales(mut self, claims_locales: Option<Vec<LanguageTag>>) -> Self {
+        self.claims_locales = claims_locales;
         self
     }
 
-    // FIXME: Other parameters MAY be sent. See Sections 3.2.2, 3.3.2, 5.2, 5.5, 6, and 7.2.1 for
-    // additional Authorization Request parameters and parameter values defined by this
-    // specification.
+    pub fn display(&self) -> Option<&D> {
+        self.display.as_ref()
+    }
+    pub fn set_display(mut self, display: Option<D>) -> Self {
+        self.display = display;
+        self
+    }
+
+    pub fn max_age(&self) -> Option<&Duration> {
+        self.max_age.as_ref()
+    }
+    pub fn set_max_age(mut self, max_age: Option<Duration>) -> Self {
+        self.max_age = max_age;
+        self
+    }
+
+    pub fn prompts(&self) -> Option<&Vec<P>> {
+        self.prompts.as_ref()
+    }
+    pub fn set_prompts(mut self, prompts: Option<Vec<P>>) -> Self {
+        self.prompts = prompts;
+        self
+    }
+
+    pub fn ui_locales(&self) -> Option<&Vec<LanguageTag>> {
+        self.ui_locales.as_ref()
+    }
+    pub fn set_ui_locales(mut self, ui_locales: Option<Vec<LanguageTag>>) -> Self {
+        self.ui_locales = ui_locales;
+        self
+    }
+
+    pub fn authorize_url<NF, RT, SF>(
+        &self,
+        authentication_flow: &AuthenticationFlow<RT>,
+        state_fn: SF,
+        nonce_fn: NF,
+    ) -> (Url, CsrfToken, Nonce)
+    where NF: Fn() -> Nonce,
+          RT: ResponseType,
+          SF: Fn() -> CsrfToken {
+        self.authorize_url_with_hint(authentication_flow, state_fn, nonce_fn, None, None)
+    }
+
+    pub fn authorize_url_with_hint<NF, RT, SF>(
+        &self,
+        authentication_flow: &AuthenticationFlow<RT>,
+        state_fn: SF,
+        nonce_fn: NF,
+        id_token_hint_opt: Option<&IdToken<AC, GC, JE, JS, JT>>,
+        login_hint_opt: Option<&LoginHint>,
+    ) -> (Url, CsrfToken, Nonce)
+    where NF: Fn() -> Nonce,
+          RT: ResponseType,
+          SF: Fn() -> CsrfToken {
+        // Create string versions of any options that need to be converted. This must be done
+        // before creating extra_params so that the lifetimes extend beyond extra_params's lifetime.
+        let acr_values_opt = join_optional_vec(self.acr_values());
+        let claims_locales_opt = join_optional_vec(self.claims_locales());
+        let max_age_opt = self.max_age().map(|max_age| max_age.as_secs().to_string());
+        let prompts_opt = join_optional_vec(self.prompts());
+        let ui_locales_opt = join_optional_vec(self.ui_locales());
+
+        let state = state_fn();
+        let nonce = nonce_fn();
+
+        let url = {
+            let mut extra_params: Vec<(&str, &str)> = vec![
+                ("state", state.secret()),
+                ("nonce", nonce.secret()),
+            ];
+
+
+            if let Some(ref acr_values) = acr_values_opt {
+                extra_params.push(("acr_values", acr_values));
+            }
+
+            if let Some(ref claims_locales) = claims_locales_opt {
+                extra_params.push(("claims_locales", claims_locales));
+            }
+
+            if let Some(display) = self.display() {
+                extra_params.push(("display", display.to_str()));
+            }
+
+// FIXME: uncomment
+/*
+            if let Some(id_token_hint) = id_token_hint_opt {
+                extra_params.push(("id_token_hint", id_token_hint));
+            }
+*/
+
+            if let Some(login_hint) = login_hint_opt {
+                extra_params.push(("login_hint", login_hint.secret()));
+            }
+
+            if let Some(ref max_age) = max_age_opt {
+                extra_params.push(("max_age", max_age));
+            }
+
+            if let Some(ref prompts) = prompts_opt {
+                extra_params.push(("prompt", prompts));
+            }
+
+            if let Some(ref ui_locales) = ui_locales_opt {
+                extra_params.push(("ui_locales", ui_locales));
+            }
+
+            let response_type =
+                match *authentication_flow {
+                    AuthenticationFlow::AuthorizationCode =>
+                        core::CoreResponseType::Code.to_oauth2(),
+                    AuthenticationFlow::Implicit(include_token) => {
+                        if include_token {
+                            OAuth2ResponseType::new(
+                                vec![core::CoreResponseType::IdToken, core::CoreResponseType::Token]
+                                    .iter()
+                                    .map(variant_name)
+                                    .collect::<Vec<_>>()
+                                    .join(" ")
+                            )
+                        } else {
+                            core::CoreResponseType::IdToken.to_oauth2()
+                        }
+                    },
+                    AuthenticationFlow::Hybrid(ref response_types) => {
+                        OAuth2ResponseType::new(
+                            response_types
+                                .iter()
+                                .map(variant_name)
+                                .collect::<Vec<_>>()
+                                .join(" ")
+                        )
+                    }
+                };
+
+            self.oauth2_client.authorize_url_extension(&response_type, &extra_params)
+        };
+        (url, state, nonce)
+    }
+
+    pub fn exchange_code(
+        &self,
+        code: AuthorizationCode
+    ) -> Result<TokenResponse<IdTokenFields<AC, GC, JE, JS, JT>, TT>, RequestTokenError<TE>> {
+        self.oauth2_client.exchange_code(code)
+    }
 }
 
-pub trait IdToken : Debug + DeserializeOwned + PartialEq + Serialize {
-    fn raw(&self) -> &str;
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct AddressClaim {
+    formatted: Option<FormattedAddress>,
+    street_address: Option<StreetAddress>,
+    locality: Option<AddressLocality>,
+    region: Option<AddressRegion>,
+    postal_code: Option<AddressPostalCode>,
+    country: Option<AddressCountry>,
+}
+
+///
+/// Authentication flow, which determines how the Authorization Server returns the OpenID Connect
+/// ID token and OAuth2 access token to the Relying Party.
+///
+#[derive(Clone, Debug, PartialEq)]
+pub enum AuthenticationFlow<RT: ResponseType> {
+    ///
+    /// Authorization Code Flow.
+    ///
+    /// The authorization server will return an OAuth2 authorization code. Clients must subsequently
+    /// call `[FIXME: specify function]` with the authorization code in order to retrieve an
+    /// OpenID Connect ID token and OAuth2 access token.
+    ///
+    AuthorizationCode,
+    ///
+    /// Implicit Flow.
+    ///
+    /// Boolean value indicates whether an OAuth2 access token should also be returned. If `true`,
+    /// the Authorization Server will return both an OAuth2 access token and OpenID Connect ID
+    /// token. If `false`, it will return only an OpenID Connect ID token.
+    ///
+    Implicit(bool),
+    ///
+    /// Hybrid Flow.
+    ///
+    /// A hybrid flow according to [OAuth 2.0 Multiple Response Type Encoding Practices](
+    ///     http://openid.net/specs/oauth-v2-multiple-response-types-1_0.html). The enum value
+    /// contains the desired `response_type`s. See
+    /// [Section 3](http://openid.net/specs/openid-connect-core-1_0.html#Authentication) for
+    /// details.
+    ///
+    Hybrid(Vec<RT>),
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct EmptyAdditionalClaims {}
+impl AdditionalClaims for EmptyAdditionalClaims {}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct IdToken<
+    AC: AdditionalClaims,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+>(
+    JsonWebToken<IdTokenClaims<AC, GC>, JE, JS, JT>,
+    PhantomData<JT>,
+);
+
+impl<AC, GC, JE, JS, JT> IdToken<AC, GC, JE, JS, JT>
+where AC: AdditionalClaims,
+        GC: GenderClaim,
+        JE: JweContentEncryptionAlgorithm,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType {
+    fn validate_jose_header(&self) -> Result<(), IdTokenDecodeError> {
+        let jose_header = &self.0.unverified_header();
+
+        // The 'typ' header field must either be omitted or have the canonicalized value JWT.
+        if let Some(ref jwt_type) = jose_header.typ {
+            if jwt_type.to_uppercase() != "JWT" {
+                return Err(
+                    IdTokenDecodeError::Unsupported(
+                        format!("unexpected or unsupported JWT type `{}`", **jwt_type)
+                    )
+                )
+            }
+        }
+        // The 'cty' header field must be omitted, since it's only used for JWTs that contain
+        // content types other than JSON-encoded claims. This may include nested JWTs, such as if
+        // JWE encryption is used. This is currently unsupported.
+        if let Some(ref content_type) = jose_header.cty {
+            if content_type.to_uppercase() == "JWT" {
+                return Err(
+                    IdTokenDecodeError::Unsupported(
+                        "nested JWT's are not currently supported".to_string()
+                    )
+                )
+            } else {
+                return Err(
+                    IdTokenDecodeError::Unsupported(
+                        format!("unexpected or unsupported JWT content type `{}`", **content_type)
+                    )
+                )
+            }
+        }
+
+        // If 'crit' fields are specified, we must reject any we do not understand. Since this
+        // implementation doesn't understand any of them, unconditionally reject the JWT. Note that
+        // the spec prohibits this field from containing any of the standard headers or being empty.
+        if let Some(ref crit) = jose_header.crit {
+            return Err(
+                IdTokenDecodeError::Unsupported(
+                    format!("critical JWT header fields are unsupported: `{:?}`", *crit)
+                )
+            )
+        }
+        Ok(())
+    }
+
+    fn claims_without_nonce_check<JU, K>(
+        &self,
+        signature_keys: &JsonWebKeySet<JS, JT, JU, K>,
+        client_secret_if_private_client: Option<&ClientSecret>,
+    ) -> Result<&IdTokenClaims<AC, GC>, IdTokenDecodeError>
+    where JT: JsonWebKeyType, JU: JsonWebKeyUse, K: JsonWebKey<JS, JT, JU> {
+        let jose_header = &self.0.unverified_header();
+        let signature_alg =
+            match jose_header.alg {
+                JsonWebTokenAlgorithm::Encryption(ref encryption_alg) => {
+                    return Err(
+                        IdTokenDecodeError::Unsupported(
+                            format!(
+                                "JWE encryption is not currently supported (found algorithm \
+                                `{:?}`)",
+                                *encryption_alg,
+                            )
+                        )
+                    )
+                },
+                JsonWebTokenAlgorithm::Signature(ref signature_alg, _) => signature_alg,
+                // Section 2 of OpenID Connect Core 1.0 specifies that "ID Tokens MUST NOT use none
+                // as the alg value unless the Response Type used returns no ID Token from the
+                // Authorization Endpoint (such as when using the Authorization Code Flow) and the
+                // Client explicitly requested the use of none at Registration time."
+                //
+                // While there's technically a use case where this is ok, we choose not to support
+                // it for now to protect against accidental misuse. If demand arises, we can figure
+                // out a API that mitigates the risk.
+                //
+                // FIXME: see FIXME above (we should have a separate function that allows this)
+                JsonWebTokenAlgorithm::None => {
+                    return Err(
+                        IdTokenDecodeError::Unsupported(
+                            "unsigned ID Tokens are unsafe and not currently supported".to_string()
+                        )
+                    )
+                }
+            };
+
+        // NB: We must *not* trust the 'kid' (key ID) or 'alg' (algorithm) fields present in the
+        // JOSE header, as an attacker could manipulate these while forging the JWT. The code below
+        // must be secure regardless of how these fields are manipulated.
+
+        if signature_alg.is_symmetric() {
+            if let Some(client_secret) = client_secret_if_private_client {
+                // FIXME: implement
+                return Err(
+                    IdTokenDecodeError::Unsupported(
+                        "FIXME: symmetric signatures are currently unimplemented".to_string()
+                    )
+                )
+            } else {
+                // The client secret isn't confidential for public clients, so anyone can forge a
+                // JWT with a valid signature.
+                return Err(
+                    IdTokenDecodeError::InvalidSignature(
+                        "symmetric signatures are disallowed for public clients".to_string()
+                    )
+                )
+            }
+        } else {
+            // Section 10.1 of OpenID Connect Core 1.0 states that the JWT must include a key ID if
+            // the JWK set contains more than one public key. 
+
+            // See if any key has a matching key ID and compatible type.
+            if let Some(ref key_id) = jose_header.kid {
+                for key in signature_keys.keys().iter() {
+                    if key.key_id() == Some(key_id) {
+                        if let Ok(verified_claims) = self.0.claims(signature_alg, key) {
+                            return Ok(verified_claims)
+                        } else {
+                            // We found the matching key, so if signature validation fails, bail.
+                            return Err(
+                                IdTokenDecodeError::InvalidSignature(
+                                    format!(
+                                        "failed to validate signature using key with ID `{}`",
+                                        **key_id
+                                    )
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // The header references a key ID we don't know, so return an error. Even if there's
+                // only one key in the JWK set, it's suspicious and inconsistent for there to be a
+                // key ID in the JOSE header but not in the JWK itself. Hence, we're conservative
+                // and reject the signature here. This decision may be revisited if legitimate
+                // scenarios arise.
+                return Err(
+                    IdTokenDecodeError::InvalidSignature(
+                        format!("could not find public key with ID `{}`", **key_id)
+                    )
+                )
+            } else {
+                // The JOSE header doesn't contain a key ID, which is only allowed if the JWK set
+                // contains exactly one asymmetric key.
+                let public_keys =
+                    signature_keys
+                        .keys()
+                        .iter()
+                        .filter(|key| !key.key_type().is_symmetric())
+                        .collect::<Vec<&K>>();
+                if public_keys.is_empty() {
+                    return Err(
+                        IdTokenDecodeError::InvalidSignature(
+                            "no public keys found in JWK set".to_string()
+                        )
+                    )
+                } else if public_keys.len() == 1 {
+                    if let Ok(verified_claims) =
+                        self.0.claims(signature_alg, *public_keys.first().expect("unreachable"))
+                    {
+                        return Ok(verified_claims)
+                    } else {
+                        // We found the matching key, so if signature validation fails, bail.
+                        return Err(
+                            IdTokenDecodeError::InvalidSignature(
+                                "failed to validate signature".to_string()
+                            )
+                        )
+                    }
+                } else {
+                    return Err(
+                        IdTokenDecodeError::InvalidSignature(
+                            "JWK set must only contain one public key if JOSE header omits \
+                            key ID".to_string()
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    fn validate_nonce(
+        &self,
+        nonce: &Nonce,
+        claims: &IdTokenClaims<AC, GC>,
+    ) -> Result<(), IdTokenDecodeError> {
+        if let Some(ref claims_nonce) = claims.nonce {
+            if claims_nonce != nonce {
+                return Err(
+                    IdTokenDecodeError::InvalidNonce("nonce mismatch".to_string())
+                )
+            }
+        } else {
+            return Err(
+                IdTokenDecodeError::InvalidNonce("no nonce present".to_string())
+            )
+        }
+
+        Ok(())
+    }
+
+    // FIXME: factor out a separate, dangerous version of this function that allows unsigned tokens,
+    // and continue rejecting them by default in this function.
+    pub fn claims_for_private_client<JU, K>(
+        &self,
+        signature_keys: &JsonWebKeySet<JS, JT, JU, K>,
+        // FIXME: add a docstring mentioning that this must only be used for private clients. Public
+        // clients can't keep their client_secret confidential, so Section 10.1 of OpenID Connect
+        // Core 1.0 prohibits using symmetric signatures for them.
+        client_secret: &ClientSecret,
+        nonce: &Nonce,
+    ) -> Result<&IdTokenClaims<AC, GC>, IdTokenDecodeError>
+    where JT: JsonWebKeyType, JU: JsonWebKeyUse, K: JsonWebKey<JS, JT, JU> {
+        self.validate_jose_header()?;
+        let claims = self.claims_without_nonce_check(signature_keys, Some(client_secret))?;
+        self.validate_nonce(nonce, claims)?;
+        Ok(claims)
+    }
+
+    pub fn claims_for_public_client<JU, K>(
+        &self,
+        signature_keys: &JsonWebKeySet<JS, JT, JU, K>,
+        nonce: &Nonce,
+    ) -> Result<&IdTokenClaims<AC, GC>, IdTokenDecodeError>
+    where JT: JsonWebKeyType, JU: JsonWebKeyUse, K: JsonWebKey<JS, JT, JU> {
+        self.validate_jose_header()?;
+        let claims = self.claims_without_nonce_check(signature_keys, None)?;
+        self.validate_nonce(nonce, claims)?;
+        Ok(claims)
+    }
+
+    pub fn dangerous_claims_without_signature_verification(
+        &self,
+        nonce_opt: Option<&Nonce>,
+    ) -> Result<&IdTokenClaims<AC, GC>, IdTokenDecodeError> {
+        self.validate_jose_header()?;
+        let claims = self.0.unverified_claims();
+        if let Some(nonce) = nonce_opt {
+            self.validate_nonce(nonce, claims)?;
+        }
+        Ok(claims)
+    }
+}
+
+#[derive(Clone, Debug, Fail)]
+pub enum IdTokenDecodeError {
+    #[fail(display = "Invalid token header: {}", _0)]
+    InvalidHeader(String),
+    #[fail(display = "Invalid nonce: {}", _0)]
+    InvalidNonce(String),
+    #[fail(display = "Invalid token signature: {}", _0)]
+    InvalidSignature(String),
+    #[fail(display = "Unsupported token header: {}", _0)]
+    Unsupported(String),
+}
+
+/*
+pub struct IdTokenHeader<JS: JwsSigningAlgorithm<JT>, JT: JsonWebKeyType>(
+    jwt::Header,
+    PhantomData<JS>,
+    PhantomData<JT>,
+);
+impl<JS, JT> IdTokenHeader<JS, JT> where JS: JwsSigningAlgorithm<JT>, JT: JsonWebKeyType {
+    // FIXME: return a real error
+    pub fn alg(&self) -> Result<JS, String> {
+        JS::from_jwt(&self.0.alg)
+    }
+    pub fn kid(&self) -> Option<JsonWebKeyId> {
+        self.0.kid.clone().map(JsonWebKeyId::new)
+    }
+}
+*/
+
+// This is an annoying hack to work around the fact that Serde won't handle a tuple struct with more
+// than one element (to accomodate the PhantomData fields) as a String.
+mod serde_id_token {
+    use std::marker::PhantomData;
+
+    use serde::{Serialize, Serializer};
+    use serde::de::{Deserialize, Deserializer};
+
+    use super::{
+        AdditionalClaims,
+        GenderClaim,
+        IdToken,
+        IdTokenClaims,
+        JsonWebKeyType,
+        JweContentEncryptionAlgorithm,
+        JwsSigningAlgorithm,
+    };
+    use super::jwt::JsonWebToken;
+
+    pub fn deserialize<'de, AC, D, GC, JE, JS, JT>(
+        deserializer: D
+    ) -> Result<IdToken<AC, GC, JE, JS, JT>, D::Error>
+    where AC: AdditionalClaims,
+            D: Deserializer<'de>,
+            GC: GenderClaim,
+            JE: JweContentEncryptionAlgorithm,
+            JS: JwsSigningAlgorithm<JT>,
+            JT: JsonWebKeyType {
+        Ok(
+            IdToken(
+                JsonWebToken::<IdTokenClaims<AC, GC>, JE, JS, JT>::deserialize(deserializer)?,
+                PhantomData,
+            )
+        )
+    }
+
+    pub fn serialize<AC, GC, JE, JS, JT, S>(
+        id_token: &IdToken<AC, GC, JE, JS, JT>,
+        serializer: S
+    ) -> Result<S::Ok, S::Error>
+    where AC: AdditionalClaims,
+            GC: GenderClaim,
+            JE: JweContentEncryptionAlgorithm,
+            JS: JwsSigningAlgorithm<JT>,
+            JT: JsonWebKeyType,
+            S: Serializer {
+        id_token.0.serialize(serializer)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct IdTokenClaims<AC, GC>
+where AC: AdditionalClaims, GC: GenderClaim {
+    iss: IssuerUrl,
+    // FIXME: this needs to be a vector, but it may also come as a single string
+    aud: Vec<Audience>,
+    exp: Seconds,
+    iat: Seconds,
+    auth_time: Option<Seconds>,
+    nonce: Option<Nonce>,
+    acr: Option<AuthenticationContextClass>,
+    amr: Option<Vec<AuthenticationMethodReference>>,
+    azp: Option<ClientId>,
+    at_hash: Option<AccessTokenHash>,
+    c_hash: Option<AuthorizationCodeHash>,
+
+    #[serde(bound = "GC: GenderClaim")]
+    #[serde(flatten)]
+    standard_claims: StandardClaims<GC>,
+
+    #[serde(bound = "AC: AdditionalClaims")]
+    #[serde(flatten)]
+    additional_claims: AC
+}
+// FIXME: see what other structs should have friendlier trait interfaces like this one
+impl<AC, GC> IdTokenClaims<AC, GC>
+where AC: AdditionalClaims, GC: GenderClaim {
+    pub fn issuer(&self) -> &IssuerUrl { &self.iss }
+    pub fn audiences(&self) -> &Vec<Audience> { &self.aud }
+    pub fn expiration(&self) -> Result<DateTime<Utc>, ()> {
+        Utc.timestamp_opt(*(&self.exp as &u64) as i64, 0).single().ok_or(())
+    }
+    pub fn issue_time(&self) -> Result<DateTime<Utc>, ()> {
+        Utc.timestamp_opt(*(&self.iat as &u64) as i64, 0).single().ok_or(())
+    }
+    pub fn auth_time(&self) -> Option<Result<DateTime<Utc>, ()>> {
+        self.auth_time
+            .as_ref()
+            .map(|seconds| Utc.timestamp_opt(*(seconds as &u64) as i64, 0).single().ok_or(()))
+    }
+    pub fn nonce(&self) -> Option<&Nonce> { self.nonce.as_ref() }
+    pub fn auth_context_ref(&self) -> Option<&AuthenticationContextClass> { self.acr.as_ref() }
+    pub fn auth_methods_refs(&self) -> Option<&Vec<AuthenticationMethodReference>> {
+        self.amr.as_ref()
+    }
+    pub fn authorized_party(&self) -> Option<&ClientId> { self.azp.as_ref() }
+    pub fn access_token_hash(&self) -> Option<&AccessTokenHash> { self.at_hash.as_ref() }
+    pub fn code_hash(&self) -> Option<&AuthorizationCodeHash> { self.c_hash.as_ref() }
 }
 
 ///
@@ -398,25 +814,189 @@ pub trait IdToken : Debug + DeserializeOwned + PartialEq + Serialize {
 ///
 /// The fields in this struct are defined in
 /// [Section 3.1.3.3](http://openid.net/specs/openid-connect-core-1_0.html#TokenResponse).
-/// The fields are private and should be accessed via the getters.
 ///
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
-pub struct Token {
-    #[serde(flatten)]
-    basic_token: BasicToken<BasicTokenType>,
-    // FIXME: this should probably be something else
-    id_token: String
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct IdTokenFields<AC, GC, JE, JS, JT>
+where AC: AdditionalClaims,
+        GC: GenderClaim,
+        JE: JweContentEncryptionAlgorithm,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType {
+    #[serde(with = "serde_id_token")]
+    id_token: IdToken<AC, GC, JE, JS, JT>,
+    #[serde(skip)]
+    _phantom_jt: PhantomData<JT>,
+}
+impl<AC, GC, JE, JS, JT> IdTokenFields<AC, GC, JE, JS, JT>
+where AC: AdditionalClaims,
+        GC: GenderClaim,
+        JE: JweContentEncryptionAlgorithm,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType {
+    pub fn id_token(&self) -> &IdToken<AC, GC, JE, JS, JT> { &self.id_token }
+}
+impl<AC, GC, JE, JS, JT> ExtraTokenFields for IdTokenFields<AC, GC, JE, JS, JT>
+where AC: AdditionalClaims,
+        GC: GenderClaim,
+        JE: JweContentEncryptionAlgorithm,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType {
 }
 
-impl oauth2::Token<BasicTokenType> for Token {
-    fn access_token(&self) -> &AccessToken { self.basic_token.access_token() }
-    fn token_type(&self) -> &BasicTokenType { self.basic_token.token_type() }
-    fn expires_in(&self) -> Option<Duration> { self.basic_token.expires_in() }
-    fn refresh_token(&self) -> Option<&RefreshToken> { self.basic_token.refresh_token() }
-    fn scopes(&self) -> Option<&Vec<Scope>> { self.basic_token.scopes() }
+pub trait JsonWebKey<JS, JT, JU> : Clone + Debug + DeserializeOwned + PartialEq + Serialize
+where JS: JwsSigningAlgorithm<JT>, JT: JsonWebKeyType, JU: JsonWebKeyUse {
+    fn key_id(&self) -> Option<&JsonWebKeyId>;
+    fn key_type(&self) -> &JT;
+    fn key_use(&self) -> Option<&JU>;
 
-    fn from_json(data: &str) -> Result<Self, serde_json::error::Error> {
-        serde_json::from_str(data)
+    fn verify_signature(
+        &self,
+        alg: &JS,
+        msg: &str,
+        signature: &[u8]
+    ) -> Result<(), SignatureVerificationError>;
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct JsonWebKeySet<JS, JT, JU, K>
+where JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType,
+        JU: JsonWebKeyUse,
+        K: JsonWebKey<JS, JT, JU> {
+    // FIXME: write a test that ensures duplicate object member names cause an error
+    // (see https://tools.ietf.org/html/rfc7517#section-5)
+    // FIXME: add a deserializer that optionally ignores invalid keys rather than failing. That way,
+    // clients can function using the keys that they do understand, which is fine if they only ever
+    // get JWTs signed with those keys. See what other places we might want to be more tolerant of
+    // deserialization errors.
+    #[serde(bound = "K: JsonWebKey<JS, JT, JU>")]
+    keys: Vec<K>,
+    #[serde(skip)]
+    _phantom_js: PhantomData<JS>,
+    #[serde(skip)]
+    _phantom_jt: PhantomData<JT>,
+    #[serde(skip)]
+    _phantom_ju: PhantomData<JU>,
+}
+impl<JS, JT, JU, K> JsonWebKeySet<JS, JT, JU, K>
+where JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType,
+        JU: JsonWebKeyUse,
+        K: JsonWebKey<JS, JT, JU> {
+    pub fn keys(&self) -> &Vec<K> { &self.keys }
+}
+
+#[derive(Clone, Debug, Fail)]
+pub enum SignatureVerificationError {
+    #[fail(display = "Crypto error: {}", _0)]
+    CryptoError(String),
+    #[fail(display = "Invalid cryptographic key: {}", _0)]
+    InvalidKey(String),
+    #[fail(display = "Unsupported cryptographic algorithm: {}", _0)]
+    UnsupportedAlg(String),
+    #[fail(display = "Other error: {}", _0)]
+    Other(String),
+}
+
+// Private (fields accessed via IdTokenClaims and UserInfoClaims)
+#[derive(Clone, Debug, PartialEq)]
+struct StandardClaims<GC>
+where GC: GenderClaim {
+    sub: SubjectIdentifier,
+    name: Option<HashMap<Option<LanguageTag>, EndUserName>>,
+    given_name: Option<HashMap<Option<LanguageTag>, EndUserGivenName>>,
+    family_name: Option<HashMap<Option<LanguageTag>, EndUserGivenName>>,
+    middle_name: Option<HashMap<Option<LanguageTag>, EndUserMiddleName>>,
+    nickname: Option<HashMap<Option<LanguageTag>, EndUserNickname>>,
+    preferred_username: Option<EndUserUsername>,
+    profile: Option<HashMap<Option<LanguageTag>, EndUserProfileUrl>>,
+    picture: Option<HashMap<Option<LanguageTag>, EndUserPictureUrl>>,
+    website: Option<HashMap<Option<LanguageTag>, EndUserWebsiteUrl>>,
+    email: Option<EndUserEmail>,
+    email_verified: Option<bool>,
+    gender: Option<GC>,
+    birthday: Option<EndUserBirthday>,
+    zoneinfo: Option<EndUserTimezone>,
+    locale: Option<LanguageTag>,
+    phone_number: Option<EndUserPhoneNumber>,
+    phone_number_verified: Option<bool>,
+    address: Option<AddressClaim>,
+    updated_at: Option<Seconds>,
+}
+impl<'de, GC> Deserialize<'de> for StandardClaims<GC> where GC: GenderClaim {
+    ///
+    /// Special deserializer that supports [RFC 5646](https://tools.ietf.org/html/rfc5646) language
+    /// tags associated with human-readable client metadata fields.
+    ///
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        struct ClaimsVisitor<GC: GenderClaim>(PhantomData<GC>);
+        impl<'de, GC> Visitor<'de> for ClaimsVisitor<GC> where GC: GenderClaim {
+            type Value = StandardClaims<GC>;
+
+            fn expecting(&self, formatter: &mut Formatter) -> FormatterResult {
+                formatter.write_str("struct IdTokenClaims")
+            }
+            fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
+            where V: MapAccess<'de> {
+                deserialize_fields!{
+                    map {
+                        [sub]
+                        [LanguageTag(name)]
+                        [LanguageTag(given_name)]
+                        [LanguageTag(family_name)]
+                        [LanguageTag(middle_name)]
+                        [LanguageTag(nickname)]
+                        [Option(preferred_username)]
+                        [LanguageTag(profile)]
+                        [LanguageTag(picture)]
+                        [LanguageTag(website)]
+                        [Option(email)]
+                        [Option(email_verified)]
+                        [Option(gender)]
+                        [Option(birthday)]
+                        [Option(zoneinfo)]
+                        [Option(locale)]
+                        [Option(phone_number)]
+                        [Option(phone_number_verified)]
+                        [Option(address)]
+                        [Option(updated_at)]
+                    }
+                }
+            }
+        }
+        deserializer
+            .deserialize_map(
+                ClaimsVisitor(PhantomData)
+            )
+    }
+}
+impl<GC> Serialize for StandardClaims<GC> where GC: GenderClaim {
+    #[allow(cyclomatic_complexity)]
+    fn serialize<SE>(&self, serializer: SE) -> Result<SE::Ok, SE::Error> where SE: Serializer {
+        serialize_fields!{
+            self -> serializer {
+                [sub]
+                [LanguageTag(name)]
+                [LanguageTag(given_name)]
+                [LanguageTag(family_name)]
+                [LanguageTag(middle_name)]
+                [LanguageTag(nickname)]
+                [Option(preferred_username)]
+                [LanguageTag(profile)]
+                [LanguageTag(picture)]
+                [LanguageTag(website)]
+                [Option(email)]
+                [Option(email_verified)]
+                [Option(gender)]
+                [Option(birthday)]
+                [Option(zoneinfo)]
+                [Option(locale)]
+                [Option(phone_number)]
+                [Option(phone_number_verified)]
+                [Option(address)]
+                [Option(updated_at)]
+            }
+        }
     }
 }
 

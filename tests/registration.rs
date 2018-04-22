@@ -139,7 +139,7 @@ fn test_metadata_serialization() {
     );
     assert_eq!(
         *client_metadata.jwks_uri().unwrap(),
-        JwkSetUrl::new(Url::parse("https://example.com/jwks").unwrap())
+        JsonWebKeySetUrl::new(Url::parse("https://example.com/jwks").unwrap())
     );
     // FIXME: set this field to something
     assert_eq!(client_metadata.jwks(), None);
@@ -421,7 +421,7 @@ fn test_response_serialization() {
     );
     assert_eq!(
         *client_metadata.jwks_uri().unwrap(),
-        JwkSetUrl::new(Url::parse("https://example.com/jwks").unwrap())
+        JsonWebKeySetUrl::new(Url::parse("https://example.com/jwks").unwrap())
     );
     // FIXME: set this field to something
     assert_eq!(client_metadata.jwks(), None);

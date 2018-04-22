@@ -258,7 +258,7 @@ fn test_discovery_deserialization() {
     );
     assert_eq!(
         Some(
-            &JwkSetUrl::new(
+            &JsonWebKeySetUrl::new(
                 Url::parse(
                     "https://rp.certification.openid.net:8080/static/jwks_3INbZl52IrrPCp2j.json"
                 ).unwrap()

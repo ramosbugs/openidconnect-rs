@@ -7,7 +7,7 @@ extern crate openidconnect;
 extern crate serde_json;
 extern crate url;
 
-use std::sync::{Once, ONCE_INIT};
+#[macro_use] mod rp_common;
 
 use oauth2::prelude::*;
 use oauth2::RedirectUrl;
@@ -18,52 +18,28 @@ use openidconnect::core::*;
 use openidconnect::discovery::*;
 use openidconnect::registration::*;
 
-const CERTIFICATION_BASE_URL: &str = "https://rp.certification.openid.net:8080";
-const CERTIFICATION_RP_NAME: &str = "openidconnect-rs";
+use rp_common::{
+    CERTIFICATION_BASE_URL,
+    get_provider_metadata,
+    init_log,
+    issuer_url,
+    register_client,
+    RP_CONTACT_EMAIL,
+    RP_NAME,
+};
 
-static INIT_LOG: Once = ONCE_INIT;
-
-macro_rules! log_info {
-    ($($args:tt)+) => {
-        info!("[{}] {}", TEST_ID, format!($($args)+));
-    }
-}
-macro_rules! log_debug {
-    ($($args:tt)+) => {
-        debug!("[{}] {}", TEST_ID, format!($($args)+));
-    }
-}
-
-fn init_log() {
-    env_logger::init();
-}
-
-fn issuer_url(test_id: &str) -> IssuerUrl {
-    IssuerUrl::new(
-        Url::parse(
-            &format!(
-                "{}/{}/{}",
-                CERTIFICATION_BASE_URL,
-                CERTIFICATION_RP_NAME,
-                test_id
-            )
-        ).expect("Failed to parse issuer URL")
-    )
-}
 
 #[test]
 fn rp_discovery_openid_configuration() {
     const TEST_ID: &str = "rp-discovery-openid-configuration";
-    INIT_LOG.call_once(init_log);
+    init_log();
 
     let _issuer_url = issuer_url(TEST_ID);
-    let provider_metadata: CoreProviderMetadata =
-        get_provider_metadata(_issuer_url.clone())
-            .expect(&format!("Failed to fetch provider metadata from {:?}", _issuer_url));
+    let provider_metadata = get_provider_metadata(TEST_ID);
 
     macro_rules! log_field {
         ($field:ident) => {
-            log_info!(concat!("  ", stringify!($field), " = {:?}"), provider_metadata.$field());
+            log_container_field!(provider_metadata.$field);
         }
     }
 
@@ -112,37 +88,18 @@ fn rp_discovery_openid_configuration() {
 #[test]
 fn rp_registration_dynamic() {
     const TEST_ID: &str = "rp-registration-dynamic";
-    INIT_LOG.call_once(init_log);
+    init_log();
 
     let _issuer_url = issuer_url(TEST_ID);
-    let provider_metadata: CoreProviderMetadata =
-        get_provider_metadata(_issuer_url.clone())
-            .expect(&format!("Failed to fetch provider metadata from {:?}", _issuer_url));
-
-    let registration_request =
-        CoreClientRegistrationRequest::new(
-            vec![RedirectUrl::new(Url::parse("https://example.com/redirect").unwrap())]
-        )
-        .set_application_type(Some(CoreApplicationType::Web))
-        .set_client_name(Some(ClientName::new(CERTIFICATION_RP_NAME.to_string())), None)
-        .set_contacts(Some(vec![ContactEmail::new("ramos@cs.stanford.edu".to_string())]));
-
-    let registration_endpoint =
-        provider_metadata
-            .registration_endpoint()
-            .expect("provider does not support dynamic registration");
-    let registration_response =
-        registration_request
-            .register(&registration_endpoint)
-            .expect(&format!("Failed to register client at {:?}", registration_endpoint));
+    let provider_metadata = get_provider_metadata(TEST_ID);
+    let registration_response = register_client(&provider_metadata);
 
     macro_rules! log_field {
         ($field:ident) => {
-            log_info!(concat!("  ", stringify!($field), " = {:?}"), registration_response.$field());
+            log_container_field!(registration_response.$field);
         }
     }
 
-    log_info!("Successfully registered client at {:?}", registration_endpoint);
     log_field!(client_id);
     log_field!(client_secret);
     log_field!(registration_access_token);
@@ -184,8 +141,9 @@ fn rp_registration_dynamic() {
 
     assert_eq!(
         format!(
-            "https://rp.certification.openid.net:8080/{}/registration?client_id={}",
-            CERTIFICATION_RP_NAME,
+            "{}/{}/registration?client_id={}",
+            CERTIFICATION_BASE_URL,
+            RP_NAME,
             registration_response.client_id().to_string()
         ),
         registration_response.registration_client_uri().unwrap().to_string()

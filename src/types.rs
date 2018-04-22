@@ -1,62 +1,151 @@
+
+extern crate base64;
+extern crate jsonwebtoken;
+extern crate oauth2;
+extern crate rand;
+extern crate serde_json;
 extern crate url;
 
 use std::fmt::{Debug, Display, Error as FormatterError, Formatter};
 use std::ops::Deref;
 
-use oauth2;
+use oauth2::ClientId;
 use oauth2::helpers::{deserialize_space_delimited_vec, deserialize_url, serialize_url};
 use oauth2::prelude::*;
+use rand::{thread_rng, Rng};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use url::Url;
 
-pub trait ApplicationType : Debug + DeserializeOwned + Eq + PartialEq + Serialize {}
+use super::{JsonWebKey, JsonWebKeySet};
+use super::discovery::DiscoveryError;
+use super::http::{
+    ACCEPT_JSON,
+    HttpRequest,
+    HttpRequestMethod,
+    HTTP_STATUS_OK,
+    MIME_TYPE_JSON,
+};
+
+
+pub trait AdditionalClaims: Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
+pub trait ApplicationType : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
 
 ///
 /// How the Authorization Server displays the authentication and consent user interface pages to
 /// the End-User.
 ///
-pub trait AuthDisplay : Debug + DeserializeOwned + Eq + PartialEq + Serialize {
+pub trait AuthDisplay : Clone + Debug + DeserializeOwned + PartialEq + Serialize {
     fn to_str(&self) -> &str;
 }
 
 ///
 /// Whether the Authorization Server should prompt the End-User for reauthentication and consent.
 ///
-pub trait AuthPrompt : AsRef<str> + Display + Eq + PartialEq {
+pub trait AuthPrompt : AsRef<str> + Display + PartialEq {
     fn to_str(&self) -> &str;
 }
 
-pub trait ClaimName : Debug + DeserializeOwned + Eq + PartialEq + Serialize {}
-pub trait ClaimType : Debug + DeserializeOwned + Eq + PartialEq + Serialize {}
+pub trait ClaimName : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
+pub trait ClaimType : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
 
-pub trait ClientAuthMethod : Debug + DeserializeOwned + Eq + PartialEq + Serialize {}
-pub trait GrantType : Debug + DeserializeOwned + Eq + PartialEq + Serialize {}
-pub trait JweContentEncryptionAlgorithm : Debug + DeserializeOwned + Eq + PartialEq + Serialize {}
-pub trait JweKeyManagementAlgorithm : Debug + DeserializeOwned + Eq + PartialEq + Serialize {}
-pub trait JwkSet : Debug + DeserializeOwned + Eq + PartialEq + Serialize {}
-pub trait JwsSigningAlgorithm : Debug + DeserializeOwned + Eq + PartialEq + Serialize {}
-pub trait ResponseMode : Debug + DeserializeOwned + Eq + PartialEq + Serialize {}
-pub trait ResponseType : AsRef<str> + Debug + DeserializeOwned + Eq + PartialEq + Serialize {
+pub trait ClientAuthMethod : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
+pub trait GenderClaim : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
+pub trait GrantType : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
+pub trait JsonWebKeyType : Clone + Debug + DeserializeOwned + PartialEq + Serialize {
+    fn is_symmetric(&self) -> bool;
+}
+pub trait JsonWebKeyUse : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
+// FIXME: add a key_type() method
+pub trait JweContentEncryptionAlgorithm
+    : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
+// FIXME: add a key_type() method?
+pub trait JweKeyManagementAlgorithm : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
+
+pub trait JwsSigningAlgorithm<JT> : Clone + Debug + DeserializeOwned + PartialEq + Serialize
+where JT: JsonWebKeyType {
+    // FIXME: return a real error
+    // FIXME: don't return jsonwebtoken types via public interface
+    fn from_jwt(alg: &jsonwebtoken::Algorithm) -> Result<Self, String>;
+    // FIXME: return a real error
+    // FIXME: don't return jsonwebtoken types via public interface
+    fn to_jwt(&self) -> Result<jsonwebtoken::Algorithm, String>;
+    // FIXME: return a real error
+    fn key_type(&self) -> Result<JT, String>;
+    fn is_symmetric(&self) -> bool;
+}
+
+pub trait ResponseMode : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
+pub trait ResponseType : AsRef<str> + Clone + Debug + DeserializeOwned + PartialEq + Serialize {
     fn to_oauth2(&self) -> oauth2::ResponseType;
 }
-pub trait SubjectIdentifierType : Debug + DeserializeOwned + Eq + PartialEq + Serialize {}
+pub trait SubjectIdentifierType : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
 
+// FIXME: make this a trait so that callers can add their own enums if desired
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
     AuthenticationContextClass(String)
 ];
 impl AsRef<str> for AuthenticationContextClass {
     fn as_ref(&self) -> &str{ self }
 }
 
+// FIXME: make this a trait so that callers can add their own enums if desired
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
+    AuthenticationMethodReference(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    AccessTokenHash(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    AddressCountry(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    AddressLocality(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    AddressPostalCode(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    AddressRegion(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    Audience(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    AuthorizationCodeHash(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    Base64UrlEncodedBytes(
+        #[serde(with = "serde_base64url_byte_array")]
+        Vec<u8>
+    )
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
     ClientName(String)
 ];
 
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
     ClientConfigUrl(
         #[serde(
             deserialize_with = "deserialize_url",
@@ -67,7 +156,7 @@ new_type![
 ];
 
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
     ClientUrl(
         #[serde(
             deserialize_with = "deserialize_url",
@@ -78,12 +167,95 @@ new_type![
 ];
 
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
     ContactEmail(String)
 ];
 
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
+    EndUserBirthday(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    EndUserEmail(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    EndUserGivenName(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    EndUserMiddleName(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    EndUserName(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    EndUserNickname(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    EndUserPhoneNumber(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    EndUserPictureUrl(
+        #[serde(
+            deserialize_with = "deserialize_url",
+            serialize_with = "serialize_url"
+        )]
+        Url
+    )
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    EndUserProfileUrl(
+        #[serde(
+            deserialize_with = "deserialize_url",
+            serialize_with = "serialize_url"
+        )]
+        Url
+    )
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    EndUserTimezone(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    EndUserWebsiteUrl(
+        #[serde(
+            deserialize_with = "deserialize_url",
+            serialize_with = "serialize_url"
+        )]
+        Url
+    )
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    EndUserUsername(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    FormattedAddress(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
     InitiateLoginUrl(
         #[serde(
             deserialize_with = "deserialize_url",
@@ -94,7 +266,7 @@ new_type![
 ];
 
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
     IssuerUrl(
         #[serde(
             deserialize_with = "deserialize_url",
@@ -115,18 +287,61 @@ new_type![
 ];
 
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
-    JwkSetUrl(
+    #[derive(Deserialize, Serialize)]
+    JsonWebKeyId(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    JsonWebKeySetUrl(
         #[serde(
             deserialize_with = "deserialize_url",
             serialize_with = "serialize_url"
         )]
         Url
     )
+    impl {
+        // FIXME: don't depend on super::discovery in this module (factor this out into some kind
+        // of HttpError?
+        pub fn get_keys<JS, JT, JU, K>(
+            &self
+        ) -> Result<JsonWebKeySet<JS, JT, JU, K>, DiscoveryError>
+        where JS: JwsSigningAlgorithm<JT>,
+                JT: JsonWebKeyType,
+                JU: JsonWebKeyUse,
+                K: JsonWebKey<JS, JT, JU> {
+            let key_response =
+                HttpRequest {
+                    url: &self.0,
+                    method: HttpRequestMethod::Get,
+                    headers: &vec![ACCEPT_JSON],
+                    post_body: &vec![],
+                }
+                .request()
+            .map_err(DiscoveryError::Request)?;
+
+            // FIXME: improve error handling (i.e., is there a body response?)
+            // possibly consolidate this error handling with discovery::get_provider_metadata().
+            if key_response.status_code != HTTP_STATUS_OK {
+                return Err(
+                    DiscoveryError::Response(
+                        key_response.status_code,
+                        "unexpected HTTP status code".to_string()
+                    )
+                );
+            }
+
+            key_response
+                .check_content_type(MIME_TYPE_JSON)
+                .map_err(|err_msg| DiscoveryError::Response(key_response.status_code, err_msg))?;
+
+            serde_json::from_slice(&key_response.body).map_err(DiscoveryError::Json)
+        }
+    }
 ];
 
 new_type![
-    #[derive(Deserialize, Eq, Hash, Serialize)]
+    #[derive(Deserialize, Serialize)]
     LanguageTag(String)
 ];
 impl AsRef<str> for LanguageTag {
@@ -134,12 +349,12 @@ impl AsRef<str> for LanguageTag {
 }
 
 new_secret_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
     LoginHint(String)
 ];
 
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
     LogoUrl(
         #[serde(
             deserialize_with = "deserialize_url",
@@ -150,12 +365,31 @@ new_type![
 ];
 
 new_secret_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
     Nonce(String)
+    impl {
+        ///
+        /// Generate a new random, base64-encoded 128-bit nonce.
+        ///
+        pub fn new_random() -> Self {
+            Nonce::new_random_len(16)
+        }
+        ///
+        /// Generate a new random, base64-encoded nonce of the specified length.
+        ///
+        /// # Arguments
+        ///
+        /// * `num_bytes` - Number of random bytes to generate, prior to base64-encoding.
+        ///
+        pub fn new_random_len(num_bytes: u32) -> Self {
+            let random_bytes: Vec<u8> = (0..num_bytes).map(|_| thread_rng().gen::<u8>()).collect();
+            Nonce::new(base64::encode(&random_bytes))
+        }
+    }
 ];
 
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
     OpPolicyUrl(
         #[serde(
             deserialize_with = "deserialize_url",
@@ -166,7 +400,7 @@ new_type![
 ];
 
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
     OpTosUrl(
         #[serde(
             deserialize_with = "deserialize_url",
@@ -177,7 +411,7 @@ new_type![
 ];
 
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
     PolicyUrl(
         #[serde(
             deserialize_with = "deserialize_url",
@@ -188,12 +422,12 @@ new_type![
 ];
 
 new_secret_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
     RegistrationAccessToken(String)
 ];
 
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
     RegistrationUrl(
         #[serde(
             deserialize_with = "deserialize_url",
@@ -204,7 +438,7 @@ new_type![
 ];
 
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
     RequestUrl(
         #[serde(
             deserialize_with = "deserialize_url",
@@ -222,7 +456,7 @@ new_type![
 ///     http://openid.net/specs/oauth-v2-multiple-response-types-1_0.html#ResponseTypesAndModes)
 /// for further details.
 ///
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ResponseTypes<RT: ResponseType>(
     #[serde(
         deserialize_with = "deserialize_space_delimited_vec",
@@ -246,7 +480,12 @@ impl<RT: ResponseType> Deref for ResponseTypes<RT> {
 }
 
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
+    Seconds(u64)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
     SectorIdentifierUrl(
         #[serde(
             deserialize_with = "deserialize_url",
@@ -257,7 +496,7 @@ new_type![
 ];
 
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
     ServiceDocUrl(
         #[serde(
             deserialize_with = "deserialize_url",
@@ -268,7 +507,17 @@ new_type![
 ];
 
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
+    StreetAddress(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    SubjectIdentifier(String)
+];
+
+new_type![
+    #[derive(Deserialize, Serialize)]
     ToSUrl(
         #[serde(
             deserialize_with = "deserialize_url",
@@ -279,7 +528,7 @@ new_type![
 ];
 
 new_type![
-    #[derive(Deserialize, Eq, Serialize)]
+    #[derive(Deserialize, Serialize)]
     UserInfoUrl(
         #[serde(
             deserialize_with = "deserialize_url",
@@ -332,5 +581,41 @@ pub mod helpers {
             };
 
         (field_name, language_tag)
+    }
+}
+
+mod serde_base64url_byte_array {
+    extern crate base64;
+
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde::de::Error;
+    use serde_json::{from_value, Value};
+
+    pub fn deserialize<'de, D>(
+        deserializer: D
+    ) -> Result<Vec<u8>, D::Error>
+    where D: Deserializer<'de> {
+        let value: Value = Deserialize::deserialize(deserializer)?;
+        let base64_encoded: String = from_value(value).map_err(D::Error::custom)?;
+
+        base64::decode_config(&base64_encoded, base64::URL_SAFE_NO_PAD)
+            .map_err(|err|
+                D::Error::custom(
+                    format!(
+                        "invalid base64url encoding `{}`: {:?}",
+                        base64_encoded,
+                        err
+                    )
+                )
+            )
+    }
+
+    pub fn serialize<S>(
+        v: &Vec<u8>,
+        serializer: S
+    ) -> Result<S::Ok, S::Error>
+    where S: Serializer {
+        let base64_encoded = base64::encode_config(v, base64::URL_SAFE_NO_PAD);
+        serializer.serialize_str(&base64_encoded)
     }
 }

@@ -19,7 +19,7 @@ use oauth2::{
     RefreshToken,
     ResponseType,
     Scope,
-    Token,
+    TokenResponse,
     TokenType,
     TokenUrl,
 };
@@ -28,7 +28,7 @@ use oauth2::basic::{
     BasicErrorResponse,
     BasicErrorResponseType,
     BasicRequestTokenError,
-    BasicToken,
+    BasicTokenResponse,
     BasicTokenType,
 };
 use openidconnect::*;
@@ -41,7 +41,7 @@ fn new_client() -> CoreClient {
         ClientId::new("aaa".to_string()),
         Some(ClientSecret::new("bbb".to_string())),
         AuthUrl::new(Url::parse("https://example/authorize").unwrap()),
-        TokenUrl::new(Url::parse("https://example/token").unwrap())
+        Some(TokenUrl::new(Url::parse("https://example/token").unwrap()))
     )
 }
 
@@ -49,15 +49,12 @@ fn new_client() -> CoreClient {
 fn test_authorize_url_minimal() {
     let client = new_client();
 
-    let auth_options =
-        CoreAuthOptions::new();
-
-    let authorize_url =
+    let (authorize_url, _, _) =
         client
             .authorize_url(
-                &auth_options,
-                &CsrfToken::new("CSRF123".to_string()),
-                &Nonce::new("NONCE456".to_string())
+                &AuthenticationFlow::AuthorizationCode::<CoreResponseType>,
+                || CsrfToken::new("CSRF123".to_string()),
+                || Nonce::new("NONCE456".to_string())
             );
 
     assert_eq!(
@@ -71,34 +68,40 @@ fn test_authorize_url_full() {
     let client =
         new_client()
             .add_scope(Scope::new("email".to_string()))
-            .set_redirect_url(RedirectUrl::new(Url::parse("http://localhost:8888/").unwrap()));
-
-    let auth_options =
-        CoreAuthOptions::new()
-            .set_display(CoreAuthDisplay::Touch)
-            .add_prompt(CoreAuthPrompt::Login)
-            .add_prompt(CoreAuthPrompt::Consent)
-            .set_max_age(Duration::from_secs(1800))
-            .add_ui_locale(LanguageTag::new("fr-CA".to_string()))
-            .add_ui_locale(LanguageTag::new("fr".to_string()))
-            .add_ui_locale(LanguageTag::new("en".to_string()))
-            .add_acr_value(
-                AuthenticationContextClass::new("urn:mace:incommon:iap:silver".to_string())
+            .set_redirect_uri(RedirectUrl::new(Url::parse("http://localhost:8888/").unwrap()))
+            .set_display(Some(CoreAuthDisplay::Touch))
+            .set_prompts(Some(vec![CoreAuthPrompt::Login, CoreAuthPrompt::Consent]))
+            .set_max_age(Some(Duration::from_secs(1800)))
+            .set_ui_locales(
+                Some(
+                    vec![
+                        LanguageTag::new("fr-CA".to_string()),
+                        LanguageTag::new("fr".to_string()),
+                        LanguageTag::new("en".to_string())
+                    ]
+                )
+            )
+            .set_acr_values(
+                Some(
+                    vec![
+                        AuthenticationContextClass::new("urn:mace:incommon:iap:silver".to_string())
+                    ]
+                )
             );
 
-    let authorize_url =
+    let (authorize_url, _, _) =
         client
             .authorize_url(
-                &auth_options,
-                &CsrfToken::new("CSRF123".to_string()),
-                &Nonce::new("NONCE456".to_string())
+                &AuthenticationFlow::AuthorizationCode::<CoreResponseType>,
+                || CsrfToken::new("CSRF123".to_string()),
+                || Nonce::new("NONCE456".to_string())
             );
 
     assert_eq!(
         "https://example/authorize?response_type=code&client_id=aaa&\
          redirect_uri=http%3A%2F%2Flocalhost%3A8888%2F&scope=openid+email&state=CSRF123&\
-         nonce=NONCE456&display=touch&prompt=login+consent&max_age=1800&ui_locales=fr-CA+fr+en&\
-         acr_values=urn%3Amace%3Aincommon%3Aiap%3Asilver",
+         nonce=NONCE456&acr_values=urn%3Amace%3Aincommon%3Aiap%3Asilver&display=touch&\
+         max_age=1800&prompt=login+consent&ui_locales=fr-CA+fr+en",
         authorize_url.to_string());
 }
 

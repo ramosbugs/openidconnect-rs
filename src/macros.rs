@@ -118,7 +118,7 @@ impl<T> DeserializeMapValue<T> for T where T: DeserializeOwned {
         }
     ) => {
         $(#[$attr])*
-        #[derive(Clone, Debug, Ord, PartialOrd, PartialEq)]
+        #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
         pub struct $name(
             $(#[$type_attr])*
             $type
@@ -356,10 +356,10 @@ impl<T> DeserializeMapValue<T> for T where T: DeserializeOwned {
     (@let_none $field:ident) => { let mut $field = None; };
     (@case $map:ident $key:ident $language_tag_opt:ident Option(Seconds($field:ident))) => {
         if $field.is_some() {
-            return Err(de::Error::duplicate_field(stringify!($field)));
+            return Err(serde::de::Error::duplicate_field(stringify!($field)));
         } else if let Some(language_tag) = $language_tag_opt {
             return Err(
-                de::Error::custom(
+                serde::de::Error::custom(
                     format!(
                         concat!("unexpected language tag `{}` for key `", stringify!($field), "`"),
                         language_tag.as_ref()
@@ -372,10 +372,10 @@ impl<T> DeserializeMapValue<T> for T where T: DeserializeOwned {
     };
     (@case $map:ident $key:ident $language_tag_opt:ident Option($field:ident)) => {
         if $field.is_some() {
-            return Err(de::Error::duplicate_field(stringify!($field)));
+            return Err(serde::de::Error::duplicate_field(stringify!($field)));
         } else if let Some(language_tag) = $language_tag_opt {
             return Err(
-                de::Error::custom(
+                serde::de::Error::custom(
                     format!(
                         concat!("unexpected language tag `{}` for key `", stringify!($field), "`"),
                         language_tag.as_ref()
@@ -395,17 +395,17 @@ impl<T> DeserializeMapValue<T> for T where T: DeserializeOwned {
                 $field.as_mut().unwrap()
             };
         if hash_map.contains_key(&$language_tag_opt) {
-            return Err(de::Error::custom(format!("duplicate field `{}`", $key)));
+            return Err(serde::de::Error::custom(format!("duplicate field `{}`", $key)));
         }
 
         hash_map.insert($language_tag_opt, $map.next_value()?);
     };
     (@case $map:ident $key:ident $language_tag_opt:ident $field:ident) => {
         if $field.is_some() {
-            return Err(de::Error::duplicate_field(stringify!($field)));
+            return Err(serde::de::Error::duplicate_field(stringify!($field)));
         } else if let Some(language_tag) = $language_tag_opt {
             return Err(
-                de::Error::custom(
+                serde::de::Error::custom(
                     format!(
                         concat!("unexpected language tag `{}` for key `", stringify!($field), "`"),
                         language_tag.as_ref()
@@ -448,8 +448,9 @@ impl<T> DeserializeMapValue<T> for T where T: DeserializeOwned {
         deserialize_fields![
             @struct_recurs [$($struct_type)+] {
                 $($name: $e,)* $field_new:
-                    $field_new.ok_or_else(|| de::Error::missing_field(stringify!($field_new)))? =>
-                        $([$($entry)+])*
+                    $field_new
+                        .ok_or_else(|| serde::de::Error::missing_field(stringify!($field_new)))? =>
+                            $([$($entry)+])*
             }
         ]
     };
@@ -480,7 +481,7 @@ impl<T> DeserializeMapValue<T> for T where T: DeserializeOwned {
                     )+
                     // Ignore unknown fields.
                     _ => {
-                        $map.next_value::<de::IgnoredAny>()?;
+                        $map.next_value::<serde::de::IgnoredAny>()?;
                     }
                 }
         }
