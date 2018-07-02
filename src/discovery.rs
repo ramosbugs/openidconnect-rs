@@ -14,7 +14,7 @@ use oauth2::{
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-use super::CONFIG_URL_SUFFIX;
+use super::{CONFIG_URL_SUFFIX, JsonWebKeySetUrl, UserInfoUrl};
 use super::http::{
     ACCEPT_JSON,
     HttpRequest,
@@ -31,7 +31,6 @@ use super::types::{
     ClaimType,
     GrantType,
     IssuerUrl,
-    JsonWebKeySetUrl,
     JsonWebKeyType,
     JweContentEncryptionAlgorithm,
     JweKeyManagementAlgorithm,
@@ -45,7 +44,6 @@ use super::types::{
     ResponseTypes,
     ServiceDocUrl,
     SubjectIdentifierType,
-    UserInfoUrl,
 };
 
 pub fn get_provider_metadata<PM, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>(

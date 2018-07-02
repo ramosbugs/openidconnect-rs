@@ -293,55 +293,6 @@ new_type![
 
 new_type![
     #[derive(Deserialize, Serialize)]
-    JsonWebKeySetUrl(
-        #[serde(
-            deserialize_with = "deserialize_url",
-            serialize_with = "serialize_url"
-        )]
-        Url
-    )
-    impl {
-        // FIXME: don't depend on super::discovery in this module (factor this out into some kind
-        // of HttpError?
-        pub fn get_keys<JS, JT, JU, K>(
-            &self
-        ) -> Result<JsonWebKeySet<JS, JT, JU, K>, DiscoveryError>
-        where JS: JwsSigningAlgorithm<JT>,
-                JT: JsonWebKeyType,
-                JU: JsonWebKeyUse,
-                K: JsonWebKey<JS, JT, JU> {
-            let key_response =
-                HttpRequest {
-                    url: &self.0,
-                    method: HttpRequestMethod::Get,
-                    headers: &vec![ACCEPT_JSON],
-                    post_body: &vec![],
-                }
-                .request()
-            .map_err(DiscoveryError::Request)?;
-
-            // FIXME: improve error handling (i.e., is there a body response?)
-            // possibly consolidate this error handling with discovery::get_provider_metadata().
-            if key_response.status_code != HTTP_STATUS_OK {
-                return Err(
-                    DiscoveryError::Response(
-                        key_response.status_code,
-                        "unexpected HTTP status code".to_string()
-                    )
-                );
-            }
-
-            key_response
-                .check_content_type(MIME_TYPE_JSON)
-                .map_err(|err_msg| DiscoveryError::Response(key_response.status_code, err_msg))?;
-
-            serde_json::from_slice(&key_response.body).map_err(DiscoveryError::Json)
-        }
-    }
-];
-
-new_type![
-    #[derive(Deserialize, Serialize)]
     LanguageTag(String)
 ];
 impl AsRef<str> for LanguageTag {
@@ -519,17 +470,6 @@ new_type![
 new_type![
     #[derive(Deserialize, Serialize)]
     ToSUrl(
-        #[serde(
-            deserialize_with = "deserialize_url",
-            serialize_with = "serialize_url"
-        )]
-        Url
-    )
-];
-
-new_type![
-    #[derive(Deserialize, Serialize)]
-    UserInfoUrl(
         #[serde(
             deserialize_with = "deserialize_url",
             serialize_with = "serialize_url"

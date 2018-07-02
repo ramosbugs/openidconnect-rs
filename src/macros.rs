@@ -51,7 +51,7 @@ impl<T> DeserializeMapValue<T> for T where T: DeserializeOwned {
 ///
 /// Copied from oauth2-rs crate (not part of that crate's stable public interface).
 ///
-#[macro_export] macro_rules! new_type {
+macro_rules! new_type {
     // Convenience pattern without an impl.
     (
         $(#[$attr:meta])*
@@ -144,7 +144,7 @@ impl<T> DeserializeMapValue<T> for T where T: DeserializeOwned {
 ///
 /// Copied from oauth2-rs crate (not part of that crate's stable public interface).
 ///
-#[macro_export] macro_rules! new_secret_type {
+macro_rules! new_secret_type {
     (
         $(#[$attr:meta])*
         $name:ident($type:ty)
@@ -224,7 +224,7 @@ impl<T> DeserializeMapValue<T> for T where T: DeserializeOwned {
 /// This macro reduces the redundancy of implementing an extensible struct with a default
 /// implementation adhering to the spec.
 ///
-#[macro_export] macro_rules! trait_struct {
+macro_rules! trait_struct {
     // Convenience pattern omitting `impl[...] trait[...] for struct[...], with a trailing comma
     // after the last struct field.
     (
@@ -345,7 +345,7 @@ impl<T> DeserializeMapValue<T> for T where T: DeserializeOwned {
     };
 }
 
-#[macro_export] macro_rules! deserialize_fields {
+macro_rules! deserialize_fields {
     (@field_str Option(Seconds($field:ident))) => { stringify![$field] };
     (@field_str Option($field:ident)) => { stringify![$field] };
     (@field_str LanguageTag($field:ident)) => { stringify![$field] };
@@ -489,7 +489,7 @@ impl<T> DeserializeMapValue<T> for T where T: DeserializeOwned {
     };
 }
 
-#[macro_export] macro_rules! serialize_fields {
+macro_rules! serialize_fields {
     (@case $self:ident $map:ident Option(Seconds($field:ident))) => {
         if let Some(ref $field) = $self.$field {
             $map.serialize_entry(stringify!($field), &$field.as_secs())?;
@@ -531,23 +531,77 @@ impl<T> DeserializeMapValue<T> for T where T: DeserializeOwned {
     };
 }
 
-#[macro_export] macro_rules! client_metadata_field_getters {
+macro_rules! field_getter_decls {
+    (@case $self:ident $field:ident Option < bool >) => {
+        fn $field(&$self) -> Option<bool>;
+    };
+    (@case $self:ident $field:ident Option < $type:ty >) => {
+        fn $field(&$self) -> Option<&$type>;
+    };
+    (@case $self:ident $field:ident $type:ty) => {
+        fn $field(&$self) -> &$type;
+    };
+    // Main entry point
+    (
+        $self:ident {
+            $(
+                $field:ident[$($entry:tt)+],
+            )+
+        }
+    ) => {
+        $(
+            field_getter_decls![@case $self $field $($entry)+];
+        )+
+    };
+}
+
+macro_rules! field_getters {
     (@case $self:ident [$zero:expr] $field:ident Option < bool >) => {
         fn $field(&$self) -> Option<bool> {
-            $zero.$field()
+            $zero.$field
         }
     };
     (@case $self:ident [$zero:expr] $field:ident Option < $type:ty >) => {
         fn $field(&$self) -> Option<&$type> {
-            $zero.$field()
+            $zero.$field.as_ref()
         }
     };
     (@case $self:ident [$zero:expr] $field:ident $type:ty) => {
         fn $field(&$self) -> &$type {
+            &$zero.$field
+        }
+    };
+    (@case pub $self:ident [$zero:expr] $field:ident Option < bool >) => {
+        pub fn $field(&$self) -> Option<bool> {
+            $zero.$field
+        }
+    };
+    (@case pub $self:ident [$zero:expr] $field:ident Option < $type:ty >) => {
+       pub  fn $field(&$self) -> Option<&$type> {
+            $zero.$field.as_ref()
+        }
+    };
+    (@case pub $self:ident [$zero:expr] $field:ident $type:ty) => {
+        pub fn $field(&$self) -> &$type {
+            &$zero.$field
+        }
+    };
+    (@case $self:ident [$zero:expr] $field:ident() Option < bool >) => {
+        fn $field(&$self) -> Option<bool> {
             $zero.$field()
         }
     };
-    // Main entry point
+    (@case $self:ident [$zero:expr] $field:ident() Option < $type:ty >) => {
+        fn $field(&$self) -> Option<&$type> {
+            $zero.$field()
+        }
+    };
+    (@case $self:ident [$zero:expr] $field:ident() $type:ty) => {
+        fn $field(&$self) -> &$type {
+            $zero.$field()
+        }
+    };
+    // Main entry points
     (
         $self:ident [$zero:expr] {
             $(
@@ -556,12 +610,34 @@ impl<T> DeserializeMapValue<T> for T where T: DeserializeOwned {
         }
     ) => {
         $(
-            client_metadata_field_getters![@case $self [$zero] $field $($entry)+];
+            field_getters![@case $self [$zero] $field $($entry)+];
+        )+
+    };
+    (
+        pub $self:ident [$zero:expr] {
+            $(
+                $field:ident[$($entry:tt)+],
+            )+
+        }
+    ) => {
+        $(
+            field_getters![@case pub $self [$zero] $field $($entry)+];
+        )+
+    };
+    (
+        $self:ident [$zero:expr]() {
+            $(
+                $field:ident[$($entry:tt)+],
+            )+
+        }
+    ) => {
+        $(
+            field_getters![@case $self [$zero] $field() $($entry)+];
         )+
     };
 }
 
-#[macro_export] macro_rules! client_metadata_field_setter_decls {
+macro_rules! field_setter_decls {
     (@case $setter:ident $field:ident Option < HashMap < Option < LanguageTag > , $type:ty > >) => {
         fn $setter(
             self,
@@ -582,12 +658,12 @@ impl<T> DeserializeMapValue<T> for T where T: DeserializeOwned {
         )+
     ) => {
         $(
-            client_metadata_field_setter_decls![@case $setter $field $($entry)+];
+            field_setter_decls![@case $setter $field $($entry)+];
         )+
     };
 }
 
-#[macro_export] macro_rules! client_metadata_field_setters {
+macro_rules! field_setters {
     (@case $self:ident [$zero:expr] $setter:ident $field:ident Option < HashMap < Option < LanguageTag > , $type:ty > >) => {
         fn $setter(
             mut $self,
@@ -634,7 +710,7 @@ impl<T> DeserializeMapValue<T> for T where T: DeserializeOwned {
         }
     ) => {
         $(
-            client_metadata_field_setters![@case $self [$zero] $setter $field $($entry)+];
+            field_setters![@case $self [$zero] $setter $field $($entry)+];
         )+
     };
 }

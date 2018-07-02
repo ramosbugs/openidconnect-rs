@@ -72,8 +72,17 @@ use types::helpers::split_language_tag_key;
 use url::Url;
 
 use discovery::{DiscoveryError, ProviderMetadata};
-use http::{HttpRequest, HttpRequestMethod, HttpResponse};
-use jwt::{JsonWebToken, JsonWebTokenAlgorithm};
+use http::{
+    ACCEPT_JSON,
+    auth_bearer,
+    HTTP_STATUS_OK,
+    HttpRequest,
+    HttpRequestMethod,
+    HttpResponse,
+    MIME_TYPE_JSON,
+    MIME_TYPE_JWT,
+};
+use jwt::{JsonWebToken, JsonWebTokenAlgorithm, JsonWebTokenHeader};
 use macros::TraitStructExtract;
 use registration::{ClientMetadata, ClientRegistrationResponse};
 // Flatten the module hierarchy involving types. They're only separated to improve code
@@ -380,6 +389,18 @@ pub struct AddressClaim {
     postal_code: Option<AddressPostalCode>,
     country: Option<AddressCountry>,
 }
+impl AddressClaim {
+    field_getters![
+        pub self [self] {
+            formatted[Option<FormattedAddress>],
+            street_address[Option<StreetAddress>],
+            locality[Option<AddressLocality>],
+            region[Option<AddressRegion>],
+            postal_code[Option<AddressPostalCode>],
+            country[Option<AddressCountry>],
+        }
+    ];
+}
 
 ///
 /// Authentication flow, which determines how the Authorization Server returns the OpenID Connect
@@ -419,27 +440,25 @@ pub enum AuthenticationFlow<RT: ResponseType> {
 pub struct EmptyAdditionalClaims {}
 impl AdditionalClaims for EmptyAdditionalClaims {}
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct IdToken<
-    AC: AdditionalClaims,
-    GC: GenderClaim,
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+struct JsonWebTokenClaims<
+    C: Clone + Debug + DeserializeOwned + Serialize,
     JE: JweContentEncryptionAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JT: JsonWebKeyType
 >(
-    JsonWebToken<IdTokenClaims<AC, GC>, JE, JS, JT>,
-    PhantomData<JT>,
+    #[serde(bound = "C: Clone + Debug + DeserializeOwned + Serialize")]
+    JsonWebToken<C, JE, JS, JT>
 );
-
-impl<AC, GC, JE, JS, JT> IdToken<AC, GC, JE, JS, JT>
-where AC: AdditionalClaims,
-        GC: GenderClaim,
+impl<C, JE, JS, JT> JsonWebTokenClaims<C, JE, JS, JT>
+where C: Clone + Debug + DeserializeOwned + Serialize,
         JE: JweContentEncryptionAlgorithm,
         JS: JwsSigningAlgorithm<JT>,
         JT: JsonWebKeyType {
-    fn validate_jose_header(&self) -> Result<(), IdTokenDecodeError> {
-        let jose_header = &self.0.unverified_header();
-
+    fn validate_jose_header(
+        jose_header: &JsonWebTokenHeader<JE, JS, JT>
+    // FIXME: return a different error type
+    ) -> Result<(), IdTokenDecodeError> {
         // The 'typ' header field must either be omitted or have the canonicalized value JWT.
         if let Some(ref jwt_type) = jose_header.typ {
             if jwt_type.to_uppercase() != "JWT" {
@@ -482,13 +501,23 @@ where AC: AdditionalClaims,
         Ok(())
     }
 
-    fn claims_without_nonce_check<JU, K>(
+    // FIXME: return a different error type
+    pub fn unverified_claims(&self) -> Result<&C, IdTokenDecodeError> {
+        let jose_header = &self.0.unverified_header();
+        Self::validate_jose_header(jose_header)?;
+        Ok(self.0.unverified_claims())
+    }
+
+    pub fn claims<JU, K>(
         &self,
         signature_keys: &JsonWebKeySet<JS, JT, JU, K>,
         client_secret_if_private_client: Option<&ClientSecret>,
-    ) -> Result<&IdTokenClaims<AC, GC>, IdTokenDecodeError>
+    // FIXME: return a different error type
+    ) -> Result<&C, IdTokenDecodeError>
     where JT: JsonWebKeyType, JU: JsonWebKeyUse, K: JsonWebKey<JS, JT, JU> {
         let jose_header = &self.0.unverified_header();
+        Self::validate_jose_header(jose_header)?;
+
         let signature_alg =
             match jose_header.alg {
                 JsonWebTokenAlgorithm::Encryption(ref encryption_alg) => {
@@ -616,7 +645,25 @@ where AC: AdditionalClaims,
             }
         }
     }
+}
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct IdToken<
+    AC: AdditionalClaims,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+>(
+    JsonWebTokenClaims<IdTokenClaims<AC, GC>, JE, JS, JT>
+);
+
+impl<AC, GC, JE, JS, JT> IdToken<AC, GC, JE, JS, JT>
+where AC: AdditionalClaims,
+        GC: GenderClaim,
+        JE: JweContentEncryptionAlgorithm,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType {
     fn validate_nonce(
         &self,
         nonce: &Nonce,
@@ -637,8 +684,6 @@ where AC: AdditionalClaims,
         Ok(())
     }
 
-    // FIXME: factor out a separate, dangerous version of this function that allows unsigned tokens,
-    // and continue rejecting them by default in this function.
     pub fn claims_for_private_client<JU, K>(
         &self,
         signature_keys: &JsonWebKeySet<JS, JT, JU, K>,
@@ -649,8 +694,7 @@ where AC: AdditionalClaims,
         nonce: &Nonce,
     ) -> Result<&IdTokenClaims<AC, GC>, IdTokenDecodeError>
     where JT: JsonWebKeyType, JU: JsonWebKeyUse, K: JsonWebKey<JS, JT, JU> {
-        self.validate_jose_header()?;
-        let claims = self.claims_without_nonce_check(signature_keys, Some(client_secret))?;
+        let claims = self.0.claims(signature_keys, Some(client_secret))?;
         self.validate_nonce(nonce, claims)?;
         Ok(claims)
     }
@@ -661,8 +705,7 @@ where AC: AdditionalClaims,
         nonce: &Nonce,
     ) -> Result<&IdTokenClaims<AC, GC>, IdTokenDecodeError>
     where JT: JsonWebKeyType, JU: JsonWebKeyUse, K: JsonWebKey<JS, JT, JU> {
-        self.validate_jose_header()?;
-        let claims = self.claims_without_nonce_check(signature_keys, None)?;
+        let claims = self.0.claims(signature_keys, None)?;
         self.validate_nonce(nonce, claims)?;
         Ok(claims)
     }
@@ -671,8 +714,7 @@ where AC: AdditionalClaims,
         &self,
         nonce_opt: Option<&Nonce>,
     ) -> Result<&IdTokenClaims<AC, GC>, IdTokenDecodeError> {
-        self.validate_jose_header()?;
-        let claims = self.0.unverified_claims();
+        let claims = self.0.unverified_claims()?;
         if let Some(nonce) = nonce_opt {
             self.validate_nonce(nonce, claims)?;
         }
@@ -692,25 +734,9 @@ pub enum IdTokenDecodeError {
     Unsupported(String),
 }
 
-/*
-pub struct IdTokenHeader<JS: JwsSigningAlgorithm<JT>, JT: JsonWebKeyType>(
-    jwt::Header,
-    PhantomData<JS>,
-    PhantomData<JT>,
-);
-impl<JS, JT> IdTokenHeader<JS, JT> where JS: JwsSigningAlgorithm<JT>, JT: JsonWebKeyType {
-    // FIXME: return a real error
-    pub fn alg(&self) -> Result<JS, String> {
-        JS::from_jwt(&self.0.alg)
-    }
-    pub fn kid(&self) -> Option<JsonWebKeyId> {
-        self.0.kid.clone().map(JsonWebKeyId::new)
-    }
-}
-*/
-
 // This is an annoying hack to work around the fact that Serde won't handle a tuple struct with more
 // than one element (to accomodate the PhantomData fields) as a String.
+// FIXME: remove this now that we don't have PhantomData?
 mod serde_id_token {
     use std::marker::PhantomData;
 
@@ -723,6 +749,7 @@ mod serde_id_token {
         IdToken,
         IdTokenClaims,
         JsonWebKeyType,
+        JsonWebTokenClaims,
         JweContentEncryptionAlgorithm,
         JwsSigningAlgorithm,
     };
@@ -739,8 +766,9 @@ mod serde_id_token {
             JT: JsonWebKeyType {
         Ok(
             IdToken(
-                JsonWebToken::<IdTokenClaims<AC, GC>, JE, JS, JT>::deserialize(deserializer)?,
-                PhantomData,
+                JsonWebTokenClaims(
+                    JsonWebToken::<IdTokenClaims<AC, GC>, JE, JS, JT>::deserialize(deserializer)?
+                )
             )
         )
     }
@@ -777,7 +805,7 @@ where AC: AdditionalClaims, GC: GenderClaim {
 
     #[serde(bound = "GC: GenderClaim")]
     #[serde(flatten)]
-    standard_claims: StandardClaims<GC>,
+    standard_claims: StandardClaimsImpl<GC>,
 
     #[serde(bound = "AC: AdditionalClaims")]
     #[serde(flatten)]
@@ -807,6 +835,35 @@ where AC: AdditionalClaims, GC: GenderClaim {
     pub fn authorized_party(&self) -> Option<&ClientId> { self.azp.as_ref() }
     pub fn access_token_hash(&self) -> Option<&AccessTokenHash> { self.at_hash.as_ref() }
     pub fn code_hash(&self) -> Option<&AuthorizationCodeHash> { self.c_hash.as_ref() }
+
+    pub fn additional_claims(&self) -> &AC { &self.additional_claims }
+}
+impl<AC, GC> StandardClaims<GC> for IdTokenClaims<AC, GC>
+where AC: AdditionalClaims, GC: GenderClaim {
+    field_getters![
+        self [self.standard_claims] {
+            sub[SubjectIdentifier],
+            name[Option<HashMap<Option<LanguageTag>, EndUserName>>],
+            given_name[Option<HashMap<Option<LanguageTag>, EndUserGivenName>>],
+            family_name[Option<HashMap<Option<LanguageTag>, EndUserGivenName>>],
+            middle_name[Option<HashMap<Option<LanguageTag>, EndUserMiddleName>>],
+            nickname[Option<HashMap<Option<LanguageTag>, EndUserNickname>>],
+            preferred_username[Option<EndUserUsername>],
+            profile[Option<HashMap<Option<LanguageTag>, EndUserProfileUrl>>],
+            picture[Option<HashMap<Option<LanguageTag>, EndUserPictureUrl>>],
+            website[Option<HashMap<Option<LanguageTag>, EndUserWebsiteUrl>>],
+            email[Option<EndUserEmail>],
+            email_verified[Option<bool>],
+            gender[Option<GC>],
+            birthday[Option<EndUserBirthday>],
+            zoneinfo[Option<EndUserTimezone>],
+            locale[Option<LanguageTag>],
+            phone_number[Option<EndUserPhoneNumber>],
+            phone_number_verified[Option<bool>],
+            address[Option<AddressClaim>],
+            updated_at[Option<Seconds>],
+        }
+    ];
 }
 
 ///
@@ -886,6 +943,55 @@ where JS: JwsSigningAlgorithm<JT>,
     pub fn keys(&self) -> &Vec<K> { &self.keys }
 }
 
+new_type![
+    #[derive(Deserialize, Serialize)]
+    JsonWebKeySetUrl(
+        #[serde(
+            deserialize_with = "deserialize_url",
+            serialize_with = "serialize_url"
+        )]
+        Url
+    )
+    impl {
+        // FIXME: don't depend on super::discovery in this module (factor this out into some kind
+        // of HttpError?
+        pub fn get_keys<JS, JT, JU, K>(
+            &self
+        ) -> Result<JsonWebKeySet<JS, JT, JU, K>, DiscoveryError>
+        where JS: JwsSigningAlgorithm<JT>,
+                JT: JsonWebKeyType,
+                JU: JsonWebKeyUse,
+                K: JsonWebKey<JS, JT, JU> {
+            let key_response =
+                HttpRequest {
+                    url: &self.0,
+                    method: HttpRequestMethod::Get,
+                    headers: &vec![ACCEPT_JSON],
+                    post_body: &vec![],
+                }
+                .request()
+            .map_err(DiscoveryError::Request)?;
+
+            // FIXME: improve error handling (i.e., is there a body response?)
+            // possibly consolidate this error handling with discovery::get_provider_metadata().
+            if key_response.status_code != HTTP_STATUS_OK {
+                return Err(
+                    DiscoveryError::Response(
+                        key_response.status_code,
+                        "unexpected HTTP status code".to_string()
+                    )
+                );
+            }
+
+            key_response
+                .check_content_type(MIME_TYPE_JSON)
+                .map_err(|err_msg| DiscoveryError::Response(key_response.status_code, err_msg))?;
+
+            serde_json::from_slice(&key_response.body).map_err(DiscoveryError::Json)
+        }
+    }
+];
+
 #[derive(Clone, Debug, Fail)]
 pub enum SignatureVerificationError {
     #[fail(display = "Crypto error: {}", _0)]
@@ -898,10 +1004,37 @@ pub enum SignatureVerificationError {
     Other(String),
 }
 
+// Public trait for accessing standard claims fields (via IdTokenClaims and UserInfoClaims).
+pub trait StandardClaims<GC> where GC: GenderClaim {
+    field_getter_decls![
+        self {
+            sub[SubjectIdentifier],
+            name[Option<HashMap<Option<LanguageTag>, EndUserName>>],
+            given_name[Option<HashMap<Option<LanguageTag>, EndUserGivenName>>],
+            family_name[Option<HashMap<Option<LanguageTag>, EndUserGivenName>>],
+            middle_name[Option<HashMap<Option<LanguageTag>, EndUserMiddleName>>],
+            nickname[Option<HashMap<Option<LanguageTag>, EndUserNickname>>],
+            preferred_username[Option<EndUserUsername>],
+            profile[Option<HashMap<Option<LanguageTag>, EndUserProfileUrl>>],
+            picture[Option<HashMap<Option<LanguageTag>, EndUserPictureUrl>>],
+            website[Option<HashMap<Option<LanguageTag>, EndUserWebsiteUrl>>],
+            email[Option<EndUserEmail>],
+            email_verified[Option<bool>],
+            gender[Option<GC>],
+            birthday[Option<EndUserBirthday>],
+            zoneinfo[Option<EndUserTimezone>],
+            locale[Option<LanguageTag>],
+            phone_number[Option<EndUserPhoneNumber>],
+            phone_number_verified[Option<bool>],
+            address[Option<AddressClaim>],
+            updated_at[Option<Seconds>],
+        }
+    ];
+}
+
 // Private (fields accessed via IdTokenClaims and UserInfoClaims)
 #[derive(Clone, Debug, PartialEq)]
-struct StandardClaims<GC>
-where GC: GenderClaim {
+struct StandardClaimsImpl<GC> where GC: GenderClaim {
     sub: SubjectIdentifier,
     name: Option<HashMap<Option<LanguageTag>, EndUserName>>,
     given_name: Option<HashMap<Option<LanguageTag>, EndUserGivenName>>,
@@ -923,7 +1056,7 @@ where GC: GenderClaim {
     address: Option<AddressClaim>,
     updated_at: Option<Seconds>,
 }
-impl<'de, GC> Deserialize<'de> for StandardClaims<GC> where GC: GenderClaim {
+impl<'de, GC> Deserialize<'de> for StandardClaimsImpl<GC> where GC: GenderClaim {
     ///
     /// Special deserializer that supports [RFC 5646](https://tools.ietf.org/html/rfc5646) language
     /// tags associated with human-readable client metadata fields.
@@ -931,10 +1064,10 @@ impl<'de, GC> Deserialize<'de> for StandardClaims<GC> where GC: GenderClaim {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         struct ClaimsVisitor<GC: GenderClaim>(PhantomData<GC>);
         impl<'de, GC> Visitor<'de> for ClaimsVisitor<GC> where GC: GenderClaim {
-            type Value = StandardClaims<GC>;
+            type Value = StandardClaimsImpl<GC>;
 
             fn expecting(&self, formatter: &mut Formatter) -> FormatterResult {
-                formatter.write_str("struct IdTokenClaims")
+                formatter.write_str("struct StandardClaimsImpl")
             }
             fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
             where V: MapAccess<'de> {
@@ -970,7 +1103,7 @@ impl<'de, GC> Deserialize<'de> for StandardClaims<GC> where GC: GenderClaim {
             )
     }
 }
-impl<GC> Serialize for StandardClaims<GC> where GC: GenderClaim {
+impl<GC> Serialize for StandardClaimsImpl<GC> where GC: GenderClaim {
     #[allow(cyclomatic_complexity)]
     fn serialize<SE>(&self, serializer: SE) -> Result<SE::Ok, SE::Error> where SE: Serializer {
         serialize_fields!{
@@ -1012,3 +1145,184 @@ fn join_optional_vec<T>(vec_opt: Option<&Vec<T>>) -> Option<String> where T: AsR
         None => None,
     }
 }
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct UserInfoClaims<AC, GC> where AC: AdditionalClaims, GC: GenderClaim {
+    iss: Option<IssuerUrl>,
+    // FIXME: this needs to be a vector, but it may also come as a single string
+    aud: Option<Vec<Audience>>,
+
+    #[serde(bound = "GC: GenderClaim")]
+    #[serde(flatten)]
+    standard_claims: StandardClaimsImpl<GC>,
+
+    #[serde(bound = "AC: AdditionalClaims")]
+    #[serde(flatten)]
+    additional_claims: AC
+}
+// FIXME: see what other structs should have friendlier trait interfaces like this one
+impl<AC, GC> UserInfoClaims<AC, GC>
+where AC: AdditionalClaims, GC: GenderClaim {
+    pub fn issuer(&self) -> Option<&IssuerUrl> { self.iss.as_ref() }
+    pub fn audiences(&self) -> Option<&Vec<Audience>> { self.aud.as_ref() }
+    pub fn additional_claims(&self) -> &AC { &self.additional_claims }
+}
+impl<AC, GC> StandardClaims<GC> for UserInfoClaims<AC, GC>
+where AC: AdditionalClaims, GC: GenderClaim {
+    field_getters![
+        self [self.standard_claims] {
+            sub[SubjectIdentifier],
+            name[Option<HashMap<Option<LanguageTag>, EndUserName>>],
+            given_name[Option<HashMap<Option<LanguageTag>, EndUserGivenName>>],
+            family_name[Option<HashMap<Option<LanguageTag>, EndUserGivenName>>],
+            middle_name[Option<HashMap<Option<LanguageTag>, EndUserMiddleName>>],
+            nickname[Option<HashMap<Option<LanguageTag>, EndUserNickname>>],
+            preferred_username[Option<EndUserUsername>],
+            profile[Option<HashMap<Option<LanguageTag>, EndUserProfileUrl>>],
+            picture[Option<HashMap<Option<LanguageTag>, EndUserPictureUrl>>],
+            website[Option<HashMap<Option<LanguageTag>, EndUserWebsiteUrl>>],
+            email[Option<EndUserEmail>],
+            email_verified[Option<bool>],
+            gender[Option<GC>],
+            birthday[Option<EndUserBirthday>],
+            zoneinfo[Option<EndUserTimezone>],
+            locale[Option<LanguageTag>],
+            phone_number[Option<EndUserPhoneNumber>],
+            phone_number_verified[Option<bool>],
+            address[Option<AddressClaim>],
+            updated_at[Option<Seconds>],
+        }
+    ];
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct UserInfoJsonWebTokenClaims<
+    AC: AdditionalClaims,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+>(
+    JsonWebTokenClaims<UserInfoClaims<AC, GC>, JE, JS, JT>
+);
+
+impl<AC, GC, JE, JS, JT> UserInfoJsonWebTokenClaims<AC, GC, JE, JS, JT>
+where AC: AdditionalClaims,
+        GC: GenderClaim,
+        JE: JweContentEncryptionAlgorithm,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType {
+    pub fn claims_for_private_client<JU, K>(
+        &self,
+        signature_keys: &JsonWebKeySet<JS, JT, JU, K>,
+        // FIXME: add a docstring mentioning that this must only be used for private clients. Public
+        // clients can't keep their client_secret confidential, so Section 10.1 of OpenID Connect
+        // Core 1.0 prohibits using symmetric signatures for them.
+        client_secret: &ClientSecret,
+    // FIXME: return a different error type
+    ) -> Result<&UserInfoClaims<AC, GC>, IdTokenDecodeError>
+    where JT: JsonWebKeyType, JU: JsonWebKeyUse, K: JsonWebKey<JS, JT, JU> {
+        self.0.claims(signature_keys, Some(client_secret))
+    }
+
+    pub fn claims_for_public_client<JU, K>(
+        &self,
+        signature_keys: &JsonWebKeySet<JS, JT, JU, K>,
+    // FIXME: return a different error type
+    ) -> Result<&UserInfoClaims<AC, GC>, IdTokenDecodeError>
+    where JT: JsonWebKeyType, JU: JsonWebKeyUse, K: JsonWebKey<JS, JT, JU> {
+        self.0.claims(signature_keys, None)
+    }
+
+    pub fn dangerous_claims_without_signature_verification(
+        &self,
+    // FIXME: return a different error type
+    ) -> Result<&UserInfoClaims<AC, GC>, IdTokenDecodeError> {
+        self.0.unverified_claims()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum UserInfoResponse<AC, GC, JE, JS, JT>
+where AC: AdditionalClaims,
+        GC: GenderClaim,
+        JE: JweContentEncryptionAlgorithm,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType {
+    JsonResponse(UserInfoClaims<AC, GC>),
+    JsonWebTokenResponse(UserInfoJsonWebTokenClaims<AC, GC, JE, JS, JT>),
+}
+
+// FIXME: move out of types module
+new_type![
+    #[derive(Deserialize, Serialize)]
+    UserInfoUrl(
+        #[serde(
+            deserialize_with = "deserialize_url",
+            serialize_with = "serialize_url"
+        )]
+        Url
+    )
+    impl {
+        // FIXME: don't depend on super::discovery in this module (factor this out into some kind
+        // of HttpError?)
+        pub fn get_user_info<AC, GC, JE, JS, JT>(
+            &self,
+            access_token: &AccessToken
+        ) -> Result<UserInfoResponse<AC, GC, JE, JS, JT>, DiscoveryError>
+        where AC: AdditionalClaims,
+                GC: GenderClaim,
+                JE: JweContentEncryptionAlgorithm,
+                JS: JwsSigningAlgorithm<JT>,
+                JT: JsonWebKeyType {
+            let (auth_header, auth_value) = auth_bearer(access_token);
+            let user_info_response =
+                HttpRequest {
+                    url: &self.0,
+                    method: HttpRequestMethod::Get,
+                    headers: &vec![ACCEPT_JSON, (auth_header, auth_value.as_ref())],
+                    post_body: &vec![],
+                }
+                .request()
+            .map_err(DiscoveryError::Request)?;
+
+            // FIXME: improve error handling (i.e., is there a body response?)
+            // possibly consolidate this error handling with discovery::get_provider_metadata().
+            if user_info_response.status_code != HTTP_STATUS_OK {
+                return Err(
+                    DiscoveryError::Response(
+                        user_info_response.status_code,
+                        "unexpected HTTP status code".to_string()
+                    )
+                );
+            }
+
+            match user_info_response.content_type.as_ref().map(String::as_str) {
+                None | Some(MIME_TYPE_JSON) =>
+                    Ok(
+                        UserInfoResponse::JsonResponse(
+                            serde_json::from_slice(&user_info_response.body)
+                                .map_err(DiscoveryError::Json)?
+                        )
+                    ),
+                Some(MIME_TYPE_JWT) =>
+                    Ok(
+                        UserInfoResponse::JsonWebTokenResponse(
+                            UserInfoJsonWebTokenClaims(
+                                serde_json::from_slice(&user_info_response.body)
+                                    .map_err(DiscoveryError::Json)?
+                            )
+                        )
+                    ),
+                Some(content_type) =>
+                    Err(
+                        DiscoveryError::Response(
+                            user_info_response.status_code,
+                            format!("Unexpected response Content-Type: `{}`", content_type)
+                        )
+                    ),
+            }
+        }
+    }
+];
+

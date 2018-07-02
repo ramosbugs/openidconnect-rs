@@ -17,6 +17,7 @@ use serde_json;
 use super::{
     JsonWebKey,
     JsonWebKeySet,
+    JsonWebKeySetUrl,
 };
 use super::http::{
     ACCEPT_JSON,
@@ -39,7 +40,6 @@ use super::types::{
     ContactEmail,
     GrantType,
     InitiateLoginUrl,
-    JsonWebKeySetUrl,
     JsonWebKeyType,
     JsonWebKeyUse,
     JweContentEncryptionAlgorithm,
@@ -409,7 +409,7 @@ where AT: ApplicationType,
             .map_err(ClientRegistrationError::Json)
     }
 
-    client_metadata_field_setter_decls![
+    field_setter_decls![
         set_redirect_uris -> redirect_uris[Vec<RedirectUrl>],
         set_response_types -> response_types[Option<Vec<ResponseTypes<RT>>>],
         set_grant_types -> grant_types[Option<Vec<G>>],
@@ -546,7 +546,7 @@ where AT: ApplicationType,
         self.initial_access_token = access_token
     }
 
-    client_metadata_field_setters![
+    field_setters![
         self [self.client_metadata] {
             set_redirect_uris -> redirect_uris[Vec<RedirectUrl>],
             set_response_types -> response_types[Option<Vec<ResponseTypes<RT>>>],
@@ -697,38 +697,38 @@ where AT: ApplicationType,
       K: JsonWebKey<JS, JT, JU>,
       RT: ResponseType,
       S: SubjectIdentifierType {
-    client_metadata_field_getters![
-        self [self.client_metadata] {
-             redirect_uris[Vec<RedirectUrl>],
-             response_types[Option<Vec<ResponseTypes<RT>>>],
-             grant_types[Option<Vec<G>>],
-             application_type[Option<AT>],
-             contacts[Option<Vec<ContactEmail>>],
-             client_name[Option<HashMap<Option<LanguageTag>, ClientName>>],
-             logo_uri[Option<HashMap<Option<LanguageTag>, LogoUrl>>],
-             client_uri[Option<HashMap<Option<LanguageTag>, ClientUrl>>],
-             policy_uri[Option<HashMap<Option<LanguageTag>, PolicyUrl>>],
-             tos_uri[Option<HashMap<Option<LanguageTag>, ToSUrl>>],
-             jwks_uri[Option<JsonWebKeySetUrl>],
-             jwks[Option<JsonWebKeySet<JS, JT, JU, K>>],
-             sector_identifier_uri[Option<SectorIdentifierUrl>],
-             subject_type[Option<S>],
-             id_token_signed_response_alg[Option<JS>],
-             id_token_encrypted_response_alg[Option<JK>],
-             id_token_encrypted_response_enc[Option<JE>],
-             userinfo_signed_response_alg[Option<JS>],
-             userinfo_encrypted_response_alg[Option<JK>],
-             userinfo_encrypted_response_enc[Option<JE>],
-             request_object_signing_alg[Option<JS>],
-             request_object_encryption_alg[Option<JK>],
-             request_object_encryption_enc[Option<JE>],
-             token_endpoint_auth_method[Option<CA>],
-             token_endpoint_auth_signing_alg[Option<JS>],
-             default_max_age[Option<Duration>],
-             require_auth_time[Option<bool>],
-             default_acr_values[Option<Vec<AuthenticationContextClass>>],
-             initiate_login_uri[Option<InitiateLoginUrl>],
-             request_uris[Option<Vec<RequestUrl>>],
+    field_getters![
+        self [self.client_metadata]() {
+            redirect_uris[Vec<RedirectUrl>],
+            response_types[Option<Vec<ResponseTypes<RT>>>],
+            grant_types[Option<Vec<G>>],
+            application_type[Option<AT>],
+            contacts[Option<Vec<ContactEmail>>],
+            client_name[Option<HashMap<Option<LanguageTag>, ClientName>>],
+            logo_uri[Option<HashMap<Option<LanguageTag>, LogoUrl>>],
+            client_uri[Option<HashMap<Option<LanguageTag>, ClientUrl>>],
+            policy_uri[Option<HashMap<Option<LanguageTag>, PolicyUrl>>],
+            tos_uri[Option<HashMap<Option<LanguageTag>, ToSUrl>>],
+            jwks_uri[Option<JsonWebKeySetUrl>],
+            jwks[Option<JsonWebKeySet<JS, JT, JU, K>>],
+            sector_identifier_uri[Option<SectorIdentifierUrl>],
+            subject_type[Option<S>],
+            id_token_signed_response_alg[Option<JS>],
+            id_token_encrypted_response_alg[Option<JK>],
+            id_token_encrypted_response_enc[Option<JE>],
+            userinfo_signed_response_alg[Option<JS>],
+            userinfo_encrypted_response_alg[Option<JK>],
+            userinfo_encrypted_response_enc[Option<JE>],
+            request_object_signing_alg[Option<JS>],
+            request_object_encryption_alg[Option<JK>],
+            request_object_encryption_enc[Option<JE>],
+            token_endpoint_auth_method[Option<CA>],
+            token_endpoint_auth_signing_alg[Option<JS>],
+            default_max_age[Option<Duration>],
+            require_auth_time[Option<bool>],
+            default_acr_values[Option<Vec<AuthenticationContextClass>>],
+            initiate_login_uri[Option<InitiateLoginUrl>],
+            request_uris[Option<Vec<RequestUrl>>],
         }
     ];
 }

@@ -8,22 +8,23 @@ extern crate openidconnect;
 #[macro_use] extern crate pretty_assertions;
 extern crate url;
 
-use std::borrow::Borrow;
 use std::collections::HashMap;
 
 use curl::easy::Easy;
 use oauth2::prelude::*;
-use oauth2::{AuthorizationCode, CsrfToken, Scope};
+use oauth2::{AccessToken, AuthorizationCode, CsrfToken, Scope};
 use url::Url;
 
-use openidconnect::{AuthenticationFlow, IdToken, IdTokenDecodeError};
+use openidconnect::{AuthenticationFlow, IdTokenDecodeError, StandardClaims, UserInfoResponse};
 use openidconnect::core::{
     CoreClient,
     CoreClientRegistrationResponse,
     CoreIdToken,
+    CoreIdTokenClaims,
     CoreJsonWebKeySet,
     CoreProviderMetadata,
-    CoreResponseType
+    CoreResponseType,
+    CoreUserInfoResponse,
 };
 use openidconnect::discovery::ProviderMetadata;
 use openidconnect::registration::{ClientMetadata, ClientRegistrationResponse};
@@ -32,16 +33,14 @@ use openidconnect::types::Nonce;
 #[macro_use] mod rp_common;
 
 use rp_common::{
-    CERTIFICATION_BASE_URL,
     get_provider_metadata,
     init_log,
     issuer_url,
     register_client,
-    RP_CONTACT_EMAIL,
-    RP_NAME,
 };
 
 struct TestState {
+    access_token: Option<AccessToken>,
     authorization_code: Option<AuthorizationCode>,
     client: CoreClient,
     id_token: Option<CoreIdToken>,
@@ -50,8 +49,20 @@ struct TestState {
     registration_response: CoreClientRegistrationResponse,
 }
 impl TestState {
+    pub fn access_token(&self) -> &AccessToken {
+        self.access_token.as_ref().expect("no access_token")
+    }
     pub fn id_token(&self) -> &CoreIdToken {
         self.id_token.as_ref().expect("no id_token")
+    }
+    pub fn id_token_claims(&self) -> &CoreIdTokenClaims {
+        self.id_token()
+            .claims_for_private_client(
+                &self.jwks(),
+                self.registration_response.client_secret().expect("no client_secret"),
+                self.nonce.as_ref().expect("no nonce"),
+            )
+            .expect("failed to validate claims")
     }
 
     pub fn init(test_id: &'static str) -> Self {
@@ -67,6 +78,7 @@ impl TestState {
                 .set_redirect_uri(redirect_uri);
 
         TestState {
+            access_token: None,
             authorization_code: None,
             client,
             id_token: None,
@@ -131,6 +143,8 @@ impl TestState {
                 .unwrap();
         log_debug!("Authorization Server returned token response: {:?}", token_response);
 
+        self.access_token = Some(token_response.access_token().clone());
+
         let id_token = (*token_response.extra_fields().id_token()).clone();
         self.id_token = Some(id_token);
 
@@ -160,9 +174,43 @@ fn rp_scope_userinfo_claims() {
             .collect::<Vec<_>>();
     let test_state =
         TestState::init("rp-scope-userinfo-claims")
-            .authorize(&user_info_scopes);
+            .authorize(&user_info_scopes)
+            .exchange_code();
+    let id_token_claims = test_state.id_token_claims();
 
-    // FIXME: implement the rest of this test
+    let user_info_response: CoreUserInfoResponse =
+        test_state
+            .provider_metadata
+            .userinfo_endpoint()
+            .unwrap()
+            .get_user_info(test_state.access_token())
+            .unwrap();
+    let user_info_claims =
+        match user_info_response {
+            UserInfoResponse::JsonResponse(user_info_claims) => user_info_claims,
+            other => panic!("Unexpected user info response: {:?}", other),
+        };
+
+    log_debug!("UserInfo response: {:?}", user_info_claims);
+
+    assert!(id_token_claims.sub() == user_info_claims.sub());
+    assert!(!user_info_claims.email().expect("no email returned by UserInfo endpoint").is_empty());
+    assert!(
+        !user_info_claims
+            .address()
+            .expect("no address returned by UserInfo endpoint")
+            .street_address()
+            .expect("no street address returned by UserInfo endpoint")
+            .is_empty()
+    );
+    assert!(
+        !user_info_claims
+            .phone_number()
+            .expect("no phone_number returned by UserInfo endpoint")
+            .is_empty()
+    );
+
+    log_info!("SUCCESS");
 }
 
 #[test]
@@ -175,14 +223,13 @@ fn rp_nonce_invalid() {
     let claims_result = test_state.id_token().claims_for_private_client(
         &test_state.jwks(),
         test_state.registration_response.client_secret().unwrap(),
-        // FIXME: make sure this fails since nonce is private
         test_state.nonce.as_ref().expect("no nonce"),
     );
 
     match claims_result {
         Err(IdTokenDecodeError::InvalidNonce(_)) =>
             log_info!("ID token contains invalid nonce (expected result)"),
-        other => panic!("Unexpected result verifying ID token claims: ${:?}", other)
+        other => panic!("Unexpected result verifying ID token claims: {:?}", other),
     }
 
     log_info!("SUCCESS");

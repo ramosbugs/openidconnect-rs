@@ -35,6 +35,7 @@ use super::{
     GenderClaim,
     GrantType,
     IdToken,
+    IdTokenClaims,
     JsonWebKey,
     JsonWebKeyId,
     JsonWebKeySet,
@@ -47,6 +48,8 @@ use super::{
     ResponseType,
     SignatureVerificationError,
     SubjectIdentifierType,
+    UserInfoClaims,
+    UserInfoResponse,
 };
 use super::discovery::Discovery10ProviderMetadata;
 use super::registration::{
@@ -129,6 +132,8 @@ pub type CoreIdToken =
         CoreJsonWebKeyType
     >;
 
+pub type CoreIdTokenClaims = IdTokenClaims<EmptyAdditionalClaims, CoreGenderClaim>;
+
 pub type CoreJsonWebKeySet =
     JsonWebKeySet<
         CoreJwsSigningAlgorithm,
@@ -151,6 +156,17 @@ pub type CoreProviderMetadata =
         CoreResponseMode,
         CoreResponseType,
         CoreSubjectIdentifierType
+    >;
+
+pub type CoreUserInfoClaims = UserInfoClaims<EmptyAdditionalClaims, CoreGenderClaim>;
+
+pub type CoreUserInfoResponse =
+    UserInfoResponse<
+        EmptyAdditionalClaims,
+        CoreGenderClaim,
+        CoreJweContentEncryptionAlgorithm,
+        CoreJwsSigningAlgorithm,
+        CoreJsonWebKeyType,
     >;
 
 ///

@@ -9,6 +9,7 @@ use oauth2::prelude::*;
 use url::Url;
 
 pub const MIME_TYPE_JSON: &str = "application/json";
+pub const MIME_TYPE_JWT: &str = "application/jwt";
 
 // Request headers
 pub const ACCEPT_JSON: (&str, &str) = ("Accept", MIME_TYPE_JSON);

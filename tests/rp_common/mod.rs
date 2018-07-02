@@ -40,7 +40,7 @@ pub fn set_test_id(test_id: &'static str) {
 
 #[macro_export] macro_rules! log_info {
     ($($args:tt)+) => {
-        info!("[{}] {}", rp_common::get_test_id().borrow(), format!($($args)+));
+        info!("[{}] {}", rp_common::get_test_id(), format!($($args)+));
     }
 }
 #[macro_export] macro_rules! log_debug {

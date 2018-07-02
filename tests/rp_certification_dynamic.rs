@@ -32,7 +32,7 @@ use rp_common::{
 #[test]
 fn rp_discovery_openid_configuration() {
     const TEST_ID: &str = "rp-discovery-openid-configuration";
-    init_log();
+    init_log(TEST_ID);
 
     let _issuer_url = issuer_url(TEST_ID);
     let provider_metadata = get_provider_metadata(TEST_ID);
@@ -88,7 +88,7 @@ fn rp_discovery_openid_configuration() {
 #[test]
 fn rp_registration_dynamic() {
     const TEST_ID: &str = "rp-registration-dynamic";
-    init_log();
+    init_log(TEST_ID);
 
     let _issuer_url = issuer_url(TEST_ID);
     let provider_metadata = get_provider_metadata(TEST_ID);
