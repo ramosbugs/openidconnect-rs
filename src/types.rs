@@ -9,23 +9,12 @@ extern crate url;
 use std::fmt::{Debug, Display, Error as FormatterError, Formatter};
 use std::ops::Deref;
 
-use oauth2::ClientId;
 use oauth2::helpers::{deserialize_space_delimited_vec, deserialize_url, serialize_url};
 use oauth2::prelude::*;
 use rand::{thread_rng, Rng};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use url::Url;
-
-use super::{JsonWebKey, JsonWebKeySet};
-use super::discovery::DiscoveryError;
-use super::http::{
-    ACCEPT_JSON,
-    HttpRequest,
-    HttpRequestMethod,
-    HTTP_STATUS_OK,
-    MIME_TYPE_JSON,
-};
 
 
 pub trait AdditionalClaims: Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
@@ -483,7 +472,7 @@ new_type![
 
 pub mod helpers {
     use oauth2::prelude::*;
-    use serde::{Serialize, Serializer};
+    use serde::Serializer;
 
     use super::LanguageTag;
 
@@ -530,7 +519,7 @@ pub mod helpers {
 mod serde_base64url_byte_array {
     extern crate base64;
 
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde::{Deserialize, Deserializer, Serializer};
     use serde::de::Error;
     use serde_json::{from_value, Value};
 
@@ -554,7 +543,7 @@ mod serde_base64url_byte_array {
     }
 
     pub fn serialize<S>(
-        v: &Vec<u8>,
+        v: &[u8],
         serializer: S
     ) -> Result<S::Ok, S::Error>
     where S: Serializer {

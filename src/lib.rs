@@ -18,7 +18,7 @@ extern crate curl;
 extern crate failure;
 #[macro_use] extern crate failure_derive;
 #[macro_use] extern crate log;
-#[macro_use] extern crate oauth2;
+extern crate oauth2;
 extern crate rand;
 extern crate ring;
 extern crate serde;
@@ -28,14 +28,12 @@ extern crate untrusted;
 extern crate url;
 
 use std::collections::HashMap;
-use std::convert::From;
-use std::fmt::{Debug, Display, Error as FormatterError, Formatter, Result as FormatterResult};
+use std::fmt::{Debug, Formatter, Result as FormatterResult};
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::time::Duration;
 
 use chrono::{DateTime, TimeZone, Utc};
-use curl::easy::Easy;
 use oauth2::prelude::*;
 use oauth2::{
     AccessToken,
@@ -56,14 +54,6 @@ use oauth2::{
     TokenType,
     TokenUrl,
 };
-use oauth2::basic::{
-    BasicClient,
-    BasicErrorResponse,
-    BasicErrorResponseType,
-    BasicRequestTokenError,
-    BasicTokenResponse,
-    BasicTokenType,
-};
 use oauth2::helpers::{deserialize_url, serialize_url, variant_name};
 use serde::{Serialize, Serializer};
 use serde::de::{Deserialize, DeserializeOwned, Deserializer, MapAccess, Visitor};
@@ -78,13 +68,11 @@ use http::{
     HTTP_STATUS_OK,
     HttpRequest,
     HttpRequestMethod,
-    HttpResponse,
     MIME_TYPE_JSON,
     MIME_TYPE_JWT,
 };
 use jwt::{JsonWebToken, JsonWebTokenAlgorithm, JsonWebTokenHeader};
-use macros::TraitStructExtract;
-use registration::{ClientMetadata, ClientRegistrationResponse};
+use registration::ClientRegistrationResponse;
 // Flatten the module hierarchy involving types. They're only separated to improve code
 // organization.
 pub use types::*;
@@ -599,7 +587,7 @@ where C: Clone + Debug + DeserializeOwned + Serialize,
                     )
                     .collect::<Vec<&K>>();
             if public_keys.is_empty() {
-                return Err(
+                Err(
                     IdTokenDecodeError::InvalidSignature(
                         "no eligible public keys found in JWK set".to_string()
                     )
@@ -608,17 +596,17 @@ where C: Clone + Debug + DeserializeOwned + Serialize,
                 if let Ok(verified_claims) =
                     self.0.claims(signature_alg, *public_keys.first().expect("unreachable"))
                 {
-                    return Ok(verified_claims)
+                    Ok(verified_claims)
                 } else {
                     // We found the matching key, so if signature validation fails, bail.
-                    return Err(
+                    Err(
                         IdTokenDecodeError::InvalidSignature(
                             "failed to validate signature".to_string()
                         )
                     )
                 }
             } else {
-                return Err(
+                Err(
                     IdTokenDecodeError::InvalidSignature(
                         format!(
                             "JWK set must only contain one eligible public key \
@@ -728,8 +716,6 @@ pub enum IdTokenDecodeError {
 // than one element (to accomodate the PhantomData fields) as a String.
 // FIXME: remove this now that we don't have PhantomData?
 mod serde_id_token {
-    use std::marker::PhantomData;
-
     use serde::{Serialize, Serializer};
     use serde::de::{Deserialize, Deserializer};
 

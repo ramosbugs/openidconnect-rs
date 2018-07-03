@@ -720,8 +720,8 @@ pub enum CoreJsonWebKeyType {
 }
 impl JsonWebKeyType for CoreJsonWebKeyType {
     fn is_symmetric(&self) -> bool {
-        match self {
-            &CoreJsonWebKeyType::Symmetric => true,
+        match *self {
+            CoreJsonWebKeyType::Symmetric => true,
             _ => false,
         }
     }
