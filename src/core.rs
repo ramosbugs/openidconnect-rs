@@ -734,7 +734,22 @@ pub enum CoreJsonWebKeyUse {
     #[serde(rename = "enc")]
     Encryption,
 }
-impl JsonWebKeyUse for CoreJsonWebKeyUse {}
+impl JsonWebKeyUse for CoreJsonWebKeyUse {
+    fn allows_signature(&self) -> bool {
+        if let CoreJsonWebKeyUse::Signature = *self {
+            true
+        } else {
+            false
+        }
+    }
+    fn allows_encryption(&self) -> bool {
+        if let CoreJsonWebKeyUse::Encryption = *self {
+            true
+        } else {
+            false
+        }
+    }
+}
 
 ///
 /// Core JWS signing algorithms.

@@ -555,7 +555,8 @@ where C: Clone + Debug + DeserializeOwned + Serialize,
         // JOSE header, as an attacker could manipulate these while forging the JWT. The code below
         // must be secure regardless of how these fields are manipulated.
 
-        if signature_alg.is_symmetric() {
+        let key_type = signature_alg.key_type().map_err(IdTokenDecodeError::Unsupported)?;
+        if key_type.is_symmetric() {
             if let Some(client_secret) = client_secret_if_private_client {
                 // FIXME: implement
                 return Err(
@@ -573,75 +574,59 @@ where C: Clone + Debug + DeserializeOwned + Serialize,
                 )
             }
         } else {
+
             // Section 10.1 of OpenID Connect Core 1.0 states that the JWT must include a key ID if
             // the JWK set contains more than one public key. 
 
-            // See if any key has a matching key ID and compatible type.
-            if let Some(ref key_id) = jose_header.kid {
-                for key in signature_keys.keys().iter() {
-                    if key.key_id() == Some(key_id) {
-                        if let Ok(verified_claims) = self.0.claims(signature_alg, key) {
-                            return Ok(verified_claims)
-                        } else {
-                            // We found the matching key, so if signature validation fails, bail.
-                            return Err(
-                                IdTokenDecodeError::InvalidSignature(
-                                    format!(
-                                        "failed to validate signature using key with ID `{}`",
-                                        **key_id
-                                    )
-                                )
-                            )
-                        }
-                    }
-                }
-
-                // The header references a key ID we don't know, so return an error. Even if there's
-                // only one key in the JWK set, it's suspicious and inconsistent for there to be a
-                // key ID in the JOSE header but not in the JWK itself. Hence, we're conservative
-                // and reject the signature here. This decision may be revisited if legitimate
-                // scenarios arise.
+            // See if any key has a matching key ID (if supplied) and compatible type.
+            let public_keys =
+                signature_keys
+                    .keys()
+                    .iter()
+                    .filter(|key|
+                        // The key must be of the type expected for this signature algorithm.
+                        *key.key_type() == key_type &&
+                            // Either the key hasn't specified it's allowed usage (in which case
+                            // any usage is acceptable), or the key supports signing.
+                            (key.key_use().is_none() ||
+                                key.key_use().iter().any(
+                                    |key_use| key_use.allows_signature()
+                                )) &&
+                            // Either the JWT doesn't include a 'kid' (in which case any 'kid'
+                            // is acceptable), or the 'kid' matches the key's ID.
+                            (jose_header.kid.is_none() ||
+                                jose_header.kid.as_ref() == key.key_id())
+                    )
+                    .collect::<Vec<&K>>();
+            if public_keys.is_empty() {
                 return Err(
                     IdTokenDecodeError::InvalidSignature(
-                        format!("could not find public key with ID `{}`", **key_id)
+                        "no eligible public keys found in JWK set".to_string()
                     )
                 )
-            } else {
-                // The JOSE header doesn't contain a key ID, which is only allowed if the JWK set
-                // contains exactly one asymmetric key.
-                let public_keys =
-                    signature_keys
-                        .keys()
-                        .iter()
-                        .filter(|key| !key.key_type().is_symmetric())
-                        .collect::<Vec<&K>>();
-                if public_keys.is_empty() {
-                    return Err(
-                        IdTokenDecodeError::InvalidSignature(
-                            "no public keys found in JWK set".to_string()
-                        )
-                    )
-                } else if public_keys.len() == 1 {
-                    if let Ok(verified_claims) =
-                        self.0.claims(signature_alg, *public_keys.first().expect("unreachable"))
-                    {
-                        return Ok(verified_claims)
-                    } else {
-                        // We found the matching key, so if signature validation fails, bail.
-                        return Err(
-                            IdTokenDecodeError::InvalidSignature(
-                                "failed to validate signature".to_string()
-                            )
-                        )
-                    }
+            } else if public_keys.len() == 1 {
+                if let Ok(verified_claims) =
+                    self.0.claims(signature_alg, *public_keys.first().expect("unreachable"))
+                {
+                    return Ok(verified_claims)
                 } else {
+                    // We found the matching key, so if signature validation fails, bail.
                     return Err(
                         IdTokenDecodeError::InvalidSignature(
-                            "JWK set must only contain one public key if JOSE header omits \
-                            key ID".to_string()
+                            "failed to validate signature".to_string()
                         )
                     )
                 }
+            } else {
+                return Err(
+                    IdTokenDecodeError::InvalidSignature(
+                        format!(
+                            "JWK set must only contain one eligible public key \
+                            (candidate keys: {:?})",
+                            public_keys
+                        )
+                    )
+                )
             }
         }
     }
@@ -695,6 +680,11 @@ where AC: AdditionalClaims,
     ) -> Result<&IdTokenClaims<AC, GC>, IdTokenDecodeError>
     where JT: JsonWebKeyType, JU: JsonWebKeyUse, K: JsonWebKey<JS, JT, JU> {
         let claims = self.0.claims(signature_keys, Some(client_secret))?;
+
+        // FIXME: do additional validation described in
+        // https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
+        // one idea: use a builder pattern to customize the validation in an extensible manner
+
         self.validate_nonce(nonce, claims)?;
         Ok(claims)
     }

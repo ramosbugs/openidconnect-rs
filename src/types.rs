@@ -55,7 +55,10 @@ pub trait GrantType : Clone + Debug + DeserializeOwned + PartialEq + Serialize {
 pub trait JsonWebKeyType : Clone + Debug + DeserializeOwned + PartialEq + Serialize {
     fn is_symmetric(&self) -> bool;
 }
-pub trait JsonWebKeyUse : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
+pub trait JsonWebKeyUse : Clone + Debug + DeserializeOwned + PartialEq + Serialize {
+    fn allows_signature(&self) -> bool;
+    fn allows_encryption(&self) -> bool;
+}
 // FIXME: add a key_type() method
 pub trait JweContentEncryptionAlgorithm
     : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}

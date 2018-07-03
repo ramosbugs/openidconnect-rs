@@ -77,8 +77,12 @@ pub fn get_provider_metadata(test_id: &str) -> CoreProviderMetadata {
         .expect(&format!("Failed to fetch provider metadata from {:?}", _issuer_url))
 }
 
-pub fn register_client(provider_metadata: &CoreProviderMetadata) -> CoreClientRegistrationResponse {
-    let registration_request =
+pub fn register_client<F>(
+    provider_metadata: &CoreProviderMetadata,
+    request_fn: F,
+) -> CoreClientRegistrationResponse
+where F: FnOnce(CoreClientRegistrationRequest) -> CoreClientRegistrationRequest {
+    let registration_request_pre =
         CoreClientRegistrationRequest::new(
             vec![RedirectUrl::new(Url::parse(RP_REDIRECT_URI).unwrap())]
         )
@@ -86,11 +90,13 @@ pub fn register_client(provider_metadata: &CoreProviderMetadata) -> CoreClientRe
         .set_client_name(Some(ClientName::new(RP_NAME.to_string())), None)
         .set_contacts(Some(vec![ContactEmail::new(RP_CONTACT_EMAIL.to_string())]));
 
+    let registration_request_post = request_fn(registration_request_pre);
+
     let registration_endpoint =
         provider_metadata
             .registration_endpoint()
             .expect("provider does not support dynamic registration");
-    registration_request
+    registration_request_post
         .register(&registration_endpoint)
         .expect(&format!("Failed to register client at {:?}", registration_endpoint))
 }

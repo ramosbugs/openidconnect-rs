@@ -12,12 +12,14 @@ use std::collections::HashMap;
 
 use curl::easy::Easy;
 use oauth2::prelude::*;
-use oauth2::{AccessToken, AuthorizationCode, CsrfToken, Scope};
+use oauth2::{AccessToken, AuthorizationCode, AuthType, CsrfToken, Scope};
 use url::Url;
 
 use openidconnect::{AuthenticationFlow, IdTokenDecodeError, StandardClaims, UserInfoResponse};
 use openidconnect::core::{
     CoreClient,
+    CoreClientAuthMethod,
+    CoreClientRegistrationRequest,
     CoreClientRegistrationResponse,
     CoreIdToken,
     CoreIdTokenClaims,
@@ -27,7 +29,11 @@ use openidconnect::core::{
     CoreUserInfoResponse,
 };
 use openidconnect::discovery::ProviderMetadata;
-use openidconnect::registration::{ClientMetadata, ClientRegistrationResponse};
+use openidconnect::registration::{
+    ClientMetadata,
+    ClientRegistrationRequest,
+    ClientRegistrationResponse
+};
 use openidconnect::types::Nonce;
 
 #[macro_use] mod rp_common;
@@ -51,41 +57,6 @@ struct TestState {
 impl TestState {
     pub fn access_token(&self) -> &AccessToken {
         self.access_token.as_ref().expect("no access_token")
-    }
-    pub fn id_token(&self) -> &CoreIdToken {
-        self.id_token.as_ref().expect("no id_token")
-    }
-    pub fn id_token_claims(&self) -> &CoreIdTokenClaims {
-        self.id_token()
-            .claims_for_private_client(
-                &self.jwks(),
-                self.registration_response.client_secret().expect("no client_secret"),
-                self.nonce.as_ref().expect("no nonce"),
-            )
-            .expect("failed to validate claims")
-    }
-
-    pub fn init(test_id: &'static str) -> Self {
-        init_log(test_id);
-
-        let _issuer_url = issuer_url(test_id);
-        let provider_metadata = get_provider_metadata(test_id);
-        let registration_response = register_client(&provider_metadata);
-
-        let redirect_uri = registration_response.redirect_uris()[0].clone();
-        let client: CoreClient =
-            CoreClient::from_dynamic_registration(&provider_metadata, &registration_response)
-                .set_redirect_uri(redirect_uri);
-
-        TestState {
-            access_token: None,
-            authorization_code: None,
-            client,
-            id_token: None,
-            nonce: None,
-            provider_metadata,
-            registration_response,
-        }
     }
 
     pub fn authorize(mut self, scopes: &Vec<Scope>) -> Self {
@@ -151,15 +122,58 @@ impl TestState {
         self
     }
 
+    pub fn id_token(&self) -> &CoreIdToken {
+        self.id_token.as_ref().expect("no id_token")
+    }
+
+    pub fn id_token_claims(&self) -> &CoreIdTokenClaims {
+        self.id_token()
+            .claims_for_private_client(
+                &self.jwks(),
+                self.registration_response.client_secret().expect("no client_secret"),
+                self.nonce.as_ref().expect("no nonce"),
+            )
+            .expect("failed to validate claims")
+    }
+
+    pub fn init<F>(test_id: &'static str, reg_request_fn: F) -> Self
+    where F: FnOnce(CoreClientRegistrationRequest) -> CoreClientRegistrationRequest {
+        init_log(test_id);
+
+        let _issuer_url = issuer_url(test_id);
+        let provider_metadata = get_provider_metadata(test_id);
+        let registration_response = register_client(&provider_metadata, reg_request_fn);
+
+        let redirect_uri = registration_response.redirect_uris()[0].clone();
+        let client: CoreClient =
+            CoreClient::from_dynamic_registration(&provider_metadata, &registration_response)
+                .set_redirect_uri(redirect_uri);
+
+        TestState {
+            access_token: None,
+            authorization_code: None,
+            client,
+            id_token: None,
+            nonce: None,
+            provider_metadata,
+            registration_response,
+        }
+    }
+
     pub fn jwks(&self) -> CoreJsonWebKeySet {
         self.provider_metadata.jwks_uri().unwrap().get_keys().unwrap()
+    }
+
+    pub fn set_auth_type(mut self, auth_type: AuthType) -> Self {
+        self.client = self.client.set_auth_type(auth_type);
+        self
     }
 }
 
 #[test]
 fn rp_response_type_code() {
     let test_state =
-        TestState::init("rp-response_type-code")
+        TestState::init("rp-response_type-code", |reg| reg)
             .authorize(&vec![]);
     assert!(test_state.authorization_code.expect("no authorization_code").secret() != "");
     log_info!("SUCCESS");
@@ -173,10 +187,11 @@ fn rp_scope_userinfo_claims() {
             .map(|scope| Scope::new(scope.to_string()))
             .collect::<Vec<_>>();
     let test_state =
-        TestState::init("rp-scope-userinfo-claims")
+        TestState::init("rp-scope-userinfo-claims", |reg| reg)
             .authorize(&user_info_scopes)
             .exchange_code();
     let id_token_claims = test_state.id_token_claims();
+    log_debug!("ID token: {:?}", id_token_claims);
 
     let user_info_response: CoreUserInfoResponse =
         test_state
@@ -216,7 +231,7 @@ fn rp_scope_userinfo_claims() {
 #[test]
 fn rp_nonce_invalid() {
     let test_state =
-        TestState::init("rp-nonce-invalid")
+        TestState::init("rp-nonce-invalid", |reg| reg)
             .authorize(&vec![])
             .exchange_code();
 
@@ -231,6 +246,52 @@ fn rp_nonce_invalid() {
             log_info!("ID token contains invalid nonce (expected result)"),
         other => panic!("Unexpected result verifying ID token claims: {:?}", other),
     }
+
+    log_info!("SUCCESS");
+}
+
+#[test]
+fn rp_token_endpoint_client_secret_basic() {
+    let test_state =
+        TestState::init("rp-token_endpoint-client_secret_basic",
+            |reg| reg.set_token_endpoint_auth_method(Some(CoreClientAuthMethod::ClientSecretBasic))
+        )
+        .set_auth_type(AuthType::BasicAuth)
+        .authorize(&vec![])
+        .exchange_code();
+
+    let id_token_claims = test_state.id_token_claims();
+    log_debug!("ID token: {:?}", id_token_claims);
+
+    log_info!("SUCCESS");
+}
+
+#[test]
+fn rp_token_endpoint_client_secret_post() {
+    let test_state =
+        TestState::init(
+            "rp-token_endpoint-client_secret_post",
+            |reg| reg.set_token_endpoint_auth_method(Some(CoreClientAuthMethod::ClientSecretPost))
+        )
+        .set_auth_type(AuthType::RequestBody)
+        .authorize(&vec![])
+        .exchange_code();
+
+    let id_token_claims = test_state.id_token_claims();
+    log_debug!("ID token: {:?}", id_token_claims);
+
+    log_info!("SUCCESS");
+}
+
+#[test]
+fn rp_id_token_kid_absent_single_jwks() {
+    let test_state =
+        TestState::init("rp-id_token-kid-absent-single-jwks", |reg| reg)
+            .authorize(&vec![])
+            .exchange_code();
+
+    let id_token_claims = test_state.id_token_claims();
+    log_debug!("ID token: {:?}", id_token_claims);
 
     log_info!("SUCCESS");
 }
