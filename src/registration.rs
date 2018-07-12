@@ -73,7 +73,7 @@ trait_struct![
         K: JsonWebKey<JS, JT, JU>,
         RT: ResponseType,
         S: SubjectIdentifierType,
-    ] : [Clone + Debug + DeserializeOwned + PartialEq + Serialize] {}
+    ] : [Debug + DeserializeOwned + PartialEq + Serialize] {}
     #[derive(Clone, Debug, PartialEq)]
     struct Registration10ClientMetadata[
         AT: ApplicationType,
@@ -313,7 +313,7 @@ where AT: ApplicationType,
 
 // FIXME: switch to embedding a flattened extra_fields struct
 pub trait ClientRegistrationRequest<AT, CA, CM, CR, ET, G, JE, JK, JS, JT, JU, K, RT, S>
-    : Clone + Debug + PartialEq + Sized
+    : Debug + PartialEq + Sized
 where AT: ApplicationType,
       CA: ClientAuthMethod,
       CM: ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
@@ -585,7 +585,7 @@ where AT: ApplicationType,
 // FIXME: switch to embedding a flattened extra_fields struct
 pub trait ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
     : ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
-    + Clone + Debug + DeserializeOwned + PartialEq + Serialize
+    + Debug + DeserializeOwned + PartialEq + Serialize
 where AT: ApplicationType,
       CA: ClientAuthMethod,
       G: GrantType,

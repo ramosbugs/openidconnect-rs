@@ -1,9 +1,11 @@
 
 extern crate env_logger;
+extern crate failure;
 
 use std::cell::RefCell;
 use std::sync::{Once, ONCE_INIT};
 
+use failure::Fail;
 use oauth2::prelude::NewType;
 use oauth2::RedirectUrl;
 use url::Url;
@@ -38,6 +40,11 @@ pub fn set_test_id(test_id: &'static str) {
     TEST_ID.with(|id| *id.borrow_mut() = test_id);
 }
 
+#[macro_export] macro_rules! log_error {
+    ($($args:tt)+) => {
+        error!("[{}] {}", rp_common::get_test_id(), format!($($args)+));
+    }
+}
 #[macro_export] macro_rules! log_info {
     ($($args:tt)+) => {
         info!("[{}] {}", rp_common::get_test_id(), format!($($args)+));
@@ -62,6 +69,29 @@ fn _init_log() {
 pub fn init_log(test_id: &'static str) {
     INIT_LOG.call_once(_init_log);
     set_test_id(test_id);
+}
+
+// FIXME: convert this to a trait on Result<_, Fail>
+pub trait PanicIfFail<T, F> where F: Fail {
+    fn panic_if_fail(self, msg: &'static str) -> T;
+}
+impl<T, F> PanicIfFail<T, F> for Result<T, F> where F: Fail {
+    fn panic_if_fail(self, msg: &'static str) -> T {
+        match self {
+            Ok(ret) => ret,
+            Err(fail) => {
+                let mut err_msg = format!("Panic: {}", msg);
+
+                let mut cur_fail: Option<&Fail> = Some(&fail);
+                while let Some(cause) = cur_fail {
+                    err_msg += &format!("\n    caused by: {}", cause);
+                    cur_fail = cause.cause();
+                }
+                error!("[{}] {}", get_test_id(), err_msg);
+                panic!(msg);
+            }
+        }
+    }
 }
 
 pub fn issuer_url(test_id: &str) -> IssuerUrl {

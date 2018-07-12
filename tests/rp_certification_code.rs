@@ -1,6 +1,7 @@
 
 extern crate curl;
 extern crate env_logger;
+extern crate failure;
 extern crate jsonwebtoken as jwt;
 #[macro_use] extern crate log;
 extern crate oauth2;
@@ -12,10 +13,16 @@ use std::collections::HashMap;
 
 use curl::easy::Easy;
 use oauth2::prelude::*;
-use oauth2::{AccessToken, AuthorizationCode, AuthType, CsrfToken, Scope};
+use oauth2::{AccessToken, AuthorizationCode, AuthType, CsrfToken, RequestTokenError, Scope};
 use url::Url;
 
-use openidconnect::{AuthenticationFlow, IdTokenDecodeError, StandardClaims, UserInfoResponse};
+use openidconnect::{
+    AuthenticationFlow,
+    ClaimsVerificationError,
+    SignatureVerificationError,
+    StandardClaims,
+    UserInfoResponse
+};
 use openidconnect::core::{
     CoreClient,
     CoreClientAuthMethod,
@@ -23,9 +30,11 @@ use openidconnect::core::{
     CoreClientRegistrationResponse,
     CoreIdToken,
     CoreIdTokenClaims,
+    CoreIdTokenVerifier,
     CoreJsonWebKeySet,
     CoreProviderMetadata,
     CoreResponseType,
+    CoreUserInfoClaims,
     CoreUserInfoResponse,
 };
 use openidconnect::discovery::ProviderMetadata;
@@ -42,6 +51,7 @@ use rp_common::{
     get_provider_metadata,
     init_log,
     issuer_url,
+    PanicIfFail,
     register_client,
 };
 
@@ -55,6 +65,30 @@ struct TestState {
     registration_response: CoreClientRegistrationResponse,
 }
 impl TestState {
+    pub fn init<F>(test_id: &'static str, reg_request_fn: F) -> Self
+    where F: FnOnce(CoreClientRegistrationRequest) -> CoreClientRegistrationRequest {
+        init_log(test_id);
+
+        let _issuer_url = issuer_url(test_id);
+        let provider_metadata = get_provider_metadata(test_id);
+        let registration_response = register_client(&provider_metadata, reg_request_fn);
+
+        let redirect_uri = registration_response.redirect_uris()[0].clone();
+        let client: CoreClient =
+            CoreClient::from_dynamic_registration(&provider_metadata, &registration_response)
+                .set_redirect_uri(redirect_uri);
+
+        TestState {
+            access_token: None,
+            authorization_code: None,
+            client,
+            id_token: None,
+            nonce: None,
+            provider_metadata,
+            registration_response,
+        }
+    }
+
     pub fn access_token(&self) -> &AccessToken {
         self.access_token.as_ref().expect("no access_token")
     }
@@ -111,7 +145,7 @@ impl TestState {
         let token_response =
             self.client
                 .exchange_code(self.authorization_code.take().expect("no authorization_code"))
-                .unwrap();
+                .panic_if_fail("failed to exchange authorization code for token");
         log_debug!("Authorization Server returned token response: {:?}", token_response);
 
         self.access_token = Some(token_response.access_token().clone());
@@ -126,37 +160,32 @@ impl TestState {
         self.id_token.as_ref().expect("no id_token")
     }
 
-    pub fn id_token_claims(&self) -> &CoreIdTokenClaims {
-        self.id_token()
-            .claims_for_private_client(
-                &self.jwks(),
-                self.registration_response.client_secret().expect("no client_secret"),
-                self.nonce.as_ref().expect("no nonce"),
-            )
-            .expect("failed to validate claims")
+    pub fn id_token_verifier<'a, 'b: 'a>(
+        &'b self,
+        jwks: &'a CoreJsonWebKeySet
+    ) -> CoreIdTokenVerifier<'a> {
+        CoreIdTokenVerifier::new_private_client(
+            self.registration_response.client_id(),
+            self.registration_response.client_secret().expect("no client_secret"),
+            self.provider_metadata.issuer(),
+            &jwks,
+        )
     }
 
-    pub fn init<F>(test_id: &'static str, reg_request_fn: F) -> Self
-    where F: FnOnce(CoreClientRegistrationRequest) -> CoreClientRegistrationRequest {
-        init_log(test_id);
+    pub fn id_token_claims(&self) -> &CoreIdTokenClaims {
+        let jwks = self.jwks();
+        let verifier = self.id_token_verifier(&jwks);
+        self.id_token()
+            .claims(&verifier, self.nonce.as_ref().expect("no nonce"))
+            .panic_if_fail("failed to validate claims")
+    }
 
-        let _issuer_url = issuer_url(test_id);
-        let provider_metadata = get_provider_metadata(test_id);
-        let registration_response = register_client(&provider_metadata, reg_request_fn);
-
-        let redirect_uri = registration_response.redirect_uris()[0].clone();
-        let client: CoreClient =
-            CoreClient::from_dynamic_registration(&provider_metadata, &registration_response)
-                .set_redirect_uri(redirect_uri);
-
-        TestState {
-            access_token: None,
-            authorization_code: None,
-            client,
-            id_token: None,
-            nonce: None,
-            provider_metadata,
-            registration_response,
+    pub fn id_token_claims_failure(&self) -> ClaimsVerificationError {
+        let jwks = self.jwks();
+        let verifier = self.id_token_verifier(&jwks);
+        match self.id_token().claims(&verifier, self.nonce.as_ref().expect("no nonce")) {
+            Err(err) => err,
+            _ => panic!("claims verification succeeded but was expected to fail"),
         }
     }
 
@@ -168,6 +197,32 @@ impl TestState {
         self.client = self.client.set_auth_type(auth_type);
         self
     }
+
+    pub fn user_info_claims(&self) -> CoreUserInfoClaims {
+        let user_info_response: CoreUserInfoResponse =
+            self.provider_metadata
+                .userinfo_endpoint()
+                .unwrap()
+                .get_user_info(self.access_token())
+                .unwrap();
+        match user_info_response {
+            UserInfoResponse::JsonResponse(user_info_claims) => user_info_claims,
+            other => panic!("Unexpected user info response: {:?}", other),
+        }
+    }
+
+/*
+    pub fn user_info_claims_failure(&self) -> ClaimsVerificationError {
+        let user_info_result =
+            self.provider_metadata
+                .userinfo_endpoint()
+                .unwrap()
+                .get_user_info(self.access_token());
+        match user_info_result {
+            Err(err) => err,
+            _ => panic!("claims verification succeeded but was expected to fail"),
+        }
+    }*/
 }
 
 #[test]
@@ -193,19 +248,7 @@ fn rp_scope_userinfo_claims() {
     let id_token_claims = test_state.id_token_claims();
     log_debug!("ID token: {:?}", id_token_claims);
 
-    let user_info_response: CoreUserInfoResponse =
-        test_state
-            .provider_metadata
-            .userinfo_endpoint()
-            .unwrap()
-            .get_user_info(test_state.access_token())
-            .unwrap();
-    let user_info_claims =
-        match user_info_response {
-            UserInfoResponse::JsonResponse(user_info_claims) => user_info_claims,
-            other => panic!("Unexpected user info response: {:?}", other),
-        };
-
+    let user_info_claims = test_state.user_info_claims();
     log_debug!("UserInfo response: {:?}", user_info_claims);
 
     assert!(id_token_claims.sub() == user_info_claims.sub());
@@ -235,15 +278,9 @@ fn rp_nonce_invalid() {
             .authorize(&vec![])
             .exchange_code();
 
-    let claims_result = test_state.id_token().claims_for_private_client(
-        &test_state.jwks(),
-        test_state.registration_response.client_secret().unwrap(),
-        test_state.nonce.as_ref().expect("no nonce"),
-    );
-
-    match claims_result {
-        Err(IdTokenDecodeError::InvalidNonce(_)) =>
-            log_info!("ID token contains invalid nonce (expected result)"),
+    match test_state.id_token_claims_failure() {
+        ClaimsVerificationError::InvalidNonce(_) =>
+            log_error!("ID token contains invalid nonce (expected result)"),
         other => panic!("Unexpected result verifying ID token claims: {:?}", other),
     }
 
@@ -296,3 +333,173 @@ fn rp_id_token_kid_absent_single_jwks() {
     log_info!("SUCCESS");
 }
 
+#[test]
+fn rp_id_token_iat() {
+    let mut test_state =
+        TestState::init("rp-id_token-iat", |reg| reg)
+            .authorize(&vec![]);
+
+    let token_response =
+        test_state
+            .client
+            .exchange_code(test_state.authorization_code.take().expect("no authorization_code"));
+
+    match token_response {
+        Err(RequestTokenError::Parse(_)) =>
+            log_error!("ID token failed to parse without `iat` claim (expected result)"),
+        other => panic!("Unexpected result verifying ID token claims: {:?}", other),
+    }
+    log_info!("SUCCESS");
+}
+
+#[test]
+fn rp_id_token_aud() {
+    let test_state =
+        TestState::init("rp-id_token-aud", |reg| reg)
+            .authorize(&vec![])
+            .exchange_code();
+
+    match test_state.id_token_claims_failure() {
+        ClaimsVerificationError::InvalidAudience(_) =>
+            log_error!("ID token has invalid audience (expected result)"),
+        other => panic!("Unexpected result verifying ID token claims: {:?}", other),
+    }
+
+    log_info!("SUCCESS");
+}
+
+#[test]
+fn rp_id_token_kid_absent_multiple_jwks() {
+    let test_state =
+        TestState::init("rp-id_token-kid-absent-multiple-jwks", |reg| reg)
+            .authorize(&vec![])
+            .exchange_code();
+
+    match test_state.id_token_claims_failure() {
+        ClaimsVerificationError::SignatureVerification(
+            SignatureVerificationError::AmbiguousKeyId(_)
+        ) => log_error!("ID token has ambiguous key identification without KID (expected result)"),
+        other => panic!("Unexpected result verifying ID token claims: {:?}", other),
+    }
+
+    log_info!("SUCCESS");
+}
+
+#[test]
+fn rp_id_token_sig_none() {
+    let test_state =
+        TestState::init("rp-id_token-sig-none", |reg| reg)
+            .authorize(&vec![])
+            .exchange_code();
+
+    let jwks = test_state.jwks();
+    let verifier =
+        test_state
+            .id_token_verifier(&jwks)
+            .insecure_disable_signature_check();
+
+    let id_token_claims =
+        test_state
+            .id_token()
+            .claims(&verifier, test_state.nonce.as_ref().expect("no nonce"))
+            .panic_if_fail("failed to validate claims");
+    log_debug!("ID token: {:?}", id_token_claims);
+
+    log_info!("SUCCESS");
+}
+
+#[test]
+fn rp_id_token_sig_rs256() {
+    let test_state =
+        TestState::init("rp-id_token-sig-rs256", |reg| reg)
+            .authorize(&vec![])
+            .exchange_code();
+
+    let id_token_claims = test_state.id_token_claims();
+    log_debug!("ID token: {:?}", id_token_claims);
+
+    log_info!("SUCCESS");
+}
+
+#[test]
+fn rp_id_token_sub() {
+    let mut test_state =
+        TestState::init("rp-id_token-sub", |reg| reg)
+            .authorize(&vec![]);
+
+    let token_response =
+        test_state
+            .client
+            .exchange_code(test_state.authorization_code.take().expect("no authorization_code"));
+
+    match token_response {
+        Err(RequestTokenError::Parse(_)) =>
+            log_error!("ID token failed to parse without `sub` claim (expected result)"),
+        other => panic!("Unexpected result verifying ID token claims: {:?}", other),
+    }
+    log_info!("SUCCESS");
+}
+
+#[test]
+fn rp_id_token_bad_sig_rs256() {
+    let test_state =
+        TestState::init("rp-id_token-bad-sig-rs256", |reg| reg)
+            .authorize(&vec![])
+            .exchange_code();
+
+    match test_state.id_token_claims_failure() {
+        ClaimsVerificationError::SignatureVerification(
+            SignatureVerificationError::CryptoError(_)
+        ) => log_error!("ID token has invalid signature (expected result)"),
+        other => panic!("Unexpected result verifying ID token claims: {:?}", other),
+    }
+
+    log_info!("SUCCESS");
+}
+
+#[test]
+fn rp_id_token_issuer_mismatch() {
+    let test_state =
+        TestState::init("rp-id_token-issuer-mismatch", |reg| reg)
+            .authorize(&vec![])
+            .exchange_code();
+
+    match test_state.id_token_claims_failure() {
+        ClaimsVerificationError::InvalidIssuer(_) =>
+            log_error!("ID token has invalid issuer (expected result)"),
+        other => panic!("Unexpected result verifying ID token claims: {:?}", other),
+    }
+
+    log_info!("SUCCESS");
+}
+
+/*#[test]
+fn rp_userinfo_bad_sub_claim() {
+    let test_state =
+        TestState::init("rp-userinfo-bad-sub-claim", |reg| reg)
+            .authorize(&vec![Scope::new("profile".to_string())])
+            .exchange_code();
+    let id_token_claims = test_state.id_token_claims();
+    log_debug!("ID token: {:?}", id_token_claims);
+
+    match test_state.user_info_claims_failure() {
+        ClaimsVerificationError::InvalidSubject(_) =>
+            log_error!("UserInfo response has invalid subject (expected result)"),
+        other => panic!("Unexpected result verifying ID token claims: {:?}", other),
+    }
+    log_info!("SUCCESS");
+}*/
+
+#[test]
+fn rp_userinfo_bearer_header() {
+    let test_state =
+        TestState::init("rp-userinfo-bearer-header", |reg| reg)
+            .authorize(&vec![Scope::new("profile".to_string())])
+            .exchange_code();
+    let id_token_claims = test_state.id_token_claims();
+    log_debug!("ID token: {:?}", id_token_claims);
+
+    let user_info_claims = test_state.user_info_claims();
+    log_debug!("UserInfo response: {:?}", user_info_claims);
+    log_info!("SUCCESS");
+}

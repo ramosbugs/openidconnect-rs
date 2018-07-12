@@ -27,7 +27,7 @@ extern crate serde_json;
 extern crate untrusted;
 extern crate url;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter, Result as FormatterResult};
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -428,30 +428,146 @@ pub enum AuthenticationFlow<RT: ResponseType> {
 pub struct EmptyAdditionalClaims {}
 impl AdditionalClaims for EmptyAdditionalClaims {}
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-struct JsonWebTokenClaims<
-    C: Clone + Debug + DeserializeOwned + Serialize,
+#[derive(Clone, Debug, PartialEq)]
+pub struct IdToken<
+    AC: AdditionalClaims,
+    GC: GenderClaim,
     JE: JweContentEncryptionAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType
+    JT: JsonWebKeyType,
 >(
-    #[serde(bound = "C: Clone + Debug + DeserializeOwned + Serialize")]
-    JsonWebToken<C, JE, JS, JT>
+    JsonWebToken<IdTokenClaims<AC, GC>, JE, JS, JT>
 );
-impl<C, JE, JS, JT> JsonWebTokenClaims<C, JE, JS, JT>
-where C: Clone + Debug + DeserializeOwned + Serialize,
+impl<AC, GC, JE, JS, JT> IdToken<AC, GC, JE, JS, JT>
+where AC: AdditionalClaims,
+        GC: GenderClaim,
         JE: JweContentEncryptionAlgorithm,
         JS: JwsSigningAlgorithm<JT>,
         JT: JsonWebKeyType {
-    fn validate_jose_header(
+    pub fn claims<JU, K>(
+        &self,
+        verifier: &IdTokenVerifier<JS, JT, JU, K>,
+        nonce: &Nonce,
+    ) -> Result<&IdTokenClaims<AC, GC>, ClaimsVerificationError>
+    where JU: JsonWebKeyUse, K: JsonWebKey<JS, JT, JU> {
+        verifier.verified_claims(&self.0, Some(nonce))
+    }
+}
+
+/*
+
+Things to control in our validator:
+
+All JWT validations (ID token and user info):
+ - whether to disable the integrity check altogether
+ - whether or not to consider a symmetric key (i.e., the client secret)
+ - expected issuer ('iss')
+ - the client_id that should be one of the 'aud'iences
+ - whether to allow 'aud' to include other audiences. if so, which?
+ - which 'alg' values to allow (RS256-only by default, unless others are specified during registration)
+
+ID token validation only:
+ - whether to validate the azp claim (which SHOULD be provided if there are multiple audiences), and
+   which to expect. there's some confusion:
+     https://bitbucket.org/openid/connect/issues/973/
+     https://stackoverflow.com/questions/41231018/openid-connect-standard-authorized-party-azp-contradiction/41240814
+ - maximum expiration time (default to current timestamp in UTC); this should be a closure
+ - earliest acceptable 'iat' (issue time); this should be a closure
+ - custom nonce validation function?
+ - custom acr validation function
+ - custom auth_time validation function
+
+Possible factory methods to have:
+ - public client
+ - private client (w/ client secret)
+
+*/
+
+// FIXME: move somewhere more appropriate
+#[derive(Clone, Debug, Fail, PartialEq)]
+pub enum ClaimsVerificationError {
+    #[fail(display = "Invalid audiences: {}", _0)]
+    InvalidAudience(String),
+    // FIXME: do we need this one?
+    #[fail(display = "Invalid token header: {}", _0)]
+    InvalidHeader(String),
+    #[fail(display = "Invalid issuer: {}", _0)]
+    InvalidIssuer(String),
+    #[fail(display = "Invalid nonce: {}", _0)]
+    InvalidNonce(String),
+    #[fail(display = "Invalid subject: {}", _0)]
+    InvalidSubject(String),
+    #[fail(display = "ID token must be signed")]
+    NoSignature,
+    #[fail(display = "{}", _0)]
+    Other(String),
+    #[fail(display = "Signature verification failed")]
+    SignatureVerification(#[cause] SignatureVerificationError),
+    #[fail(display = "Unsupported token header: {}", _0)]
+    Unsupported(String),
+}
+
+// FIXME: move somewhere more appropriate
+struct JwtClaimsVerifier<'a, JS, JT, JU, K>
+where JS: 'a + JwsSigningAlgorithm<JT>,
+        JT: 'a + JsonWebKeyType,
+        JU: 'a + JsonWebKeyUse,
+        K: 'a + JsonWebKey<JS, JT, JU> {
+    allowed_algs: Option<HashSet<JS>>,
+    client_id: &'a ClientId,
+    client_secret: Option<&'a ClientSecret>,
+    issuer: &'a IssuerUrl,
+    is_signature_check_enabled: bool,
+    signature_keys: &'a JsonWebKeySet<JS, JT, JU, K>,
+}
+impl<'a, JS, JT, JU, K> JwtClaimsVerifier<'a, JS, JT, JU, K>
+where JS: 'a + JwsSigningAlgorithm<JT>,
+        JT: 'a + JsonWebKeyType,
+        JU: 'a + JsonWebKeyUse,
+        K: 'a + JsonWebKey<JS, JT, JU> {
+    pub fn new(
+        client_id: &'a ClientId,
+        issuer: &'a IssuerUrl,
+        signature_keys: &'a JsonWebKeySet<JS, JT, JU, K>
+    ) -> Self {
+        JwtClaimsVerifier {
+            allowed_algs: Some([JS::rsa_sha_256()].iter().cloned().collect()),
+            client_id,
+            client_secret: None,
+            issuer,
+            is_signature_check_enabled: true,
+            signature_keys,
+        }
+    }
+
+    pub fn set_allowed_algs<I>(mut self, algs: I) -> Self
+    where I: IntoIterator<Item = JS> {
+        self.allowed_algs = Some(algs.into_iter().collect());
+        self
+    }
+    pub fn allow_any_alg(mut self) -> Self {
+        self.allowed_algs = None;
+        self
+    }
+
+    pub fn enable_signature_check(mut self) -> Self {
+        self.is_signature_check_enabled = true;
+        self
+    }
+    pub fn disable_signature_check(mut self) -> Self {
+        self.is_signature_check_enabled = false;
+        self
+    }
+
+    fn validate_jose_header<JE>(
         jose_header: &JsonWebTokenHeader<JE, JS, JT>
-    // FIXME: return a different error type
-    ) -> Result<(), IdTokenDecodeError> {
+    ) -> Result<(), ClaimsVerificationError>
+    where JE: JweContentEncryptionAlgorithm {
         // The 'typ' header field must either be omitted or have the canonicalized value JWT.
         if let Some(ref jwt_type) = jose_header.typ {
             if jwt_type.to_uppercase() != "JWT" {
                 return Err(
-                    IdTokenDecodeError::Unsupported(
+                    ClaimsVerificationError::Unsupported(
                         format!("unexpected or unsupported JWT type `{}`", **jwt_type)
                     )
                 )
@@ -463,13 +579,13 @@ where C: Clone + Debug + DeserializeOwned + Serialize,
         if let Some(ref content_type) = jose_header.cty {
             if content_type.to_uppercase() == "JWT" {
                 return Err(
-                    IdTokenDecodeError::Unsupported(
+                    ClaimsVerificationError::Unsupported(
                         "nested JWT's are not currently supported".to_string()
                     )
                 )
             } else {
                 return Err(
-                    IdTokenDecodeError::Unsupported(
+                    ClaimsVerificationError::Unsupported(
                         format!("unexpected or unsupported JWT content type `{}`", **content_type)
                     )
                 )
@@ -481,235 +597,365 @@ where C: Clone + Debug + DeserializeOwned + Serialize,
         // the spec prohibits this field from containing any of the standard headers or being empty.
         if let Some(ref crit) = jose_header.crit {
             return Err(
-                IdTokenDecodeError::Unsupported(
-                    format!("critical JWT header fields are unsupported: `{:?}`", *crit)
+                ClaimsVerificationError::Unsupported(
+                    "critical JWT header fields are unsupported".to_string()
                 )
             )
         }
         Ok(())
     }
 
-    // FIXME: return a different error type
-    pub fn unverified_claims(&self) -> Result<&C, IdTokenDecodeError> {
-        let jose_header = &self.0.unverified_header();
-        Self::validate_jose_header(jose_header)?;
-        Ok(self.0.unverified_claims())
-    }
-
-    pub fn claims<JU, K>(
+    pub fn verified_claims<'b, C, JE>(
         &self,
-        signature_keys: &JsonWebKeySet<JS, JT, JU, K>,
-        client_secret_if_private_client: Option<&ClientSecret>,
-    // FIXME: return a different error type
-    ) -> Result<&C, IdTokenDecodeError>
-    where JT: JsonWebKeyType, JU: JsonWebKeyUse, K: JsonWebKey<JS, JT, JU> {
-        let jose_header = &self.0.unverified_header();
+        jwt: &'b JsonWebToken<C, JE, JS, JT>
+    ) -> Result<&'b C, ClaimsVerificationError>
+    where C: AudiencesClaim + Debug + DeserializeOwned + IssuerClaim + Serialize,
+            JE: JweContentEncryptionAlgorithm {
+        let jose_header = &jwt.unverified_header();
         Self::validate_jose_header(jose_header)?;
 
-        let signature_alg =
-            match jose_header.alg {
-                JsonWebTokenAlgorithm::Encryption(ref encryption_alg) => {
-                    return Err(
-                        IdTokenDecodeError::Unsupported(
-                            format!(
-                                "JWE encryption is not currently supported (found algorithm \
-                                `{:?}`)",
-                                *encryption_alg,
-                            )
+        // The code below roughly follows the validation steps described in
+        // https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
+
+        // 1. If the ID Token is encrypted, decrypt it using the keys and algorithms that the Client
+        //    specified during Registration that the OP was to use to encrypt the ID Token. If
+        //    encryption was negotiated with the OP at Registration time and the ID Token is not
+        //    encrypted, the RP SHOULD reject it.
+
+        match jose_header.alg {
+            JsonWebTokenAlgorithm::Encryption(ref encryption_alg) => {
+                return Err(
+                    ClaimsVerificationError::Unsupported(
+                        format!(
+                            "JWE encryption is not currently supported (found algorithm `{}`)",
+                            variant_name(encryption_alg),
                         )
                     )
-                },
-                JsonWebTokenAlgorithm::Signature(ref signature_alg, _) => signature_alg,
-                // Section 2 of OpenID Connect Core 1.0 specifies that "ID Tokens MUST NOT use none
-                // as the alg value unless the Response Type used returns no ID Token from the
-                // Authorization Endpoint (such as when using the Authorization Code Flow) and the
-                // Client explicitly requested the use of none at Registration time."
-                //
-                // While there's technically a use case where this is ok, we choose not to support
-                // it for now to protect against accidental misuse. If demand arises, we can figure
-                // out a API that mitigates the risk.
-                //
-                // FIXME: see FIXME above (we should have a separate function that allows this)
-                JsonWebTokenAlgorithm::None => {
-                    return Err(
-                        IdTokenDecodeError::Unsupported(
-                            "unsigned ID Tokens are unsafe and not currently supported".to_string()
-                        )
-                    )
-                }
-            };
-
-        // NB: We must *not* trust the 'kid' (key ID) or 'alg' (algorithm) fields present in the
-        // JOSE header, as an attacker could manipulate these while forging the JWT. The code below
-        // must be secure regardless of how these fields are manipulated.
-
-        let key_type = signature_alg.key_type().map_err(IdTokenDecodeError::Unsupported)?;
-        if key_type.is_symmetric() {
-            if let Some(client_secret) = client_secret_if_private_client {
-                // FIXME: implement
-                return Err(
-                    IdTokenDecodeError::Unsupported(
-                        "FIXME: symmetric signatures are currently unimplemented".to_string()
-                    )
                 )
-            } else {
-                // The client secret isn't confidential for public clients, so anyone can forge a
-                // JWT with a valid signature.
+            },
+            _ => {},
+        }
+
+
+        // TODO: Add encryption (JWE) support
+
+        // 2. The Issuer Identifier for the OpenID Provider (which is typically obtained during
+        //    Discovery) MUST exactly match the value of the iss (issuer) Claim.
+        let unverified_claims = jwt.unverified_claims();
+        if let Some(issuer) = unverified_claims.issuer() {
+            if issuer != self.issuer {
                 return Err(
-                    IdTokenDecodeError::InvalidSignature(
-                        "symmetric signatures are disallowed for public clients".to_string()
+                    ClaimsVerificationError::InvalidIssuer(
+                        format!("expected `{}` (found `{}`)", **self.issuer, **issuer)
                     )
-                )
+                );
             }
         } else {
-
-            // Section 10.1 of OpenID Connect Core 1.0 states that the JWT must include a key ID if
-            // the JWK set contains more than one public key. 
-
-            // See if any key has a matching key ID (if supplied) and compatible type.
-            let public_keys =
-                signature_keys
-                    .keys()
-                    .iter()
-                    .filter(|key|
-                        // The key must be of the type expected for this signature algorithm.
-                        *key.key_type() == key_type &&
-                            // Either the key hasn't specified it's allowed usage (in which case
-                            // any usage is acceptable), or the key supports signing.
-                            (key.key_use().is_none() ||
-                                key.key_use().iter().any(
-                                    |key_use| key_use.allows_signature()
-                                )) &&
-                            // Either the JWT doesn't include a 'kid' (in which case any 'kid'
-                            // is acceptable), or the 'kid' matches the key's ID.
-                            (jose_header.kid.is_none() ||
-                                jose_header.kid.as_ref() == key.key_id())
-                    )
-                    .collect::<Vec<&K>>();
-            if public_keys.is_empty() {
-                Err(
-                    IdTokenDecodeError::InvalidSignature(
-                        "no eligible public keys found in JWK set".to_string()
-                    )
-                )
-            } else if public_keys.len() == 1 {
-                if let Ok(verified_claims) =
-                    self.0.claims(signature_alg, *public_keys.first().expect("unreachable"))
-                {
-                    Ok(verified_claims)
-                } else {
-                    // We found the matching key, so if signature validation fails, bail.
-                    Err(
-                        IdTokenDecodeError::InvalidSignature(
-                            "failed to validate signature".to_string()
-                        )
-                    )
-                }
-            } else {
-                Err(
-                    IdTokenDecodeError::InvalidSignature(
-                        format!(
-                            "JWK set must only contain one eligible public key \
-                            (candidate keys: {:?})",
-                            public_keys
-                        )
-                    )
-                )
-            }
+            return Err(ClaimsVerificationError::InvalidIssuer("missing issuer claim".to_string()));
         }
-    }
-}
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct IdToken<
-    AC: AdditionalClaims,
-    GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
->(
-    JsonWebTokenClaims<IdTokenClaims<AC, GC>, JE, JS, JT>
-);
-
-impl<AC, GC, JE, JS, JT> IdToken<AC, GC, JE, JS, JT>
-where AC: AdditionalClaims,
-        GC: GenderClaim,
-        JE: JweContentEncryptionAlgorithm,
-        JS: JwsSigningAlgorithm<JT>,
-        JT: JsonWebKeyType {
-    fn validate_nonce(
-        &self,
-        nonce: &Nonce,
-        claims: &IdTokenClaims<AC, GC>,
-    ) -> Result<(), IdTokenDecodeError> {
-        if let Some(ref claims_nonce) = claims.nonce {
-            if claims_nonce != nonce {
+        // 3. The Client MUST validate that the aud (audience) Claim contains its client_id value
+        //    registered at the Issuer identified by the iss (issuer) Claim as an audience. The aud
+        //    (audience) Claim MAY contain an array with more than one element. The ID Token MUST be
+        //    rejected if the ID Token does not list the Client as a valid audience, or if it
+        //    contains additional audiences not trusted by the Client.
+        if let Some(audiences) = unverified_claims.audiences() {
+            if audiences
+                    .iter()
+                    .find(|aud| (**aud).deref() == self.client_id.deref()).is_none() {
                 return Err(
-                    IdTokenDecodeError::InvalidNonce("nonce mismatch".to_string())
-                )
+                    ClaimsVerificationError::InvalidAudience(
+                        format!(
+                            "must contain `{}` (found audiences: {})",
+                            **self.client_id,
+                            audiences
+                                .iter()
+                                .map(|aud| format!("`{}`", Deref::deref(aud)))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )
+                    )
+                );
             }
         } else {
             return Err(
-                IdTokenDecodeError::InvalidNonce("no nonce present".to_string())
-            )
+                ClaimsVerificationError::InvalidAudience("missing audiences claim".to_string())
+            );
         }
 
-        Ok(())
-    }
+        // Steps 4--5 (azp claim validation) are specific to the ID token.
 
-    pub fn claims_for_private_client<JU, K>(
-        &self,
-        signature_keys: &JsonWebKeySet<JS, JT, JU, K>,
-        // FIXME: add a docstring mentioning that this must only be used for private clients. Public
-        // clients can't keep their client_secret confidential, so Section 10.1 of OpenID Connect
-        // Core 1.0 prohibits using symmetric signatures for them.
-        client_secret: &ClientSecret,
-        nonce: &Nonce,
-    ) -> Result<&IdTokenClaims<AC, GC>, IdTokenDecodeError>
-    where JT: JsonWebKeyType, JU: JsonWebKeyUse, K: JsonWebKey<JS, JT, JU> {
-        let claims = self.0.claims(signature_keys, Some(client_secret))?;
+        // 6. If the ID Token is received via direct communication between the Client and the Token
+        //    Endpoint (which it is in this flow), the TLS server validation MAY be used to validate
+        //    the issuer in place of checking the token signature. The Client MUST validate the
+        //    signature of all other ID Tokens according to JWS [JWS] using the algorithm specified
+        //    in the JWT alg Header Parameter. The Client MUST use the keys provided by the Issuer.
+        if !self.is_signature_check_enabled {
+            Ok(unverified_claims)
+        } else {
+            let signature_alg =
+                match jose_header.alg {
+                    // Encryption is handled above.
+                    JsonWebTokenAlgorithm::Encryption(_) => panic!("unreachable"),
+                    JsonWebTokenAlgorithm::Signature(ref signature_alg, _) => signature_alg,
+                    // Section 2 of OpenID Connect Core 1.0 specifies that "ID Tokens MUST NOT use
+                    // none as the alg value unless the Response Type used returns no ID Token from
+                    // the Authorization Endpoint (such as when using the Authorization Code Flow)
+                    // and the Client explicitly requested the use of none at Registration time."
+                    //
+                    // While there's technically a use case where this is ok, we choose not to
+                    // support it for now to protect against accidental misuse. If demand arises,
+                    // we can figure out a API that mitigates the risk.
+                    JsonWebTokenAlgorithm::None => {
+                        return Err(ClaimsVerificationError::NoSignature)
+                    }
+                };
 
-        // FIXME: do additional validation described in
-        // https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
-        // one idea: use a builder pattern to customize the validation in an extensible manner
+            // 7. The alg value SHOULD be the default of RS256 or the algorithm sent by the Client
+            //    in the id_token_signed_response_alg parameter during Registration.
+            if let Some(ref allowed_algs) = self.allowed_algs {
+                if !allowed_algs.contains(signature_alg) {
+                    return Err(
+                        ClaimsVerificationError::SignatureVerification(
+                            SignatureVerificationError::DisallowedAlg(
+                                format!(
+                                    "algorithm `{}` is not one of: {}",
+                                    variant_name(signature_alg),
+                                    allowed_algs
+                                        .iter()
+                                        .map(variant_name)
+                                        .collect::<Vec<_>>()
+                                        .join(", "),
+                                )
+                            )
+                        )
+                    );
+                }
+            }
 
-        self.validate_nonce(nonce, claims)?;
-        Ok(claims)
-    }
+            // NB: We must *not* trust the 'kid' (key ID) or 'alg' (algorithm) fields present in the
+            // JOSE header, as an attacker could manipulate these while forging the JWT. The code
+            // below must be secure regardless of how these fields are manipulated.
 
-    pub fn claims_for_public_client<JU, K>(
-        &self,
-        signature_keys: &JsonWebKeySet<JS, JT, JU, K>,
-        nonce: &Nonce,
-    ) -> Result<&IdTokenClaims<AC, GC>, IdTokenDecodeError>
-    where JT: JsonWebKeyType, JU: JsonWebKeyUse, K: JsonWebKey<JS, JT, JU> {
-        let claims = self.0.claims(signature_keys, None)?;
-        self.validate_nonce(nonce, claims)?;
-        Ok(claims)
-    }
+            let key_type = signature_alg.key_type().map_err(ClaimsVerificationError::Unsupported)?;
+            if key_type.is_symmetric() {
+                // 8. If the JWT alg Header Parameter uses a MAC based algorithm such as HS256,
+                //    HS384, or HS512, the octets of the UTF-8 representation of the client_secret
+                //    corresponding to the client_id contained in the aud (audience) Claim are used
+                //    as the key to validate the signature. For MAC based algorithms, the behavior
+                //    is unspecified if the aud is multi-valued or if an azp value is present that
+                //    is different than the aud value.
+                if let Some(ref client_secret) = self.client_secret {
+                    // FIXME: implement
+                    return Err(
+                        ClaimsVerificationError::Unsupported(
+                            "FIXME: symmetric signatures are currently unimplemented".to_string()
+                        )
+                    )
+                } else {
+                    // The client secret isn't confidential for public clients, so anyone can forge a
+                    // JWT with a valid signature.
+                    return Err(
+                        ClaimsVerificationError::SignatureVerification(
+                            SignatureVerificationError::DisallowedAlg(
+                                "symmetric signatures are disallowed for public clients".to_string()
+                            )
+                        )
+                    )
+                }
+            } else {
+                // Section 10.1 of OpenID Connect Core 1.0 states that the JWT must include a key ID
+                // if the JWK set contains more than one public key.
 
-    pub fn dangerous_claims_without_signature_verification(
-        &self,
-        nonce_opt: Option<&Nonce>,
-    ) -> Result<&IdTokenClaims<AC, GC>, IdTokenDecodeError> {
-        let claims = self.0.unverified_claims()?;
-        if let Some(nonce) = nonce_opt {
-            self.validate_nonce(nonce, claims)?;
+                // See if any key has a matching key ID (if supplied) and compatible type.
+                let public_keys =
+                    self.signature_keys
+                        .keys()
+                        .iter()
+                        .filter(|key|
+                            // The key must be of the type expected for this signature algorithm.
+                            *key.key_type() == key_type &&
+                                // Either the key hasn't specified it's allowed usage (in which case
+                                // any usage is acceptable), or the key supports signing.
+                                (key.key_use().is_none() ||
+                                    key.key_use().iter().any(
+                                        |key_use| key_use.allows_signature()
+                                    )) &&
+                                // Either the JWT doesn't include a 'kid' (in which case any 'kid'
+                                // is acceptable), or the 'kid' matches the key's ID.
+                                (jose_header.kid.is_none() ||
+                                    jose_header.kid.as_ref() == key.key_id())
+                        )
+                        .collect::<Vec<&K>>();
+                if public_keys.is_empty() {
+                    // FIXME: if there's a KID but no matching key, try re-fetching the
+                    // JWKS to support KeyRotation
+                    Err(
+                        ClaimsVerificationError::SignatureVerification(
+                            SignatureVerificationError::NoMatchingKey
+                        )
+                    )
+                } else if public_keys.len() == 1 {
+                    jwt.claims(signature_alg, *public_keys.first().expect("unreachable"))
+                        .map_err(ClaimsVerificationError::SignatureVerification)
+                } else {
+                    Err(
+                        ClaimsVerificationError::SignatureVerification(
+                            SignatureVerificationError::AmbiguousKeyId(
+                                format!(
+                                    "JWK set must only contain one eligible public key \
+                                    ({} eligible keys: {})",
+                                    public_keys.len(),
+                                    public_keys
+                                        .iter()
+                                        .map(|key|
+                                            format!(
+                                                "{} ({})",
+                                                key.key_id()
+                                                    .map(|kid| format!("`{}`", **kid))
+                                                    .unwrap_or("null ID".to_string()),
+                                                variant_name(key.key_type())
+                                            )
+                                        )
+                                        .collect::<Vec<_>>()
+                                        .join(", ")
+                                )
+                            )
+                        )
+                    )
+                }
+            }
+            // Steps 9--13 are specific to the ID token.
         }
-        Ok(claims)
     }
 }
 
-#[derive(Clone, Debug, Fail)]
-pub enum IdTokenDecodeError {
-    #[fail(display = "Invalid token header: {}", _0)]
-    InvalidHeader(String),
-    #[fail(display = "Invalid nonce: {}", _0)]
-    InvalidNonce(String),
-    #[fail(display = "Invalid token signature: {}", _0)]
-    InvalidSignature(String),
-    #[fail(display = "Unsupported token header: {}", _0)]
-    Unsupported(String),
+// FIXME: move somewhere more appropriate
+trait AudiencesClaim {
+    fn audiences(&self) -> Option<&Vec<Audience>>;
+}
+
+trait IssuerClaim {
+    fn issuer(&self) -> Option<&IssuerUrl>;
+}
+
+// FIXME: move somewhere more appropriate
+struct UserInfoVerifier {}
+
+// FIXME: move somewhere more appropriate
+pub struct IdTokenVerifier<'a, JS, JT, JU, K>
+where JS: 'a + JwsSigningAlgorithm<JT>,
+        JT: 'a + JsonWebKeyType,
+        JU: 'a + JsonWebKeyUse,
+        K: 'a + JsonWebKey<JS, JT, JU> {
+    jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>,
+    client_secret: Option<&'a ClientSecret>,
+}
+impl<'a, JS, JT, JU, K> IdTokenVerifier<'a, JS, JT, JU, K>
+where JS: 'a + JwsSigningAlgorithm<JT>,
+        JT: 'a + JsonWebKeyType,
+        JU: 'a + JsonWebKeyUse,
+        K: 'a + JsonWebKey<JS, JT, JU> {
+    pub fn new_public_client(
+        client_id: &'a ClientId,
+        issuer: &'a IssuerUrl,
+        signature_keys: &'a JsonWebKeySet<JS, JT, JU, K>
+    ) -> Self {
+        IdTokenVerifier {
+            jwt_verifier: JwtClaimsVerifier::new(client_id, issuer, signature_keys),
+            client_secret: None,
+        }
+    }
+
+    pub fn new_private_client(
+        client_id: &'a ClientId,
+        client_secret: &'a ClientSecret,
+        issuer: &'a IssuerUrl,
+        signature_keys: &'a JsonWebKeySet<JS, JT, JU, K>,
+    ) -> Self {
+        IdTokenVerifier {
+            jwt_verifier: JwtClaimsVerifier::new(client_id, issuer, signature_keys),
+            client_secret: Some(client_secret),
+        }
+    }
+
+    pub fn set_allowed_algs<I>(mut self, algs: I) -> Self
+    where I: IntoIterator<Item = JS> {
+        self.jwt_verifier = self.jwt_verifier.set_allowed_algs(algs);
+        self
+    }
+    pub fn allow_any_alg(mut self) -> Self {
+        self.jwt_verifier = self.jwt_verifier.allow_any_alg();
+        self
+    }
+
+    pub fn enable_signature_check(mut self) -> Self {
+        self.jwt_verifier = self.jwt_verifier.enable_signature_check();
+        self
+    }
+    pub fn insecure_disable_signature_check(mut self) -> Self {
+        self.jwt_verifier = self.jwt_verifier.disable_signature_check();
+        self
+    }
+
+    fn verified_claims<'b, AC, GC, JE>(
+        &self,
+        jwt: &'b JsonWebToken<IdTokenClaims<AC, GC>, JE, JS, JT>,
+        nonce: Option<&Nonce>,
+    ) -> Result<&'b IdTokenClaims<AC, GC>, ClaimsVerificationError>
+    where AC: AdditionalClaims,
+            GC: GenderClaim,
+            JE: JweContentEncryptionAlgorithm {
+        // The code below roughly follows the validation steps described in
+        // https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
+
+        // Steps 1--3 are handled by the generic JwtClaimsVerifier.
+        let partially_verified_claims = self.jwt_verifier.verified_claims(jwt)?;
+
+        // 4. If the ID Token contains multiple audiences, the Client SHOULD verify that an azp
+        //    Claim is present.
+
+        // 5. If an azp (authorized party) Claim is present, the Client SHOULD verify that its
+        //    client_id is the Claim Value.
+
+        // Steps 6--8 are handled by the generic JwtClaimsVerifier.
+
+        // 9. The current time MUST be before the time represented by the exp Claim.
+
+        // 10. The iat Claim can be used to reject tokens that were issued too far away from the
+        //     current time, limiting the amount of time that nonces need to be stored to prevent
+        //     attacks. The acceptable range is Client specific.
+
+        // 11. If a nonce value was sent in the Authentication Request, a nonce Claim MUST be
+        //     present and its value checked to verify that it is the same value as the one that was
+        //     sent in the Authentication Request. The Client SHOULD check the nonce value for
+        //     replay attacks. The precise method for detecting replay attacks is Client specific.
+        if let Some(expected_nonce) = nonce {
+            if let Some(ref claims_nonce) = partially_verified_claims.nonce {
+                if claims_nonce != expected_nonce {
+                    return Err(
+                        ClaimsVerificationError::InvalidNonce("nonce mismatch".to_string())
+                    )
+                }
+            } else {
+                return Err(
+                    ClaimsVerificationError::InvalidNonce("missing nonce claim".to_string())
+                )
+            }
+        }
+
+        // 12. If the acr Claim was requested, the Client SHOULD check that the asserted Claim Value
+        //     is appropriate. The meaning and processing of acr Claim Values is out of scope for
+        //     this specification.
+
+        // 13. If the auth_time Claim was requested, either through a specific request for this
+        //     Claim or by using the max_age parameter, the Client SHOULD check the auth_time Claim
+        //     value and request re-authentication if it determines too much time has elapsed since
+        //     the last End-User authentication.
+
+        // FIXME: implement validation above
+        Ok(partially_verified_claims)
+    }
 }
 
 // This is an annoying hack to work around the fact that Serde won't handle a tuple struct with more
@@ -725,7 +971,6 @@ mod serde_id_token {
         IdToken,
         IdTokenClaims,
         JsonWebKeyType,
-        JsonWebTokenClaims,
         JweContentEncryptionAlgorithm,
         JwsSigningAlgorithm,
     };
@@ -740,13 +985,7 @@ mod serde_id_token {
             JE: JweContentEncryptionAlgorithm,
             JS: JwsSigningAlgorithm<JT>,
             JT: JsonWebKeyType {
-        Ok(
-            IdToken(
-                JsonWebTokenClaims(
-                    JsonWebToken::<IdTokenClaims<AC, GC>, JE, JS, JT>::deserialize(deserializer)?
-                )
-            )
-        )
+        Ok(IdToken(JsonWebToken::<IdTokenClaims<AC, GC>, JE, JS, JT>::deserialize(deserializer)?))
     }
 
     pub fn serialize<AC, GC, JE, JS, JT, S>(
@@ -763,6 +1002,9 @@ mod serde_id_token {
     }
 }
 
+// FIXME: document at the module level that we do not support aggregated or distributed claims,
+// which are OPTIONAL in the spec:
+// http://openid.net/specs/openid-connect-core-1_0.html#AggregatedDistributedClaims
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct IdTokenClaims<AC, GC>
 where AC: AdditionalClaims, GC: GenderClaim {
@@ -841,6 +1083,18 @@ where AC: AdditionalClaims, GC: GenderClaim {
         }
     ];
 }
+impl<AC, GC> AudiencesClaim for IdTokenClaims<AC, GC>
+where AC: AdditionalClaims, GC: GenderClaim {
+    fn audiences(&self) -> Option<&Vec<Audience>> {
+        Some(self.audiences())
+    }
+}
+impl<AC, GC> IssuerClaim for IdTokenClaims<AC, GC>
+where AC: AdditionalClaims, GC: GenderClaim {
+    fn issuer(&self) -> Option<&IssuerUrl> {
+        Some(self.issuer())
+    }
+}
 
 ///
 /// OpenID Connect authorization token.
@@ -867,6 +1121,7 @@ where AC: AdditionalClaims,
         JS: JwsSigningAlgorithm<JT>,
         JT: JsonWebKeyType {
     pub fn id_token(&self) -> &IdToken<AC, GC, JE, JS, JT> { &self.id_token }
+    // FIXME: add extra_fields here to enable further extensibility by clients
 }
 impl<AC, GC, JE, JS, JT> ExtraTokenFields for IdTokenFields<AC, GC, JE, JS, JT>
 where AC: AdditionalClaims,
@@ -968,13 +1223,19 @@ new_type![
     }
 ];
 
-#[derive(Clone, Debug, Fail)]
+#[derive(Clone, Debug, Fail, PartialEq)]
 pub enum SignatureVerificationError {
+    #[fail(display = "Ambiguous key identification: {}", _0)]
+    AmbiguousKeyId(String),
     #[fail(display = "Crypto error: {}", _0)]
     CryptoError(String),
+    #[fail(display = "Disallowed signature algorithm: {}", _0)]
+    DisallowedAlg(String),
     #[fail(display = "Invalid cryptographic key: {}", _0)]
     InvalidKey(String),
-    #[fail(display = "Unsupported cryptographic algorithm: {}", _0)]
+    #[fail(display = "No matching key found")]
+    NoMatchingKey,
+    #[fail(display = "Unsupported signature algorithm: {}", _0)]
     UnsupportedAlg(String),
     #[fail(display = "Other error: {}", _0)]
     Other(String),
@@ -1123,6 +1384,21 @@ fn join_optional_vec<T>(vec_opt: Option<&Vec<T>>) -> Option<String> where T: AsR
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct UnverifiedUserInfoClaims<AC: AdditionalClaims, GC: GenderClaim>(
+    #[serde(bound = "AC: AdditionalClaims")]
+    UserInfoClaims<AC, GC>
+);
+impl<AC, GC> UnverifiedUserInfoClaims<AC, GC>
+where AC: AdditionalClaims, GC: GenderClaim> {
+    pub fn claims<JU, K>(
+        &self,
+        verifier: &UserInfoVerifier,
+    ) -> Result<&UserInfoClaims<AC, GC>, ClaimsVerificationError> {
+        verifier.verified_claims(&self.0)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct UserInfoClaims<AC, GC> where AC: AdditionalClaims, GC: GenderClaim {
     iss: Option<IssuerUrl>,
     // FIXME: this needs to be a vector, but it may also come as a single string
@@ -1171,7 +1447,7 @@ where AC: AdditionalClaims, GC: GenderClaim {
     ];
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct UserInfoJsonWebTokenClaims<
     AC: AdditionalClaims,
     GC: GenderClaim,
@@ -1179,43 +1455,15 @@ pub struct UserInfoJsonWebTokenClaims<
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 >(
-    JsonWebTokenClaims<UserInfoClaims<AC, GC>, JE, JS, JT>
+    #[serde(bound = "AC: AdditionalClaims")]
+    JsonWebToken<UnverifiedUserInfoClaims<AC, GC>, JE, JS, JT>
 );
-
 impl<AC, GC, JE, JS, JT> UserInfoJsonWebTokenClaims<AC, GC, JE, JS, JT>
 where AC: AdditionalClaims,
         GC: GenderClaim,
         JE: JweContentEncryptionAlgorithm,
         JS: JwsSigningAlgorithm<JT>,
         JT: JsonWebKeyType {
-    pub fn claims_for_private_client<JU, K>(
-        &self,
-        signature_keys: &JsonWebKeySet<JS, JT, JU, K>,
-        // FIXME: add a docstring mentioning that this must only be used for private clients. Public
-        // clients can't keep their client_secret confidential, so Section 10.1 of OpenID Connect
-        // Core 1.0 prohibits using symmetric signatures for them.
-        client_secret: &ClientSecret,
-    // FIXME: return a different error type
-    ) -> Result<&UserInfoClaims<AC, GC>, IdTokenDecodeError>
-    where JT: JsonWebKeyType, JU: JsonWebKeyUse, K: JsonWebKey<JS, JT, JU> {
-        self.0.claims(signature_keys, Some(client_secret))
-    }
-
-    pub fn claims_for_public_client<JU, K>(
-        &self,
-        signature_keys: &JsonWebKeySet<JS, JT, JU, K>,
-    // FIXME: return a different error type
-    ) -> Result<&UserInfoClaims<AC, GC>, IdTokenDecodeError>
-    where JT: JsonWebKeyType, JU: JsonWebKeyUse, K: JsonWebKey<JS, JT, JU> {
-        self.0.claims(signature_keys, None)
-    }
-
-    pub fn dangerous_claims_without_signature_verification(
-        &self,
-    // FIXME: return a different error type
-    ) -> Result<&UserInfoClaims<AC, GC>, IdTokenDecodeError> {
-        self.0.unverified_claims()
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1225,7 +1473,7 @@ where AC: AdditionalClaims,
         JE: JweContentEncryptionAlgorithm,
         JS: JwsSigningAlgorithm<JT>,
         JT: JsonWebKeyType {
-    JsonResponse(UserInfoClaims<AC, GC>),
+    JsonResponse(UnverifiedUserInfoClaims<AC, GC>),
     JsonWebTokenResponse(UserInfoJsonWebTokenClaims<AC, GC, JE, JS, JT>),
 }
 
@@ -1284,10 +1532,8 @@ new_type![
                 Some(MIME_TYPE_JWT) =>
                     Ok(
                         UserInfoResponse::JsonWebTokenResponse(
-                            UserInfoJsonWebTokenClaims(
-                                serde_json::from_slice(&user_info_response.body)
-                                    .map_err(DiscoveryError::Json)?
-                            )
+                            serde_json::from_slice(&user_info_response.body)
+                                .map_err(DiscoveryError::Json)?
                         )
                     ),
                 Some(content_type) =>

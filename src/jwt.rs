@@ -124,7 +124,7 @@ where JE: JweContentEncryptionAlgorithm,
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct JsonWebToken<C, JE, JS, JT>
-where C: Clone + Debug + DeserializeOwned + Serialize,
+where C: Debug + DeserializeOwned + Serialize,
         JE: JweContentEncryptionAlgorithm,
         JS: JwsSigningAlgorithm<JT>,
         JT: JsonWebKeyType {
@@ -136,7 +136,7 @@ where C: Clone + Debug + DeserializeOwned + Serialize,
 }
 // FIXME: add methods or remove
 impl<C, JE, JS, JT> JsonWebToken<C, JE, JS, JT>
-where C: Clone + Debug + DeserializeOwned + Serialize,
+where C: Debug + DeserializeOwned + Serialize,
         JE: JweContentEncryptionAlgorithm,
         JS: JwsSigningAlgorithm<JT>,
         JT: JsonWebKeyType {
@@ -154,13 +154,13 @@ where C: Clone + Debug + DeserializeOwned + Serialize,
     }
 }
 impl<'de, C, JE, JS, JT> Deserialize<'de> for JsonWebToken<C, JE, JS, JT>
-where C: Clone + Debug + DeserializeOwned + Serialize,
+where C: Debug + DeserializeOwned + Serialize,
         JE: JweContentEncryptionAlgorithm,
         JS: JwsSigningAlgorithm<JT>,
         JT: JsonWebKeyType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         struct JsonWebTokenVisitor<
-            C: Clone + Debug + DeserializeOwned + Serialize,
+            C: Debug + DeserializeOwned + Serialize,
             JE: JweContentEncryptionAlgorithm,
             JS: JwsSigningAlgorithm<JT>,
             JT: JsonWebKeyType
@@ -171,7 +171,7 @@ where C: Clone + Debug + DeserializeOwned + Serialize,
             PhantomData<JT>,
         );
         impl<'de, C, JE, JS, JT> Visitor<'de> for JsonWebTokenVisitor<C, JE, JS, JT>
-        where C: Clone + Debug + DeserializeOwned + Serialize,
+        where C: Debug + DeserializeOwned + Serialize,
                 JE: JweContentEncryptionAlgorithm,
                 JS: JwsSigningAlgorithm<JT>,
                 JT: JsonWebKeyType {
@@ -192,11 +192,13 @@ where C: Clone + Debug + DeserializeOwned + Serialize,
                 {
                     let parts = raw_token.split('.').collect::<Vec<_>>();
 
+                    // NB: We avoid including the full claims encoding in the error output to avoid
+                    // clients potentially logging sensitive values.
                     if parts.len() != 3 {
                         return Err(
                             DeserializeError::custom(
                                 format!(
-                                    "invalid JSON web token: found {} parts (expected 3)",
+                                    "Invalid JSON web token: found {} parts (expected 3)",
                                     parts.len()
                                 )
                             )
@@ -207,33 +209,21 @@ where C: Clone + Debug + DeserializeOwned + Serialize,
                         base64::decode_config(parts[0], base64::URL_SAFE_NO_PAD)
                             .map_err(|err|
                                 DeserializeError::custom(
-                                    format!(
-                                        "invalid base64url header encoding `{}`: {:?}",
-                                        parts[0],
-                                        err
-                                    )
+                                    format!("Invalid base64url header encoding: {:?}", err)
                                 )
                             )?;
                     let header_json =
                         &str::from_utf8(&header_json_raw)
                             .map_err(|err|
                                 DeserializeError::custom(
-                                    format!(
-                                        "invalid UTF-8 encoding `{:?}`: {:?}",
-                                        header_json_raw,
-                                        err
-                                    )
+                                    format!("Invalid UTF-8 header encoding: {:?}", err)
                                 )
                             )?;
                     header =
                         serde_json::from_str(header_json)
                             .map_err(|err|
                                 DeserializeError::custom(
-                                    format!(
-                                        "failed to parse header JSON `{:?}`: {:?}",
-                                        header_json,
-                                        err
-                                    )
+                                    format!("Failed to parse header JSON: {:?}", err)
                                 )
                             )?;
 
@@ -241,33 +231,21 @@ where C: Clone + Debug + DeserializeOwned + Serialize,
                         base64::decode_config(parts[1], base64::URL_SAFE_NO_PAD)
                             .map_err(|err|
                                 DeserializeError::custom(
-                                    format!(
-                                        "invalid base64url claims encoding `{}`: {:?}",
-                                        parts[1],
-                                        err
-                                    )
+                                    format!("Invalid base64url claims encoding: {:?}", err)
                                 )
                             )?;
                     let claims_json =
                         &str::from_utf8(&claims_json_raw)
                             .map_err(|err|
                                 DeserializeError::custom(
-                                    format!(
-                                        "invalid UTF-8 encoding `{:?}`: {:?}",
-                                        claims_json_raw,
-                                        err
-                                    )
+                                    format!("Invalid UTF-8 encoding: {:?}", err)
                                 )
                             )?;
                     claims =
                         serde_json::from_str(claims_json)
                             .map_err(|err|
                                 DeserializeError::custom(
-                                    format!(
-                                        "failed to parse claims JSON `{:?}`: {:?}",
-                                        claims_json,
-                                        err
-                                    )
+                                    format!("Failed to parse claims JSON: {:?}", err)
                                 )
                             )?;
 
@@ -275,11 +253,7 @@ where C: Clone + Debug + DeserializeOwned + Serialize,
                         base64::decode_config(parts[2], base64::URL_SAFE_NO_PAD)
                             .map_err(|err|
                                 DeserializeError::custom(
-                                    format!(
-                                        "invalid base64url signature encoding `{}`: {:?}",
-                                        parts[2],
-                                        err
-                                    )
+                                    format!("Invalid base64url signature encoding: {:?}", err)
                                 )
                             )?;
 
@@ -304,7 +278,7 @@ where C: Clone + Debug + DeserializeOwned + Serialize,
     }
 }
 impl<C, JE, JS, JT> Serialize for JsonWebToken<C, JE, JS, JT>
-where C: Clone + Debug + DeserializeOwned + Serialize,
+where C: Debug + DeserializeOwned + Serialize,
         JE: JweContentEncryptionAlgorithm,
         JS: JwsSigningAlgorithm<JT>,
         JT: JsonWebKeyType {

@@ -7,6 +7,7 @@ extern crate serde_json;
 extern crate url;
 
 use std::fmt::{Debug, Display, Error as FormatterError, Formatter};
+use std::hash::Hash;
 use std::ops::Deref;
 
 use oauth2::helpers::{deserialize_space_delimited_vec, deserialize_url, serialize_url};
@@ -50,11 +51,13 @@ pub trait JsonWebKeyUse : Clone + Debug + DeserializeOwned + PartialEq + Seriali
 }
 // FIXME: add a key_type() method
 pub trait JweContentEncryptionAlgorithm
-    : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
+    : Clone + Debug + DeserializeOwned + Eq + Hash + PartialEq + Serialize {}
 // FIXME: add a key_type() method?
-pub trait JweKeyManagementAlgorithm : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
+pub trait JweKeyManagementAlgorithm
+    : Clone + Debug + DeserializeOwned + Eq + Hash + PartialEq + Serialize {}
 
-pub trait JwsSigningAlgorithm<JT> : Clone + Debug + DeserializeOwned + PartialEq + Serialize
+pub trait JwsSigningAlgorithm<JT>
+    : Clone + Debug + DeserializeOwned + Eq + Hash + PartialEq + Serialize
 where JT: JsonWebKeyType {
     // FIXME: return a real error
     // FIXME: don't return jsonwebtoken types via public interface
@@ -65,6 +68,7 @@ where JT: JsonWebKeyType {
     // FIXME: return a real error
     fn key_type(&self) -> Result<JT, String>;
     fn is_symmetric(&self) -> bool;
+    fn rsa_sha_256() -> Self;
 }
 
 pub trait ResponseMode : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}

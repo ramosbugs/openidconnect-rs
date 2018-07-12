@@ -36,6 +36,7 @@ use super::{
     GrantType,
     IdToken,
     IdTokenClaims,
+    IdTokenVerifier,
     JsonWebKey,
     JsonWebKeyId,
     JsonWebKeySet,
@@ -133,6 +134,15 @@ pub type CoreIdToken =
     >;
 
 pub type CoreIdTokenClaims = IdTokenClaims<EmptyAdditionalClaims, CoreGenderClaim>;
+
+pub type CoreIdTokenVerifier<'a> =
+    IdTokenVerifier<
+        'a,
+        CoreJwsSigningAlgorithm,
+        CoreJsonWebKeyType,
+        CoreJsonWebKeyUse,
+        CoreJsonWebKey
+    >;
 
 pub type CoreJsonWebKeySet =
     JsonWebKeySet<
@@ -449,7 +459,7 @@ pub mod serde_core_grant_type {
 /// The values are described in
 /// [Section 5.1 of RFC 7518](https://tools.ietf.org/html/rfc7518#section-5.1).
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum CoreJweContentEncryptionAlgorithm {
     ///
     /// AES-128 CBC HMAC SHA-256 authenticated encryption.
@@ -492,7 +502,7 @@ impl JweContentEncryptionAlgorithm for CoreJweContentEncryptionAlgorithm {}
 /// to use key agreement to agree upon the CEK. The values are described in
 /// [Section 4.1 of RFC 7518](https://tools.ietf.org/html/rfc7518#section-4.1).
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum CoreJweKeyManagementAlgorithm {
     ///
     /// RSAES-PKCS1-V1_5.
@@ -623,17 +633,21 @@ impl CoreJsonWebKey {
                 )
                 .map_err(|_|
                     SignatureVerificationError::CryptoError(
-                        "failed to verify signature".to_string()
+                        "bad signature".to_string()
                     )
                 )
             } else {
                 Err(
-                    SignatureVerificationError::InvalidKey("RSA exponent `e` is `None`".to_string())
+                    SignatureVerificationError::InvalidKey(
+                        "RSA exponent `e` is missing".to_string()
+                    )
                 )
             }
         } else {
             Err(
-                SignatureVerificationError::InvalidKey("RSA modulus `n` is `None`".to_string())
+                SignatureVerificationError::InvalidKey(
+                    "RSA modulus `n` is missing".to_string()
+                )
             )
         }
     }
@@ -656,7 +670,7 @@ for CoreJsonWebKey {
             if *key_use != CoreJsonWebKeyUse::Signature {
                 return Err(
                     SignatureVerificationError::InvalidKey(
-                        "key not usable for digital signatures".to_string()
+                        "key usage not permitted for digital signatures".to_string()
                     )
                 )
             }
@@ -699,12 +713,9 @@ for CoreJsonWebKey {
                     msg,
                     signature
                 ),
-            ref other =>
-                Err(
-                    SignatureVerificationError::UnsupportedAlg(
-                        format!("unsupported signature algorithm: {}", variant_name(other))
-                    )
-                )
+            ref other => Err(
+                SignatureVerificationError::UnsupportedAlg(variant_name(other).to_string())
+            )
         }
     }
 }
@@ -759,7 +770,7 @@ impl JsonWebKeyUse for CoreJsonWebKeyUse {
 /// the JWS Payload. The values are described in
 /// [Section 3.1 of RFC 7518](https://tools.ietf.org/html/rfc7518#section-3.1).
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum CoreJwsSigningAlgorithm {
     ///
     /// HMAC using SHA-256 (currently unsupported).
@@ -896,6 +907,10 @@ impl<> JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
         } else {
             false
         }
+    }
+
+    fn rsa_sha_256() -> Self {
+        CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256
     }
 }
 
