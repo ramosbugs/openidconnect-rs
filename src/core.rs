@@ -50,7 +50,7 @@ use super::{
     SignatureVerificationError,
     SubjectIdentifierType,
     UserInfoClaims,
-    UserInfoResponse,
+    UserInfoVerifier,
 };
 use super::discovery::Discovery10ProviderMetadata;
 use super::registration::{
@@ -165,18 +165,18 @@ pub type CoreProviderMetadata =
         CoreJsonWebKeyType,
         CoreResponseMode,
         CoreResponseType,
-        CoreSubjectIdentifierType
+        CoreSubjectIdentifierType,
     >;
 
 pub type CoreUserInfoClaims = UserInfoClaims<EmptyAdditionalClaims, CoreGenderClaim>;
-
-pub type CoreUserInfoResponse =
-    UserInfoResponse<
-        EmptyAdditionalClaims,
-        CoreGenderClaim,
+pub type CoreUserInfoVerifier<'a> =
+    UserInfoVerifier<
+        'a,
         CoreJweContentEncryptionAlgorithm,
         CoreJwsSigningAlgorithm,
         CoreJsonWebKeyType,
+        CoreJsonWebKeyUse,
+        CoreJsonWebKey,
     >;
 
 ///

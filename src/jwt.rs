@@ -47,7 +47,7 @@ where JE: JweContentEncryptionAlgorithm, JS: JwsSigningAlgorithm<JT>, JT: JsonWe
 mod serde_jwt_algorithm {
     use std::marker::PhantomData;
 
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde::{Deserialize, Deserializer, Serializer};
     use serde::de::Error;
     use serde_json::{from_value, Value};
 
@@ -122,6 +122,27 @@ where JE: JweContentEncryptionAlgorithm,
     _phantom_jt: PhantomData<JT>,
 }
 
+// Helper trait so that we can get borrowed claims when we have a reference to the JWT and owned
+// claims when we own the JWT.
+pub trait JsonWebTokenAccess<C, JE, JS, JT>
+where C: Debug + DeserializeOwned + Serialize,
+        JE: JweContentEncryptionAlgorithm,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType {
+    type ReturnType;
+
+    fn unverified_header(&self) -> &JsonWebTokenHeader<JE, JS, JT>;
+    fn unverified_claims(self) -> Self::ReturnType;
+    fn unverified_claims_ref(&self) -> &C;
+
+    fn claims<JU, JW>(
+        self,
+        signature_alg: &JS,
+        key: &JW
+    ) -> Result<Self::ReturnType, SignatureVerificationError>
+    where JU: JsonWebKeyUse, JW: JsonWebKey<JS, JT, JU>;
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct JsonWebToken<C, JE, JS, JT>
 where C: Debug + DeserializeOwned + Serialize,
@@ -140,14 +161,43 @@ where C: Debug + DeserializeOwned + Serialize,
         JE: JweContentEncryptionAlgorithm,
         JS: JwsSigningAlgorithm<JT>,
         JT: JsonWebKeyType {
-    pub fn unverified_header(&self) -> &JsonWebTokenHeader<JE, JS, JT> { &self.header }
-    pub fn unverified_claims(&self) -> &C { &self.claims }
-
-    pub fn claims<JU, JW>(
-        &self,
+}
+// Owned JWT.
+impl<C, JE, JS, JT> JsonWebTokenAccess<C, JE, JS, JT>
+for JsonWebToken<C, JE, JS, JT>
+where C: Debug + DeserializeOwned + Serialize,
+        JE: JweContentEncryptionAlgorithm,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType {
+    type ReturnType = C;
+    fn unverified_header(&self) -> &JsonWebTokenHeader<JE, JS, JT> { &self.header }
+    fn unverified_claims(self) -> Self::ReturnType { self.claims }
+    fn unverified_claims_ref(&self) -> &C { &self.claims }
+    fn claims<JU, JW>(
+        self,
         signature_alg: &JS,
-        key: &JW,
-    ) -> Result<&C, SignatureVerificationError>
+        key: &JW
+    ) -> Result<Self::ReturnType, SignatureVerificationError>
+    where JU: JsonWebKeyUse, JW: JsonWebKey<JS, JT, JU> {
+        key.verify_signature(signature_alg, &self.signing_input, &self.signature)?;
+        Ok(self.claims)
+    }
+}
+// Borrowed JWT.
+impl<'a, C, JE, JS, JT> JsonWebTokenAccess<C, JE, JS, JT> for &'a JsonWebToken<C, JE, JS, JT>
+where C: Debug + DeserializeOwned + Serialize,
+        JE: JweContentEncryptionAlgorithm,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType {
+    type ReturnType = &'a C;
+    fn unverified_header(&self) -> &JsonWebTokenHeader<JE, JS, JT> { &self.header }
+    fn unverified_claims(self) -> Self::ReturnType { &self.claims }
+    fn unverified_claims_ref(&self) -> &C { &self.claims }
+    fn claims<JU, JW>(
+        self,
+        signature_alg: &JS,
+        key: &JW
+    ) -> Result<Self::ReturnType, SignatureVerificationError>
     where JU: JsonWebKeyUse, JW: JsonWebKey<JS, JT, JU> {
         key.verify_signature(signature_alg, &self.signing_input, &self.signature)?;
         Ok(&self.claims)

@@ -1,6 +1,4 @@
 
-use serde::de::{DeserializeOwned, MapAccess};
-
 ///
 /// Helper trait to convert struct values to the types returned by the parent trait getters.
 ///

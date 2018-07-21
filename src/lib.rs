@@ -31,6 +31,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter, Result as FormatterResult};
 use std::marker::PhantomData;
 use std::ops::Deref;
+use std::str;
 use std::time::Duration;
 
 use chrono::{DateTime, TimeZone, Utc};
@@ -46,7 +47,6 @@ use oauth2::{
     ErrorResponseType,
     ExtraTokenFields,
     RedirectUrl,
-    RefreshToken,
     RequestTokenError,
     ResponseType as OAuth2ResponseType,
     Scope,
@@ -71,7 +71,7 @@ use http::{
     MIME_TYPE_JSON,
     MIME_TYPE_JWT,
 };
-use jwt::{JsonWebToken, JsonWebTokenAlgorithm, JsonWebTokenHeader};
+use jwt::{JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenHeader};
 use registration::ClientRegistrationResponse;
 // Flatten the module hierarchy involving types. They're only separated to improve code
 // organization.
@@ -428,6 +428,12 @@ pub enum AuthenticationFlow<RT: ResponseType> {
 pub struct EmptyAdditionalClaims {}
 impl AdditionalClaims for EmptyAdditionalClaims {}
 
+// FIXME: remove this wrapper layer, and have the functions that return IdToken currently
+// directly call claims() to perform the verification and extract the result. There's nothing
+// a caller can do with this IdToken other than call claims() on it, so we might as well
+// do that automatically. If there's ever a reasonable use case for wanting to do lower
+// level stuff, we could always expose another interface that returns something like this.
+// For now, let's optimize for ease of (secure) use.
 #[derive(Clone, Debug, PartialEq)]
 pub struct IdToken<
     AC: AdditionalClaims,
@@ -497,25 +503,28 @@ pub enum ClaimsVerificationError {
     InvalidNonce(String),
     #[fail(display = "Invalid subject: {}", _0)]
     InvalidSubject(String),
-    #[fail(display = "ID token must be signed")]
+    #[fail(display = "Claims must be signed")]
     NoSignature,
     #[fail(display = "{}", _0)]
     Other(String),
     #[fail(display = "Signature verification failed")]
     SignatureVerification(#[cause] SignatureVerificationError),
-    #[fail(display = "Unsupported token header: {}", _0)]
+    #[fail(display = "Unsupported: {}", _0)]
     Unsupported(String),
 }
 
 // FIXME: move somewhere more appropriate
+// This struct is intentionally private.
 struct JwtClaimsVerifier<'a, JS, JT, JU, K>
 where JS: 'a + JwsSigningAlgorithm<JT>,
         JT: 'a + JsonWebKeyType,
         JU: 'a + JsonWebKeyUse,
         K: 'a + JsonWebKey<JS, JT, JU> {
     allowed_algs: Option<HashSet<JS>>,
+    aud_required: bool,
     client_id: &'a ClientId,
     client_secret: Option<&'a ClientSecret>,
+    iss_required: bool,
     issuer: &'a IssuerUrl,
     is_signature_check_enabled: bool,
     signature_keys: &'a JsonWebKeySet<JS, JT, JU, K>,
@@ -532,30 +541,38 @@ where JS: 'a + JwsSigningAlgorithm<JT>,
     ) -> Self {
         JwtClaimsVerifier {
             allowed_algs: Some([JS::rsa_sha_256()].iter().cloned().collect()),
+            aud_required: true,
             client_id,
             client_secret: None,
+            iss_required: true,
             issuer,
             is_signature_check_enabled: true,
             signature_keys,
         }
     }
 
+    pub fn require_audience_match(mut self, aud_required: bool) -> Self {
+        self.aud_required = aud_required;
+        self
+    }
+
+    pub fn require_issuer_match(mut self, iss_required: bool) -> Self {
+        self.iss_required = iss_required;
+        self
+    }
+
+    pub fn require_signature_check(mut self, sig_required: bool) -> Self {
+        self.is_signature_check_enabled = sig_required;
+        self
+    }
+
     pub fn set_allowed_algs<I>(mut self, algs: I) -> Self
-    where I: IntoIterator<Item = JS> {
+        where I: IntoIterator<Item = JS> {
         self.allowed_algs = Some(algs.into_iter().collect());
         self
     }
     pub fn allow_any_alg(mut self) -> Self {
         self.allowed_algs = None;
-        self
-    }
-
-    pub fn enable_signature_check(mut self) -> Self {
-        self.is_signature_check_enabled = true;
-        self
-    }
-    pub fn disable_signature_check(mut self) -> Self {
-        self.is_signature_check_enabled = false;
         self
     }
 
@@ -595,7 +612,7 @@ where JS: 'a + JwsSigningAlgorithm<JT>,
         // If 'crit' fields are specified, we must reject any we do not understand. Since this
         // implementation doesn't understand any of them, unconditionally reject the JWT. Note that
         // the spec prohibits this field from containing any of the standard headers or being empty.
-        if let Some(ref crit) = jose_header.crit {
+        if let Some(_) = jose_header.crit {
             return Err(
                 ClaimsVerificationError::Unsupported(
                     "critical JWT header fields are unsupported".to_string()
@@ -605,25 +622,27 @@ where JS: 'a + JwsSigningAlgorithm<JT>,
         Ok(())
     }
 
-    pub fn verified_claims<'b, C, JE>(
+    pub fn verified_claims<A, C, JE, T>(
         &self,
-        jwt: &'b JsonWebToken<C, JE, JS, JT>
-    ) -> Result<&'b C, ClaimsVerificationError>
-    where C: AudiencesClaim + Debug + DeserializeOwned + IssuerClaim + Serialize,
-            JE: JweContentEncryptionAlgorithm {
-        let jose_header = &jwt.unverified_header();
-        Self::validate_jose_header(jose_header)?;
+        jwt: A
+    ) -> Result<T, ClaimsVerificationError>
+    where A: JsonWebTokenAccess<C, JE, JS, JT, ReturnType = T>,
+            C: AudiencesClaim + Debug + DeserializeOwned + IssuerClaim + Serialize,
+            JE: JweContentEncryptionAlgorithm,
+            T: AudiencesClaim + IssuerClaim {
+        {
+            let jose_header = jwt.unverified_header();
+            Self::validate_jose_header(jose_header)?;
 
-        // The code below roughly follows the validation steps described in
-        // https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
+            // The code below roughly follows the validation steps described in
+            // https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
 
-        // 1. If the ID Token is encrypted, decrypt it using the keys and algorithms that the Client
-        //    specified during Registration that the OP was to use to encrypt the ID Token. If
-        //    encryption was negotiated with the OP at Registration time and the ID Token is not
-        //    encrypted, the RP SHOULD reject it.
+            // 1. If the ID Token is encrypted, decrypt it using the keys and algorithms that the Client
+            //    specified during Registration that the OP was to use to encrypt the ID Token. If
+            //    encryption was negotiated with the OP at Registration time and the ID Token is not
+            //    encrypted, the RP SHOULD reject it.
 
-        match jose_header.alg {
-            JsonWebTokenAlgorithm::Encryption(ref encryption_alg) => {
+            if let JsonWebTokenAlgorithm::Encryption(ref encryption_alg) = jose_header.alg {
                 return Err(
                     ClaimsVerificationError::Unsupported(
                         format!(
@@ -631,58 +650,64 @@ where JS: 'a + JwsSigningAlgorithm<JT>,
                             variant_name(encryption_alg),
                         )
                     )
-                )
-            },
-            _ => {},
+                );
+            }
         }
-
 
         // TODO: Add encryption (JWE) support
-
-        // 2. The Issuer Identifier for the OpenID Provider (which is typically obtained during
-        //    Discovery) MUST exactly match the value of the iss (issuer) Claim.
-        let unverified_claims = jwt.unverified_claims();
-        if let Some(issuer) = unverified_claims.issuer() {
-            if issuer != self.issuer {
-                return Err(
-                    ClaimsVerificationError::InvalidIssuer(
-                        format!("expected `{}` (found `{}`)", **self.issuer, **issuer)
-                    )
-                );
+        {
+            // 2. The Issuer Identifier for the OpenID Provider (which is typically obtained during
+            //    Discovery) MUST exactly match the value of the iss (issuer) Claim.
+            let unverified_claims = jwt.unverified_claims_ref();
+            if self.iss_required {
+                if let Some(issuer) = unverified_claims.issuer() {
+                    if issuer != self.issuer {
+                        return Err(
+                            ClaimsVerificationError::InvalidIssuer(
+                                format!("expected `{}` (found `{}`)", **self.issuer, **issuer)
+                            )
+                        );
+                    }
+                } else {
+                    return Err(
+                        ClaimsVerificationError::InvalidIssuer("missing issuer claim".to_string())
+                    );
+                }
             }
-        } else {
-            return Err(ClaimsVerificationError::InvalidIssuer("missing issuer claim".to_string()));
-        }
 
-        // 3. The Client MUST validate that the aud (audience) Claim contains its client_id value
-        //    registered at the Issuer identified by the iss (issuer) Claim as an audience. The aud
-        //    (audience) Claim MAY contain an array with more than one element. The ID Token MUST be
-        //    rejected if the ID Token does not list the Client as a valid audience, or if it
-        //    contains additional audiences not trusted by the Client.
-        if let Some(audiences) = unverified_claims.audiences() {
-            if audiences
-                    .iter()
-                    .find(|aud| (**aud).deref() == self.client_id.deref()).is_none() {
-                return Err(
-                    ClaimsVerificationError::InvalidAudience(
-                        format!(
-                            "must contain `{}` (found audiences: {})",
-                            **self.client_id,
-                            audiences
-                                .iter()
-                                .map(|aud| format!("`{}`", Deref::deref(aud)))
-                                .collect::<Vec<_>>()
-                                .join(", ")
+            // 3. The Client MUST validate that the aud (audience) Claim contains its client_id value
+            //    registered at the Issuer identified by the iss (issuer) Claim as an audience. The aud
+            //    (audience) Claim MAY contain an array with more than one element. The ID Token MUST be
+            //    rejected if the ID Token does not list the Client as a valid audience, or if it
+            //    contains additional audiences not trusted by the Client.
+            if self.aud_required {
+                if let Some(audiences) = unverified_claims.audiences() {
+                    if audiences
+                        .iter()
+                        .find(|aud| (**aud).deref() == self.client_id.deref()).is_none() {
+                        return Err(
+                            ClaimsVerificationError::InvalidAudience(
+                                format!(
+                                    "must contain `{}` (found audiences: {})",
+                                    **self.client_id,
+                                    audiences
+                                        .iter()
+                                        .map(|aud| format!("`{}`", Deref::deref(aud)))
+                                        .collect::<Vec<_>>()
+                                        .join(", ")
+                                )
+                            )
+                        );
+                    }
+                } else {
+                    return Err(
+                        ClaimsVerificationError::InvalidAudience(
+                            "missing audiences claim".to_string()
                         )
-                    )
-                );
+                    );
+                }
             }
-        } else {
-            return Err(
-                ClaimsVerificationError::InvalidAudience("missing audiences claim".to_string())
-            );
         }
-
         // Steps 4--5 (azp claim validation) are specific to the ID token.
 
         // 6. If the ID Token is received via direct communication between the Client and the Token
@@ -691,142 +716,147 @@ where JS: 'a + JwsSigningAlgorithm<JT>,
         //    signature of all other ID Tokens according to JWS [JWS] using the algorithm specified
         //    in the JWT alg Header Parameter. The Client MUST use the keys provided by the Issuer.
         if !self.is_signature_check_enabled {
-            Ok(unverified_claims)
-        } else {
-            let signature_alg =
-                match jose_header.alg {
-                    // Encryption is handled above.
-                    JsonWebTokenAlgorithm::Encryption(_) => panic!("unreachable"),
-                    JsonWebTokenAlgorithm::Signature(ref signature_alg, _) => signature_alg,
-                    // Section 2 of OpenID Connect Core 1.0 specifies that "ID Tokens MUST NOT use
-                    // none as the alg value unless the Response Type used returns no ID Token from
-                    // the Authorization Endpoint (such as when using the Authorization Code Flow)
-                    // and the Client explicitly requested the use of none at Registration time."
-                    //
-                    // While there's technically a use case where this is ok, we choose not to
-                    // support it for now to protect against accidental misuse. If demand arises,
-                    // we can figure out a API that mitigates the risk.
-                    JsonWebTokenAlgorithm::None => {
-                        return Err(ClaimsVerificationError::NoSignature)
-                    }
-                };
-
-            // 7. The alg value SHOULD be the default of RS256 or the algorithm sent by the Client
-            //    in the id_token_signed_response_alg parameter during Registration.
-            if let Some(ref allowed_algs) = self.allowed_algs {
-                if !allowed_algs.contains(signature_alg) {
-                    return Err(
-                        ClaimsVerificationError::SignatureVerification(
-                            SignatureVerificationError::DisallowedAlg(
-                                format!(
-                                    "algorithm `{}` is not one of: {}",
-                                    variant_name(signature_alg),
-                                    allowed_algs
-                                        .iter()
-                                        .map(variant_name)
-                                        .collect::<Vec<_>>()
-                                        .join(", "),
-                                )
-                            )
-                        )
-                    );
-                }
-            }
-
-            // NB: We must *not* trust the 'kid' (key ID) or 'alg' (algorithm) fields present in the
-            // JOSE header, as an attacker could manipulate these while forging the JWT. The code
-            // below must be secure regardless of how these fields are manipulated.
-
-            let key_type = signature_alg.key_type().map_err(ClaimsVerificationError::Unsupported)?;
-            if key_type.is_symmetric() {
-                // 8. If the JWT alg Header Parameter uses a MAC based algorithm such as HS256,
-                //    HS384, or HS512, the octets of the UTF-8 representation of the client_secret
-                //    corresponding to the client_id contained in the aud (audience) Claim are used
-                //    as the key to validate the signature. For MAC based algorithms, the behavior
-                //    is unspecified if the aud is multi-valued or if an azp value is present that
-                //    is different than the aud value.
-                if let Some(ref client_secret) = self.client_secret {
-                    // FIXME: implement
-                    return Err(
-                        ClaimsVerificationError::Unsupported(
-                            "FIXME: symmetric signatures are currently unimplemented".to_string()
-                        )
-                    )
-                } else {
-                    // The client secret isn't confidential for public clients, so anyone can forge a
-                    // JWT with a valid signature.
-                    return Err(
-                        ClaimsVerificationError::SignatureVerification(
-                            SignatureVerificationError::DisallowedAlg(
-                                "symmetric signatures are disallowed for public clients".to_string()
-                            )
-                        )
-                    )
-                }
-            } else {
-                // Section 10.1 of OpenID Connect Core 1.0 states that the JWT must include a key ID
-                // if the JWK set contains more than one public key.
-
-                // See if any key has a matching key ID (if supplied) and compatible type.
-                let public_keys =
-                    self.signature_keys
-                        .keys()
-                        .iter()
-                        .filter(|key|
-                            // The key must be of the type expected for this signature algorithm.
-                            *key.key_type() == key_type &&
-                                // Either the key hasn't specified it's allowed usage (in which case
-                                // any usage is acceptable), or the key supports signing.
-                                (key.key_use().is_none() ||
-                                    key.key_use().iter().any(
-                                        |key_use| key_use.allows_signature()
-                                    )) &&
-                                // Either the JWT doesn't include a 'kid' (in which case any 'kid'
-                                // is acceptable), or the 'kid' matches the key's ID.
-                                (jose_header.kid.is_none() ||
-                                    jose_header.kid.as_ref() == key.key_id())
-                        )
-                        .collect::<Vec<&K>>();
-                if public_keys.is_empty() {
-                    // FIXME: if there's a KID but no matching key, try re-fetching the
-                    // JWKS to support KeyRotation
-                    Err(
-                        ClaimsVerificationError::SignatureVerification(
-                            SignatureVerificationError::NoMatchingKey
-                        )
-                    )
-                } else if public_keys.len() == 1 {
-                    jwt.claims(signature_alg, *public_keys.first().expect("unreachable"))
-                        .map_err(ClaimsVerificationError::SignatureVerification)
-                } else {
-                    Err(
-                        ClaimsVerificationError::SignatureVerification(
-                            SignatureVerificationError::AmbiguousKeyId(
-                                format!(
-                                    "JWK set must only contain one eligible public key \
-                                    ({} eligible keys: {})",
-                                    public_keys.len(),
-                                    public_keys
-                                        .iter()
-                                        .map(|key|
-                                            format!(
-                                                "{} ({})",
-                                                key.key_id()
-                                                    .map(|kid| format!("`{}`", **kid))
-                                                    .unwrap_or("null ID".to_string()),
-                                                variant_name(key.key_type())
-                                            )
-                                        )
-                                        .collect::<Vec<_>>()
-                                        .join(", ")
-                                )
-                            )
-                        )
-                    )
-                }
-            }
-            // Steps 9--13 are specific to the ID token.
+            return Ok(jwt.unverified_claims());
         }
+
+        // Borrow the header again. We had to drop the reference above to allow for the
+        // early exit calling jwt.unverified_claims(), which takes ownership of the JWT.
+        let signature_alg =
+            match jwt.unverified_header().alg {
+                // Encryption is handled above.
+                JsonWebTokenAlgorithm::Encryption(_) => panic!("unreachable"),
+                JsonWebTokenAlgorithm::Signature(ref signature_alg, _) => signature_alg,
+                // Section 2 of OpenID Connect Core 1.0 specifies that "ID Tokens MUST NOT use
+                // none as the alg value unless the Response Type used returns no ID Token from
+                // the Authorization Endpoint (such as when using the Authorization Code Flow)
+                // and the Client explicitly requested the use of none at Registration time."
+                //
+                // While there's technically a use case where this is ok, we choose not to
+                // support it for now to protect against accidental misuse. If demand arises,
+                // we can figure out a API that mitigates the risk.
+                JsonWebTokenAlgorithm::None => {
+                    return Err(ClaimsVerificationError::NoSignature)
+                }
+            }.clone();
+
+        // 7. The alg value SHOULD be the default of RS256 or the algorithm sent by the Client
+        //    in the id_token_signed_response_alg parameter during Registration.
+        if let Some(ref allowed_algs) = self.allowed_algs {
+            if !allowed_algs.contains(&signature_alg) {
+                return Err(
+                    ClaimsVerificationError::SignatureVerification(
+                        SignatureVerificationError::DisallowedAlg(
+                            format!(
+                                "algorithm `{}` is not one of: {}",
+                                variant_name(&signature_alg),
+                                allowed_algs
+                                    .iter()
+                                    .map(variant_name)
+                                    .collect::<Vec<_>>()
+                                    .join(", "),
+                            )
+                        )
+                    )
+                );
+            }
+        }
+
+        // NB: We must *not* trust the 'kid' (key ID) or 'alg' (algorithm) fields present in the
+        // JOSE header, as an attacker could manipulate these while forging the JWT. The code
+        // below must be secure regardless of how these fields are manipulated.
+
+        let key_type = signature_alg.key_type().map_err(ClaimsVerificationError::Unsupported)?;
+        if key_type.is_symmetric() {
+            // 8. If the JWT alg Header Parameter uses a MAC based algorithm such as HS256,
+            //    HS384, or HS512, the octets of the UTF-8 representation of the client_secret
+            //    corresponding to the client_id contained in the aud (audience) Claim are used
+            //    as the key to validate the signature. For MAC based algorithms, the behavior
+            //    is unspecified if the aud is multi-valued or if an azp value is present that
+            //    is different than the aud value.
+            if let Some(client_secret) = self.client_secret {
+                // FIXME: implement
+                return Err(
+                    ClaimsVerificationError::Unsupported(
+                        "FIXME: symmetric signatures are currently unimplemented".to_string()
+                    )
+                )
+            } else {
+                // The client secret isn't confidential for public clients, so anyone can forge a
+                // JWT with a valid signature.
+                return Err(
+                    ClaimsVerificationError::SignatureVerification(
+                        SignatureVerificationError::DisallowedAlg(
+                            "symmetric signatures are disallowed for public clients".to_string()
+                        )
+                    )
+                )
+            }
+        }
+
+        // Section 10.1 of OpenID Connect Core 1.0 states that the JWT must include a key ID
+        // if the JWK set contains more than one public key.
+
+        // See if any key has a matching key ID (if supplied) and compatible type.
+        let public_keys = {
+            let jose_header = jwt.unverified_header();
+            self.signature_keys
+                .keys()
+                .iter()
+                .filter(|key|
+                    // The key must be of the type expected for this signature algorithm.
+                    *key.key_type() == key_type &&
+                        // Either the key hasn't specified it's allowed usage (in which case
+                        // any usage is acceptable), or the key supports signing.
+                        (key.key_use().is_none() ||
+                            key.key_use().iter().any(
+                                |key_use| key_use.allows_signature()
+                            )) &&
+                        // Either the JWT doesn't include a 'kid' (in which case any 'kid'
+                        // is acceptable), or the 'kid' matches the key's ID.
+                        (jose_header.kid.is_none() ||
+                            jose_header.kid.as_ref() == key.key_id())
+                )
+                .collect::<Vec<&K>>()
+            };
+        if public_keys.is_empty() {
+            // FIXME: if there's a KID but no matching key, try re-fetching the
+            // JWKS to support KeyRotation
+            return Err(
+                ClaimsVerificationError::SignatureVerification(
+                    SignatureVerificationError::NoMatchingKey
+                )
+            )
+        } else if public_keys.len() != 1 {
+            return Err(
+                ClaimsVerificationError::SignatureVerification(
+                    SignatureVerificationError::AmbiguousKeyId(
+                        format!(
+                            "JWK set must only contain one eligible public key \
+                            ({} eligible keys: {})",
+                            public_keys.len(),
+                            public_keys
+                                .iter()
+                                .map(|key|
+                                    format!(
+                                        "{} ({})",
+                                        key.key_id()
+                                            .map(|kid| format!("`{}`", **kid))
+                                            .unwrap_or_else(|| "null ID".to_string()),
+                                        variant_name(key.key_type())
+                                    )
+                                )
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )
+                    )
+                )
+            )
+        }
+
+        jwt.claims(&signature_alg.clone(), *public_keys.first().expect("unreachable"))
+            .map_err(ClaimsVerificationError::SignatureVerification)
+
+        // Steps 9--13 are specific to the ID token.
     }
 }
 
@@ -840,7 +870,82 @@ trait IssuerClaim {
 }
 
 // FIXME: move somewhere more appropriate
-struct UserInfoVerifier {}
+pub struct UserInfoVerifier<'a, JE, JS, JT, JU, K>
+where JE: 'a + JweContentEncryptionAlgorithm,
+        JS: 'a + JwsSigningAlgorithm<JT>,
+        JT: 'a + JsonWebKeyType,
+        JU: 'a + JsonWebKeyUse,
+        K: 'a + JsonWebKey<JS, JT, JU> {
+    jwt_required: bool,
+    jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>,
+    sub: &'a SubjectIdentifier,
+    _phantom: PhantomData<JE>,
+}
+impl<'a, JE, JS, JT, JU, K> UserInfoVerifier<'a, JE, JS, JT, JU, K>
+where JE: 'a + JweContentEncryptionAlgorithm,
+        JS: 'a + JwsSigningAlgorithm<JT>,
+        JT: 'a + JsonWebKeyType,
+        JU: 'a + JsonWebKeyUse,
+        K: 'a + JsonWebKey<JS, JT, JU> {
+    pub fn new(
+        client_id: &'a ClientId,
+        issuer: &'a IssuerUrl,
+        signature_keys: &'a JsonWebKeySet<JS, JT, JU, K>,
+        sub: &'a SubjectIdentifier,
+    ) -> Self {
+        UserInfoVerifier {
+            jwt_required: false,
+            jwt_verifier: JwtClaimsVerifier::new(client_id, issuer, signature_keys),
+            sub,
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn require_signed_response(mut self, jwt_required: bool) -> Self {
+        self.jwt_required = jwt_required;
+        self
+    }
+
+    pub fn require_issuer_match(mut self, iss_required: bool) -> Self {
+        self.jwt_verifier = self.jwt_verifier.require_issuer_match(iss_required);
+        self
+    }
+
+    pub fn require_audience_match(mut self, aud_required: bool) -> Self {
+        self.jwt_verifier = self.jwt_verifier.require_audience_match(aud_required);
+        self
+    }
+
+    fn verified_claims<AC, GC>(
+        &self,
+        unverified_user_info: UnverifiedUserInfoClaims<AC, GC, JE, JS, JT>,
+    ) -> Result<UserInfoClaims<AC, GC>, ClaimsVerificationError>
+    where AC: AdditionalClaims, GC: GenderClaim {
+        let user_info =
+            match unverified_user_info {
+                UnverifiedUserInfoClaims::JsonClaims(user_info) => {
+                    if self.jwt_required {
+                        return Err(ClaimsVerificationError::NoSignature);
+                    }
+                    user_info
+                },
+                UnverifiedUserInfoClaims::JwtClaims(user_info_jwt) => {
+                    trace!("here: {:?}", user_info_jwt);
+                    self.jwt_verifier.verified_claims(user_info_jwt)?
+                }
+            };
+
+        if user_info.sub() != self.sub {
+            return Err(
+                ClaimsVerificationError::InvalidSubject(
+                    format!("expected `{}` (found `{}`)", **self.sub, **user_info.sub())
+                )
+            );
+        }
+
+        Ok(user_info)
+    }
+}
 
 // FIXME: move somewhere more appropriate
 pub struct IdTokenVerifier<'a, JS, JT, JU, K>
@@ -890,11 +995,11 @@ where JS: 'a + JwsSigningAlgorithm<JT>,
     }
 
     pub fn enable_signature_check(mut self) -> Self {
-        self.jwt_verifier = self.jwt_verifier.enable_signature_check();
+        self.jwt_verifier = self.jwt_verifier.require_signature_check(true);
         self
     }
     pub fn insecure_disable_signature_check(mut self) -> Self {
-        self.jwt_verifier = self.jwt_verifier.disable_signature_check();
+        self.jwt_verifier = self.jwt_verifier.require_signature_check(false);
         self
     }
 
@@ -1086,13 +1191,25 @@ where AC: AdditionalClaims, GC: GenderClaim {
 impl<AC, GC> AudiencesClaim for IdTokenClaims<AC, GC>
 where AC: AdditionalClaims, GC: GenderClaim {
     fn audiences(&self) -> Option<&Vec<Audience>> {
-        Some(self.audiences())
+        Some(IdTokenClaims::audiences(self))
+    }
+}
+impl<'a, AC, GC> AudiencesClaim for &'a IdTokenClaims<AC, GC>
+where AC: AdditionalClaims, GC: GenderClaim {
+    fn audiences(&self) -> Option<&Vec<Audience>> {
+        Some(IdTokenClaims::audiences(self))
     }
 }
 impl<AC, GC> IssuerClaim for IdTokenClaims<AC, GC>
 where AC: AdditionalClaims, GC: GenderClaim {
     fn issuer(&self) -> Option<&IssuerUrl> {
-        Some(self.issuer())
+        Some(IdTokenClaims::issuer(self))
+    }
+}
+impl<'a, AC, GC> IssuerClaim for &'a IdTokenClaims<AC, GC>
+where AC: AdditionalClaims, GC: GenderClaim {
+    fn issuer(&self) -> Option<&IssuerUrl> {
+        Some(IdTokenClaims::issuer(self))
     }
 }
 
@@ -1383,19 +1500,35 @@ fn join_optional_vec<T>(vec_opt: Option<&Vec<T>>) -> Option<String> where T: AsR
     }
 }
 
+#[derive(Debug, Fail)]
+pub enum UserInfoError {
+    #[fail(display = "Failed to verify claims")]
+    ClaimsVerification(#[cause] ClaimsVerificationError),
+    #[fail(display = "Request failed")]
+    Request(#[cause] curl::Error),
+    #[fail(display = "Response error (status={}): {}", _0, _1)]
+    Response(u32, String),
+    #[fail(display = "Failed to parse response")]
+    Json(#[cause] serde_json::Error),
+    #[fail(display = "Other error: {}", _0)]
+    Other(String),
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct UnverifiedUserInfoClaims<AC: AdditionalClaims, GC: GenderClaim>(
-    #[serde(bound = "AC: AdditionalClaims")]
-    UserInfoClaims<AC, GC>
-);
-impl<AC, GC> UnverifiedUserInfoClaims<AC, GC>
-where AC: AdditionalClaims, GC: GenderClaim> {
-    pub fn claims<JU, K>(
-        &self,
-        verifier: &UserInfoVerifier,
-    ) -> Result<&UserInfoClaims<AC, GC>, ClaimsVerificationError> {
-        verifier.verified_claims(&self.0)
-    }
+enum UnverifiedUserInfoClaims<AC, GC, JE, JS, JT>
+where AC: AdditionalClaims,
+        GC: GenderClaim,
+        JE: JweContentEncryptionAlgorithm,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType {
+    JsonClaims(
+        #[serde(bound = "AC: AdditionalClaims")]
+        UserInfoClaims<AC, GC>
+    ),
+    JwtClaims(
+        #[serde(bound = "AC: AdditionalClaims")]
+        JsonWebToken<UserInfoClaims<AC, GC>, JE, JS, JT>
+    )
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -1447,37 +1580,32 @@ where AC: AdditionalClaims, GC: GenderClaim {
     ];
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct UserInfoJsonWebTokenClaims<
-    AC: AdditionalClaims,
-    GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
->(
-    #[serde(bound = "AC: AdditionalClaims")]
-    JsonWebToken<UnverifiedUserInfoClaims<AC, GC>, JE, JS, JT>
-);
-impl<AC, GC, JE, JS, JT> UserInfoJsonWebTokenClaims<AC, GC, JE, JS, JT>
-where AC: AdditionalClaims,
-        GC: GenderClaim,
-        JE: JweContentEncryptionAlgorithm,
-        JS: JwsSigningAlgorithm<JT>,
-        JT: JsonWebKeyType {
+impl<AC, GC> AudiencesClaim for UserInfoClaims<AC, GC>
+    where AC: AdditionalClaims, GC: GenderClaim {
+    fn audiences(&self) -> Option<&Vec<Audience>> {
+        UserInfoClaims::audiences(&self)
+    }
+}
+impl<'a, AC, GC> AudiencesClaim for &'a UserInfoClaims<AC, GC>
+    where AC: AdditionalClaims, GC: GenderClaim {
+    fn audiences(&self) -> Option<&Vec<Audience>> {
+        UserInfoClaims::audiences(&self)
+    }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum UserInfoResponse<AC, GC, JE, JS, JT>
-where AC: AdditionalClaims,
-        GC: GenderClaim,
-        JE: JweContentEncryptionAlgorithm,
-        JS: JwsSigningAlgorithm<JT>,
-        JT: JsonWebKeyType {
-    JsonResponse(UnverifiedUserInfoClaims<AC, GC>),
-    JsonWebTokenResponse(UserInfoJsonWebTokenClaims<AC, GC, JE, JS, JT>),
+impl<AC, GC> IssuerClaim for UserInfoClaims<AC, GC>
+    where AC: AdditionalClaims, GC: GenderClaim {
+    fn issuer(&self) -> Option<&IssuerUrl> {
+        UserInfoClaims::issuer(&self)
+    }
+}
+impl<'a, AC, GC> IssuerClaim for &'a UserInfoClaims<AC, GC>
+    where AC: AdditionalClaims, GC: GenderClaim {
+    fn issuer(&self) -> Option<&IssuerUrl> {
+        UserInfoClaims::issuer(&self)
+    }
 }
 
-// FIXME: move out of types module
 new_type![
     #[derive(Deserialize, Serialize)]
     UserInfoUrl(
@@ -1488,17 +1616,18 @@ new_type![
         Url
     )
     impl {
-        // FIXME: don't depend on super::discovery in this module (factor this out into some kind
-        // of HttpError?)
-        pub fn get_user_info<AC, GC, JE, JS, JT>(
+        pub fn get_user_info<AC, GC, JE, JS, JT, JU, K>(
             &self,
-            access_token: &AccessToken
-        ) -> Result<UserInfoResponse<AC, GC, JE, JS, JT>, DiscoveryError>
+            access_token: &AccessToken,
+            verifier: &UserInfoVerifier<JE, JS, JT, JU, K>,
+        ) -> Result<UserInfoClaims<AC, GC>, UserInfoError>
         where AC: AdditionalClaims,
                 GC: GenderClaim,
                 JE: JweContentEncryptionAlgorithm,
                 JS: JwsSigningAlgorithm<JT>,
-                JT: JsonWebKeyType {
+                JT: JsonWebKeyType,
+                JU: JsonWebKeyUse,
+                K: JsonWebKey<JS, JT, JU>{
             let (auth_header, auth_value) = auth_bearer(access_token);
             let user_info_response =
                 HttpRequest {
@@ -1508,13 +1637,13 @@ new_type![
                     post_body: &vec![],
                 }
                 .request()
-            .map_err(DiscoveryError::Request)?;
+                .map_err(UserInfoError::Request)?;
 
             // FIXME: improve error handling (i.e., is there a body response?)
             // possibly consolidate this error handling with discovery::get_provider_metadata().
             if user_info_response.status_code != HTTP_STATUS_OK {
                 return Err(
-                    DiscoveryError::Response(
+                    UserInfoError::Response(
                         user_info_response.status_code,
                         "unexpected HTTP status code".to_string()
                     )
@@ -1522,29 +1651,46 @@ new_type![
             }
 
             match user_info_response.content_type.as_ref().map(String::as_str) {
-                None | Some(MIME_TYPE_JSON) =>
-                    Ok(
-                        UserInfoResponse::JsonResponse(
-                            serde_json::from_slice(&user_info_response.body)
-                                .map_err(DiscoveryError::Json)?
+                None | Some(MIME_TYPE_JSON) => {
+                    verifier
+                        .verified_claims(
+                            UnverifiedUserInfoClaims::JsonClaims(
+                                serde_json::from_slice(&user_info_response.body)
+                                    .map_err(UserInfoError::Json)?
+                            )
                         )
-                    ),
-                Some(MIME_TYPE_JWT) =>
-                    Ok(
-                        UserInfoResponse::JsonWebTokenResponse(
-                            serde_json::from_slice(&user_info_response.body)
-                                .map_err(DiscoveryError::Json)?
+                        .map_err(UserInfoError::ClaimsVerification)
+                }
+                Some(MIME_TYPE_JWT) => {
+                    let jwt_str =
+                        str::from_utf8(&user_info_response.body)
+                            .map_err(|_|
+                                UserInfoError::Other(
+                                    "response body has invalid UTF-8 encoding".to_string()
+                                )
+                            )?;
+                    // TODO: Implement a simple deserializer so that we can go straight from a str
+                    // to a JsonWebToken without first converting to/from JSON.
+                    let jwt_json =
+                        serde_json::to_string(&jwt_str)
+                            .map_err(UserInfoError::Json)?;
+                    verifier
+                        .verified_claims(
+                            UnverifiedUserInfoClaims::JwtClaims(
+                                serde_json::from_str(&jwt_json)
+                                    .map_err(UserInfoError::Json)?
+                            )
                         )
-                    ),
+                        .map_err(UserInfoError::ClaimsVerification)
+                }
                 Some(content_type) =>
                     Err(
-                        DiscoveryError::Response(
+                        UserInfoError::Response(
                             user_info_response.status_code,
-                            format!("Unexpected response Content-Type: `{}`", content_type)
+                            format!("unexpected response Content-Type: `{}`", content_type)
                         )
                     ),
             }
         }
     }
 ];
-

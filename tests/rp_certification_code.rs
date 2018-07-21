@@ -21,7 +21,8 @@ use openidconnect::{
     ClaimsVerificationError,
     SignatureVerificationError,
     StandardClaims,
-    UserInfoResponse
+    SubjectIdentifier,
+    UserInfoError,
 };
 use openidconnect::core::{
     CoreClient,
@@ -32,10 +33,11 @@ use openidconnect::core::{
     CoreIdTokenClaims,
     CoreIdTokenVerifier,
     CoreJsonWebKeySet,
+    CoreJwsSigningAlgorithm,
     CoreProviderMetadata,
     CoreResponseType,
     CoreUserInfoClaims,
-    CoreUserInfoResponse,
+    CoreUserInfoVerifier,
 };
 use openidconnect::discovery::ProviderMetadata;
 use openidconnect::registration::{
@@ -162,7 +164,7 @@ impl TestState {
 
     pub fn id_token_verifier<'a, 'b: 'a>(
         &'b self,
-        jwks: &'a CoreJsonWebKeySet
+        jwks: &'a CoreJsonWebKeySet,
     ) -> CoreIdTokenVerifier<'a> {
         CoreIdTokenVerifier::new_private_client(
             self.registration_response.client_id(),
@@ -198,31 +200,43 @@ impl TestState {
         self
     }
 
-    pub fn user_info_claims(&self) -> CoreUserInfoClaims {
-        let user_info_response: CoreUserInfoResponse =
-            self.provider_metadata
-                .userinfo_endpoint()
-                .unwrap()
-                .get_user_info(self.access_token())
-                .unwrap();
-        match user_info_response {
-            UserInfoResponse::JsonResponse(user_info_claims) => user_info_claims,
-            other => panic!("Unexpected user info response: {:?}", other),
-        }
+    pub fn user_info_verifier<'a, 'b: 'a>(
+        &'b self,
+        jwks: &'a CoreJsonWebKeySet,
+        sub: &'a SubjectIdentifier,
+    ) -> CoreUserInfoVerifier<'a> {
+        CoreUserInfoVerifier::new(
+            self.registration_response.client_id(),
+            self.provider_metadata.issuer(),
+            &jwks,
+            &sub,
+        )
     }
 
-/*
-    pub fn user_info_claims_failure(&self) -> ClaimsVerificationError {
-        let user_info_result =
+    pub fn user_info_claims(&self) -> CoreUserInfoClaims {
+        let jwks = self.jwks();
+        let verifier = self.user_info_verifier(&jwks, &self.id_token_claims().sub());
+        self.provider_metadata
+            .userinfo_endpoint()
+            .unwrap()
+            .get_user_info(self.access_token(), &verifier)
+            .unwrap()
+    }
+
+
+    pub fn user_info_claims_failure(&self) -> UserInfoError {
+        let jwks = self.jwks();
+        let verifier = self.user_info_verifier(&jwks, &self.id_token_claims().sub());
+        let user_info_result: Result<CoreUserInfoClaims, UserInfoError> =
             self.provider_metadata
                 .userinfo_endpoint()
                 .unwrap()
-                .get_user_info(self.access_token());
+                .get_user_info(self.access_token(), &verifier);
         match user_info_result {
             Err(err) => err,
             _ => panic!("claims verification succeeded but was expected to fail"),
         }
-    }*/
+    }
 }
 
 #[test]
@@ -473,7 +487,7 @@ fn rp_id_token_issuer_mismatch() {
     log_info!("SUCCESS");
 }
 
-/*#[test]
+#[test]
 fn rp_userinfo_bad_sub_claim() {
     let test_state =
         TestState::init("rp-userinfo-bad-sub-claim", |reg| reg)
@@ -483,12 +497,12 @@ fn rp_userinfo_bad_sub_claim() {
     log_debug!("ID token: {:?}", id_token_claims);
 
     match test_state.user_info_claims_failure() {
-        ClaimsVerificationError::InvalidSubject(_) =>
+        UserInfoError::ClaimsVerification(ClaimsVerificationError::InvalidSubject(_)) =>
             log_error!("UserInfo response has invalid subject (expected result)"),
         other => panic!("Unexpected result verifying ID token claims: {:?}", other),
     }
     log_info!("SUCCESS");
-}*/
+}
 
 #[test]
 fn rp_userinfo_bearer_header() {
@@ -500,6 +514,41 @@ fn rp_userinfo_bearer_header() {
     log_debug!("ID token: {:?}", id_token_claims);
 
     let user_info_claims = test_state.user_info_claims();
+    log_debug!("UserInfo response: {:?}", user_info_claims);
+    log_info!("SUCCESS");
+}
+
+#[test]
+fn rp_userinfo_sig() {
+    let test_state =
+        TestState::init(
+            "rp-userinfo-sig",
+            |reg| reg.set_userinfo_signed_response_alg(
+                Some(CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256)
+            )
+        )
+        .authorize(&vec![Scope::new("profile".to_string())])
+        .exchange_code();
+    let id_token_claims = test_state.id_token_claims();
+    log_debug!("ID token: {:?}", id_token_claims);
+
+    let jwks = test_state.jwks();
+    let verifier =
+        test_state
+            .user_info_verifier(&jwks, &test_state.id_token_claims().sub())
+            .require_signed_response(true)
+            // For some reason, the test suite omits these claims even though the Core spec says
+            // that the RP SHOULD verify these.
+            .require_audience_match(false)
+            .require_issuer_match(false);
+    let user_info_claims: CoreUserInfoClaims =
+        test_state
+            .provider_metadata
+            .userinfo_endpoint()
+            .unwrap()
+            .get_user_info(test_state.access_token(), &verifier)
+            .panic_if_fail("failed to get user info");
+
     log_debug!("UserInfo response: {:?}", user_info_claims);
     log_info!("SUCCESS");
 }

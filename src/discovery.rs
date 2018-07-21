@@ -119,10 +119,10 @@ trait_struct![
                 return Err(
                     DiscoveryError::Validation(
                         format!(
-                            "unexpected issuer URI `{:?}` (expected `{:?}`); this may indicate an \
+                            "unexpected issuer URI `{}` (expected `{}`); this may indicate an \
                                 OpenID Provider impersonation attack",
-                            self.issuer(),
-                            issuer_uri
+                            **self.issuer(),
+                            **issuer_uri
                         )
                     )
                 )
