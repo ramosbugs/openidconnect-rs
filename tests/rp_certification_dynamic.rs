@@ -1,22 +1,12 @@
 
+extern crate curl;
 extern crate env_logger;
+extern crate failure;
 #[macro_use] extern crate log;
 extern crate oauth2;
 extern crate openidconnect;
 #[macro_use] extern crate pretty_assertions;
-extern crate serde_json;
 extern crate url;
-
-#[macro_use] mod rp_common;
-
-use oauth2::prelude::*;
-use oauth2::RedirectUrl;
-use url::Url;
-
-use openidconnect::*;
-use openidconnect::core::*;
-use openidconnect::discovery::*;
-use openidconnect::registration::*;
 
 use rp_common::{
     CERTIFICATION_BASE_URL,
@@ -24,10 +14,16 @@ use rp_common::{
     init_log,
     issuer_url,
     register_client,
-    RP_CONTACT_EMAIL,
     RP_NAME,
 };
 
+use openidconnect::discovery::ProviderMetadata;
+use openidconnect::registration::{
+    ClientMetadata,
+    ClientRegistrationResponse,
+};
+
+#[macro_use] mod rp_common;
 
 #[test]
 fn rp_discovery_openid_configuration() {
@@ -92,7 +88,7 @@ fn rp_registration_dynamic() {
 
     let _issuer_url = issuer_url(TEST_ID);
     let provider_metadata = get_provider_metadata(TEST_ID);
-    let registration_response = register_client(&provider_metadata);
+    let registration_response = register_client(&provider_metadata, |reg| reg);
 
     macro_rules! log_field {
         ($field:ident) => {

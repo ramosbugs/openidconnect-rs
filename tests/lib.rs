@@ -7,32 +7,29 @@ extern crate url;
 
 use oauth2::prelude::*;
 use oauth2::{
-    AccessToken,
-    AuthType,
     AuthUrl,
-    Client,
     ClientId,
     ClientSecret,
     CsrfToken,
-    ErrorResponseType,
     RedirectUrl,
-    RefreshToken,
-    ResponseType,
     Scope,
-    TokenResponse,
-    TokenType,
     TokenUrl,
 };
-use oauth2::basic::{
-    BasicClient,
-    BasicErrorResponse,
-    BasicErrorResponseType,
-    BasicRequestTokenError,
-    BasicTokenResponse,
-    BasicTokenType,
+use openidconnect::{
+    AuthenticationContextClass,
+    AuthenticationFlow,
+    IssuerUrl,
+    LanguageTag,
+    Nonce,
 };
-use openidconnect::*;
-use openidconnect::core::*;
+use openidconnect::core::{
+    CoreAuthDisplay,
+    CoreAuthPrompt,
+    CoreClient,
+    CoreGrantType,
+    CoreGrantTypeWrapper,
+    CoreResponseType,
+};
 use std::time::Duration;
 use url::Url;
 

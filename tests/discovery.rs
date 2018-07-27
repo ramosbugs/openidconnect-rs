@@ -9,9 +9,36 @@ use oauth2::{AuthUrl, Scope, TokenUrl};
 use oauth2::prelude::*;
 use url::Url;
 
-use openidconnect::*;
-use openidconnect::core::*;
-use openidconnect::discovery::*;
+use openidconnect::{
+    AuthenticationContextClass,
+    IssuerUrl,
+    JsonWebKeySetUrl,
+    LanguageTag,
+    OpPolicyUrl,
+    OpTosUrl,
+    RegistrationUrl,
+    ResponseTypes,
+    ServiceDocUrl,
+    UserInfoUrl,
+};
+use openidconnect::core::{
+    CoreAuthDisplay,
+    CoreClaimName,
+    CoreClaimType,
+    CoreClientAuthMethod,
+    CoreGrantType,
+    CoreGrantTypeWrapper,
+    CoreJweContentEncryptionAlgorithm,
+    CoreJweKeyManagementAlgorithm,
+    CoreJwsSigningAlgorithm,
+    CoreProviderMetadata,
+    CoreResponseMode,
+    CoreResponseType,
+    CoreSubjectIdentifierType,
+};
+use openidconnect::discovery::{
+    ProviderMetadata
+};
 
 #[test]
 fn test_discovery_deserialization() {

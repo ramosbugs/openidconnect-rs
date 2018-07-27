@@ -1,6 +1,3 @@
-
-extern crate serde;
-
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter, Result as FormatterResult};
 use std::marker::PhantomData;
@@ -9,6 +6,7 @@ use std::time::Duration;
 use chrono::{DateTime, TimeZone, Utc};
 use curl;
 use oauth2::{AccessToken, ClientId, ClientSecret, ErrorResponse, ErrorResponseType, RedirectUrl};
+use serde;
 use serde::{Serialize, Serializer};
 use serde::de::{Deserialize, DeserializeOwned, Deserializer, MapAccess, Visitor};
 use serde::ser::SerializeMap;

@@ -1,11 +1,8 @@
-extern crate curl;
-extern crate url;
-extern crate serde;
-extern crate serde_json;
 
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
+use curl;
 use oauth2::{
     AuthUrl,
     Scope,
@@ -13,6 +10,8 @@ use oauth2::{
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde_json;
+use url;
 
 use super::{CONFIG_URL_SUFFIX, JsonWebKeySetUrl, UserInfoUrl};
 use super::http::{

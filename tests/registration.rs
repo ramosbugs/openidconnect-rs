@@ -7,16 +7,45 @@ extern crate openidconnect;
 extern crate serde_json;
 extern crate url;
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{TimeZone, Utc};
 use itertools::sorted;
-use oauth2::{AuthUrl, ClientId, ClientSecret, RedirectUrl, Scope, TokenUrl};
+use oauth2::{ClientId, ClientSecret, RedirectUrl};
 use oauth2::prelude::*;
 use std::time::Duration;
 use url::Url;
 
-use openidconnect::*;
-use openidconnect::core::*;
-use openidconnect::registration::*;
+use openidconnect::{
+    AuthenticationContextClass,
+    ClientConfigUrl,
+    ClientName,
+    ClientUrl,
+    ContactEmail,
+    JsonWebKeySetUrl,
+    LanguageTag,
+    LogoUrl,
+    PolicyUrl,
+    RegistrationAccessToken,
+    RequestUrl,
+    ResponseTypes,
+    SectorIdentifierUrl,
+    ToSUrl,
+};
+use openidconnect::core::{
+    CoreApplicationType,
+    CoreClientAuthMethod,
+    CoreClientMetadata,
+    CoreClientRegistrationResponse,
+    CoreGrantType,
+    CoreJweContentEncryptionAlgorithm,
+    CoreJweKeyManagementAlgorithm,
+    CoreJwsSigningAlgorithm,
+    CoreResponseType,
+    CoreSubjectIdentifierType,
+};
+use openidconnect::registration::{
+    ClientMetadata,
+    ClientRegistrationResponse,
+};
 
 #[test]
 fn test_metadata_serialization() {

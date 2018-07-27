@@ -391,6 +391,7 @@ impl PartialEq<CoreGrantTypeWrapper> for CoreGrantType {
     }
 }
 
+// FIXME: remove this and implement a custom serializer/deserializer
 new_type![
     #[derive(Deserialize, Serialize)]
     CoreGrantTypeWrapper(
