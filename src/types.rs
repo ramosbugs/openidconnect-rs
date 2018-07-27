@@ -1,20 +1,16 @@
 
-extern crate base64;
-extern crate jsonwebtoken;
-extern crate oauth2;
-extern crate rand;
-extern crate serde_json;
-extern crate url;
-
 use std::fmt::{Debug, Display, Error as FormatterError, Formatter};
 use std::hash::Hash;
 use std::ops::Deref;
 
+use base64;
+use oauth2;
 use oauth2::helpers::{deserialize_space_delimited_vec, deserialize_url, serialize_url};
 use oauth2::prelude::*;
 use rand::{thread_rng, Rng};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use url;
 use url::Url;
 
 
@@ -42,9 +38,7 @@ pub trait ClaimType : Clone + Debug + DeserializeOwned + PartialEq + Serialize {
 pub trait ClientAuthMethod : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
 pub trait GenderClaim : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
 pub trait GrantType : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
-pub trait JsonWebKeyType : Clone + Debug + DeserializeOwned + PartialEq + Serialize {
-    fn is_symmetric(&self) -> bool;
-}
+pub trait JsonWebKeyType : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
 pub trait JsonWebKeyUse : Clone + Debug + DeserializeOwned + PartialEq + Serialize {
     fn allows_signature(&self) -> bool;
     fn allows_encryption(&self) -> bool;
@@ -59,12 +53,6 @@ pub trait JweKeyManagementAlgorithm
 pub trait JwsSigningAlgorithm<JT>
     : Clone + Debug + DeserializeOwned + Eq + Hash + PartialEq + Serialize
 where JT: JsonWebKeyType {
-    // FIXME: return a real error
-    // FIXME: don't return jsonwebtoken types via public interface
-    fn from_jwt(alg: &jsonwebtoken::Algorithm) -> Result<Self, String>;
-    // FIXME: return a real error
-    // FIXME: don't return jsonwebtoken types via public interface
-    fn to_jwt(&self) -> Result<jsonwebtoken::Algorithm, String>;
     // FIXME: return a real error
     fn key_type(&self) -> Result<JT, String>;
     fn is_symmetric(&self) -> bool;
@@ -521,8 +509,7 @@ pub mod helpers {
 }
 
 mod serde_base64url_byte_array {
-    extern crate base64;
-
+    use base64;
     use serde::{Deserialize, Deserializer, Serializer};
     use serde::de::Error;
     use serde_json::{from_value, Value};

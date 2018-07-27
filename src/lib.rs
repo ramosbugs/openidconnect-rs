@@ -84,7 +84,10 @@ pub use types::*;
 pub mod core;
 pub mod discovery;
 pub mod registration;
-pub mod types;
+
+// Private module since we may move types between different modules; these are exported publicly
+// via the pub use above.
+mod types;
 
 // Private module for HTTP(S) utilities.
 mod http;
@@ -576,6 +579,11 @@ where JS: 'a + JwsSigningAlgorithm<JT>,
         self
     }
 
+    pub fn set_client_secret(mut self, client_secret: &'a ClientSecret) -> Self {
+        self.client_secret = Some(client_secret);
+        self
+    }
+
     fn validate_jose_header<JE>(
         jose_header: &JsonWebTokenHeader<JE, JS, JT>
     ) -> Result<(), ClaimsVerificationError>
@@ -765,8 +773,7 @@ where JS: 'a + JwsSigningAlgorithm<JT>,
         // JOSE header, as an attacker could manipulate these while forging the JWT. The code
         // below must be secure regardless of how these fields are manipulated.
 
-        let key_type = signature_alg.key_type().map_err(ClaimsVerificationError::Unsupported)?;
-        if key_type.is_symmetric() {
+        if signature_alg.is_symmetric() {
             // 8. If the JWT alg Header Parameter uses a MAC based algorithm such as HS256,
             //    HS384, or HS512, the octets of the UTF-8 representation of the client_secret
             //    corresponding to the client_id contained in the aud (audience) Claim are used
@@ -774,12 +781,9 @@ where JS: 'a + JwsSigningAlgorithm<JT>,
             //    is unspecified if the aud is multi-valued or if an azp value is present that
             //    is different than the aud value.
             if let Some(client_secret) = self.client_secret {
-                // FIXME: implement
-                return Err(
-                    ClaimsVerificationError::Unsupported(
-                        "FIXME: symmetric signatures are currently unimplemented".to_string()
-                    )
-                )
+                let key = K::new_symmetric(client_secret.secret().clone().into_bytes());
+                return jwt.claims(&signature_alg.clone(), &key)
+                    .map_err(ClaimsVerificationError::SignatureVerification);
             } else {
                 // The client secret isn't confidential for public clients, so anyone can forge a
                 // JWT with a valid signature.
@@ -797,6 +801,7 @@ where JS: 'a + JwsSigningAlgorithm<JT>,
         // if the JWK set contains more than one public key.
 
         // See if any key has a matching key ID (if supplied) and compatible type.
+        let key_type = signature_alg.key_type().map_err(ClaimsVerificationError::Unsupported)?;
         let public_keys = {
             let jose_header = jwt.unverified_header();
             self.signature_keys
@@ -953,8 +958,7 @@ where JS: 'a + JwsSigningAlgorithm<JT>,
         JT: 'a + JsonWebKeyType,
         JU: 'a + JsonWebKeyUse,
         K: 'a + JsonWebKey<JS, JT, JU> {
-    jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>,
-    client_secret: Option<&'a ClientSecret>,
+    jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>
 }
 impl<'a, JS, JT, JU, K> IdTokenVerifier<'a, JS, JT, JU, K>
 where JS: 'a + JwsSigningAlgorithm<JT>,
@@ -968,7 +972,6 @@ where JS: 'a + JwsSigningAlgorithm<JT>,
     ) -> Self {
         IdTokenVerifier {
             jwt_verifier: JwtClaimsVerifier::new(client_id, issuer, signature_keys),
-            client_secret: None,
         }
     }
 
@@ -979,8 +982,8 @@ where JS: 'a + JwsSigningAlgorithm<JT>,
         signature_keys: &'a JsonWebKeySet<JS, JT, JU, K>,
     ) -> Self {
         IdTokenVerifier {
-            jwt_verifier: JwtClaimsVerifier::new(client_id, issuer, signature_keys),
-            client_secret: Some(client_secret),
+            jwt_verifier: JwtClaimsVerifier::new(client_id, issuer, signature_keys)
+                .set_client_secret(client_secret),
         }
     }
 
@@ -1253,10 +1256,10 @@ where JS: JwsSigningAlgorithm<JT>, JT: JsonWebKeyType, JU: JsonWebKeyUse {
     fn key_id(&self) -> Option<&JsonWebKeyId>;
     fn key_type(&self) -> &JT;
     fn key_use(&self) -> Option<&JU>;
-
+    fn new_symmetric(key: Vec<u8>) -> Self;
     fn verify_signature(
         &self,
-        alg: &JS,
+        signature_alg: &JS,
         msg: &str,
         signature: &[u8]
     ) -> Result<(), SignatureVerificationError>;

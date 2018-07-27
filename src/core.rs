@@ -1,10 +1,4 @@
 
-extern crate jsonwebtoken;
-extern crate oauth2;
-extern crate ring;
-extern crate serde_json;
-extern crate untrusted;
-
 use std::fmt::{Display, Error as FormatterError, Formatter};
 use std::ops::Deref;
 
@@ -18,9 +12,8 @@ use oauth2::basic::{
 };
 use oauth2::helpers::variant_name;
 use oauth2::prelude::*;
+use ring::digest;
 use ring::signature as ring_signature;
-use ring::signature::RSAParameters;
-use untrusted::Input;
 
 use super::{
     ApplicationType,
@@ -611,61 +604,33 @@ pub struct CoreJsonWebKey {
     // base64url, and either fails or sets it to none if that fails (check the spec)
     n: Option<Base64UrlEncodedBytes>,
     e: Option<Base64UrlEncodedBytes>,
-}
-impl CoreJsonWebKey {
-    fn verify_rsa_signature(
-        &self,
-        params: &RSAParameters,
-        msg: &str,
-        signature: &[u8]
-    ) -> Result<(), SignatureVerificationError> {
-        if *self.key_type() != CoreJsonWebKeyType::RSA {
-            return Err(SignatureVerificationError::InvalidKey("RSA key required".to_string()))
-        }
 
-        if let Some(n) = self.n.as_ref() {
-            if let Some(e) = self.e.as_ref() {
-                ring_signature::primitive::verify_rsa(
-                    params,
-                    (Input::from(n), Input::from(e)),
-                    Input::from(msg.as_bytes()),
-                    Input::from(signature),
-                )
-                .map_err(|_|
-                    SignatureVerificationError::CryptoError(
-                        "bad signature".to_string()
-                    )
-                )
-            } else {
-                Err(
-                    SignatureVerificationError::InvalidKey(
-                        "RSA exponent `e` is missing".to_string()
-                    )
-                )
-            }
-        } else {
-            Err(
-                SignatureVerificationError::InvalidKey(
-                    "RSA modulus `n` is missing".to_string()
-                )
-            )
-        }
-    }
+    // Used for symmetric keys, which we only generate internally from the client secret; these
+    // are never part of the JWK set.
+    k: Option<Base64UrlEncodedBytes>,
 }
-impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse>
-for CoreJsonWebKey {
+impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> for CoreJsonWebKey {
     fn key_id(&self) -> Option<&JsonWebKeyId> { self.kid.as_ref() }
     fn key_type(&self) -> &CoreJsonWebKeyType { &self.kty }
     fn key_use(&self) -> Option<&CoreJsonWebKeyUse> { self.use_.as_ref() }
 
-    // FIXME: this should probably move out of Core
+    fn new_symmetric(key: Vec<u8>) -> Self {
+        return Self {
+            kty: CoreJsonWebKeyType::Symmetric,
+            use_: None,
+            kid: None,
+            n: None,
+            e: None,
+            k: Some(Base64UrlEncodedBytes::new(key)),
+        }
+    }
+
     fn verify_signature(
         &self,
-        alg: &CoreJwsSigningAlgorithm,
+        signature_alg: &CoreJwsSigningAlgorithm,
         msg: &str,
         signature: &[u8]
     ) -> Result<(), SignatureVerificationError> {
-
         if let Some(key_use) = self.key_use() {
             if *key_use != CoreJsonWebKeyUse::Signature {
                 return Err(
@@ -676,43 +641,64 @@ for CoreJsonWebKey {
             }
         }
 
+        let key_type = signature_alg.key_type().map_err(SignatureVerificationError::Other)?;
+        if *self.key_type() != key_type {
+            return Err(
+                SignatureVerificationError::InvalidKey(
+                    "key type does not match signature algorithm".to_string()
+                )
+            )
+        }
+
         // FIXME: add test cases for each of these
-        match *alg {
+        match *signature_alg {
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256 =>
-                self.verify_rsa_signature(
+                crypto::verify_rsa_signature(
+                    self,
                     &ring_signature::RSA_PKCS1_2048_8192_SHA256,
                     msg,
                     signature
                 ),
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384 =>
-                self.verify_rsa_signature(
+                crypto::verify_rsa_signature(
+                    self,
                     &ring_signature::RSA_PKCS1_2048_8192_SHA384,
                     msg,signature
                 ),
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512 =>
-                self.verify_rsa_signature(
+                crypto::verify_rsa_signature(
+                    self,
                     &ring_signature::RSA_PKCS1_2048_8192_SHA512,
                     msg,
                     signature
                 ),
             CoreJwsSigningAlgorithm::RsaSsaPssSha256 =>
-                self.verify_rsa_signature(
+                crypto::verify_rsa_signature(
+                    self,
                     &ring_signature::RSA_PSS_2048_8192_SHA256,
                     msg,
                     signature
                 ),
             CoreJwsSigningAlgorithm::RsaSsaPssSha384 =>
-                self.verify_rsa_signature(
+                crypto::verify_rsa_signature(
+                    self,
                     &ring_signature::RSA_PSS_2048_8192_SHA384,
                     msg,
                     signature
                 ),
             CoreJwsSigningAlgorithm::RsaSsaPssSha512 =>
-                self.verify_rsa_signature(
+                crypto::verify_rsa_signature(
+                    self,
                     &ring_signature::RSA_PSS_2048_8192_SHA512,
                     msg,
                     signature
                 ),
+            CoreJwsSigningAlgorithm::HmacSha256 =>
+                crypto::verify_hmac(self, &digest::SHA256, msg, signature),
+            CoreJwsSigningAlgorithm::HmacSha384 =>
+                crypto::verify_hmac(self, &digest::SHA384, msg, signature),
+            CoreJwsSigningAlgorithm::HmacSha512 =>
+                crypto::verify_hmac(self, &digest::SHA512, msg, signature),
             ref other => Err(
                 SignatureVerificationError::UnsupportedAlg(variant_name(other).to_string())
             )
@@ -729,14 +715,7 @@ pub enum CoreJsonWebKeyType {
     #[serde(rename = "oct")]
     Symmetric,
 }
-impl JsonWebKeyType for CoreJsonWebKeyType {
-    fn is_symmetric(&self) -> bool {
-        match *self {
-            CoreJsonWebKeyType::Symmetric => true,
-            _ => false,
-        }
-    }
-}
+impl JsonWebKeyType for CoreJsonWebKeyType {}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum CoreJsonWebKeyUse {
@@ -847,36 +826,6 @@ pub enum CoreJwsSigningAlgorithm {
     None,
 }
 impl<> JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
-    // FIXME: delete this
-    fn from_jwt(alg: &jsonwebtoken::Algorithm) -> Result<Self, String> {
-        Ok(
-            match *alg {
-                jsonwebtoken::Algorithm::HS256 => CoreJwsSigningAlgorithm::HmacSha256,
-                jsonwebtoken::Algorithm::HS384 => CoreJwsSigningAlgorithm::HmacSha384,
-                jsonwebtoken::Algorithm::HS512 => CoreJwsSigningAlgorithm::HmacSha512,
-                jsonwebtoken::Algorithm::RS256 => CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
-                jsonwebtoken::Algorithm::RS384 => CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384,
-                jsonwebtoken::Algorithm::RS512 => CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512,
-            }
-        )
-    }
-    // FIXME: return a real error
-    fn to_jwt(&self) -> Result<jsonwebtoken::Algorithm, String> {
-        Ok(
-            match *self {
-                CoreJwsSigningAlgorithm::HmacSha256 => jsonwebtoken::Algorithm::HS256,
-                CoreJwsSigningAlgorithm::HmacSha384 => jsonwebtoken::Algorithm::HS384,
-                CoreJwsSigningAlgorithm::HmacSha512 => jsonwebtoken::Algorithm::HS512,
-                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256 => jsonwebtoken::Algorithm::RS256,
-                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384 => jsonwebtoken::Algorithm::RS384,
-                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512 => jsonwebtoken::Algorithm::RS512,
-                ref other => {
-                    return Err(format!("unsupported JWS algorithm `{:?}`", other));
-                },
-            }
-        )
-    }
-
     fn key_type(&self) -> Result<CoreJsonWebKeyType, String> {
         Ok(
             match *self {
@@ -1055,3 +1004,77 @@ pub enum CoreSubjectIdentifierType {
     Public
 }
 impl SubjectIdentifierType for CoreSubjectIdentifierType {}
+
+// This module is currently not part of the public API. If a use case arises for exposing it
+// publicly, we'll probably need to think through this API some more.
+mod crypto {
+    use ring::digest;
+    use ring::hmac;
+    use ring::signature as ring_signature;
+    use untrusted::Input;
+
+    use super::super::{
+        JsonWebKey,
+        SignatureVerificationError
+    };
+    use super::{
+        CoreJsonWebKey,
+        CoreJsonWebKeyType,
+    };
+
+    pub fn verify_hmac(
+        key: &CoreJsonWebKey,
+        digest_alg: &'static digest::Algorithm,
+        msg: &str,
+        signature: &[u8]
+    ) -> Result<(), SignatureVerificationError> {
+        if let Some(k) = key.k.as_ref() {
+            let verification_key = hmac::VerificationKey::new(digest_alg, k);
+            hmac::verify(&verification_key, msg.as_bytes(), signature)
+                .map_err(|_| SignatureVerificationError::CryptoError("bad HMAC".to_string()))
+        } else {
+            Err(
+                SignatureVerificationError::InvalidKey("Symmetric key `k` is missing".to_string())
+            )
+        }
+    }
+
+    pub fn verify_rsa_signature(
+        key: &CoreJsonWebKey,
+        params: &ring_signature::RSAParameters,
+        msg: &str,
+        signature: &[u8]
+    ) -> Result<(), SignatureVerificationError> {
+        if *key.key_type() != CoreJsonWebKeyType::RSA {
+            return Err(SignatureVerificationError::InvalidKey("RSA key required".to_string()))
+        }
+
+        if let Some(n) = key.n.as_ref() {
+            if let Some(e) = key.e.as_ref() {
+                ring_signature::primitive::verify_rsa(
+                    params,
+                    (Input::from(n), Input::from(e)),
+                    Input::from(msg.as_bytes()),
+                    Input::from(signature),
+                )
+                    .map_err(|_|
+                        SignatureVerificationError::CryptoError(
+                            "bad signature".to_string()
+                        )
+                    )
+            } else {
+                Err(
+                    SignatureVerificationError::InvalidKey(
+                        "RSA exponent `e` is missing".to_string()
+                    )
+                )
+            }
+        } else {
+            Err(
+                SignatureVerificationError::InvalidKey(
+                    "RSA modulus `n` is missing".to_string()
+                )
+            )
+        }
+    }
+}

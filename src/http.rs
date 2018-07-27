@@ -1,8 +1,7 @@
 
-extern crate curl;
-
 use std::io::Read;
 
+use curl;
 use curl::easy::Easy;
 use oauth2::AccessToken;
 use oauth2::prelude::*;

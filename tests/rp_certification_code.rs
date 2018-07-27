@@ -2,7 +2,6 @@
 extern crate curl;
 extern crate env_logger;
 extern crate failure;
-extern crate jsonwebtoken as jwt;
 #[macro_use] extern crate log;
 extern crate oauth2;
 extern crate openidconnect;
@@ -45,7 +44,7 @@ use openidconnect::registration::{
     ClientRegistrationRequest,
     ClientRegistrationResponse
 };
-use openidconnect::types::Nonce;
+use openidconnect::Nonce;
 
 #[macro_use] mod rp_common;
 
@@ -185,14 +184,17 @@ impl TestState {
     pub fn id_token_claims_failure(&self) -> ClaimsVerificationError {
         let jwks = self.jwks();
         let verifier = self.id_token_verifier(&jwks);
-        match self.id_token().claims(&verifier, self.nonce.as_ref().expect("no nonce")) {
-            Err(err) => err,
-            _ => panic!("claims verification succeeded but was expected to fail"),
-        }
+        self.id_token()
+            .claims(&verifier, self.nonce.as_ref().expect("no nonce"))
+            .expect_err("claims verification succeeded but was expected to fail")
     }
 
     pub fn jwks(&self) -> CoreJsonWebKeySet {
-        self.provider_metadata.jwks_uri().unwrap().get_keys().unwrap()
+        self.provider_metadata
+            .jwks_uri()
+            .unwrap()
+            .get_keys()
+            .panic_if_fail("failed to fetch JWK set")
     }
 
     pub fn set_auth_type(mut self, auth_type: AuthType) -> Self {
@@ -220,7 +222,7 @@ impl TestState {
             .userinfo_endpoint()
             .unwrap()
             .get_user_info(self.access_token(), &verifier)
-            .unwrap()
+            .panic_if_fail("failed to get UserInfo")
     }
 
 
@@ -436,6 +438,28 @@ fn rp_id_token_sig_rs256() {
 }
 
 #[test]
+fn rp_id_token_sig_hs256() {
+    let test_state =
+        TestState::init("rp-id_token-sig-hs256", |reg| reg)
+            .authorize(&vec![])
+            .exchange_code();
+
+    let jwks = test_state.jwks();
+    let verifier =
+        test_state
+            .id_token_verifier(&jwks)
+            .set_allowed_algs(vec![CoreJwsSigningAlgorithm::HmacSha256]);
+    let id_token_claims =
+        test_state
+            .id_token()
+            .claims(&verifier, test_state.nonce.as_ref().expect("no nonce"))
+            .panic_if_fail("failed to validate claims");
+    log_debug!("ID token: {:?}", id_token_claims);
+
+    log_info!("SUCCESS");
+}
+
+#[test]
 fn rp_id_token_sub() {
     let mut test_state =
         TestState::init("rp-id_token-sub", |reg| reg)
@@ -462,6 +486,33 @@ fn rp_id_token_bad_sig_rs256() {
             .exchange_code();
 
     match test_state.id_token_claims_failure() {
+        ClaimsVerificationError::SignatureVerification(
+            SignatureVerificationError::CryptoError(_)
+        ) => log_error!("ID token has invalid signature (expected result)"),
+        other => panic!("Unexpected result verifying ID token claims: {:?}", other),
+    }
+
+    log_info!("SUCCESS");
+}
+
+#[test]
+fn rp_id_token_bad_sig_hs256() {
+    let test_state =
+        TestState::init("rp-id_token-bad-sig-hs256", |reg| reg)
+            .authorize(&vec![])
+            .exchange_code();
+
+    let jwks = test_state.jwks();
+    let verifier =
+        test_state
+            .id_token_verifier(&jwks)
+            .set_allowed_algs(vec![CoreJwsSigningAlgorithm::HmacSha256]);
+    let id_token_err =
+        test_state
+            .id_token()
+            .claims(&verifier, test_state.nonce.as_ref().expect("no nonce"))
+            .expect_err("claims verification succeeded but was expected to fail");
+    match id_token_err {
         ClaimsVerificationError::SignatureVerification(
             SignatureVerificationError::CryptoError(_)
         ) => log_error!("ID token has invalid signature (expected result)"),

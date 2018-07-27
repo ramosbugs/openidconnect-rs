@@ -1,19 +1,14 @@
 
-extern crate base64;
-extern crate failure;
-extern crate ring;
-extern crate serde;
-extern crate serde_json;
-extern crate untrusted;
-
 use std::fmt::{Debug, Formatter, Result as FormatterResult};
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str;
 
+use base64;
 use oauth2::prelude::NewType;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::{DeserializeOwned, Error as DeserializeError, Visitor};
+use serde_json;
 
 use super::{
     JsonWebKey,
