@@ -20,7 +20,6 @@ use openidconnect::{
     ClientName,
     ClientUrl,
     ContactEmail,
-    JsonWebKeySetUrl,
     LanguageTag,
     LogoUrl,
     PolicyUrl,
@@ -42,6 +41,7 @@ use openidconnect::core::{
     CoreResponseType,
     CoreSubjectIdentifierType,
 };
+use openidconnect::discovery::JsonWebKeySetUrl;
 use openidconnect::registration::{
     ClientMetadata,
     ClientRegistrationResponse,

@@ -12,7 +12,6 @@ use url::Url;
 use openidconnect::{
     AuthenticationContextClass,
     IssuerUrl,
-    JsonWebKeySetUrl,
     LanguageTag,
     OpPolicyUrl,
     OpTosUrl,
@@ -37,6 +36,7 @@ use openidconnect::core::{
     CoreSubjectIdentifierType,
 };
 use openidconnect::discovery::{
+    JsonWebKeySetUrl,
     ProviderMetadata
 };
 

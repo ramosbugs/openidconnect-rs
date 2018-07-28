@@ -32,9 +32,9 @@ use super::{
     StandardClaims,
     SubjectIdentifier,
     UserInfoClaims,
-    UnverifiedUserInfoClaims,
 };
 use super::jwt::JsonWebToken;
+use super::user_info::UnverifiedUserInfoClaims;
 
 /*
 
@@ -548,7 +548,7 @@ impl<'a, JS, JT, JU, K> IdTokenVerifier<'a, JS, JT, JU, K>
         //     sent in the Authentication Request. The Client SHOULD check the nonce value for
         //     replay attacks. The precise method for detecting replay attacks is Client specific.
         if let Some(expected_nonce) = nonce {
-            if let Some(ref claims_nonce) = partially_verified_claims.nonce {
+            if let Some(claims_nonce) = partially_verified_claims.nonce() {
                 if claims_nonce != expected_nonce {
                     return Err(
                         ClaimsVerificationError::InvalidNonce("nonce mismatch".to_string())

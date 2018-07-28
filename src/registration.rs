@@ -15,8 +15,8 @@ use serde_json;
 use super::{
     JsonWebKey,
     JsonWebKeySet,
-    JsonWebKeySetUrl,
 };
+use super::discovery::JsonWebKeySetUrl;
 use super::http::{
     ACCEPT_JSON,
     auth_bearer,
@@ -268,7 +268,6 @@ where AT: ApplicationType,
       K: JsonWebKey<JS, JT, JU>,
       RT: ResponseType,
       S: SubjectIdentifierType {
-    #[allow(cyclomatic_complexity)]
     fn serialize<SE>(&self, serializer: SE) -> Result<SE::Ok, SE::Error>
         where SE: Serializer
     {

@@ -1,6 +1,7 @@
 
 use std::fmt::{Debug, Display, Error as FormatterError, Formatter};
 use std::hash::Hash;
+use std::marker::PhantomData;
 use std::ops::Deref;
 
 use base64;
@@ -13,8 +14,8 @@ use serde::de::DeserializeOwned;
 use url;
 use url::Url;
 
+use super::SignatureVerificationError;
 
-pub trait AdditionalClaims: Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
 pub trait ApplicationType : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
 
 ///
@@ -36,8 +37,22 @@ pub trait ClaimName : Clone + Debug + DeserializeOwned + PartialEq + Serialize {
 pub trait ClaimType : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
 
 pub trait ClientAuthMethod : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
-pub trait GenderClaim : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
 pub trait GrantType : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
+
+pub trait JsonWebKey<JS, JT, JU> : Clone + Debug + DeserializeOwned + PartialEq + Serialize
+    where JS: JwsSigningAlgorithm<JT>, JT: JsonWebKeyType, JU: JsonWebKeyUse {
+    fn key_id(&self) -> Option<&JsonWebKeyId>;
+    fn key_type(&self) -> &JT;
+    fn key_use(&self) -> Option<&JU>;
+    fn new_symmetric(key: Vec<u8>) -> Self;
+    fn verify_signature(
+        &self,
+        signature_alg: &JS,
+        msg: &str,
+        signature: &[u8]
+    ) -> Result<(), SignatureVerificationError>;
+}
+
 pub trait JsonWebKeyType : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
 pub trait JsonWebKeyUse : Clone + Debug + DeserializeOwned + PartialEq + Serialize {
     fn allows_signature(&self) -> bool;
@@ -275,6 +290,35 @@ new_type![
     JsonWebKeyId(String)
 ];
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct JsonWebKeySet<JS, JT, JU, K>
+    where JS: JwsSigningAlgorithm<JT>,
+          JT: JsonWebKeyType,
+          JU: JsonWebKeyUse,
+          K: JsonWebKey<JS, JT, JU> {
+    // FIXME: write a test that ensures duplicate object member names cause an error
+    // (see https://tools.ietf.org/html/rfc7517#section-5)
+    // FIXME: add a deserializer that optionally ignores invalid keys rather than failing. That way,
+    // clients can function using the keys that they do understand, which is fine if they only ever
+    // get JWTs signed with those keys. See what other places we might want to be more tolerant of
+    // deserialization errors.
+    #[serde(bound = "K: JsonWebKey<JS, JT, JU>")]
+    keys: Vec<K>,
+    #[serde(skip)]
+    _phantom_js: PhantomData<JS>,
+    #[serde(skip)]
+    _phantom_jt: PhantomData<JT>,
+    #[serde(skip)]
+    _phantom_ju: PhantomData<JU>,
+}
+impl<JS, JT, JU, K> JsonWebKeySet<JS, JT, JU, K>
+    where JS: JwsSigningAlgorithm<JT>,
+          JT: JsonWebKeyType,
+          JU: JsonWebKeyUse,
+          K: JsonWebKey<JS, JT, JU> {
+    pub fn keys(&self) -> &Vec<K> { &self.keys }
+}
+
 new_type![
     #[derive(Deserialize, Serialize)]
     LanguageTag(String)
@@ -462,7 +506,7 @@ new_type![
     )
 ];
 
-pub mod helpers {
+pub(crate) mod helpers {
     use oauth2::prelude::*;
     use serde::Serializer;
 

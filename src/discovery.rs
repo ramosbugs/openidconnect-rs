@@ -1,6 +1,7 @@
 
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use std::ops::Deref;
 
 use curl;
 use oauth2::{
@@ -8,12 +9,15 @@ use oauth2::{
     Scope,
     TokenUrl,
 };
+use oauth2::helpers::{deserialize_url, serialize_url};
+use oauth2::prelude::*;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json;
 use url;
+use url::Url;
 
-use super::{CONFIG_URL_SUFFIX, JsonWebKeySetUrl, UserInfoUrl};
+use super::{CONFIG_URL_SUFFIX, UserInfoUrl};
 use super::http::{
     ACCEPT_JSON,
     HttpRequest,
@@ -30,7 +34,10 @@ use super::types::{
     ClaimType,
     GrantType,
     IssuerUrl,
+    JsonWebKey,
+    JsonWebKeySet,
     JsonWebKeyType,
+    JsonWebKeyUse,
     JweContentEncryptionAlgorithm,
     JweKeyManagementAlgorithm,
     JwsSigningAlgorithm,
@@ -219,6 +226,7 @@ trait_struct![
     struct[AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S]
 ];
 
+// FIXME: clean up Display/Debug/cause for this and other Fail impls
 #[derive(Debug, Fail)]
 pub enum DiscoveryError {
     #[fail(display = "URL parse error: {}", _0)]
@@ -234,3 +242,52 @@ pub enum DiscoveryError {
     #[fail(display = "Other error: {}", _0)]
     Other(String),
 }
+
+new_type![
+    #[derive(Deserialize, Serialize)]
+    JsonWebKeySetUrl(
+        #[serde(
+            deserialize_with = "deserialize_url",
+            serialize_with = "serialize_url"
+        )]
+        Url
+    )
+    impl {
+        // FIXME: don't depend on super::discovery in this module (factor this out into some kind
+        // of HttpError?
+        pub fn get_keys<JS, JT, JU, K>(
+            &self
+        ) -> Result<JsonWebKeySet<JS, JT, JU, K>, DiscoveryError>
+        where JS: JwsSigningAlgorithm<JT>,
+                JT: JsonWebKeyType,
+                JU: JsonWebKeyUse,
+                K: JsonWebKey<JS, JT, JU> {
+            let key_response =
+                HttpRequest {
+                    url: &self.0,
+                    method: HttpRequestMethod::Get,
+                    headers: &vec![ACCEPT_JSON],
+                    post_body: &vec![],
+                }
+                .request()
+            .map_err(DiscoveryError::Request)?;
+
+            // FIXME: improve error handling (i.e., is there a body response?)
+            // possibly consolidate this error handling with discovery::get_provider_metadata().
+            if key_response.status_code != HTTP_STATUS_OK {
+                return Err(
+                    DiscoveryError::Response(
+                        key_response.status_code,
+                        "unexpected HTTP status code".to_string()
+                    )
+                );
+            }
+
+            key_response
+                .check_content_type(MIME_TYPE_JSON)
+                .map_err(|err_msg| DiscoveryError::Response(key_response.status_code, err_msg))?;
+
+            serde_json::from_slice(&key_response.body).map_err(DiscoveryError::Json)
+        }
+    }
+];
