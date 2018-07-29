@@ -9,8 +9,9 @@ extern crate openidconnect;
 extern crate pretty_assertions;
 extern crate url;
 
-use rp_common::{get_provider_metadata, init_log, issuer_url, register_client,
-                CERTIFICATION_BASE_URL, RP_NAME};
+use rp_common::{
+    get_provider_metadata, init_log, issuer_url, register_client, CERTIFICATION_BASE_URL, RP_NAME,
+};
 
 use openidconnect::discovery::ProviderMetadata;
 use openidconnect::registration::{ClientMetadata, ClientRegistrationResponse};

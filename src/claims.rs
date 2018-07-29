@@ -9,11 +9,12 @@ use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
 
 use super::types::helpers::split_language_tag_key;
-use super::{AddressCountry, AddressLocality, AddressPostalCode, AddressRegion, EndUserBirthday,
-            EndUserEmail, EndUserGivenName, EndUserMiddleName, EndUserName, EndUserNickname,
-            EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone,
-            EndUserUsername, EndUserWebsiteUrl, FormattedAddress, LanguageTag, Seconds,
-            StreetAddress, SubjectIdentifier};
+use super::{
+    AddressCountry, AddressLocality, AddressPostalCode, AddressRegion, EndUserBirthday,
+    EndUserEmail, EndUserGivenName, EndUserMiddleName, EndUserName, EndUserNickname,
+    EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone, EndUserUsername,
+    EndUserWebsiteUrl, FormattedAddress, LanguageTag, Seconds, StreetAddress, SubjectIdentifier,
+};
 
 pub trait AdditionalClaims: Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
 

@@ -6,20 +6,21 @@ use curl;
 use oauth2::helpers::{deserialize_url, serialize_url};
 use oauth2::prelude::*;
 use oauth2::{AuthUrl, Scope, TokenUrl};
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 use serde_json;
 use url;
 use url::Url;
 
 use super::http::{HttpRequest, HttpRequestMethod, ACCEPT_JSON, HTTP_STATUS_OK, MIME_TYPE_JSON};
 use super::macros::TraitStructExtract;
-use super::types::{AuthDisplay, AuthenticationContextClass, ClaimName, ClaimType,
-                   ClientAuthMethod, GrantType, IssuerUrl, JsonWebKey, JsonWebKeySet,
-                   JsonWebKeyType, JsonWebKeyUse, JweContentEncryptionAlgorithm,
-                   JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag, OpPolicyUrl,
-                   OpTosUrl, RegistrationUrl, ResponseMode, ResponseType, ResponseTypes,
-                   ServiceDocUrl, SubjectIdentifierType};
+use super::types::{
+    AuthDisplay, AuthenticationContextClass, ClaimName, ClaimType, ClientAuthMethod, GrantType,
+    IssuerUrl, JsonWebKey, JsonWebKeySet, JsonWebKeyType, JsonWebKeyUse,
+    JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag,
+    OpPolicyUrl, OpTosUrl, RegistrationUrl, ResponseMode, ResponseType, ResponseTypes,
+    ServiceDocUrl, SubjectIdentifierType,
+};
 use super::{UserInfoUrl, CONFIG_URL_SUFFIX};
 
 pub fn get_provider_metadata<PM, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>(

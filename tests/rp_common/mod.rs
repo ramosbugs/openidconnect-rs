@@ -5,13 +5,15 @@ use std::cell::RefCell;
 use std::sync::{Once, ONCE_INIT};
 
 use failure::Fail;
-use oauth2::RedirectUrl;
 use oauth2::prelude::NewType;
+use oauth2::RedirectUrl;
 use url::Url;
 
 use openidconnect;
-use openidconnect::core::{CoreApplicationType, CoreClientRegistrationRequest,
-                          CoreClientRegistrationResponse, CoreProviderMetadata};
+use openidconnect::core::{
+    CoreApplicationType, CoreClientRegistrationRequest, CoreClientRegistrationResponse,
+    CoreProviderMetadata,
+};
 use openidconnect::discovery::ProviderMetadata;
 use openidconnect::registration::ClientRegistrationRequest;
 use openidconnect::{ClientName, ContactEmail, IssuerUrl};
@@ -126,9 +128,9 @@ pub fn register_client<F>(
 where
     F: FnOnce(CoreClientRegistrationRequest) -> CoreClientRegistrationRequest,
 {
-    let registration_request_pre = CoreClientRegistrationRequest::new(vec![
-        RedirectUrl::new(Url::parse(RP_REDIRECT_URI).unwrap()),
-    ]).set_application_type(Some(CoreApplicationType::Native))
+    let registration_request_pre = CoreClientRegistrationRequest::new(vec![RedirectUrl::new(
+        Url::parse(RP_REDIRECT_URI).unwrap(),
+    )]).set_application_type(Some(CoreApplicationType::Native))
         .set_client_name(Some(ClientName::new(RP_NAME.to_string())), None)
         .set_contacts(Some(vec![ContactEmail::new(RP_CONTACT_EMAIL.to_string())]));
 

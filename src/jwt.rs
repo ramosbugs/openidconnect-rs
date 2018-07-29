@@ -9,18 +9,16 @@ use serde::de::{DeserializeOwned, Error as DeserializeError, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json;
 
-use super::{JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse,
-            JweContentEncryptionAlgorithm, JwsSigningAlgorithm, SignatureVerificationError};
+use super::{
+    JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse, JweContentEncryptionAlgorithm,
+    JwsSigningAlgorithm, SignatureVerificationError,
+};
 
-new_type![
-    #[derive(Deserialize, Serialize)]
-    JsonWebTokenContentType(String)
-];
+new_type![#[derive(Deserialize, Serialize)]
+JsonWebTokenContentType(String)];
 
-new_type![
-    #[derive(Deserialize, Serialize)]
-    JsonWebTokenType(String)
-];
+new_type![#[derive(Deserialize, Serialize)]
+JsonWebTokenType(String)];
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum JsonWebTokenAlgorithm<JE, JS, JT>
@@ -42,8 +40,9 @@ mod serde_jwt_algorithm {
     use serde::{Deserialize, Deserializer, Serializer};
     use serde_json::{from_value, Value};
 
-    use super::{JsonWebKeyType, JsonWebTokenAlgorithm, JweContentEncryptionAlgorithm,
-                JwsSigningAlgorithm};
+    use super::{
+        JsonWebKeyType, JsonWebTokenAlgorithm, JweContentEncryptionAlgorithm, JwsSigningAlgorithm,
+    };
 
     pub fn deserialize<'de, D, JE, JS, JT>(
         deserializer: D,
@@ -100,7 +99,9 @@ where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
-    #[serde(bound = "JE: JweContentEncryptionAlgorithm, JS: JwsSigningAlgorithm<JT>, JT: JsonWebKeyType")]
+    #[serde(
+        bound = "JE: JweContentEncryptionAlgorithm, JS: JwsSigningAlgorithm<JT>, JT: JsonWebKeyType"
+    )]
     #[serde(with = "serde_jwt_algorithm")]
     pub alg: JsonWebTokenAlgorithm<JE, JS, JT>,
     // Additional critical header parameters that must be understood by this implementation. Since
@@ -164,8 +165,7 @@ where
     JE: JweContentEncryptionAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
-{
-}
+{}
 // Owned JWT.
 impl<C, JE, JS, JT> JsonWebTokenAccess<C, JE, JS, JT> for JsonWebToken<C, JE, JS, JT>
 where

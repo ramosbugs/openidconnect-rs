@@ -7,55 +7,26 @@ use chrono::{DateTime, TimeZone, Utc};
 use curl;
 use oauth2::{AccessToken, ClientId, ClientSecret, ErrorResponse, ErrorResponseType, RedirectUrl};
 use serde;
-use serde::{Serialize, Serializer};
 use serde::de::{Deserialize, DeserializeOwned, Deserializer, MapAccess, Visitor};
 use serde::ser::SerializeMap;
+use serde::{Serialize, Serializer};
 use serde_json;
 
-use super::{
-    JsonWebKey,
-    JsonWebKeySet,
-};
 use super::discovery::JsonWebKeySetUrl;
 use super::http::{
-    ACCEPT_JSON,
-    auth_bearer,
-    CONTENT_TYPE_JSON,
-    HTTP_STATUS_BAD_REQUEST,
-    HTTP_STATUS_CREATED,
-    HttpRequest,
-    HttpRequestMethod,
-    MIME_TYPE_JSON,
+    auth_bearer, HttpRequest, HttpRequestMethod, ACCEPT_JSON, CONTENT_TYPE_JSON,
+    HTTP_STATUS_BAD_REQUEST, HTTP_STATUS_CREATED, MIME_TYPE_JSON,
 };
 use super::macros::TraitStructExtract;
-use super::types::{
-    ApplicationType,
-    AuthenticationContextClass,
-    ClientAuthMethod,
-    ClientConfigUrl,
-    ClientName,
-    ClientUrl,
-    ContactEmail,
-    GrantType,
-    InitiateLoginUrl,
-    JsonWebKeyType,
-    JsonWebKeyUse,
-    JweContentEncryptionAlgorithm,
-    JweKeyManagementAlgorithm,
-    JwsSigningAlgorithm,
-    LanguageTag,
-    LogoUrl,
-    PolicyUrl,
-    RegistrationAccessToken,
-    RegistrationUrl,
-    RequestUrl,
-    ResponseType,
-    ResponseTypes,
-    SectorIdentifierUrl,
-    SubjectIdentifierType,
-    ToSUrl,
-};
 use super::types::helpers::split_language_tag_key;
+use super::types::{
+    ApplicationType, AuthenticationContextClass, ClientAuthMethod, ClientConfigUrl, ClientName,
+    ClientUrl, ContactEmail, GrantType, InitiateLoginUrl, JsonWebKeyType, JsonWebKeyUse,
+    JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag,
+    LogoUrl, PolicyUrl, RegistrationAccessToken, RegistrationUrl, RequestUrl, ResponseType,
+    ResponseTypes, SectorIdentifierUrl, SubjectIdentifierType, ToSUrl,
+};
+use super::{JsonWebKey, JsonWebKeySet};
 
 // FIXME: switch to embedding a flattened extra_fields struct
 trait_struct![
@@ -139,23 +110,28 @@ trait_struct![
     struct[AT, CA, G, JE, JK, JS, JT, JU, K, RT, S]
 ];
 impl<'de, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S> Deserialize<'de>
-for Registration10ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
-where AT: ApplicationType,
-      CA: ClientAuthMethod,
-      G: GrantType,
-      JE: JweContentEncryptionAlgorithm,
-      JK: JweKeyManagementAlgorithm,
-      JS: JwsSigningAlgorithm<JT>,
-      JT: JsonWebKeyType,
-      JU: JsonWebKeyUse,
-      K: JsonWebKey<JS, JT, JU>,
-      RT: ResponseType,
-      S: SubjectIdentifierType {
+    for Registration10ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+where
+    AT: ApplicationType,
+    CA: ClientAuthMethod,
+    G: GrantType,
+    JE: JweContentEncryptionAlgorithm,
+    JK: JweKeyManagementAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    RT: ResponseType,
+    S: SubjectIdentifierType,
+{
     ///
     /// Special deserializer that supports [RFC 5646](https://tools.ietf.org/html/rfc5646) language
     /// tags associated with human-readable client metadata fields.
     ///
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
         struct MetadataVisitor<
             AT: ApplicationType,
             CA: ClientAuthMethod,
@@ -167,7 +143,7 @@ where AT: ApplicationType,
             JU: JsonWebKeyUse,
             K: JsonWebKey<JS, JT, JU>,
             RT: ResponseType,
-            S: SubjectIdentifierType
+            S: SubjectIdentifierType,
         >(
             PhantomData<AT>,
             PhantomData<CA>,
@@ -182,25 +158,29 @@ where AT: ApplicationType,
             PhantomData<S>,
         );
         impl<'de, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S> Visitor<'de>
-        for MetadataVisitor<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
-        where AT: ApplicationType,
-                CA: ClientAuthMethod,
-                G: GrantType,
-                JE: JweContentEncryptionAlgorithm,
-                JK: JweKeyManagementAlgorithm,
-                JS: JwsSigningAlgorithm<JT>,
-                JT: JsonWebKeyType,
-                JU: JsonWebKeyUse,
-                K: JsonWebKey<JS, JT, JU>,
-                RT: ResponseType,
-                S: SubjectIdentifierType {
+            for MetadataVisitor<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+        where
+            AT: ApplicationType,
+            CA: ClientAuthMethod,
+            G: GrantType,
+            JE: JweContentEncryptionAlgorithm,
+            JK: JweKeyManagementAlgorithm,
+            JS: JwsSigningAlgorithm<JT>,
+            JT: JsonWebKeyType,
+            JU: JsonWebKeyUse,
+            K: JsonWebKey<JS, JT, JU>,
+            RT: ResponseType,
+            S: SubjectIdentifierType,
+        {
             type Value = Registration10ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>;
 
             fn expecting(&self, formatter: &mut Formatter) -> FormatterResult {
                 formatter.write_str("struct Registration10ClientMetadata")
             }
             fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
-            where V: MapAccess<'de> {
+            where
+                V: MapAccess<'de>,
+            {
                 deserialize_fields!{
                     map {
                         [redirect_uris]
@@ -237,39 +217,39 @@ where AT: ApplicationType,
                 }
             }
         }
-        deserializer
-            .deserialize_map(
-                MetadataVisitor(
-                    PhantomData,
-                    PhantomData,
-                    PhantomData,
-                    PhantomData,
-                    PhantomData,
-                    PhantomData,
-                    PhantomData,
-                    PhantomData,
-                    PhantomData,
-                    PhantomData,
-                    PhantomData,
-                )
-            )
+        deserializer.deserialize_map(MetadataVisitor(
+            PhantomData,
+            PhantomData,
+            PhantomData,
+            PhantomData,
+            PhantomData,
+            PhantomData,
+            PhantomData,
+            PhantomData,
+            PhantomData,
+            PhantomData,
+            PhantomData,
+        ))
     }
 }
 impl<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S> Serialize
-for Registration10ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
-where AT: ApplicationType,
-      CA: ClientAuthMethod,
-      G: GrantType,
-      JE: JweContentEncryptionAlgorithm,
-      JK: JweKeyManagementAlgorithm,
-      JS: JwsSigningAlgorithm<JT>,
-      JT: JsonWebKeyType,
-      JU: JsonWebKeyUse,
-      K: JsonWebKey<JS, JT, JU>,
-      RT: ResponseType,
-      S: SubjectIdentifierType {
+    for Registration10ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+where
+    AT: ApplicationType,
+    CA: ClientAuthMethod,
+    G: GrantType,
+    JE: JweContentEncryptionAlgorithm,
+    JK: JweKeyManagementAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    RT: ResponseType,
+    S: SubjectIdentifierType,
+{
     fn serialize<SE>(&self, serializer: SE) -> Result<SE::Ok, SE::Error>
-        where SE: Serializer
+    where
+        SE: Serializer,
     {
         serialize_fields!{
             self -> serializer {
@@ -309,22 +289,24 @@ where AT: ApplicationType,
 }
 
 // FIXME: switch to embedding a flattened extra_fields struct
-pub trait ClientRegistrationRequest<AT, CA, CM, CR, ET, G, JE, JK, JS, JT, JU, K, RT, S>
-    : Debug + PartialEq
-where AT: ApplicationType,
-      CA: ClientAuthMethod,
-      CM: ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
-      CR: ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
-      ET: RegisterErrorResponseType,
-      G: GrantType,
-      JE: JweContentEncryptionAlgorithm,
-      JK: JweKeyManagementAlgorithm,
-      JS: JwsSigningAlgorithm<JT>,
-      JT: JsonWebKeyType,
-      JU: JsonWebKeyUse,
-      K: JsonWebKey<JS, JT, JU>,
-      RT: ResponseType,
-      S: SubjectIdentifierType {
+pub trait ClientRegistrationRequest<AT, CA, CM, CR, ET, G, JE, JK, JS, JT, JU, K, RT, S>:
+    Debug + PartialEq
+where
+    AT: ApplicationType,
+    CA: ClientAuthMethod,
+    CM: ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+    CR: ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+    ET: RegisterErrorResponseType,
+    G: GrantType,
+    JE: JweContentEncryptionAlgorithm,
+    JK: JweKeyManagementAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    RT: ResponseType,
+    S: SubjectIdentifierType,
+{
     fn new(redirect_uris: Vec<RedirectUrl>) -> Self;
     fn client_metadata(&self) -> &CM;
 
@@ -334,33 +316,29 @@ where AT: ApplicationType,
 
     fn register(
         &self,
-        registration_endpoint: &RegistrationUrl
+        registration_endpoint: &RegistrationUrl,
     ) -> Result<CR, ClientRegistrationError<ET>> {
-        let request_json =
-            serde_json::to_string(self.client_metadata())
-                .map_err(ClientRegistrationError::Json)?
-                .into_bytes();
+        let request_json = serde_json::to_string(self.client_metadata())
+            .map_err(ClientRegistrationError::Json)?
+            .into_bytes();
 
-        let auth_header_opt =
-            if let Some(initial_access_token) = self.initial_access_token() {
-                Some(auth_bearer(initial_access_token))
-            } else {
-                None
-            };
+        let auth_header_opt = if let Some(initial_access_token) = self.initial_access_token() {
+            Some(auth_bearer(initial_access_token))
+        } else {
+            None
+        };
 
         let mut headers = vec![ACCEPT_JSON, CONTENT_TYPE_JSON];
         if let Some((header, ref value)) = auth_header_opt {
             headers.push((header, value.as_ref()));
         }
 
-        let register_response =
-            HttpRequest {
-                url: registration_endpoint,
-                method: HttpRequestMethod::Post,
-                headers: &headers,
-                post_body: &request_json,
-            }
-            .request()
+        let register_response = HttpRequest {
+            url: registration_endpoint,
+            method: HttpRequestMethod::Post,
+            headers: &headers,
+            post_body: &request_json,
+        }.request()
             .map_err(ClientRegistrationError::Request)?;
 
         // FIXME: check for WWW-Authenticate response header if bearer auth was used (see
@@ -372,38 +350,34 @@ where AT: ApplicationType,
         // condition returns (no "SHOULD") 400 Bad Request. For now, only accept these two status
         // codes. We may need to relax the success status to improve interoperability.
         if register_response.status_code != HTTP_STATUS_CREATED
-                && register_response.status_code != HTTP_STATUS_BAD_REQUEST {
-            return Err(
-                ClientRegistrationError::Response(
-                    register_response.status_code,
-                    "unexpected HTTP status code".to_string()
-                )
-            );
+            && register_response.status_code != HTTP_STATUS_BAD_REQUEST
+        {
+            return Err(ClientRegistrationError::Response(
+                register_response.status_code,
+                "unexpected HTTP status code".to_string(),
+            ));
         }
 
         register_response
             .check_content_type(MIME_TYPE_JSON)
-            .map_err(
-                |err_msg| ClientRegistrationError::Response(register_response.status_code, err_msg)
-            )?;
+            .map_err(|err_msg| {
+                ClientRegistrationError::Response(register_response.status_code, err_msg)
+            })?;
 
-        let response_body =
-            String::from_utf8(register_response.body)
-                .map_err(|parse_error|
-                    ClientRegistrationError::Other(
-                        format!("couldn't parse response as UTF-8: {}", parse_error)
-                    )
-                )?;
+        let response_body = String::from_utf8(register_response.body).map_err(|parse_error| {
+            ClientRegistrationError::Other(format!(
+                "couldn't parse response as UTF-8: {}",
+                parse_error
+            ))
+        })?;
 
         if register_response.status_code == HTTP_STATUS_BAD_REQUEST {
             let response_error: ErrorResponse<ET> =
-                serde_json::from_str(&response_body)
-                    .map_err(ClientRegistrationError::Json)?;
-            return Err(ClientRegistrationError::ServerResponse(response_error))
+                serde_json::from_str(&response_body).map_err(ClientRegistrationError::Json)?;
+            return Err(ClientRegistrationError::ServerResponse(response_error));
         }
 
-        serde_json::from_str(&response_body)
-            .map_err(ClientRegistrationError::Json)
+        serde_json::from_str(&response_body).map_err(ClientRegistrationError::Json)
     }
 
     field_setter_decls![
@@ -453,7 +427,7 @@ pub struct Registration10ClientRegistrationRequest<
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
     RT: ResponseType,
-    S: SubjectIdentifierType
+    S: SubjectIdentifierType,
 > {
     client_metadata: Registration10ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
     initial_access_token: Option<AccessToken>,
@@ -461,36 +435,37 @@ pub struct Registration10ClientRegistrationRequest<
     _phantom_et: PhantomData<ET>,
 }
 impl<AT, CA, CR, ET, G, JE, JK, JS, JT, JU, K, RT, S>
-ClientRegistrationRequest<
-    AT,
-    CA,
-    Registration10ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
-    CR,
-    ET,
-    G,
-    JE,
-    JK,
-    JS,
-    JT,
-    JU,
-    K,
-    RT,
-    S
->
-for Registration10ClientRegistrationRequest<AT, CA, CR, ET, G, JE, JK, JS, JT, JU, K, RT, S>
-where AT: ApplicationType,
-      CA: ClientAuthMethod,
-      CR: ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
-      ET: RegisterErrorResponseType,
-      G: GrantType,
-      JE: JweContentEncryptionAlgorithm,
-      JK: JweKeyManagementAlgorithm,
-      JS: JwsSigningAlgorithm<JT>,
-      JT: JsonWebKeyType,
-      JU: JsonWebKeyUse,
-      K: JsonWebKey<JS, JT, JU>,
-      RT: ResponseType,
-      S: SubjectIdentifierType {
+    ClientRegistrationRequest<
+        AT,
+        CA,
+        Registration10ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+        CR,
+        ET,
+        G,
+        JE,
+        JK,
+        JS,
+        JT,
+        JU,
+        K,
+        RT,
+        S,
+    > for Registration10ClientRegistrationRequest<AT, CA, CR, ET, G, JE, JK, JS, JT, JU, K, RT, S>
+where
+    AT: ApplicationType,
+    CA: ClientAuthMethod,
+    CR: ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+    ET: RegisterErrorResponseType,
+    G: GrantType,
+    JE: JweContentEncryptionAlgorithm,
+    JK: JweKeyManagementAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    RT: ResponseType,
+    S: SubjectIdentifierType,
+{
     fn new(redirect_uris: Vec<RedirectUrl>) -> Self {
         Registration10ClientRegistrationRequest {
             client_metadata: Registration10ClientMetadata {
@@ -531,7 +506,7 @@ where AT: ApplicationType,
         }
     }
     fn client_metadata(
-        &self
+        &self,
     ) -> &Registration10ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S> {
         &self.client_metadata
     }
@@ -580,20 +555,25 @@ where AT: ApplicationType,
 }
 
 // FIXME: switch to embedding a flattened extra_fields struct
-pub trait ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
-    : ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
-    + Debug + DeserializeOwned + PartialEq + Serialize
-where AT: ApplicationType,
-      CA: ClientAuthMethod,
-      G: GrantType,
-      JE: JweContentEncryptionAlgorithm,
-      JK: JweKeyManagementAlgorithm,
-      JS: JwsSigningAlgorithm<JT>,
-      JT: JsonWebKeyType,
-      JU: JsonWebKeyUse,
-      K: JsonWebKey<JS, JT, JU>,
-      RT: ResponseType,
-      S: SubjectIdentifierType {
+pub trait ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>:
+    ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+    + Debug
+    + DeserializeOwned
+    + PartialEq
+    + Serialize
+where
+    AT: ApplicationType,
+    CA: ClientAuthMethod,
+    G: GrantType,
+    JE: JweContentEncryptionAlgorithm,
+    JK: JweKeyManagementAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    RT: ResponseType,
+    S: SubjectIdentifierType,
+{
     fn client_id(&self) -> &ClientId;
     fn client_secret(&self) -> Option<&ClientSecret>;
     fn registration_access_token(&self) -> Option<&RegistrationAccessToken>;
@@ -603,18 +583,20 @@ where AT: ApplicationType,
 }
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Registration10ClientRegistrationResponse<AT, CA, CM, G, JE, JK, JS, JT, JU, K, RT, S>
-where AT: ApplicationType,
-      CA: ClientAuthMethod,
-      CM: ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
-      G: GrantType,
-      JE: JweContentEncryptionAlgorithm,
-      JK: JweKeyManagementAlgorithm,
-      JS: JwsSigningAlgorithm<JT>,
-      JT: JsonWebKeyType,
-      JU: JsonWebKeyUse,
-      K: JsonWebKey<JS, JT, JU>,
-      RT: ResponseType,
-      S: SubjectIdentifierType {
+where
+    AT: ApplicationType,
+    CA: ClientAuthMethod,
+    CM: ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+    G: GrantType,
+    JE: JweContentEncryptionAlgorithm,
+    JK: JweKeyManagementAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    RT: ResponseType,
+    S: SubjectIdentifierType,
+{
     client_id: ClientId,
     client_secret: Option<ClientSecret>,
     registration_access_token: Option<RegistrationAccessToken>,
@@ -648,22 +630,28 @@ where AT: ApplicationType,
     _phantom_s: PhantomData<S>,
 }
 impl<AT, CA, CM, G, JE, JK, JS, JT, JU, K, RT, S>
-ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
-for Registration10ClientRegistrationResponse<AT, CA, CM, G, JE, JK, JS, JT, JU, K, RT, S>
-where AT: ApplicationType,
-      CA: ClientAuthMethod,
-      CM: ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
-      G: GrantType,
-      JE: JweContentEncryptionAlgorithm,
-      JK: JweKeyManagementAlgorithm,
-      JS: JwsSigningAlgorithm<JT>,
-      JT: JsonWebKeyType,
-      JU: JsonWebKeyUse,
-      K: JsonWebKey<JS, JT, JU>,
-      RT: ResponseType,
-      S: SubjectIdentifierType {
-    fn client_id(&self) -> &ClientId { &self.client_id }
-    fn client_secret(&self) -> Option<&ClientSecret> { self.client_secret.as_ref() }
+    ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+    for Registration10ClientRegistrationResponse<AT, CA, CM, G, JE, JK, JS, JT, JU, K, RT, S>
+where
+    AT: ApplicationType,
+    CA: ClientAuthMethod,
+    CM: ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+    G: GrantType,
+    JE: JweContentEncryptionAlgorithm,
+    JK: JweKeyManagementAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    RT: ResponseType,
+    S: SubjectIdentifierType,
+{
+    fn client_id(&self) -> &ClientId {
+        &self.client_id
+    }
+    fn client_secret(&self) -> Option<&ClientSecret> {
+        self.client_secret.as_ref()
+    }
     fn registration_access_token(&self) -> Option<&RegistrationAccessToken> {
         self.registration_access_token.as_ref()
     }
@@ -680,20 +668,22 @@ where AT: ApplicationType,
     }
 }
 impl<AT, CA, CM, G, JE, JK, JS, JT, JU, K, RT, S>
-ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
-for Registration10ClientRegistrationResponse<AT, CA, CM, G, JE, JK, JS, JT, JU, K, RT, S>
-where AT: ApplicationType,
-      CA: ClientAuthMethod,
-      CM: ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
-      G: GrantType,
-      JE: JweContentEncryptionAlgorithm,
-      JK: JweKeyManagementAlgorithm,
-      JS: JwsSigningAlgorithm<JT>,
-      JT: JsonWebKeyType,
-      JU: JsonWebKeyUse,
-      K: JsonWebKey<JS, JT, JU>,
-      RT: ResponseType,
-      S: SubjectIdentifierType {
+    ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+    for Registration10ClientRegistrationResponse<AT, CA, CM, G, JE, JK, JS, JT, JU, K, RT, S>
+where
+    AT: ApplicationType,
+    CA: ClientAuthMethod,
+    CM: ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+    G: GrantType,
+    JE: JweContentEncryptionAlgorithm,
+    JK: JweKeyManagementAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    RT: ResponseType,
+    S: SubjectIdentifierType,
+{
     field_getters![
         self [self.client_metadata]() {
             redirect_uris[Vec<RedirectUrl>],
@@ -732,7 +722,7 @@ where AT: ApplicationType,
 
 // FIXME: implement client configuration endpoint request (Section 4)
 
-pub trait RegisterErrorResponseType : Clone + ErrorResponseType {}
+pub trait RegisterErrorResponseType: Clone + ErrorResponseType {}
 
 #[derive(Debug, Fail)]
 pub enum ClientRegistrationError<T: RegisterErrorResponseType> {

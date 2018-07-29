@@ -3,8 +3,10 @@ use oauth2::prelude::*;
 use ring::digest;
 use ring::signature as ring_signature;
 
-use super::super::{Base64UrlEncodedBytes, JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse,
-                   JwsSigningAlgorithm, SignatureVerificationError};
+use super::super::{
+    Base64UrlEncodedBytes, JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse,
+    JwsSigningAlgorithm, SignatureVerificationError,
+};
 use super::{crypto, CoreJwsSigningAlgorithm};
 
 // Other than the 'kty' (key type) parameter, which must be present in all JWKs, Section 4 of RFC

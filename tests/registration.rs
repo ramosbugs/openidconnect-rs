@@ -14,15 +14,18 @@ use oauth2::{ClientId, ClientSecret, RedirectUrl};
 use std::time::Duration;
 use url::Url;
 
-use openidconnect::core::{CoreApplicationType, CoreClientAuthMethod, CoreClientMetadata,
-                          CoreClientRegistrationResponse, CoreGrantType,
-                          CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm,
-                          CoreJwsSigningAlgorithm, CoreResponseType, CoreSubjectIdentifierType};
+use openidconnect::core::{
+    CoreApplicationType, CoreClientAuthMethod, CoreClientMetadata, CoreClientRegistrationResponse,
+    CoreGrantType, CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm,
+    CoreJwsSigningAlgorithm, CoreResponseType, CoreSubjectIdentifierType,
+};
 use openidconnect::discovery::JsonWebKeySetUrl;
 use openidconnect::registration::{ClientMetadata, ClientRegistrationResponse};
-use openidconnect::{AuthenticationContextClass, ClientConfigUrl, ClientName, ClientUrl,
-                    ContactEmail, LanguageTag, LogoUrl, PolicyUrl, RegistrationAccessToken,
-                    RequestUrl, ResponseTypes, SectorIdentifierUrl, ToSUrl};
+use openidconnect::{
+    AuthenticationContextClass, ClientConfigUrl, ClientName, ClientUrl, ContactEmail, LanguageTag,
+    LogoUrl, PolicyUrl, RegistrationAccessToken, RequestUrl, ResponseTypes, SectorIdentifierUrl,
+    ToSUrl,
+};
 
 #[test]
 fn test_metadata_serialization() {
@@ -268,9 +271,9 @@ fn test_metadata_serialization_minimal() {
 
     assert_eq!(
         *client_metadata.redirect_uris(),
-        vec![
-            RedirectUrl::new(Url::parse("https://example.com/redirect-1").unwrap()),
-        ]
+        vec![RedirectUrl::new(
+            Url::parse("https://example.com/redirect-1").unwrap(),
+        )]
     );
     assert_eq!(client_metadata.response_types(), None);
     assert_eq!(client_metadata.grant_types(), None);

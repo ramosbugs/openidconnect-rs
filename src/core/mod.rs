@@ -7,14 +7,16 @@ use oauth2::prelude::*;
 use oauth2::{ErrorResponseType, ResponseType as OAuth2ResponseType};
 
 use super::discovery::Discovery10ProviderMetadata;
-use super::registration::{RegisterErrorResponseType, Registration10ClientMetadata,
-                          Registration10ClientRegistrationRequest,
-                          Registration10ClientRegistrationResponse};
-use super::{ApplicationType, AuthDisplay, AuthPrompt, ClaimName, ClaimType, Client,
-            ClientAuthMethod, EmptyAdditionalClaims, GenderClaim, GrantType, IdToken,
-            IdTokenClaims, IdTokenVerifier, JsonWebKeySet, JweContentEncryptionAlgorithm,
-            JweKeyManagementAlgorithm, JwsSigningAlgorithm, ResponseMode, ResponseType,
-            SubjectIdentifierType, UserInfoClaims, UserInfoVerifier};
+use super::registration::{
+    RegisterErrorResponseType, Registration10ClientMetadata,
+    Registration10ClientRegistrationRequest, Registration10ClientRegistrationResponse,
+};
+use super::{
+    ApplicationType, AuthDisplay, AuthPrompt, ClaimName, ClaimType, Client, ClientAuthMethod,
+    EmptyAdditionalClaims, GenderClaim, GrantType, IdToken, IdTokenClaims, IdTokenVerifier,
+    JsonWebKeySet, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm,
+    ResponseMode, ResponseType, SubjectIdentifierType, UserInfoClaims, UserInfoVerifier,
+};
 
 pub use self::jwk::{CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse};
 
@@ -270,10 +272,8 @@ impl Display for CoreAuthPrompt {
     }
 }
 
-new_type![
-    #[derive(Deserialize, Serialize)]
-    CoreClaimName(String)
-];
+new_type![#[derive(Deserialize, Serialize)]
+CoreClaimName(String)];
 impl ClaimName for CoreClaimName {}
 
 ///
@@ -354,13 +354,11 @@ impl PartialEq<CoreGrantTypeWrapper> for CoreGrantType {
 }
 
 // FIXME: remove this and implement a custom serializer/deserializer
-new_type![
-    #[derive(Deserialize, Serialize)]
-    CoreGrantTypeWrapper(
-        #[serde(with = "serde_core_grant_type")]
-        CoreGrantType
-    )
-];
+new_type![#[derive(Deserialize, Serialize)]
+CoreGrantTypeWrapper(
+    #[serde(with = "serde_core_grant_type")]
+    CoreGrantType
+)];
 impl GrantType for CoreGrantTypeWrapper {}
 impl From<CoreGrantType> for CoreGrantTypeWrapper {
     fn from(grant_type: CoreGrantType) -> Self {

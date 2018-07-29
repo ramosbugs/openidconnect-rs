@@ -1,4 +1,3 @@
-
 ///
 /// Helper trait to convert struct values to the types returned by the parent trait getters.
 ///
@@ -44,7 +43,6 @@ impl<T> DeserializeMapValue<T> for T where T: DeserializeOwned {
     }
 }
 */
-
 
 ///
 /// Copied from oauth2-rs crate (not part of that crate's stable public interface).

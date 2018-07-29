@@ -36,13 +36,16 @@ use std::time::Duration;
 
 use oauth2::helpers::variant_name;
 use oauth2::prelude::*;
-use oauth2::{AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken,
-             ErrorResponseType, ExtraTokenFields, RedirectUrl, RequestTokenError,
-             ResponseType as OAuth2ResponseType, Scope, TokenResponse, TokenType, TokenUrl};
+use oauth2::{
+    AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, ErrorResponseType,
+    ExtraTokenFields, RedirectUrl, RequestTokenError, ResponseType as OAuth2ResponseType, Scope,
+    TokenResponse, TokenType, TokenUrl,
+};
 use url::Url;
 
-pub use claims::{AdditionalClaims, AddressClaim, EmptyAdditionalClaims, GenderClaim,
-                 StandardClaims};
+pub use claims::{
+    AdditionalClaims, AddressClaim, EmptyAdditionalClaims, GenderClaim, StandardClaims,
+};
 pub use discovery::{DiscoveryError, ProviderMetadata};
 pub use id_token::IdTokenFields;
 pub use id_token::{IdToken, IdTokenClaims};
@@ -50,24 +53,26 @@ use jwt::{JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenH
 use registration::ClientRegistrationResponse;
 // Flatten the module hierarchy involving types. They're only separated to improve code
 // organization.
-pub use types::{AccessTokenHash, AddressCountry, AddressLocality, AddressPostalCode,
-                AddressRegion, ApplicationType, Audience, AuthDisplay, AuthPrompt,
-                AuthenticationContextClass, AuthenticationMethodReference, AuthorizationCodeHash,
-                Base64UrlEncodedBytes, ClaimName, ClaimType, ClientAuthMethod, ClientConfigUrl,
-                ClientName, ClientUrl, ContactEmail, EndUserBirthday, EndUserEmail,
-                EndUserGivenName, EndUserMiddleName, EndUserName, EndUserNickname,
-                EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone,
-                EndUserUsername, EndUserWebsiteUrl, FormattedAddress, GrantType, InitiateLoginUrl,
-                IssuerUrl, JsonWebKey, JsonWebKeyId, JsonWebKeySet, JsonWebKeyType, JsonWebKeyUse,
-                JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm,
-                LanguageTag, LoginHint, LogoUrl, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl,
-                RegistrationAccessToken, RegistrationUrl, RequestUrl, ResponseMode, ResponseType,
-                ResponseTypes, Seconds, SectorIdentifierUrl, ServiceDocUrl, StreetAddress,
-                SubjectIdentifier, SubjectIdentifierType, ToSUrl};
+pub use types::{
+    AccessTokenHash, AddressCountry, AddressLocality, AddressPostalCode, AddressRegion,
+    ApplicationType, Audience, AuthDisplay, AuthPrompt, AuthenticationContextClass,
+    AuthenticationMethodReference, AuthorizationCodeHash, Base64UrlEncodedBytes, ClaimName,
+    ClaimType, ClientAuthMethod, ClientConfigUrl, ClientName, ClientUrl, ContactEmail,
+    EndUserBirthday, EndUserEmail, EndUserGivenName, EndUserMiddleName, EndUserName,
+    EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone,
+    EndUserUsername, EndUserWebsiteUrl, FormattedAddress, GrantType, InitiateLoginUrl, IssuerUrl,
+    JsonWebKey, JsonWebKeyId, JsonWebKeySet, JsonWebKeyType, JsonWebKeyUse,
+    JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag,
+    LoginHint, LogoUrl, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl, RegistrationAccessToken,
+    RegistrationUrl, RequestUrl, ResponseMode, ResponseType, ResponseTypes, Seconds,
+    SectorIdentifierUrl, ServiceDocUrl, StreetAddress, SubjectIdentifier, SubjectIdentifierType,
+    ToSUrl,
+};
 pub use user_info::{UserInfoClaims, UserInfoError, UserInfoUrl};
 use verification::{AudiencesClaim, IssuerClaim};
-pub use verification::{ClaimsVerificationError, IdTokenVerifier, SignatureVerificationError,
-                       UserInfoVerifier};
+pub use verification::{
+    ClaimsVerificationError, IdTokenVerifier, SignatureVerificationError, UserInfoVerifier,
+};
 
 // Defined first since other modules need the macros, and definition order is significant for
 // macros. This module is private.
@@ -385,7 +390,8 @@ where
         JU: JsonWebKeyUse,
         K: JsonWebKey<JS, JT, JU>,
     {
-        let provider_metadata = self.provider_metadata
+        let provider_metadata = self
+            .provider_metadata
             .as_ref()
             .ok_or_else(|| DiscoveryError::Other("no provider metadata present".to_string()))?;
         let jwks_uri = provider_metadata.jwks_uri().ok_or_else(|| {

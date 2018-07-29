@@ -9,14 +9,17 @@ use oauth2::prelude::*;
 use oauth2::{AuthUrl, Scope, TokenUrl};
 use url::Url;
 
-use openidconnect::core::{CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClientAuthMethod,
-                          CoreGrantType, CoreGrantTypeWrapper, CoreJweContentEncryptionAlgorithm,
-                          CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm,
-                          CoreProviderMetadata, CoreResponseMode, CoreResponseType,
-                          CoreSubjectIdentifierType};
+use openidconnect::core::{
+    CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClientAuthMethod, CoreGrantType,
+    CoreGrantTypeWrapper, CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm,
+    CoreJwsSigningAlgorithm, CoreProviderMetadata, CoreResponseMode, CoreResponseType,
+    CoreSubjectIdentifierType,
+};
 use openidconnect::discovery::{JsonWebKeySetUrl, ProviderMetadata};
-use openidconnect::{AuthenticationContextClass, IssuerUrl, LanguageTag, OpPolicyUrl, OpTosUrl,
-                    RegistrationUrl, ResponseTypes, ServiceDocUrl, UserInfoUrl};
+use openidconnect::{
+    AuthenticationContextClass, IssuerUrl, LanguageTag, OpPolicyUrl, OpTosUrl, RegistrationUrl,
+    ResponseTypes, ServiceDocUrl, UserInfoUrl,
+};
 
 #[test]
 fn test_discovery_deserialization() {
@@ -274,18 +277,20 @@ fn test_discovery_deserialization() {
         provider_metadata.registration_endpoint()
     );
     assert_eq!(
-        Some(&vec![
-            "email",
-            "phone",
-            "profile",
-            "openid",
-            "address",
-            "offline_access",
-            "openid",
-        ].iter()
-            .map(|s| s.to_string())
-            .map(Scope::new)
-            .collect::<Vec<_>>()),
+        Some(
+            &vec![
+                "email",
+                "phone",
+                "profile",
+                "openid",
+                "address",
+                "offline_access",
+                "openid",
+            ].iter()
+                .map(|s| s.to_string())
+                .map(Scope::new)
+                .collect::<Vec<_>>()
+        ),
         provider_metadata.scopes_supported()
     );
     assert_eq!(
@@ -301,20 +306,22 @@ fn test_discovery_deserialization() {
         provider_metadata.response_modes_supported()
     );
     assert_eq!(
-        Some(&vec![
-            CoreGrantType::AuthorizationCode,
-            CoreGrantType::Implicit,
-            CoreGrantType::Extension("urn:ietf:params:oauth:grant-type:jwt-bearer".to_string()),
-            CoreGrantType::RefreshToken,
-        ].into_iter()
-            .map(Into::<CoreGrantTypeWrapper>::into)
-            .collect::<Vec<_>>()),
+        Some(
+            &vec![
+                CoreGrantType::AuthorizationCode,
+                CoreGrantType::Implicit,
+                CoreGrantType::Extension("urn:ietf:params:oauth:grant-type:jwt-bearer".to_string()),
+                CoreGrantType::RefreshToken,
+            ].into_iter()
+                .map(Into::<CoreGrantTypeWrapper>::into)
+                .collect::<Vec<_>>()
+        ),
         provider_metadata.grant_types_supported()
     );
     assert_eq!(
-        Some(&vec![
-            AuthenticationContextClass::new("PASSWORD".to_string()),
-        ]),
+        Some(&vec![AuthenticationContextClass::new(
+            "PASSWORD".to_string(),
+        )]),
         provider_metadata.acr_values_supported()
     );
     assert_eq!(

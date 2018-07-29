@@ -16,17 +16,21 @@ use oauth2::prelude::*;
 use oauth2::{AccessToken, AuthType, AuthorizationCode, CsrfToken, RequestTokenError, Scope};
 use url::Url;
 
-use openidconnect::Nonce;
-use openidconnect::core::{CoreClient, CoreClientAuthMethod, CoreClientRegistrationRequest,
-                          CoreClientRegistrationResponse, CoreIdToken, CoreIdTokenClaims,
-                          CoreIdTokenVerifier, CoreJsonWebKeySet, CoreJwsSigningAlgorithm,
-                          CoreProviderMetadata, CoreResponseType, CoreUserInfoClaims,
-                          CoreUserInfoVerifier};
+use openidconnect::core::{
+    CoreClient, CoreClientAuthMethod, CoreClientRegistrationRequest,
+    CoreClientRegistrationResponse, CoreIdToken, CoreIdTokenClaims, CoreIdTokenVerifier,
+    CoreJsonWebKeySet, CoreJwsSigningAlgorithm, CoreProviderMetadata, CoreResponseType,
+    CoreUserInfoClaims, CoreUserInfoVerifier,
+};
 use openidconnect::discovery::ProviderMetadata;
-use openidconnect::registration::{ClientMetadata, ClientRegistrationRequest,
-                                  ClientRegistrationResponse};
-use openidconnect::{AuthenticationFlow, ClaimsVerificationError, SignatureVerificationError,
-                    StandardClaims, SubjectIdentifier, UserInfoError};
+use openidconnect::registration::{
+    ClientMetadata, ClientRegistrationRequest, ClientRegistrationResponse,
+};
+use openidconnect::Nonce;
+use openidconnect::{
+    AuthenticationFlow, ClaimsVerificationError, SignatureVerificationError, StandardClaims,
+    SubjectIdentifier, UserInfoError,
+};
 
 #[macro_use]
 mod rp_common;
@@ -124,7 +128,8 @@ impl TestState {
     }
 
     pub fn exchange_code(mut self) -> Self {
-        let token_response = self.client
+        let token_response = self
+            .client
             .exchange_code(
                 self.authorization_code
                     .take()
@@ -148,10 +153,7 @@ impl TestState {
         self.id_token.as_ref().expect("no id_token")
     }
 
-    pub fn id_token_verifier(
-        &self,
-        jwks: CoreJsonWebKeySet,
-    ) -> CoreIdTokenVerifier {
+    pub fn id_token_verifier(&self, jwks: CoreJsonWebKeySet) -> CoreIdTokenVerifier {
         CoreIdTokenVerifier::new_private_client(
             self.registration_response.client_id().clone(),
             self.registration_response
@@ -214,7 +216,8 @@ impl TestState {
 
     pub fn user_info_claims_failure(&self) -> UserInfoError {
         let verifier = self.user_info_verifier(self.jwks(), self.id_token_claims().sub().clone());
-        let user_info_result: Result<CoreUserInfoClaims, UserInfoError> = self.provider_metadata
+        let user_info_result: Result<CoreUserInfoClaims, UserInfoError> = self
+            .provider_metadata
             .userinfo_endpoint()
             .unwrap()
             .get_user_info(self.access_token(), &verifier);
@@ -253,20 +256,26 @@ fn rp_scope_userinfo_claims() {
     log_debug!("UserInfo response: {:?}", user_info_claims);
 
     assert!(id_token_claims.sub() == user_info_claims.sub());
-    assert!(!user_info_claims
-        .email()
-        .expect("no email returned by UserInfo endpoint")
-        .is_empty());
-    assert!(!user_info_claims
-        .address()
-        .expect("no address returned by UserInfo endpoint")
-        .street_address()
-        .expect("no street address returned by UserInfo endpoint")
-        .is_empty());
-    assert!(!user_info_claims
-        .phone_number()
-        .expect("no phone_number returned by UserInfo endpoint")
-        .is_empty());
+    assert!(
+        !user_info_claims
+            .email()
+            .expect("no email returned by UserInfo endpoint")
+            .is_empty()
+    );
+    assert!(
+        !user_info_claims
+            .address()
+            .expect("no address returned by UserInfo endpoint")
+            .street_address()
+            .expect("no street address returned by UserInfo endpoint")
+            .is_empty()
+    );
+    assert!(
+        !user_info_claims
+            .phone_number()
+            .expect("no phone_number returned by UserInfo endpoint")
+            .is_empty()
+    );
 
     log_info!("SUCCESS");
 }

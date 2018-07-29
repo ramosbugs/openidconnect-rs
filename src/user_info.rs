@@ -3,58 +3,33 @@ use std::ops::Deref;
 use std::str;
 
 use curl;
-use oauth2::AccessToken;
 use oauth2::helpers::{deserialize_url, serialize_url};
 use oauth2::prelude::*;
+use oauth2::AccessToken;
 use serde_json;
 use url::Url;
 
-use super::{
-    AdditionalClaims,
-    AddressClaim,
-    Audience,
-    AudiencesClaim,
-    ClaimsVerificationError,
-    EndUserBirthday,
-    EndUserGivenName,
-    EndUserEmail,
-    EndUserMiddleName,
-    EndUserName,
-    EndUserNickname,
-    EndUserPhoneNumber,
-    EndUserPictureUrl,
-    EndUserProfileUrl,
-    EndUserTimezone,
-    EndUserUsername,
-    EndUserWebsiteUrl,
-    GenderClaim,
-    IssuerClaim,
-    IssuerUrl,
-    LanguageTag,
-    JsonWebKey,
-    JsonWebKeyType,
-    JsonWebKeyUse,
-    JsonWebToken,
-    JweContentEncryptionAlgorithm,
-    JwsSigningAlgorithm,
-    Seconds,
-    StandardClaims,
-    SubjectIdentifier,
-};
 use super::claims::StandardClaimsImpl;
 use super::http::{
-    ACCEPT_JSON,
-    auth_bearer,
-    HTTP_STATUS_OK,
-    HttpRequest,
-    HttpRequestMethod,
-    MIME_TYPE_JSON,
+    auth_bearer, HttpRequest, HttpRequestMethod, ACCEPT_JSON, HTTP_STATUS_OK, MIME_TYPE_JSON,
     MIME_TYPE_JWT,
 };
 use super::verification::UserInfoVerifier;
+use super::{
+    AdditionalClaims, AddressClaim, Audience, AudiencesClaim, ClaimsVerificationError,
+    EndUserBirthday, EndUserEmail, EndUserGivenName, EndUserMiddleName, EndUserName,
+    EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone,
+    EndUserUsername, EndUserWebsiteUrl, GenderClaim, IssuerClaim, IssuerUrl, JsonWebKey,
+    JsonWebKeyType, JsonWebKeyUse, JsonWebToken, JweContentEncryptionAlgorithm,
+    JwsSigningAlgorithm, LanguageTag, Seconds, StandardClaims, SubjectIdentifier,
+};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct UserInfoClaims<AC, GC> where AC: AdditionalClaims, GC: GenderClaim {
+pub struct UserInfoClaims<AC, GC>
+where
+    AC: AdditionalClaims,
+    GC: GenderClaim,
+{
     iss: Option<IssuerUrl>,
     // FIXME: this needs to be a vector, but it may also come as a single string
     aud: Option<Vec<Audience>>,
@@ -65,17 +40,29 @@ pub struct UserInfoClaims<AC, GC> where AC: AdditionalClaims, GC: GenderClaim {
 
     #[serde(bound = "AC: AdditionalClaims")]
     #[serde(flatten)]
-    additional_claims: AC
+    additional_claims: AC,
 }
 // FIXME: see what other structs should have friendlier trait interfaces like this one
 impl<AC, GC> UserInfoClaims<AC, GC>
-    where AC: AdditionalClaims, GC: GenderClaim {
-    pub fn issuer(&self) -> Option<&IssuerUrl> { self.iss.as_ref() }
-    pub fn audiences(&self) -> Option<&Vec<Audience>> { self.aud.as_ref() }
-    pub fn additional_claims(&self) -> &AC { &self.additional_claims }
+where
+    AC: AdditionalClaims,
+    GC: GenderClaim,
+{
+    pub fn issuer(&self) -> Option<&IssuerUrl> {
+        self.iss.as_ref()
+    }
+    pub fn audiences(&self) -> Option<&Vec<Audience>> {
+        self.aud.as_ref()
+    }
+    pub fn additional_claims(&self) -> &AC {
+        &self.additional_claims
+    }
 }
 impl<AC, GC> StandardClaims<GC> for UserInfoClaims<AC, GC>
-    where AC: AdditionalClaims, GC: GenderClaim {
+where
+    AC: AdditionalClaims,
+    GC: GenderClaim,
+{
     field_getters![
         self [self.standard_claims] {
             sub[SubjectIdentifier],
@@ -103,26 +90,38 @@ impl<AC, GC> StandardClaims<GC> for UserInfoClaims<AC, GC>
 }
 
 impl<AC, GC> AudiencesClaim for UserInfoClaims<AC, GC>
-    where AC: AdditionalClaims, GC: GenderClaim {
+where
+    AC: AdditionalClaims,
+    GC: GenderClaim,
+{
     fn audiences(&self) -> Option<&Vec<Audience>> {
         UserInfoClaims::audiences(&self)
     }
 }
 impl<'a, AC, GC> AudiencesClaim for &'a UserInfoClaims<AC, GC>
-    where AC: AdditionalClaims, GC: GenderClaim {
+where
+    AC: AdditionalClaims,
+    GC: GenderClaim,
+{
     fn audiences(&self) -> Option<&Vec<Audience>> {
         UserInfoClaims::audiences(&self)
     }
 }
 
 impl<AC, GC> IssuerClaim for UserInfoClaims<AC, GC>
-    where AC: AdditionalClaims, GC: GenderClaim {
+where
+    AC: AdditionalClaims,
+    GC: GenderClaim,
+{
     fn issuer(&self) -> Option<&IssuerUrl> {
         UserInfoClaims::issuer(&self)
     }
 }
 impl<'a, AC, GC> IssuerClaim for &'a UserInfoClaims<AC, GC>
-    where AC: AdditionalClaims, GC: GenderClaim {
+where
+    AC: AdditionalClaims,
+    GC: GenderClaim,
+{
     fn issuer(&self) -> Option<&IssuerUrl> {
         UserInfoClaims::issuer(&self)
     }
@@ -233,17 +232,15 @@ pub enum UserInfoError {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub(crate) enum UnverifiedUserInfoClaims<AC, GC, JE, JS, JT>
-    where AC: AdditionalClaims,
-          GC: GenderClaim,
-          JE: JweContentEncryptionAlgorithm,
-          JS: JwsSigningAlgorithm<JT>,
-          JT: JsonWebKeyType {
-    JsonClaims(
-        #[serde(bound = "AC: AdditionalClaims")]
-        UserInfoClaims<AC, GC>
-    ),
+where
+    AC: AdditionalClaims,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+{
+    JsonClaims(#[serde(bound = "AC: AdditionalClaims")] UserInfoClaims<AC, GC>),
     JwtClaims(
-        #[serde(bound = "AC: AdditionalClaims")]
-        JsonWebToken<UserInfoClaims<AC, GC>, JE, JS, JT>
-    )
+        #[serde(bound = "AC: AdditionalClaims")] JsonWebToken<UserInfoClaims<AC, GC>, JE, JS, JT>,
+    ),
 }

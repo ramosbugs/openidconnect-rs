@@ -2,8 +2,8 @@ use std::io::Read;
 
 use curl;
 use curl::easy::Easy;
-use oauth2::AccessToken;
 use oauth2::prelude::*;
+use oauth2::AccessToken;
 use url::Url;
 
 pub const MIME_TYPE_JSON: &str = "application/json";

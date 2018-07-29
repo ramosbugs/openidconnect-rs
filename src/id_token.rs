@@ -5,15 +5,16 @@ use chrono::{DateTime, TimeZone, Utc};
 use oauth2::ClientId;
 
 use super::claims::StandardClaimsImpl;
-use super::{AccessTokenHash, AdditionalClaims, AddressClaim, Audience, AudiencesClaim,
-            AuthenticationContextClass, AuthenticationMethodReference, AuthorizationCodeHash,
-            ClaimsVerificationError, EndUserBirthday, EndUserEmail, EndUserGivenName,
-            EndUserMiddleName, EndUserName, EndUserNickname, EndUserPhoneNumber,
-            EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone, EndUserUsername,
-            EndUserWebsiteUrl, ExtraTokenFields, GenderClaim, IdTokenVerifier, IssuerClaim,
-            IssuerUrl, JsonWebKey, JsonWebKeyType, JsonWebKeyUse, JsonWebToken,
-            JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, Nonce, Seconds,
-            StandardClaims, SubjectIdentifier};
+use super::{
+    AccessTokenHash, AdditionalClaims, AddressClaim, Audience, AudiencesClaim,
+    AuthenticationContextClass, AuthenticationMethodReference, AuthorizationCodeHash,
+    ClaimsVerificationError, EndUserBirthday, EndUserEmail, EndUserGivenName, EndUserMiddleName,
+    EndUserName, EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl,
+    EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, ExtraTokenFields, GenderClaim,
+    IdTokenVerifier, IssuerClaim, IssuerUrl, JsonWebKey, JsonWebKeyType, JsonWebKeyUse,
+    JsonWebToken, JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, Nonce, Seconds,
+    StandardClaims, SubjectIdentifier,
+};
 
 // FIXME: remove this wrapper layer, and have the functions that return IdToken currently
 // directly call claims() to perform the verification and extract the result. There's nothing
@@ -241,5 +242,4 @@ where
     JE: JweContentEncryptionAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
-{
-}
+{}

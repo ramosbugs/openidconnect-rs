@@ -7,9 +7,13 @@ extern crate url;
 
 use oauth2::prelude::*;
 use oauth2::{AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl};
-use openidconnect::core::{CoreAuthDisplay, CoreAuthPrompt, CoreClient, CoreGrantType,
-                          CoreGrantTypeWrapper, CoreResponseType};
-use openidconnect::{AuthenticationContextClass, AuthenticationFlow, IssuerUrl, LanguageTag, Nonce};
+use openidconnect::core::{
+    CoreAuthDisplay, CoreAuthPrompt, CoreClient, CoreGrantType, CoreGrantTypeWrapper,
+    CoreResponseType,
+};
+use openidconnect::{
+    AuthenticationContextClass, AuthenticationFlow, IssuerUrl, LanguageTag, Nonce,
+};
 use std::time::Duration;
 use url::Url;
 
@@ -54,9 +58,9 @@ fn test_authorize_url_full() {
             LanguageTag::new("fr".to_string()),
             LanguageTag::new("en".to_string()),
         ]))
-        .set_acr_values(Some(vec![
-            AuthenticationContextClass::new("urn:mace:incommon:iap:silver".to_string()),
-        ]));
+        .set_acr_values(Some(vec![AuthenticationContextClass::new(
+            "urn:mace:incommon:iap:silver".to_string(),
+        )]));
 
     let (authorize_url, _, _) = client.authorize_url(
         &AuthenticationFlow::AuthorizationCode::<CoreResponseType>,
