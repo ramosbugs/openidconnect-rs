@@ -443,9 +443,28 @@ ToSUrl(
 
 pub(crate) mod helpers {
     use oauth2::prelude::*;
-    use serde::Serializer;
+    use serde::de::DeserializeOwned;
+    use serde::{Deserialize, Deserializer, Serializer};
+    use serde_json::{from_value, Value};
 
     use super::LanguageTag;
+
+    pub fn deserialize_string_or_vec<'de, T, D>(deserializer: D) -> Result<Vec<T>, D::Error>
+    where
+        T: DeserializeOwned,
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error;
+
+        let value: Value = Deserialize::deserialize(deserializer)?;
+        match from_value::<Vec<T>>(value.clone()) {
+            Ok(val) => Ok(val),
+            Err(_) => {
+                let single_val: T = from_value(value).map_err(Error::custom)?;
+                Ok(vec![single_val])
+            }
+        }
+    }
 
     ///
     /// Serde space-delimited string serializer for an `Option<Vec<String>>`.

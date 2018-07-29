@@ -5,6 +5,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use oauth2::ClientId;
 
 use super::claims::StandardClaimsImpl;
+use super::types::helpers::deserialize_string_or_vec;
 use super::{
     AccessTokenHash, AdditionalClaims, AddressClaim, Audience, AudiencesClaim,
     AuthenticationContextClass, AuthenticationMethodReference, AuthorizationCodeHash,
@@ -63,7 +64,7 @@ where
     GC: GenderClaim,
 {
     iss: IssuerUrl,
-    // FIXME: this needs to be a vector, but it may also come as a single string
+    #[serde(deserialize_with = "deserialize_string_or_vec")]
     aud: Vec<Audience>,
     exp: Seconds,
     iat: Seconds,
