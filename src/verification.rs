@@ -115,29 +115,29 @@ pub enum SignatureVerificationError {
 }
 
 // This struct is intentionally private.
-struct JwtClaimsVerifier<'a, JS, JT, JU, K>
-    where JS: 'a + JwsSigningAlgorithm<JT>,
-          JT: 'a + JsonWebKeyType,
-          JU: 'a + JsonWebKeyUse,
-          K: 'a + JsonWebKey<JS, JT, JU> {
+struct JwtClaimsVerifier<JS, JT, JU, K>
+    where JS: JwsSigningAlgorithm<JT>,
+          JT: JsonWebKeyType,
+          JU: JsonWebKeyUse,
+          K: JsonWebKey<JS, JT, JU> {
     allowed_algs: Option<HashSet<JS>>,
     aud_required: bool,
-    client_id: &'a ClientId,
-    client_secret: Option<&'a ClientSecret>,
+    client_id: ClientId,
+    client_secret: Option<ClientSecret>,
     iss_required: bool,
-    issuer: &'a IssuerUrl,
+    issuer: IssuerUrl,
     is_signature_check_enabled: bool,
-    signature_keys: &'a JsonWebKeySet<JS, JT, JU, K>,
+    signature_keys: JsonWebKeySet<JS, JT, JU, K>,
 }
-impl<'a, JS, JT, JU, K> JwtClaimsVerifier<'a, JS, JT, JU, K>
-    where JS: 'a + JwsSigningAlgorithm<JT>,
-          JT: 'a + JsonWebKeyType,
-          JU: 'a + JsonWebKeyUse,
-          K: 'a + JsonWebKey<JS, JT, JU> {
+impl<JS, JT, JU, K> JwtClaimsVerifier<JS, JT, JU, K>
+    where JS: JwsSigningAlgorithm<JT>,
+          JT: JsonWebKeyType,
+          JU: JsonWebKeyUse,
+          K: JsonWebKey<JS, JT, JU> {
     pub fn new(
-        client_id: &'a ClientId,
-        issuer: &'a IssuerUrl,
-        signature_keys: &'a JsonWebKeySet<JS, JT, JU, K>
+        client_id: ClientId,
+        issuer: IssuerUrl,
+        signature_keys: JsonWebKeySet<JS, JT, JU, K>
     ) -> Self {
         JwtClaimsVerifier {
             allowed_algs: Some([JS::rsa_sha_256()].iter().cloned().collect()),
@@ -176,7 +176,7 @@ impl<'a, JS, JT, JU, K> JwtClaimsVerifier<'a, JS, JT, JU, K>
         self
     }
 
-    pub fn set_client_secret(mut self, client_secret: &'a ClientSecret) -> Self {
+    pub fn set_client_secret(mut self, client_secret: ClientSecret) -> Self {
         self.client_secret = Some(client_secret);
         self
     }
@@ -266,10 +266,10 @@ impl<'a, JS, JT, JU, K> JwtClaimsVerifier<'a, JS, JT, JU, K>
             let unverified_claims = jwt.unverified_claims_ref();
             if self.iss_required {
                 if let Some(issuer) = unverified_claims.issuer() {
-                    if issuer != self.issuer {
+                    if *issuer != self.issuer {
                         return Err(
                             ClaimsVerificationError::InvalidIssuer(
-                                format!("expected `{}` (found `{}`)", **self.issuer, **issuer)
+                                format!("expected `{}` (found `{}`)", *self.issuer, **issuer)
                             )
                         );
                     }
@@ -294,7 +294,7 @@ impl<'a, JS, JT, JU, K> JwtClaimsVerifier<'a, JS, JT, JU, K>
                             ClaimsVerificationError::InvalidAudience(
                                 format!(
                                     "must contain `{}` (found audiences: {})",
-                                    **self.client_id,
+                                    *self.client_id,
                                     audiences
                                         .iter()
                                         .map(|aud| format!("`{}`", Deref::deref(aud)))
@@ -377,7 +377,7 @@ impl<'a, JS, JT, JU, K> JwtClaimsVerifier<'a, JS, JT, JU, K>
             //    as the key to validate the signature. For MAC based algorithms, the behavior
             //    is unspecified if the aud is multi-valued or if an azp value is present that
             //    is different than the aud value.
-            if let Some(client_secret) = self.client_secret {
+            if let Some(ref client_secret) = self.client_secret {
                 let key = K::new_symmetric(client_secret.secret().clone().into_bytes());
                 return jwt.claims(&signature_alg.clone(), &key)
                     .map_err(ClaimsVerificationError::SignatureVerification);
@@ -462,22 +462,22 @@ impl<'a, JS, JT, JU, K> JwtClaimsVerifier<'a, JS, JT, JU, K>
     }
 }
 
-pub struct IdTokenVerifier<'a, JS, JT, JU, K>
-    where JS: 'a + JwsSigningAlgorithm<JT>,
-          JT: 'a + JsonWebKeyType,
-          JU: 'a + JsonWebKeyUse,
-          K: 'a + JsonWebKey<JS, JT, JU> {
-    jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>
+pub struct IdTokenVerifier<JS, JT, JU, K>
+    where JS: JwsSigningAlgorithm<JT>,
+          JT: JsonWebKeyType,
+          JU: JsonWebKeyUse,
+          K: JsonWebKey<JS, JT, JU> {
+    jwt_verifier: JwtClaimsVerifier<JS, JT, JU, K>
 }
-impl<'a, JS, JT, JU, K> IdTokenVerifier<'a, JS, JT, JU, K>
-    where JS: 'a + JwsSigningAlgorithm<JT>,
-          JT: 'a + JsonWebKeyType,
-          JU: 'a + JsonWebKeyUse,
-          K: 'a + JsonWebKey<JS, JT, JU> {
+impl<JS, JT, JU, K> IdTokenVerifier<JS, JT, JU, K>
+    where JS: JwsSigningAlgorithm<JT>,
+          JT: JsonWebKeyType,
+          JU: JsonWebKeyUse,
+          K: JsonWebKey<JS, JT, JU> {
     pub fn new_public_client(
-        client_id: &'a ClientId,
-        issuer: &'a IssuerUrl,
-        signature_keys: &'a JsonWebKeySet<JS, JT, JU, K>
+        client_id: ClientId,
+        issuer: IssuerUrl,
+        signature_keys: JsonWebKeySet<JS, JT, JU, K>
     ) -> Self {
         IdTokenVerifier {
             jwt_verifier: JwtClaimsVerifier::new(client_id, issuer, signature_keys),
@@ -485,10 +485,10 @@ impl<'a, JS, JT, JU, K> IdTokenVerifier<'a, JS, JT, JU, K>
     }
 
     pub fn new_private_client(
-        client_id: &'a ClientId,
-        client_secret: &'a ClientSecret,
-        issuer: &'a IssuerUrl,
-        signature_keys: &'a JsonWebKeySet<JS, JT, JU, K>,
+        client_id: ClientId,
+        client_secret: ClientSecret,
+        issuer: IssuerUrl,
+        signature_keys: JsonWebKeySet<JS, JT, JU, K>,
     ) -> Self {
         IdTokenVerifier {
             jwt_verifier: JwtClaimsVerifier::new(client_id, issuer, signature_keys)
@@ -575,28 +575,28 @@ impl<'a, JS, JT, JU, K> IdTokenVerifier<'a, JS, JT, JU, K>
     }
 }
 
-pub struct UserInfoVerifier<'a, JE, JS, JT, JU, K>
-    where JE: 'a + JweContentEncryptionAlgorithm,
-          JS: 'a + JwsSigningAlgorithm<JT>,
-          JT: 'a + JsonWebKeyType,
-          JU: 'a + JsonWebKeyUse,
-          K: 'a + JsonWebKey<JS, JT, JU> {
+pub struct UserInfoVerifier<JE, JS, JT, JU, K>
+    where JE: JweContentEncryptionAlgorithm,
+          JS: JwsSigningAlgorithm<JT>,
+          JT: JsonWebKeyType,
+          JU: JsonWebKeyUse,
+          K: JsonWebKey<JS, JT, JU> {
     jwt_required: bool,
-    jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>,
-    sub: &'a SubjectIdentifier,
+    jwt_verifier: JwtClaimsVerifier<JS, JT, JU, K>,
+    sub: SubjectIdentifier,
     _phantom: PhantomData<JE>,
 }
-impl<'a, JE, JS, JT, JU, K> UserInfoVerifier<'a, JE, JS, JT, JU, K>
-    where JE: 'a + JweContentEncryptionAlgorithm,
-          JS: 'a + JwsSigningAlgorithm<JT>,
-          JT: 'a + JsonWebKeyType,
-          JU: 'a + JsonWebKeyUse,
-          K: 'a + JsonWebKey<JS, JT, JU> {
+impl<JE, JS, JT, JU, K> UserInfoVerifier<JE, JS, JT, JU, K>
+    where JE: JweContentEncryptionAlgorithm,
+          JS: JwsSigningAlgorithm<JT>,
+          JT: JsonWebKeyType,
+          JU: JsonWebKeyUse,
+          K: JsonWebKey<JS, JT, JU> {
     pub fn new(
-        client_id: &'a ClientId,
-        issuer: &'a IssuerUrl,
-        signature_keys: &'a JsonWebKeySet<JS, JT, JU, K>,
-        sub: &'a SubjectIdentifier,
+        client_id: ClientId,
+        issuer: IssuerUrl,
+        signature_keys: JsonWebKeySet<JS, JT, JU, K>,
+        sub: SubjectIdentifier,
     ) -> Self {
         UserInfoVerifier {
             jwt_required: false,
@@ -640,10 +640,10 @@ impl<'a, JE, JS, JT, JU, K> UserInfoVerifier<'a, JE, JS, JT, JU, K>
                 }
             };
 
-        if user_info.sub() != self.sub {
+        if *user_info.sub() != self.sub {
             return Err(
                 ClaimsVerificationError::InvalidSubject(
-                    format!("expected `{}` (found `{}`)", **self.sub, **user_info.sub())
+                    format!("expected `{}` (found `{}`)", *self.sub, **user_info.sub())
                 )
             );
         }

@@ -148,31 +148,30 @@ impl TestState {
         self.id_token.as_ref().expect("no id_token")
     }
 
-    pub fn id_token_verifier<'a, 'b: 'a>(
-        &'b self,
-        jwks: &'a CoreJsonWebKeySet,
-    ) -> CoreIdTokenVerifier<'a> {
+    pub fn id_token_verifier(
+        &self,
+        jwks: CoreJsonWebKeySet,
+    ) -> CoreIdTokenVerifier {
         CoreIdTokenVerifier::new_private_client(
-            self.registration_response.client_id(),
+            self.registration_response.client_id().clone(),
             self.registration_response
                 .client_secret()
-                .expect("no client_secret"),
-            self.provider_metadata.issuer(),
-            &jwks,
+                .expect("no client_secret")
+                .clone(),
+            self.provider_metadata.issuer().clone(),
+            jwks,
         )
     }
 
     pub fn id_token_claims(&self) -> &CoreIdTokenClaims {
-        let jwks = self.jwks();
-        let verifier = self.id_token_verifier(&jwks);
+        let verifier = self.id_token_verifier(self.jwks());
         self.id_token()
             .claims(&verifier, self.nonce.as_ref().expect("no nonce"))
             .panic_if_fail("failed to validate claims")
     }
 
     pub fn id_token_claims_failure(&self) -> ClaimsVerificationError {
-        let jwks = self.jwks();
-        let verifier = self.id_token_verifier(&jwks);
+        let verifier = self.id_token_verifier(self.jwks());
         self.id_token()
             .claims(&verifier, self.nonce.as_ref().expect("no nonce"))
             .expect_err("claims verification succeeded but was expected to fail")
@@ -191,22 +190,21 @@ impl TestState {
         self
     }
 
-    pub fn user_info_verifier<'a, 'b: 'a>(
-        &'b self,
-        jwks: &'a CoreJsonWebKeySet,
-        sub: &'a SubjectIdentifier,
-    ) -> CoreUserInfoVerifier<'a> {
+    pub fn user_info_verifier(
+        &self,
+        jwks: CoreJsonWebKeySet,
+        sub: SubjectIdentifier,
+    ) -> CoreUserInfoVerifier {
         CoreUserInfoVerifier::new(
-            self.registration_response.client_id(),
-            self.provider_metadata.issuer(),
-            &jwks,
-            &sub,
+            self.registration_response.client_id().clone(),
+            self.provider_metadata.issuer().clone(),
+            jwks,
+            sub,
         )
     }
 
     pub fn user_info_claims(&self) -> CoreUserInfoClaims {
-        let jwks = self.jwks();
-        let verifier = self.user_info_verifier(&jwks, &self.id_token_claims().sub());
+        let verifier = self.user_info_verifier(self.jwks(), self.id_token_claims().sub().clone());
         self.provider_metadata
             .userinfo_endpoint()
             .unwrap()
@@ -215,8 +213,7 @@ impl TestState {
     }
 
     pub fn user_info_claims_failure(&self) -> UserInfoError {
-        let jwks = self.jwks();
-        let verifier = self.user_info_verifier(&jwks, &self.id_token_claims().sub());
+        let verifier = self.user_info_verifier(self.jwks(), self.id_token_claims().sub().clone());
         let user_info_result: Result<CoreUserInfoClaims, UserInfoError> = self.provider_metadata
             .userinfo_endpoint()
             .unwrap()
@@ -388,9 +385,8 @@ fn rp_id_token_sig_none() {
         .authorize(&vec![])
         .exchange_code();
 
-    let jwks = test_state.jwks();
     let verifier = test_state
-        .id_token_verifier(&jwks)
+        .id_token_verifier(test_state.jwks())
         .insecure_disable_signature_check();
 
     let id_token_claims = test_state
@@ -420,9 +416,8 @@ fn rp_id_token_sig_hs256() {
         .authorize(&vec![])
         .exchange_code();
 
-    let jwks = test_state.jwks();
     let verifier = test_state
-        .id_token_verifier(&jwks)
+        .id_token_verifier(test_state.jwks())
         .set_allowed_algs(vec![CoreJwsSigningAlgorithm::HmacSha256]);
     let id_token_claims = test_state
         .id_token()
@@ -475,9 +470,8 @@ fn rp_id_token_bad_sig_hs256() {
         .authorize(&vec![])
         .exchange_code();
 
-    let jwks = test_state.jwks();
     let verifier = test_state
-        .id_token_verifier(&jwks)
+        .id_token_verifier(test_state.jwks())
         .set_allowed_algs(vec![CoreJwsSigningAlgorithm::HmacSha256]);
     let id_token_err = test_state
         .id_token()
@@ -548,9 +542,8 @@ fn rp_userinfo_sig() {
     let id_token_claims = test_state.id_token_claims();
     log_debug!("ID token: {:?}", id_token_claims);
 
-    let jwks = test_state.jwks();
     let verifier = test_state
-            .user_info_verifier(&jwks, &test_state.id_token_claims().sub())
+            .user_info_verifier(test_state.jwks(), test_state.id_token_claims().sub().clone())
             .require_signed_response(true)
             // For some reason, the test suite omits these claims even though the Core spec says
             // that the RP SHOULD verify these.

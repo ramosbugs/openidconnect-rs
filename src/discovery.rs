@@ -84,7 +84,7 @@ trait_struct![
         RM: ResponseMode,
         RT: ResponseType,
         S: SubjectIdentifierType,
-    ] : [Debug + DeserializeOwned + PartialEq + Serialize + Sized] {
+    ] : [Clone + Debug + DeserializeOwned + PartialEq + Serialize] {
         // consumes self so that, if validation fails, it doesn't get used
         fn validate(self, issuer_uri: &IssuerUrl) -> Result<Self, DiscoveryError> {
             if self.issuer() != issuer_uri {

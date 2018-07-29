@@ -44,7 +44,7 @@ use url::Url;
 pub use claims::{AdditionalClaims, AddressClaim, EmptyAdditionalClaims, GenderClaim,
                  StandardClaims};
 pub use discovery::{DiscoveryError, ProviderMetadata};
-use id_token::IdTokenFields;
+pub use id_token::IdTokenFields;
 pub use id_token::{IdToken, IdTokenClaims};
 use jwt::{JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenHeader};
 use registration::ClientRegistrationResponse;
@@ -105,7 +105,7 @@ pub enum AuthenticationFlow<RT: ResponseType> {
     /// Authorization Code Flow.
     ///
     /// The authorization server will return an OAuth2 authorization code. Clients must subsequently
-    /// call `[FIXME: specify function]` with the authorization code in order to retrieve an
+    /// call `Client::exchange_code()` with the authorization code in order to retrieve an
     /// OpenID Connect ID token and OAuth2 access token.
     ///
     AuthorizationCode,
@@ -129,39 +129,69 @@ pub enum AuthenticationFlow<RT: ResponseType> {
     Hybrid(Vec<RT>),
 }
 
-pub struct Client<AC, D, GC, JE, JS, JT, P, TE, TT>
+pub struct Client<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TT>
 where
     AC: AdditionalClaims,
-    D: AuthDisplay,
+    AD: AuthDisplay,
+    CA: ClientAuthMethod,
+    CN: ClaimName,
+    CT: ClaimType,
+    G: GrantType,
     GC: GenderClaim,
     JE: JweContentEncryptionAlgorithm,
+    JK: JweKeyManagementAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     P: AuthPrompt,
+    PM: ProviderMetadata<AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
+    RM: ResponseMode,
+    RT: ResponseType,
+    S: SubjectIdentifierType,
     TE: ErrorResponseType,
     TT: TokenType,
 {
     oauth2_client: oauth2::Client<IdTokenFields<AC, GC, JE, JS, JT>, TT, TE>,
     acr_values: Option<Vec<AuthenticationContextClass>>,
     claims_locales: Option<Vec<LanguageTag>>,
-    display: Option<D>,
+    client_id: ClientId,
+    client_secret: Option<ClientSecret>,
+    display: Option<AD>,
     max_age: Option<Duration>,
     prompts: Option<Vec<P>>,
+    provider_metadata: Option<PM>,
     ui_locales: Option<Vec<LanguageTag>>,
+    _phantom_ca: PhantomData<CA>,
+    _phantom_cn: PhantomData<CN>,
+    _phantom_ct: PhantomData<CT>,
+    _phantom_g: PhantomData<G>,
+    _phantom_jk: PhantomData<JK>,
     _phantom_jt: PhantomData<JT>,
+    _phantom_rm: PhantomData<RM>,
+    _phantom_rt: PhantomData<RT>,
+    _phantom_s: PhantomData<S>,
     // FIXME: Other parameters MAY be sent. See Sections 3.2.2, 3.3.2, 5.2, 5.5, 6, and 7.2.1 for
     // additional Authorization Request parameters and parameter values defined by this
     // specification.
 }
-impl<AC, D, GC, JE, JS, JT, P, TE, TT> Client<AC, D, GC, JE, JS, JT, P, TE, TT>
+impl<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TT>
+    Client<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TT>
 where
     AC: AdditionalClaims,
-    D: AuthDisplay,
+    AD: AuthDisplay,
+    CA: ClientAuthMethod,
+    CN: ClaimName,
+    CT: ClaimType,
+    G: GrantType,
     GC: GenderClaim,
     JE: JweContentEncryptionAlgorithm,
+    JK: JweKeyManagementAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     P: AuthPrompt,
+    PM: ProviderMetadata<AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
+    RM: ResponseMode,
+    RT: ResponseType,
+    S: SubjectIdentifierType,
     TE: ErrorResponseType,
     TT: TokenType,
 {
@@ -170,47 +200,108 @@ where
         client_secret: Option<ClientSecret>,
         auth_url: AuthUrl,
         token_url: Option<TokenUrl>,
-    ) -> Client<AC, D, GC, JE, JS, JT, P, TE, TT> {
-        let oauth2_client = oauth2::Client::new(client_id, client_secret, auth_url, token_url)
-            .add_scope(Scope::new(OPENID_SCOPE.to_string()));
+    ) -> Client<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TT> {
+        let oauth2_client = oauth2::Client::new(
+            client_id.clone(),
+            client_secret.clone(),
+            auth_url,
+            token_url,
+        ).add_scope(Scope::new(OPENID_SCOPE.to_string()));
         Client {
             oauth2_client,
             acr_values: None,
             claims_locales: None,
+            client_id,
+            client_secret,
             display: None,
             max_age: None,
             prompts: None,
+            provider_metadata: None,
             ui_locales: None,
+            _phantom_ca: PhantomData,
+            _phantom_cn: PhantomData,
+            _phantom_ct: PhantomData,
+            _phantom_g: PhantomData,
+            _phantom_jk: PhantomData,
             _phantom_jt: PhantomData,
+            _phantom_rm: PhantomData,
+            _phantom_rt: PhantomData,
+            _phantom_s: PhantomData,
         }
     }
 
-    pub fn from_dynamic_registration<AD, AT, CA, CN, CR, CT, G, JK, JU, K, PM, RM, RT, S>(
+    pub fn discover(
+        client_id: ClientId,
+        client_secret: Option<ClientSecret>,
+        issuer_url: &IssuerUrl,
+    ) -> Result<Self, DiscoveryError> {
+        let provider_metadata: PM = discovery::get_provider_metadata(issuer_url)?;
+
+        let oauth2_client = oauth2::Client::new(
+            client_id.clone(),
+            client_secret.clone(),
+            provider_metadata.authorization_endpoint().clone(),
+            provider_metadata.token_endpoint().cloned(),
+        ).add_scope(Scope::new(OPENID_SCOPE.to_string()));
+        Ok(Client {
+            oauth2_client,
+            acr_values: None,
+            claims_locales: None,
+            client_id,
+            client_secret,
+            display: None,
+            max_age: None,
+            prompts: None,
+            provider_metadata: Some(provider_metadata),
+            ui_locales: None,
+            _phantom_ca: PhantomData,
+            _phantom_cn: PhantomData,
+            _phantom_ct: PhantomData,
+            _phantom_g: PhantomData,
+            _phantom_jk: PhantomData,
+            _phantom_jt: PhantomData,
+            _phantom_rm: PhantomData,
+            _phantom_rt: PhantomData,
+            _phantom_s: PhantomData,
+        })
+    }
+    pub fn from_dynamic_registration<AT, CR, JU, K>(
         provider_metadata: &PM,
         registration_response: &CR,
-    ) -> Client<AC, D, GC, JE, JS, JT, P, TE, TT>
+    ) -> Self
     where
-        AD: AuthDisplay,
         AT: ApplicationType,
-        CA: ClientAuthMethod,
-        CN: ClaimName,
         CR: ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
-        CT: ClaimType,
-        G: GrantType,
-        JK: JweKeyManagementAlgorithm,
         JU: JsonWebKeyUse,
         K: JsonWebKey<JS, JT, JU>,
-        PM: ProviderMetadata<AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
-        RM: ResponseMode,
-        RT: ResponseType,
-        S: SubjectIdentifierType,
     {
-        Self::new(
+        let oauth2_client = oauth2::Client::new(
             registration_response.client_id().clone(),
             registration_response.client_secret().cloned(),
             provider_metadata.authorization_endpoint().clone(),
             provider_metadata.token_endpoint().cloned(),
-        )
+        ).add_scope(Scope::new(OPENID_SCOPE.to_string()));
+        Client {
+            oauth2_client,
+            acr_values: None,
+            claims_locales: None,
+            client_id: registration_response.client_id().clone(),
+            client_secret: registration_response.client_secret().cloned(),
+            display: None,
+            max_age: None,
+            prompts: None,
+            provider_metadata: Some(provider_metadata.clone()),
+            ui_locales: None,
+            _phantom_ca: PhantomData,
+            _phantom_cn: PhantomData,
+            _phantom_ct: PhantomData,
+            _phantom_g: PhantomData,
+            _phantom_jk: PhantomData,
+            _phantom_jt: PhantomData,
+            _phantom_rm: PhantomData,
+            _phantom_rt: PhantomData,
+            _phantom_s: PhantomData,
+        }
     }
 
     ///
@@ -257,10 +348,10 @@ where
         self
     }
 
-    pub fn display(&self) -> Option<&D> {
+    pub fn display(&self) -> Option<&AD> {
         self.display.as_ref()
     }
-    pub fn set_display(mut self, display: Option<D>) -> Self {
+    pub fn set_display(mut self, display: Option<AD>) -> Self {
         self.display = display;
         self
     }
@@ -289,7 +380,35 @@ where
         self
     }
 
-    pub fn authorize_url<NF, RT, SF>(
+    pub fn id_token_verifier<JU, K>(&self) -> Result<IdTokenVerifier<JS, JT, JU, K>, DiscoveryError>
+    where
+        JU: JsonWebKeyUse,
+        K: JsonWebKey<JS, JT, JU>,
+    {
+        let provider_metadata = self.provider_metadata
+            .as_ref()
+            .ok_or_else(|| DiscoveryError::Other("no provider metadata present".to_string()))?;
+        let jwks_uri = provider_metadata.jwks_uri().ok_or_else(|| {
+            DiscoveryError::Other("provider metadata contains no `jwks_uri`".to_string())
+        })?;
+        let signature_keys = jwks_uri.get_keys()?;
+        if let Some(ref client_secret) = self.client_secret {
+            Ok(IdTokenVerifier::new_private_client(
+                self.client_id.clone(),
+                client_secret.clone(),
+                provider_metadata.issuer().clone(),
+                signature_keys,
+            ))
+        } else {
+            Ok(IdTokenVerifier::new_public_client(
+                self.client_id.clone(),
+                provider_metadata.issuer().clone(),
+                signature_keys,
+            ))
+        }
+    }
+
+    pub fn authorize_url<NF, SF>(
         &self,
         authentication_flow: &AuthenticationFlow<RT>,
         state_fn: SF,
@@ -297,23 +416,21 @@ where
     ) -> (Url, CsrfToken, Nonce)
     where
         NF: Fn() -> Nonce,
-        RT: ResponseType,
         SF: Fn() -> CsrfToken,
     {
         self.authorize_url_with_hint(authentication_flow, state_fn, nonce_fn, None, None)
     }
 
-    pub fn authorize_url_with_hint<NF, RT, SF>(
+    pub fn authorize_url_with_hint<NF, SF>(
         &self,
         authentication_flow: &AuthenticationFlow<RT>,
         state_fn: SF,
         nonce_fn: NF,
-        id_token_hint_opt: Option<&IdToken<AC, GC, JE, JS, JT>>,
-        login_hint_opt: Option<&LoginHint>,
+        id_token_hint: Option<&IdToken<AC, GC, JE, JS, JT>>,
+        login_hint: Option<&LoginHint>,
     ) -> (Url, CsrfToken, Nonce)
     where
         NF: Fn() -> Nonce,
-        RT: ResponseType,
         SF: Fn() -> CsrfToken,
     {
         // Create string versions of any options that need to be converted. This must be done
@@ -345,12 +462,12 @@ where
 
             // FIXME: uncomment
 /*
-            if let Some(id_token_hint) = id_token_hint_opt {
+            if let Some(id_token_hint) = id_token_hint {
                 extra_params.push(("id_token_hint", id_token_hint));
             }
 */
 
-            if let Some(login_hint) = login_hint_opt {
+            if let Some(login_hint) = login_hint {
                 extra_params.push(("login_hint", login_hint.secret()));
             }
 

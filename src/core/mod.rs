@@ -28,11 +28,20 @@ pub type CoreClient = Client<
     // to use type aliases to make this cleaner.
     EmptyAdditionalClaims,
     CoreAuthDisplay,
+    CoreClientAuthMethod,
+    CoreClaimName,
+    CoreClaimType,
+    CoreGrantTypeWrapper,
     CoreGenderClaim,
     CoreJweContentEncryptionAlgorithm,
+    CoreJweKeyManagementAlgorithm,
     CoreJwsSigningAlgorithm,
     CoreJsonWebKeyType,
     CoreAuthPrompt,
+    CoreProviderMetadata,
+    CoreResponseMode,
+    CoreResponseType,
+    CoreSubjectIdentifierType,
     // FIXME: use the right error types for the token response
     BasicErrorResponseType,
     BasicTokenType,
@@ -93,13 +102,8 @@ pub type CoreIdToken = IdToken<
 
 pub type CoreIdTokenClaims = IdTokenClaims<EmptyAdditionalClaims, CoreGenderClaim>;
 
-pub type CoreIdTokenVerifier<'a> = IdTokenVerifier<
-    'a,
-    CoreJwsSigningAlgorithm,
-    CoreJsonWebKeyType,
-    CoreJsonWebKeyUse,
-    CoreJsonWebKey,
->;
+pub type CoreIdTokenVerifier =
+    IdTokenVerifier<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJsonWebKey>;
 
 pub type CoreJsonWebKeySet =
     JsonWebKeySet<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJsonWebKey>;
@@ -120,8 +124,7 @@ pub type CoreProviderMetadata = Discovery10ProviderMetadata<
 >;
 
 pub type CoreUserInfoClaims = UserInfoClaims<EmptyAdditionalClaims, CoreGenderClaim>;
-pub type CoreUserInfoVerifier<'a> = UserInfoVerifier<
-    'a,
+pub type CoreUserInfoVerifier = UserInfoVerifier<
     CoreJweContentEncryptionAlgorithm,
     CoreJwsSigningAlgorithm,
     CoreJsonWebKeyType,

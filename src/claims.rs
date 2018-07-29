@@ -46,7 +46,7 @@ impl AddressClaim {
 pub trait GenderClaim: Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
 
 // Public trait for accessing standard claims fields (via IdTokenClaims and UserInfoClaims).
-pub trait StandardClaims<GC>
+pub trait StandardClaims<GC>: Clone + Debug + DeserializeOwned + PartialEq + Serialize
 where
     GC: GenderClaim,
 {

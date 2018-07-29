@@ -21,6 +21,8 @@ use super::{AccessTokenHash, AdditionalClaims, AddressClaim, Audience, Audiences
 // do that automatically. If there's ever a reasonable use case for wanting to do lower
 // level stuff, we could always expose another interface that returns something like this.
 // For now, let's optimize for ease of (secure) use.
+// This wrapper layer exists instead of directly verifying the JWT and returning the claims so that
+//
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct IdToken<
     AC: AdditionalClaims,
