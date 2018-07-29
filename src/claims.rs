@@ -4,34 +4,16 @@ use std::marker::PhantomData;
 use std::str;
 
 use serde;
-use serde::{Serialize, Serializer};
 use serde::de::{Deserialize, DeserializeOwned, Deserializer, MapAccess, Visitor};
 use serde::ser::SerializeMap;
+use serde::{Serialize, Serializer};
 
-use super::{
-    AddressCountry,
-    AddressLocality,
-    AddressPostalCode,
-    AddressRegion,
-    EndUserBirthday,
-    EndUserEmail,
-    EndUserGivenName,
-    EndUserMiddleName,
-    EndUserName,
-    EndUserNickname,
-    EndUserPhoneNumber,
-    EndUserPictureUrl,
-    EndUserProfileUrl,
-    EndUserTimezone,
-    EndUserUsername,
-    EndUserWebsiteUrl,
-    FormattedAddress,
-    LanguageTag,
-    Seconds,
-    StreetAddress,
-    SubjectIdentifier,
-};
 use super::types::helpers::split_language_tag_key;
+use super::{AddressCountry, AddressLocality, AddressPostalCode, AddressRegion, EndUserBirthday,
+            EndUserEmail, EndUserGivenName, EndUserMiddleName, EndUserName, EndUserNickname,
+            EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone,
+            EndUserUsername, EndUserWebsiteUrl, FormattedAddress, LanguageTag, Seconds,
+            StreetAddress, SubjectIdentifier};
 
 pub trait AdditionalClaims: Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
 
@@ -61,10 +43,13 @@ impl AddressClaim {
     ];
 }
 
-pub trait GenderClaim : Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
+pub trait GenderClaim: Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
 
 // Public trait for accessing standard claims fields (via IdTokenClaims and UserInfoClaims).
-pub trait StandardClaims<GC> where GC: GenderClaim {
+pub trait StandardClaims<GC>
+where
+    GC: GenderClaim,
+{
     field_getter_decls![
         self {
             sub[SubjectIdentifier],
@@ -93,7 +78,10 @@ pub trait StandardClaims<GC> where GC: GenderClaim {
 
 // Private (fields accessed via IdTokenClaims and UserInfoClaims)
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct StandardClaimsImpl<GC> where GC: GenderClaim {
+pub(crate) struct StandardClaimsImpl<GC>
+where
+    GC: GenderClaim,
+{
     pub sub: SubjectIdentifier,
     pub name: Option<HashMap<Option<LanguageTag>, EndUserName>>,
     pub given_name: Option<HashMap<Option<LanguageTag>, EndUserGivenName>>,
@@ -115,21 +103,32 @@ pub(crate) struct StandardClaimsImpl<GC> where GC: GenderClaim {
     pub address: Option<AddressClaim>,
     pub updated_at: Option<Seconds>,
 }
-impl<'de, GC> Deserialize<'de> for StandardClaimsImpl<GC> where GC: GenderClaim {
+impl<'de, GC> Deserialize<'de> for StandardClaimsImpl<GC>
+where
+    GC: GenderClaim,
+{
     ///
     /// Special deserializer that supports [RFC 5646](https://tools.ietf.org/html/rfc5646) language
     /// tags associated with human-readable client metadata fields.
     ///
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
         struct ClaimsVisitor<GC: GenderClaim>(PhantomData<GC>);
-        impl<'de, GC> Visitor<'de> for ClaimsVisitor<GC> where GC: GenderClaim {
+        impl<'de, GC> Visitor<'de> for ClaimsVisitor<GC>
+        where
+            GC: GenderClaim,
+        {
             type Value = StandardClaimsImpl<GC>;
 
             fn expecting(&self, formatter: &mut Formatter) -> FormatterResult {
                 formatter.write_str("struct StandardClaimsImpl")
             }
             fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
-                where V: MapAccess<'de> {
+            where
+                V: MapAccess<'de>,
+            {
                 deserialize_fields!{
                     map {
                         [sub]
@@ -156,14 +155,17 @@ impl<'de, GC> Deserialize<'de> for StandardClaimsImpl<GC> where GC: GenderClaim 
                 }
             }
         }
-        deserializer
-            .deserialize_map(
-                ClaimsVisitor(PhantomData)
-            )
+        deserializer.deserialize_map(ClaimsVisitor(PhantomData))
     }
 }
-impl<GC> Serialize for StandardClaimsImpl<GC> where GC: GenderClaim {
-    fn serialize<SE>(&self, serializer: SE) -> Result<SE::Ok, SE::Error> where SE: Serializer {
+impl<GC> Serialize for StandardClaimsImpl<GC>
+where
+    GC: GenderClaim,
+{
+    fn serialize<SE>(&self, serializer: SE) -> Result<SE::Ok, SE::Error>
+    where
+        SE: Serializer,
+    {
         serialize_fields!{
             self -> serializer {
                 [sub]

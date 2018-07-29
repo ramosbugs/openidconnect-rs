@@ -1,44 +1,22 @@
-
 extern crate oauth2;
 extern crate openidconnect;
-#[macro_use] extern crate pretty_assertions;
+#[macro_use]
+extern crate pretty_assertions;
 extern crate serde_json;
 extern crate url;
 
-use oauth2::{AuthUrl, Scope, TokenUrl};
 use oauth2::prelude::*;
+use oauth2::{AuthUrl, Scope, TokenUrl};
 use url::Url;
 
-use openidconnect::{
-    AuthenticationContextClass,
-    IssuerUrl,
-    LanguageTag,
-    OpPolicyUrl,
-    OpTosUrl,
-    RegistrationUrl,
-    ResponseTypes,
-    ServiceDocUrl,
-    UserInfoUrl,
-};
-use openidconnect::core::{
-    CoreAuthDisplay,
-    CoreClaimName,
-    CoreClaimType,
-    CoreClientAuthMethod,
-    CoreGrantType,
-    CoreGrantTypeWrapper,
-    CoreJweContentEncryptionAlgorithm,
-    CoreJweKeyManagementAlgorithm,
-    CoreJwsSigningAlgorithm,
-    CoreProviderMetadata,
-    CoreResponseMode,
-    CoreResponseType,
-    CoreSubjectIdentifierType,
-};
-use openidconnect::discovery::{
-    JsonWebKeySetUrl,
-    ProviderMetadata
-};
+use openidconnect::core::{CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClientAuthMethod,
+                          CoreGrantType, CoreGrantTypeWrapper, CoreJweContentEncryptionAlgorithm,
+                          CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm,
+                          CoreProviderMetadata, CoreResponseMode, CoreResponseType,
+                          CoreSubjectIdentifierType};
+use openidconnect::discovery::{JsonWebKeySetUrl, ProviderMetadata};
+use openidconnect::{AuthenticationContextClass, IssuerUrl, LanguageTag, OpPolicyUrl, OpTosUrl,
+                    RegistrationUrl, ResponseTypes, ServiceDocUrl, UserInfoUrl};
 
 #[test]
 fn test_discovery_deserialization() {
@@ -240,9 +218,8 @@ fn test_discovery_deserialization() {
            \"PASSWORD\"
         ]
     }";
-    
-    let provider_metadata: CoreProviderMetadata =
-        serde_json::from_str(json_response).unwrap();
+
+    let provider_metadata: CoreProviderMetadata = serde_json::from_str(json_response).unwrap();
 
     assert_eq!(
         IssuerUrl::new(
@@ -256,97 +233,95 @@ fn test_discovery_deserialization() {
         AuthUrl::new(
             Url::parse(
                 "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
-                    /authorization"
+                 /authorization"
             ).unwrap()
         ),
         *provider_metadata.authorization_endpoint()
     );
     assert_eq!(
-        Some(
-            &TokenUrl::new(
-                Url::parse(
-                    "https://rp.certification.openid.net:8080/openidconnect-rs\
-                        /rp-response_type-code/token"
-                ).unwrap()
-            )
-        ),
+        Some(&TokenUrl::new(
+            Url::parse(
+                "https://rp.certification.openid.net:8080/openidconnect-rs\
+                 /rp-response_type-code/token"
+            ).unwrap()
+        )),
         provider_metadata.token_endpoint()
     );
     assert_eq!(
-        Some(
-            &UserInfoUrl::new(
-                Url::parse(
-                    "https://rp.certification.openid.net:8080/openidconnect-rs\
-                        /rp-response_type-code/userinfo"
-                ).unwrap()
-            )
-        ),
+        Some(&UserInfoUrl::new(
+            Url::parse(
+                "https://rp.certification.openid.net:8080/openidconnect-rs\
+                 /rp-response_type-code/userinfo"
+            ).unwrap()
+        )),
         provider_metadata.userinfo_endpoint()
     );
     assert_eq!(
-        Some(
-            &JsonWebKeySetUrl::new(
-                Url::parse(
-                    "https://rp.certification.openid.net:8080/static/jwks_3INbZl52IrrPCp2j.json"
-                ).unwrap()
-            )
-        ),
+        Some(&JsonWebKeySetUrl::new(
+            Url::parse(
+                "https://rp.certification.openid.net:8080/static/jwks_3INbZl52IrrPCp2j.json"
+            ).unwrap()
+        )),
         provider_metadata.jwks_uri()
     );
     assert_eq!(
-        Some(
-            &RegistrationUrl::new(
-                Url::parse(
-                    "https://rp.certification.openid.net:8080/openidconnect-rs\
-                        /rp-response_type-code/registration"
-                ).unwrap()
-            )
-        ),
+        Some(&RegistrationUrl::new(
+            Url::parse(
+                "https://rp.certification.openid.net:8080/openidconnect-rs\
+                 /rp-response_type-code/registration"
+            ).unwrap()
+        )),
         provider_metadata.registration_endpoint()
     );
     assert_eq!(
-        Some(
-            &vec!["email", "phone", "profile", "openid", "address", "offline_access", "openid"]
-                .iter()
-                .map(|s| s.to_string())
-                .map(Scope::new)
-                .collect::<Vec<_>>()
-        ),
+        Some(&vec![
+            "email",
+            "phone",
+            "profile",
+            "openid",
+            "address",
+            "offline_access",
+            "openid",
+        ].iter()
+            .map(|s| s.to_string())
+            .map(Scope::new)
+            .collect::<Vec<_>>()),
         provider_metadata.scopes_supported()
     );
     assert_eq!(
-        vec![
-            ResponseTypes::new(vec![CoreResponseType::Code])
-        ],
+        vec![ResponseTypes::new(vec![CoreResponseType::Code])],
         *provider_metadata.response_types_supported()
     );
     assert_eq!(
-        Some(
-            &vec![
-                CoreResponseMode::Query,
-                CoreResponseMode::Fragment,
-                CoreResponseMode::FormPost,
-            ]
-        ),
+        Some(&vec![
+            CoreResponseMode::Query,
+            CoreResponseMode::Fragment,
+            CoreResponseMode::FormPost,
+        ]),
         provider_metadata.response_modes_supported()
     );
     assert_eq!(
-        Some(
-            &vec![
-                CoreGrantType::AuthorizationCode,
-                CoreGrantType::Implicit,
-                CoreGrantType::Extension("urn:ietf:params:oauth:grant-type:jwt-bearer".to_string()),
-                CoreGrantType::RefreshToken,
-            ].into_iter().map(Into::<CoreGrantTypeWrapper>::into).collect::<Vec<_>>()
-        ),
+        Some(&vec![
+            CoreGrantType::AuthorizationCode,
+            CoreGrantType::Implicit,
+            CoreGrantType::Extension("urn:ietf:params:oauth:grant-type:jwt-bearer".to_string()),
+            CoreGrantType::RefreshToken,
+        ].into_iter()
+            .map(Into::<CoreGrantTypeWrapper>::into)
+            .collect::<Vec<_>>()),
         provider_metadata.grant_types_supported()
     );
     assert_eq!(
-        Some(&vec![AuthenticationContextClass::new("PASSWORD".to_string())]),
+        Some(&vec![
+            AuthenticationContextClass::new("PASSWORD".to_string()),
+        ]),
         provider_metadata.acr_values_supported()
     );
     assert_eq!(
-        vec![CoreSubjectIdentifierType::Public, CoreSubjectIdentifierType::Pairwise],
+        vec![
+            CoreSubjectIdentifierType::Public,
+            CoreSubjectIdentifierType::Pairwise,
+        ],
         *provider_metadata.subject_types_supported()
     );
     assert_eq!(
@@ -368,201 +343,177 @@ fn test_discovery_deserialization() {
         *provider_metadata.id_token_signing_alg_values_supported()
     );
     assert_eq!(
-        Some(
-            &vec![
-                CoreJweKeyManagementAlgorithm::RsaPkcs1V15,
-                CoreJweKeyManagementAlgorithm::RsaOaep,
-                CoreJweKeyManagementAlgorithm::RsaOaepSha256,
-                CoreJweKeyManagementAlgorithm::AesKeyWrap128,
-                CoreJweKeyManagementAlgorithm::AesKeyWrap192,
-                CoreJweKeyManagementAlgorithm::AesKeyWrap256,
-                CoreJweKeyManagementAlgorithm::EcdhEs,
-                CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap128,
-                CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap192,
-                CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap256,
-            ]
-        ),
+        Some(&vec![
+            CoreJweKeyManagementAlgorithm::RsaPkcs1V15,
+            CoreJweKeyManagementAlgorithm::RsaOaep,
+            CoreJweKeyManagementAlgorithm::RsaOaepSha256,
+            CoreJweKeyManagementAlgorithm::AesKeyWrap128,
+            CoreJweKeyManagementAlgorithm::AesKeyWrap192,
+            CoreJweKeyManagementAlgorithm::AesKeyWrap256,
+            CoreJweKeyManagementAlgorithm::EcdhEs,
+            CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap128,
+            CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap192,
+            CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap256,
+        ]),
         provider_metadata.id_token_encryption_alg_values_supported()
     );
     assert_eq!(
-        Some(
-            &vec![
-                CoreJweContentEncryptionAlgorithm::Aes128CbcHmacSha256,
-                CoreJweContentEncryptionAlgorithm::Aes192CbcHmacSha384,
-                CoreJweContentEncryptionAlgorithm::Aes256CbcHmacSha512,
-                CoreJweContentEncryptionAlgorithm::Aes128Gcm,
-                CoreJweContentEncryptionAlgorithm::Aes192Gcm,
-                CoreJweContentEncryptionAlgorithm::Aes256Gcm,
-            ]
-        ),
+        Some(&vec![
+            CoreJweContentEncryptionAlgorithm::Aes128CbcHmacSha256,
+            CoreJweContentEncryptionAlgorithm::Aes192CbcHmacSha384,
+            CoreJweContentEncryptionAlgorithm::Aes256CbcHmacSha512,
+            CoreJweContentEncryptionAlgorithm::Aes128Gcm,
+            CoreJweContentEncryptionAlgorithm::Aes192Gcm,
+            CoreJweContentEncryptionAlgorithm::Aes256Gcm,
+        ]),
         provider_metadata.id_token_encryption_enc_values_supported()
     );
     assert_eq!(
-        Some(
-            &vec![
-                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
-                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384,
-                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512,
-                CoreJwsSigningAlgorithm::EcdsaP256Sha256,
-                CoreJwsSigningAlgorithm::EcdsaP384Sha384,
-                CoreJwsSigningAlgorithm::EcdsaP521Sha512,
-                CoreJwsSigningAlgorithm::HmacSha256,
-                CoreJwsSigningAlgorithm::HmacSha384,
-                CoreJwsSigningAlgorithm::HmacSha512,
-                CoreJwsSigningAlgorithm::RsaSsaPssSha256,
-                CoreJwsSigningAlgorithm::RsaSsaPssSha384,
-                CoreJwsSigningAlgorithm::RsaSsaPssSha512,
-                CoreJwsSigningAlgorithm::None,
-            ]
-        ),
+        Some(&vec![
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384,
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512,
+            CoreJwsSigningAlgorithm::EcdsaP256Sha256,
+            CoreJwsSigningAlgorithm::EcdsaP384Sha384,
+            CoreJwsSigningAlgorithm::EcdsaP521Sha512,
+            CoreJwsSigningAlgorithm::HmacSha256,
+            CoreJwsSigningAlgorithm::HmacSha384,
+            CoreJwsSigningAlgorithm::HmacSha512,
+            CoreJwsSigningAlgorithm::RsaSsaPssSha256,
+            CoreJwsSigningAlgorithm::RsaSsaPssSha384,
+            CoreJwsSigningAlgorithm::RsaSsaPssSha512,
+            CoreJwsSigningAlgorithm::None,
+        ]),
         provider_metadata.userinfo_signing_alg_values_supported()
     );
     assert_eq!(
-        Some(
-            &vec![
-                CoreJweKeyManagementAlgorithm::RsaPkcs1V15,
-                CoreJweKeyManagementAlgorithm::RsaOaep,
-                CoreJweKeyManagementAlgorithm::RsaOaepSha256,
-                CoreJweKeyManagementAlgorithm::AesKeyWrap128,
-                CoreJweKeyManagementAlgorithm::AesKeyWrap192,
-                CoreJweKeyManagementAlgorithm::AesKeyWrap256,
-                CoreJweKeyManagementAlgorithm::EcdhEs,
-                CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap128,
-                CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap192,
-                CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap256,
-            ]
-        ),
+        Some(&vec![
+            CoreJweKeyManagementAlgorithm::RsaPkcs1V15,
+            CoreJweKeyManagementAlgorithm::RsaOaep,
+            CoreJweKeyManagementAlgorithm::RsaOaepSha256,
+            CoreJweKeyManagementAlgorithm::AesKeyWrap128,
+            CoreJweKeyManagementAlgorithm::AesKeyWrap192,
+            CoreJweKeyManagementAlgorithm::AesKeyWrap256,
+            CoreJweKeyManagementAlgorithm::EcdhEs,
+            CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap128,
+            CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap192,
+            CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap256,
+        ]),
         provider_metadata.userinfo_encryption_alg_values_supported()
     );
     assert_eq!(
-        Some(
-            &vec![
-                CoreJweContentEncryptionAlgorithm::Aes128CbcHmacSha256,
-                CoreJweContentEncryptionAlgorithm::Aes192CbcHmacSha384,
-                CoreJweContentEncryptionAlgorithm::Aes256CbcHmacSha512,
-                CoreJweContentEncryptionAlgorithm::Aes128Gcm,
-                CoreJweContentEncryptionAlgorithm::Aes192Gcm,
-                CoreJweContentEncryptionAlgorithm::Aes256Gcm,
-            ]
-        ),
+        Some(&vec![
+            CoreJweContentEncryptionAlgorithm::Aes128CbcHmacSha256,
+            CoreJweContentEncryptionAlgorithm::Aes192CbcHmacSha384,
+            CoreJweContentEncryptionAlgorithm::Aes256CbcHmacSha512,
+            CoreJweContentEncryptionAlgorithm::Aes128Gcm,
+            CoreJweContentEncryptionAlgorithm::Aes192Gcm,
+            CoreJweContentEncryptionAlgorithm::Aes256Gcm,
+        ]),
         provider_metadata.userinfo_encryption_enc_values_supported()
     );
     assert_eq!(
-        Some(
-            &vec![
-                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
-                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384,
-                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512,
-                CoreJwsSigningAlgorithm::EcdsaP256Sha256,
-                CoreJwsSigningAlgorithm::EcdsaP384Sha384,
-                CoreJwsSigningAlgorithm::EcdsaP521Sha512,
-                CoreJwsSigningAlgorithm::HmacSha256,
-                CoreJwsSigningAlgorithm::HmacSha384,
-                CoreJwsSigningAlgorithm::HmacSha512,
-                CoreJwsSigningAlgorithm::RsaSsaPssSha256,
-                CoreJwsSigningAlgorithm::RsaSsaPssSha384,
-                CoreJwsSigningAlgorithm::RsaSsaPssSha512,
-                CoreJwsSigningAlgorithm::None,
-            ]
-        ),
+        Some(&vec![
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384,
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512,
+            CoreJwsSigningAlgorithm::EcdsaP256Sha256,
+            CoreJwsSigningAlgorithm::EcdsaP384Sha384,
+            CoreJwsSigningAlgorithm::EcdsaP521Sha512,
+            CoreJwsSigningAlgorithm::HmacSha256,
+            CoreJwsSigningAlgorithm::HmacSha384,
+            CoreJwsSigningAlgorithm::HmacSha512,
+            CoreJwsSigningAlgorithm::RsaSsaPssSha256,
+            CoreJwsSigningAlgorithm::RsaSsaPssSha384,
+            CoreJwsSigningAlgorithm::RsaSsaPssSha512,
+            CoreJwsSigningAlgorithm::None,
+        ]),
         provider_metadata.request_object_signing_alg_values_supported()
     );
     assert_eq!(
-        Some(
-            &vec![
-                CoreJweKeyManagementAlgorithm::RsaPkcs1V15,
-                CoreJweKeyManagementAlgorithm::RsaOaep,
-                CoreJweKeyManagementAlgorithm::RsaOaepSha256,
-                CoreJweKeyManagementAlgorithm::AesKeyWrap128,
-                CoreJweKeyManagementAlgorithm::AesKeyWrap192,
-                CoreJweKeyManagementAlgorithm::AesKeyWrap256,
-                CoreJweKeyManagementAlgorithm::EcdhEs,
-                CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap128,
-                CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap192,
-                CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap256,
-            ]
-        ),
+        Some(&vec![
+            CoreJweKeyManagementAlgorithm::RsaPkcs1V15,
+            CoreJweKeyManagementAlgorithm::RsaOaep,
+            CoreJweKeyManagementAlgorithm::RsaOaepSha256,
+            CoreJweKeyManagementAlgorithm::AesKeyWrap128,
+            CoreJweKeyManagementAlgorithm::AesKeyWrap192,
+            CoreJweKeyManagementAlgorithm::AesKeyWrap256,
+            CoreJweKeyManagementAlgorithm::EcdhEs,
+            CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap128,
+            CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap192,
+            CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap256,
+        ]),
         provider_metadata.request_object_encryption_alg_values_supported()
     );
     assert_eq!(
-        Some(
-            &vec![
-                CoreJweContentEncryptionAlgorithm::Aes128CbcHmacSha256,
-                CoreJweContentEncryptionAlgorithm::Aes192CbcHmacSha384,
-                CoreJweContentEncryptionAlgorithm::Aes256CbcHmacSha512,
-                CoreJweContentEncryptionAlgorithm::Aes128Gcm,
-                CoreJweContentEncryptionAlgorithm::Aes192Gcm,
-                CoreJweContentEncryptionAlgorithm::Aes256Gcm,
-            ]
-        ),
+        Some(&vec![
+            CoreJweContentEncryptionAlgorithm::Aes128CbcHmacSha256,
+            CoreJweContentEncryptionAlgorithm::Aes192CbcHmacSha384,
+            CoreJweContentEncryptionAlgorithm::Aes256CbcHmacSha512,
+            CoreJweContentEncryptionAlgorithm::Aes128Gcm,
+            CoreJweContentEncryptionAlgorithm::Aes192Gcm,
+            CoreJweContentEncryptionAlgorithm::Aes256Gcm,
+        ]),
         provider_metadata.request_object_encryption_enc_values_supported()
     );
     assert_eq!(
-        Some(
-            &vec![
-                CoreClientAuthMethod::ClientSecretPost,
-                CoreClientAuthMethod::ClientSecretBasic,
-                CoreClientAuthMethod::ClientSecretJwt,
-                CoreClientAuthMethod::PrivateKeyJwt,
-            ]
-        ),
+        Some(&vec![
+            CoreClientAuthMethod::ClientSecretPost,
+            CoreClientAuthMethod::ClientSecretBasic,
+            CoreClientAuthMethod::ClientSecretJwt,
+            CoreClientAuthMethod::PrivateKeyJwt,
+        ]),
         provider_metadata.token_endpoint_auth_methods_supported()
     );
     assert_eq!(
-        Some(
-            &vec![
-                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
-                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384,
-                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512,
-                CoreJwsSigningAlgorithm::EcdsaP256Sha256,
-                CoreJwsSigningAlgorithm::EcdsaP384Sha384,
-                CoreJwsSigningAlgorithm::EcdsaP521Sha512,
-                CoreJwsSigningAlgorithm::HmacSha256,
-                CoreJwsSigningAlgorithm::HmacSha384,
-                CoreJwsSigningAlgorithm::HmacSha512,
-                CoreJwsSigningAlgorithm::RsaSsaPssSha256,
-                CoreJwsSigningAlgorithm::RsaSsaPssSha384,
-                CoreJwsSigningAlgorithm::RsaSsaPssSha512,
-            ]
-        ),
+        Some(&vec![
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384,
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512,
+            CoreJwsSigningAlgorithm::EcdsaP256Sha256,
+            CoreJwsSigningAlgorithm::EcdsaP384Sha384,
+            CoreJwsSigningAlgorithm::EcdsaP521Sha512,
+            CoreJwsSigningAlgorithm::HmacSha256,
+            CoreJwsSigningAlgorithm::HmacSha384,
+            CoreJwsSigningAlgorithm::HmacSha512,
+            CoreJwsSigningAlgorithm::RsaSsaPssSha256,
+            CoreJwsSigningAlgorithm::RsaSsaPssSha384,
+            CoreJwsSigningAlgorithm::RsaSsaPssSha512,
+        ]),
         provider_metadata.token_endpoint_auth_signing_alg_values_supported()
     );
     assert_eq!(None, provider_metadata.display_values_supported());
     assert_eq!(
-        Some(
-            &vec![
-                CoreClaimType::Normal,
-                CoreClaimType::Aggregated,
-                CoreClaimType::Distributed,
-            ]
-        ),
+        Some(&vec![
+            CoreClaimType::Normal,
+            CoreClaimType::Aggregated,
+            CoreClaimType::Distributed,
+        ]),
         provider_metadata.claim_types_supported()
     );
     assert_eq!(
-        Some(
-            &vec![
-                CoreClaimName::new("name".to_string()),
-                CoreClaimName::new("given_name".to_string()),
-                CoreClaimName::new("middle_name".to_string()),
-                CoreClaimName::new("picture".to_string()),
-                CoreClaimName::new("email_verified".to_string()),
-                CoreClaimName::new("birthdate".to_string()),
-                CoreClaimName::new("sub".to_string()),
-                CoreClaimName::new("address".to_string()),
-                CoreClaimName::new("zoneinfo".to_string()),
-                CoreClaimName::new("email".to_string()),
-                CoreClaimName::new("gender".to_string()),
-                CoreClaimName::new("preferred_username".to_string()),
-                CoreClaimName::new("family_name".to_string()),
-                CoreClaimName::new("website".to_string()),
-                CoreClaimName::new("profile".to_string()),
-                CoreClaimName::new("phone_number_verified".to_string()),
-                CoreClaimName::new("nickname".to_string()),
-                CoreClaimName::new("updated_at".to_string()),
-                CoreClaimName::new("phone_number".to_string()),
-                CoreClaimName::new("locale".to_string()),
-            ]
-        ),
+        Some(&vec![
+            CoreClaimName::new("name".to_string()),
+            CoreClaimName::new("given_name".to_string()),
+            CoreClaimName::new("middle_name".to_string()),
+            CoreClaimName::new("picture".to_string()),
+            CoreClaimName::new("email_verified".to_string()),
+            CoreClaimName::new("birthdate".to_string()),
+            CoreClaimName::new("sub".to_string()),
+            CoreClaimName::new("address".to_string()),
+            CoreClaimName::new("zoneinfo".to_string()),
+            CoreClaimName::new("email".to_string()),
+            CoreClaimName::new("gender".to_string()),
+            CoreClaimName::new("preferred_username".to_string()),
+            CoreClaimName::new("family_name".to_string()),
+            CoreClaimName::new("website".to_string()),
+            CoreClaimName::new("profile".to_string()),
+            CoreClaimName::new("phone_number_verified".to_string()),
+            CoreClaimName::new("nickname".to_string()),
+            CoreClaimName::new("updated_at".to_string()),
+            CoreClaimName::new("phone_number".to_string()),
+            CoreClaimName::new("locale".to_string()),
+        ]),
         provider_metadata.claims_supported()
     );
     assert_eq!(None, provider_metadata.service_documentation());
@@ -570,8 +521,14 @@ fn test_discovery_deserialization() {
     assert_eq!(None, provider_metadata.ui_locales_supported());
     assert_eq!(Some(true), provider_metadata.claims_parameter_supported());
     assert_eq!(Some(true), provider_metadata.request_parameter_supported());
-    assert_eq!(Some(true), provider_metadata.request_uri_parameter_supported());
-    assert_eq!(Some(true), provider_metadata.require_request_uri_registration());
+    assert_eq!(
+        Some(true),
+        provider_metadata.request_uri_parameter_supported()
+    );
+    assert_eq!(
+        Some(true),
+        provider_metadata.require_request_uri_registration()
+    );
     assert_eq!(None, provider_metadata.op_policy_uri());
     assert_eq!(None, provider_metadata.op_tos_uri());
 
@@ -634,8 +591,7 @@ fn test_discovery_deserialization_other_fields() {
         \"op_tos_uri\" : \"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/op_tos\"
     }";
 
-    let provider_metadata: CoreProviderMetadata =
-        serde_json::from_str(json_response).unwrap();
+    let provider_metadata: CoreProviderMetadata = serde_json::from_str(json_response).unwrap();
 
     assert_eq!(
         IssuerUrl::new(
@@ -649,7 +605,7 @@ fn test_discovery_deserialization_other_fields() {
         AuthUrl::new(
             Url::parse(
                 "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
-                    /authorization"
+                 /authorization"
             ).unwrap()
         ),
         *provider_metadata.authorization_endpoint()
@@ -665,13 +621,17 @@ fn test_discovery_deserialization_other_fields() {
             ResponseTypes::new(vec![CoreResponseType::Code, CoreResponseType::Token]),
             ResponseTypes::new(vec![CoreResponseType::Code, CoreResponseType::IdToken]),
             ResponseTypes::new(vec![CoreResponseType::IdToken, CoreResponseType::Token]),
-            ResponseTypes::new(
-                vec![CoreResponseType::Code, CoreResponseType::IdToken, CoreResponseType::Token]
-            ),
+            ResponseTypes::new(vec![
+                CoreResponseType::Code,
+                CoreResponseType::IdToken,
+                CoreResponseType::Token,
+            ]),
             ResponseTypes::new(vec![CoreResponseType::Token, CoreResponseType::IdToken]),
-            ResponseTypes::new(
-                vec![CoreResponseType::Token, CoreResponseType::IdToken, CoreResponseType::Code]
-            ),
+            ResponseTypes::new(vec![
+                CoreResponseType::Token,
+                CoreResponseType::IdToken,
+                CoreResponseType::Code,
+            ]),
             ResponseTypes::new(vec![CoreResponseType::IdToken]),
             ResponseTypes::new(vec![CoreResponseType::Token]),
         ],
@@ -681,7 +641,10 @@ fn test_discovery_deserialization_other_fields() {
     assert_eq!(None, provider_metadata.grant_types_supported());
     assert_eq!(None, provider_metadata.acr_values_supported());
     assert_eq!(
-        vec![CoreSubjectIdentifierType::Public, CoreSubjectIdentifierType::Pairwise],
+        vec![
+            CoreSubjectIdentifierType::Public,
+            CoreSubjectIdentifierType::Pairwise,
+        ],
         *provider_metadata.subject_types_supported()
     );
     assert_eq!(
@@ -692,59 +655,81 @@ fn test_discovery_deserialization_other_fields() {
         ],
         *provider_metadata.id_token_signing_alg_values_supported()
     );
-    assert_eq!(None, provider_metadata.id_token_encryption_alg_values_supported());
-    assert_eq!(None, provider_metadata.id_token_encryption_enc_values_supported());
-    assert_eq!(None, provider_metadata.userinfo_signing_alg_values_supported());
-    assert_eq!(None, provider_metadata.userinfo_encryption_alg_values_supported());
-    assert_eq!(None, provider_metadata.userinfo_encryption_enc_values_supported());
-    assert_eq!(None, provider_metadata.request_object_signing_alg_values_supported());
-    assert_eq!(None, provider_metadata.request_object_encryption_alg_values_supported());
-    assert_eq!(None, provider_metadata.request_object_encryption_enc_values_supported());
-    assert_eq!(None, provider_metadata.token_endpoint_auth_methods_supported());
-    assert_eq!(None, provider_metadata.token_endpoint_auth_signing_alg_values_supported());
     assert_eq!(
-        Some(
-            &vec![
-                CoreAuthDisplay::Page,
-                CoreAuthDisplay::Popup,
-                CoreAuthDisplay::Touch,
-                CoreAuthDisplay::Wap,
-            ]
-        ),
+        None,
+        provider_metadata.id_token_encryption_alg_values_supported()
+    );
+    assert_eq!(
+        None,
+        provider_metadata.id_token_encryption_enc_values_supported()
+    );
+    assert_eq!(
+        None,
+        provider_metadata.userinfo_signing_alg_values_supported()
+    );
+    assert_eq!(
+        None,
+        provider_metadata.userinfo_encryption_alg_values_supported()
+    );
+    assert_eq!(
+        None,
+        provider_metadata.userinfo_encryption_enc_values_supported()
+    );
+    assert_eq!(
+        None,
+        provider_metadata.request_object_signing_alg_values_supported()
+    );
+    assert_eq!(
+        None,
+        provider_metadata.request_object_encryption_alg_values_supported()
+    );
+    assert_eq!(
+        None,
+        provider_metadata.request_object_encryption_enc_values_supported()
+    );
+    assert_eq!(
+        None,
+        provider_metadata.token_endpoint_auth_methods_supported()
+    );
+    assert_eq!(
+        None,
+        provider_metadata.token_endpoint_auth_signing_alg_values_supported()
+    );
+    assert_eq!(
+        Some(&vec![
+            CoreAuthDisplay::Page,
+            CoreAuthDisplay::Popup,
+            CoreAuthDisplay::Touch,
+            CoreAuthDisplay::Wap,
+        ]),
         provider_metadata.display_values_supported()
     );
     assert_eq!(None, provider_metadata.claim_types_supported());
     assert_eq!(None, provider_metadata.claims_supported());
 
     assert_eq!(
-        Some(
-            &ServiceDocUrl::new(
-                Url::parse(
-                    "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
-                        /documentation"
-                ).unwrap()
-            )
-        ),
+        Some(&ServiceDocUrl::new(
+            Url::parse(
+                "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
+                 /documentation"
+            ).unwrap()
+        )),
         provider_metadata.service_documentation()
     );
     assert_eq!(
-        Some(
-            &vec![
-                LanguageTag::new("de".to_string()),
-                LanguageTag::new("fr".to_string()),
-                LanguageTag::new("de-CH-1901".to_string()),
-            ]
-        ),
+        Some(&vec![
+            LanguageTag::new("de".to_string()),
+            LanguageTag::new("fr".to_string()),
+            LanguageTag::new("de-CH-1901".to_string()),
+        ]),
         provider_metadata.claims_locales_supported()
     );
     assert_eq!(
-        Some(
-            &vec![
-                LanguageTag::new("ja".to_string()),
-                LanguageTag::new("sr-Latn".to_string()),
-                LanguageTag::new("yue-HK".to_string()),
-            ]
-        ),
+        Some(&vec![
+            LanguageTag::new("ja".to_string()),
+            LanguageTag::new("sr-Latn".to_string()),
+            LanguageTag::new("yue-HK".to_string()),
+        ]),
         provider_metadata.ui_locales_supported()
     );
     assert_eq!(None, provider_metadata.claims_parameter_supported());
@@ -752,25 +737,21 @@ fn test_discovery_deserialization_other_fields() {
     assert_eq!(None, provider_metadata.request_uri_parameter_supported());
     assert_eq!(None, provider_metadata.require_request_uri_registration());
     assert_eq!(
-        Some(
-            &OpPolicyUrl::new(
-                Url::parse(
-                    "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
-                        /op_policy"
-                ).unwrap()
-            )
-        ),
+        Some(&OpPolicyUrl::new(
+            Url::parse(
+                "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
+                 /op_policy"
+            ).unwrap()
+        )),
         provider_metadata.op_policy_uri()
     );
     assert_eq!(
-        Some(
-            &OpTosUrl::new(
-                Url::parse(
-                    "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
-                        /op_tos"
-                ).unwrap()
-            )
-        ),
+        Some(&OpTosUrl::new(
+            Url::parse(
+                "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
+                 /op_tos"
+            ).unwrap()
+        )),
         provider_metadata.op_tos_uri()
     );
 

@@ -1,29 +1,22 @@
-
 extern crate curl;
 extern crate env_logger;
 extern crate failure;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate oauth2;
 extern crate openidconnect;
-#[macro_use] extern crate pretty_assertions;
+#[macro_use]
+extern crate pretty_assertions;
 extern crate url;
 
-use rp_common::{
-    CERTIFICATION_BASE_URL,
-    get_provider_metadata,
-    init_log,
-    issuer_url,
-    register_client,
-    RP_NAME,
-};
+use rp_common::{get_provider_metadata, init_log, issuer_url, register_client,
+                CERTIFICATION_BASE_URL, RP_NAME};
 
 use openidconnect::discovery::ProviderMetadata;
-use openidconnect::registration::{
-    ClientMetadata,
-    ClientRegistrationResponse,
-};
+use openidconnect::registration::{ClientMetadata, ClientRegistrationResponse};
 
-#[macro_use] mod rp_common;
+#[macro_use]
+mod rp_common;
 
 #[test]
 fn rp_discovery_openid_configuration() {
@@ -36,10 +29,13 @@ fn rp_discovery_openid_configuration() {
     macro_rules! log_field {
         ($field:ident) => {
             log_container_field!(provider_metadata.$field);
-        }
+        };
     }
 
-    log_info!("Successfully retrieved provider metadata from {:?}", _issuer_url);
+    log_info!(
+        "Successfully retrieved provider metadata from {:?}",
+        _issuer_url
+    );
     log_field!(issuer);
     log_field!(authorization_endpoint);
     log_field!(token_endpoint);
@@ -93,7 +89,7 @@ fn rp_registration_dynamic() {
     macro_rules! log_field {
         ($field:ident) => {
             log_container_field!(registration_response.$field);
-        }
+        };
     }
 
     log_field!(client_id);
@@ -142,7 +138,10 @@ fn rp_registration_dynamic() {
             RP_NAME,
             registration_response.client_id().to_string()
         ),
-        registration_response.registration_client_uri().unwrap().to_string()
+        registration_response
+            .registration_client_uri()
+            .unwrap()
+            .to_string()
     );
 
     log_info!("SUCCESS");

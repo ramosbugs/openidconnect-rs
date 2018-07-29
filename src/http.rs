@@ -1,4 +1,3 @@
-
 use std::io::Read;
 
 use curl;
@@ -36,8 +35,7 @@ impl HttpResponse {
             if !content_type.starts_with(expected_content_type) {
                 Err(format!(
                     "Unexpected response Content-Type: `{}`, should be `{}`",
-                    content_type,
-                    expected_content_type
+                    content_type, expected_content_type
                 ))
             } else {
                 Ok(())
@@ -54,12 +52,16 @@ pub enum HttpRequestMethod {
     Post,
 }
 impl Default for HttpRequestMethod {
-    fn default() -> HttpRequestMethod { HttpRequestMethod::Get }
+    fn default() -> HttpRequestMethod {
+        HttpRequestMethod::Get
+    }
 }
 
 pub fn auth_bearer(access_token: &AccessToken) -> (&str, String) {
-    (AUTHORIZATION,
-     format!("{} {}", BEARER, access_token.secret()))
+    (
+        AUTHORIZATION,
+        format!("{} {}", BEARER, access_token.secret()),
+    )
 }
 
 #[derive(Debug)]
@@ -77,15 +79,18 @@ impl<'a> HttpRequest<'a> {
             HttpRequestMethod::Get => {
                 // FIXME: make this a flag that gets passed in
                 trace!("GET {:?}", self.url);
-            },
+            }
             HttpRequestMethod::Post => {
                 // FIXME: remove
                 trace!("POST {:?}", self.url);
                 easy.post(true)?;
                 easy.post_field_size(self.post_body.len() as u64)?;
                 // FIXME: remove
-                trace!("Body: {}", String::from_utf8(self.post_body.to_vec()).unwrap());
-            },
+                trace!(
+                    "Body: {}",
+                    String::from_utf8(self.post_body.to_vec()).unwrap()
+                );
+            }
         }
 
         if !self.headers.is_empty() {
@@ -105,9 +110,7 @@ impl<'a> HttpRequest<'a> {
         let mut post_body_slice = &self.post_body[..];
         {
             let mut transfer = easy.transfer();
-            transfer.read_function(|buf| {
-                Ok(post_body_slice.read(buf).unwrap_or(0))
-            })?;
+            transfer.read_function(|buf| Ok(post_body_slice.read(buf).unwrap_or(0)))?;
 
             transfer.write_function(|new_data| {
                 response_body.extend_from_slice(new_data);
@@ -117,19 +120,19 @@ impl<'a> HttpRequest<'a> {
             transfer.perform()?;
         }
 
-        let response =
-            HttpResponse {
-                status_code: easy.response_code()?,
-                // Section 3.1.1.1 of RFC 7231 indicates that media types are case insensitive.
-                content_type: easy.content_type()?.map(|s| s.to_lowercase().to_string()),
-                body: response_body,
-            };
+        let response = HttpResponse {
+            status_code: easy.response_code()?,
+            // Section 3.1.1.1 of RFC 7231 indicates that media types are case insensitive.
+            content_type: easy.content_type()?.map(|s| s.to_lowercase().to_string()),
+            body: response_body,
+        };
         // FIXME: remove
         trace!(
             "Response: status_code={}, content_type=`{:?}`, body=`{}`",
             response.status_code,
             response.content_type,
-            String::from_utf8(response.body.to_vec()).unwrap());
+            String::from_utf8(response.body.to_vec()).unwrap()
+        );
         Ok(response)
     }
 }

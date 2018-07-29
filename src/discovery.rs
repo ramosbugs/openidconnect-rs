@@ -1,95 +1,62 @@
-
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::Deref;
 
 use curl;
-use oauth2::{
-    AuthUrl,
-    Scope,
-    TokenUrl,
-};
 use oauth2::helpers::{deserialize_url, serialize_url};
 use oauth2::prelude::*;
+use oauth2::{AuthUrl, Scope, TokenUrl};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json;
 use url;
 use url::Url;
 
-use super::{CONFIG_URL_SUFFIX, UserInfoUrl};
-use super::http::{
-    ACCEPT_JSON,
-    HttpRequest,
-    HttpRequestMethod,
-    HTTP_STATUS_OK,
-    MIME_TYPE_JSON,
-};
+use super::http::{HttpRequest, HttpRequestMethod, ACCEPT_JSON, HTTP_STATUS_OK, MIME_TYPE_JSON};
 use super::macros::TraitStructExtract;
-use super::types::{
-    AuthDisplay,
-    AuthenticationContextClass,
-    ClientAuthMethod,
-    ClaimName,
-    ClaimType,
-    GrantType,
-    IssuerUrl,
-    JsonWebKey,
-    JsonWebKeySet,
-    JsonWebKeyType,
-    JsonWebKeyUse,
-    JweContentEncryptionAlgorithm,
-    JweKeyManagementAlgorithm,
-    JwsSigningAlgorithm,
-    LanguageTag,
-    OpPolicyUrl,
-    OpTosUrl,
-    RegistrationUrl,
-    ResponseMode,
-    ResponseType,
-    ResponseTypes,
-    ServiceDocUrl,
-    SubjectIdentifierType,
-};
+use super::types::{AuthDisplay, AuthenticationContextClass, ClaimName, ClaimType,
+                   ClientAuthMethod, GrantType, IssuerUrl, JsonWebKey, JsonWebKeySet,
+                   JsonWebKeyType, JsonWebKeyUse, JweContentEncryptionAlgorithm,
+                   JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag, OpPolicyUrl,
+                   OpTosUrl, RegistrationUrl, ResponseMode, ResponseType, ResponseTypes,
+                   ServiceDocUrl, SubjectIdentifierType};
+use super::{UserInfoUrl, CONFIG_URL_SUFFIX};
 
 pub fn get_provider_metadata<PM, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>(
-    issuer_url: &IssuerUrl
+    issuer_url: &IssuerUrl,
 ) -> Result<PM, DiscoveryError>
-where AD: AuthDisplay,
-        CA: ClientAuthMethod,
-        CN: ClaimName,
-        CT: ClaimType,
-        G: GrantType,
-        JE: JweContentEncryptionAlgorithm,
-        JK: JweKeyManagementAlgorithm,
-        JS: JwsSigningAlgorithm<JT>,
-        JT: JsonWebKeyType,
-        RM: ResponseMode,
-        RT: ResponseType,
-        S: SubjectIdentifierType,
-        PM: ProviderMetadata<AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S> {
-    let discover_url =
-        issuer_url
-            .join(CONFIG_URL_SUFFIX)
-            .map_err(DiscoveryError::UrlParse)?;
-    let discover_response =
-        HttpRequest {
-            url: &discover_url,
-            method: HttpRequestMethod::Get,
-            headers: &vec![ACCEPT_JSON],
-            post_body: &vec![],
-        }
-        .request()
+where
+    AD: AuthDisplay,
+    CA: ClientAuthMethod,
+    CN: ClaimName,
+    CT: ClaimType,
+    G: GrantType,
+    JE: JweContentEncryptionAlgorithm,
+    JK: JweKeyManagementAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    RM: ResponseMode,
+    RT: ResponseType,
+    S: SubjectIdentifierType,
+    PM: ProviderMetadata<AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
+{
+    let discover_url = issuer_url
+        .join(CONFIG_URL_SUFFIX)
+        .map_err(DiscoveryError::UrlParse)?;
+    let discover_response = HttpRequest {
+        url: &discover_url,
+        method: HttpRequestMethod::Get,
+        headers: &vec![ACCEPT_JSON],
+        post_body: &vec![],
+    }.request()
         .map_err(DiscoveryError::Request)?;
 
     // FIXME: improve error handling (i.e., is there a body response?)
     if discover_response.status_code != HTTP_STATUS_OK {
-        return Err(
-            DiscoveryError::Response(
-                discover_response.status_code,
-                "unexpected HTTP status code".to_string()
-            )
-        );
+        return Err(DiscoveryError::Response(
+            discover_response.status_code,
+            "unexpected HTTP status code".to_string(),
+        ));
     }
 
     discover_response
@@ -97,8 +64,7 @@ where AD: AuthDisplay,
         .map_err(|err_msg| DiscoveryError::Response(discover_response.status_code, err_msg))?;
 
     let provider_metadata: PM =
-        serde_json::from_slice(&discover_response.body)
-            .map_err(DiscoveryError::Json)?;
+        serde_json::from_slice(&discover_response.body).map_err(DiscoveryError::Json)?;
 
     provider_metadata.validate(issuer_url)
 }

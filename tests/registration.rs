@@ -1,51 +1,28 @@
-
 extern crate chrono;
 extern crate itertools;
 extern crate oauth2;
 extern crate openidconnect;
-#[macro_use] extern crate pretty_assertions;
+#[macro_use]
+extern crate pretty_assertions;
 extern crate serde_json;
 extern crate url;
 
 use chrono::{TimeZone, Utc};
 use itertools::sorted;
-use oauth2::{ClientId, ClientSecret, RedirectUrl};
 use oauth2::prelude::*;
+use oauth2::{ClientId, ClientSecret, RedirectUrl};
 use std::time::Duration;
 use url::Url;
 
-use openidconnect::{
-    AuthenticationContextClass,
-    ClientConfigUrl,
-    ClientName,
-    ClientUrl,
-    ContactEmail,
-    LanguageTag,
-    LogoUrl,
-    PolicyUrl,
-    RegistrationAccessToken,
-    RequestUrl,
-    ResponseTypes,
-    SectorIdentifierUrl,
-    ToSUrl,
-};
-use openidconnect::core::{
-    CoreApplicationType,
-    CoreClientAuthMethod,
-    CoreClientMetadata,
-    CoreClientRegistrationResponse,
-    CoreGrantType,
-    CoreJweContentEncryptionAlgorithm,
-    CoreJweKeyManagementAlgorithm,
-    CoreJwsSigningAlgorithm,
-    CoreResponseType,
-    CoreSubjectIdentifierType,
-};
+use openidconnect::core::{CoreApplicationType, CoreClientAuthMethod, CoreClientMetadata,
+                          CoreClientRegistrationResponse, CoreGrantType,
+                          CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm,
+                          CoreJwsSigningAlgorithm, CoreResponseType, CoreSubjectIdentifierType};
 use openidconnect::discovery::JsonWebKeySetUrl;
-use openidconnect::registration::{
-    ClientMetadata,
-    ClientRegistrationResponse,
-};
+use openidconnect::registration::{ClientMetadata, ClientRegistrationResponse};
+use openidconnect::{AuthenticationContextClass, ClientConfigUrl, ClientName, ClientUrl,
+                    ContactEmail, LanguageTag, LogoUrl, PolicyUrl, RegistrationAccessToken,
+                    RequestUrl, ResponseTypes, SectorIdentifierUrl, ToSUrl};
 
 #[test]
 fn test_metadata_serialization() {
@@ -89,23 +66,24 @@ fn test_metadata_serialization() {
         \"request_uris\": [\"https://example.com/request-1\", \"https://example.com/request-2\"]
     }";
 
-    let client_metadata: CoreClientMetadata =
-        serde_json::from_str(json_response).unwrap();
+    let client_metadata: CoreClientMetadata = serde_json::from_str(json_response).unwrap();
 
     assert_eq!(
         *client_metadata.redirect_uris(),
         vec![
             RedirectUrl::new(Url::parse("https://example.com/redirect-1").unwrap()),
-            RedirectUrl::new(Url::parse("https://example.com/redirect-2").unwrap())
+            RedirectUrl::new(Url::parse("https://example.com/redirect-2").unwrap()),
         ]
     );
     assert_eq!(
         *client_metadata.response_types().unwrap(),
         vec![
             ResponseTypes::new(vec![CoreResponseType::Code]),
-            ResponseTypes::new(
-                vec![CoreResponseType::Code, CoreResponseType::Token, CoreResponseType::IdToken]
-            ),
+            ResponseTypes::new(vec![
+                CoreResponseType::Code,
+                CoreResponseType::Token,
+                CoreResponseType::IdToken,
+            ]),
         ]
     );
     assert_eq!(
@@ -116,54 +94,80 @@ fn test_metadata_serialization() {
             CoreGrantType::Implicit,
             CoreGrantType::Password,
             CoreGrantType::RefreshToken,
-            CoreGrantType::Extension("some_extension".to_string())
+            CoreGrantType::Extension("some_extension".to_string()),
         ]
     );
-    assert_eq!(*client_metadata.application_type().unwrap(), CoreApplicationType::Web);
+    assert_eq!(
+        *client_metadata.application_type().unwrap(),
+        CoreApplicationType::Web
+    );
     assert_eq!(
         *client_metadata.contacts().unwrap(),
         vec![
             ContactEmail::new("user@example.com".to_string()),
-            ContactEmail::new("admin@openidconnect.local".to_string())
+            ContactEmail::new("admin@openidconnect.local".to_string()),
         ]
     );
     assert_eq!(
         sorted(client_metadata.client_name().unwrap().clone()),
         vec![
             (None, ClientName::new("Example".to_string())),
-            (Some(LanguageTag::new("es".to_string())), ClientName::new("Ejemplo".to_string())),
+            (
+                Some(LanguageTag::new("es".to_string())),
+                ClientName::new("Ejemplo".to_string()),
+            ),
         ]
     );
     assert_eq!(
         sorted(client_metadata.logo_uri().unwrap().clone()),
         vec![
-            (None, LogoUrl::new(Url::parse("https://example.com/logo.png").unwrap())),
-            (Some(LanguageTag::new("fr".to_string())),
-             LogoUrl::new(Url::parse("https://example.com/logo-fr.png").unwrap())),
+            (
+                None,
+                LogoUrl::new(Url::parse("https://example.com/logo.png").unwrap()),
+            ),
+            (
+                Some(LanguageTag::new("fr".to_string())),
+                LogoUrl::new(Url::parse("https://example.com/logo-fr.png").unwrap()),
+            ),
         ]
     );
     assert_eq!(
         sorted(client_metadata.client_uri().unwrap().clone()),
         vec![
-            (None, ClientUrl::new(Url::parse("https://example.com/client-app").unwrap())),
-            (Some(LanguageTag::new("de".to_string())),
-             ClientUrl::new(Url::parse("https://example.com/client-app-de").unwrap())),
+            (
+                None,
+                ClientUrl::new(Url::parse("https://example.com/client-app").unwrap()),
+            ),
+            (
+                Some(LanguageTag::new("de".to_string())),
+                ClientUrl::new(Url::parse("https://example.com/client-app-de").unwrap()),
+            ),
         ]
     );
     assert_eq!(
         sorted(client_metadata.policy_uri().unwrap().clone()),
         vec![
-            (None, PolicyUrl::new(Url::parse("https://example.com/policy").unwrap())),
-            (Some(LanguageTag::new("sr-Latn".to_string())),
-             PolicyUrl::new(Url::parse("https://example.com/policy-sr-latin").unwrap())),
+            (
+                None,
+                PolicyUrl::new(Url::parse("https://example.com/policy").unwrap()),
+            ),
+            (
+                Some(LanguageTag::new("sr-Latn".to_string())),
+                PolicyUrl::new(Url::parse("https://example.com/policy-sr-latin").unwrap()),
+            ),
         ]
     );
     assert_eq!(
         sorted(client_metadata.tos_uri().unwrap().clone()),
         vec![
-            (None, ToSUrl::new(Url::parse("https://example.com/tos").unwrap())),
-            (Some(LanguageTag::new("sr-Cyrl".to_string())),
-             ToSUrl::new(Url::parse("https://example.com/tos-sr-cyrl").unwrap())),
+            (
+                None,
+                ToSUrl::new(Url::parse("https://example.com/tos").unwrap()),
+            ),
+            (
+                Some(LanguageTag::new("sr-Cyrl".to_string())),
+                ToSUrl::new(Url::parse("https://example.com/tos-sr-cyrl").unwrap()),
+            ),
         ]
     );
     assert_eq!(
@@ -176,7 +180,10 @@ fn test_metadata_serialization() {
         *client_metadata.sector_identifier_uri().unwrap(),
         SectorIdentifierUrl::new(Url::parse("https://example.com/sector").unwrap())
     );
-    assert_eq!(*client_metadata.subject_type().unwrap(), CoreSubjectIdentifierType::Pairwise);
+    assert_eq!(
+        *client_metadata.subject_type().unwrap(),
+        CoreSubjectIdentifierType::Pairwise
+    );
     assert_eq!(
         *client_metadata.id_token_signed_response_alg().unwrap(),
         CoreJwsSigningAlgorithm::HmacSha256
@@ -221,7 +228,10 @@ fn test_metadata_serialization() {
         *client_metadata.token_endpoint_auth_signing_alg().unwrap(),
         CoreJwsSigningAlgorithm::RsaSsaPssSha512
     );
-    assert_eq!(*client_metadata.default_max_age().unwrap(), Duration::from_secs(3600));
+    assert_eq!(
+        *client_metadata.default_max_age().unwrap(),
+        Duration::from_secs(3600)
+    );
     assert_eq!(client_metadata.require_auth_time().unwrap(), true);
     assert_eq!(
         *client_metadata.default_acr_values().unwrap(),
@@ -239,7 +249,7 @@ fn test_metadata_serialization() {
         *client_metadata.request_uris().unwrap(),
         vec![
             RequestUrl::new(Url::parse("https://example.com/request-1").unwrap()),
-            RequestUrl::new(Url::parse("https://example.com/request-2").unwrap())
+            RequestUrl::new(Url::parse("https://example.com/request-2").unwrap()),
         ]
     );
     let serialized_json = serde_json::to_string(&client_metadata).unwrap();
@@ -254,12 +264,13 @@ fn test_metadata_serialization() {
 fn test_metadata_serialization_minimal() {
     let json_response = "{\"redirect_uris\": [\"https://example.com/redirect-1\"]}";
 
-    let client_metadata: CoreClientMetadata =
-        serde_json::from_str(json_response).unwrap();
+    let client_metadata: CoreClientMetadata = serde_json::from_str(json_response).unwrap();
 
     assert_eq!(
         *client_metadata.redirect_uris(),
-        vec![RedirectUrl::new(Url::parse("https://example.com/redirect-1").unwrap())]
+        vec![
+            RedirectUrl::new(Url::parse("https://example.com/redirect-1").unwrap()),
+        ]
     );
     assert_eq!(client_metadata.response_types(), None);
     assert_eq!(client_metadata.grant_types(), None);
@@ -378,16 +389,18 @@ fn test_response_serialization() {
         *client_metadata.redirect_uris(),
         vec![
             RedirectUrl::new(Url::parse("https://example.com/redirect-1").unwrap()),
-            RedirectUrl::new(Url::parse("https://example.com/redirect-2").unwrap())
+            RedirectUrl::new(Url::parse("https://example.com/redirect-2").unwrap()),
         ]
     );
     assert_eq!(
         *client_metadata.response_types().unwrap(),
         vec![
             ResponseTypes::new(vec![CoreResponseType::Code]),
-            ResponseTypes::new(
-                vec![CoreResponseType::Code, CoreResponseType::Token, CoreResponseType::IdToken]
-            ),
+            ResponseTypes::new(vec![
+                CoreResponseType::Code,
+                CoreResponseType::Token,
+                CoreResponseType::IdToken,
+            ]),
         ]
     );
     assert_eq!(
@@ -398,54 +411,80 @@ fn test_response_serialization() {
             CoreGrantType::Implicit,
             CoreGrantType::Password,
             CoreGrantType::RefreshToken,
-            CoreGrantType::Extension("some_extension".to_string())
+            CoreGrantType::Extension("some_extension".to_string()),
         ]
     );
-    assert_eq!(*client_metadata.application_type().unwrap(), CoreApplicationType::Web);
+    assert_eq!(
+        *client_metadata.application_type().unwrap(),
+        CoreApplicationType::Web
+    );
     assert_eq!(
         *client_metadata.contacts().unwrap(),
         vec![
             ContactEmail::new("user@example.com".to_string()),
-            ContactEmail::new("admin@openidconnect.local".to_string())
+            ContactEmail::new("admin@openidconnect.local".to_string()),
         ]
     );
     assert_eq!(
         sorted(client_metadata.client_name().unwrap().clone()),
         vec![
             (None, ClientName::new("Example".to_string())),
-            (Some(LanguageTag::new("es".to_string())), ClientName::new("Ejemplo".to_string())),
+            (
+                Some(LanguageTag::new("es".to_string())),
+                ClientName::new("Ejemplo".to_string()),
+            ),
         ]
     );
     assert_eq!(
         sorted(client_metadata.logo_uri().unwrap().clone()),
         vec![
-            (None, LogoUrl::new(Url::parse("https://example.com/logo.png").unwrap())),
-            (Some(LanguageTag::new("fr".to_string())),
-             LogoUrl::new(Url::parse("https://example.com/logo-fr.png").unwrap())),
+            (
+                None,
+                LogoUrl::new(Url::parse("https://example.com/logo.png").unwrap()),
+            ),
+            (
+                Some(LanguageTag::new("fr".to_string())),
+                LogoUrl::new(Url::parse("https://example.com/logo-fr.png").unwrap()),
+            ),
         ]
     );
     assert_eq!(
         sorted(client_metadata.client_uri().unwrap().clone()),
         vec![
-            (None, ClientUrl::new(Url::parse("https://example.com/client-app").unwrap())),
-            (Some(LanguageTag::new("de".to_string())),
-             ClientUrl::new(Url::parse("https://example.com/client-app-de").unwrap())),
+            (
+                None,
+                ClientUrl::new(Url::parse("https://example.com/client-app").unwrap()),
+            ),
+            (
+                Some(LanguageTag::new("de".to_string())),
+                ClientUrl::new(Url::parse("https://example.com/client-app-de").unwrap()),
+            ),
         ]
     );
     assert_eq!(
         sorted(client_metadata.policy_uri().unwrap().clone()),
         vec![
-            (None, PolicyUrl::new(Url::parse("https://example.com/policy").unwrap())),
-            (Some(LanguageTag::new("sr-Latn".to_string())),
-             PolicyUrl::new(Url::parse("https://example.com/policy-sr-latin").unwrap())),
+            (
+                None,
+                PolicyUrl::new(Url::parse("https://example.com/policy").unwrap()),
+            ),
+            (
+                Some(LanguageTag::new("sr-Latn".to_string())),
+                PolicyUrl::new(Url::parse("https://example.com/policy-sr-latin").unwrap()),
+            ),
         ]
     );
     assert_eq!(
         sorted(client_metadata.tos_uri().unwrap().clone()),
         vec![
-            (None, ToSUrl::new(Url::parse("https://example.com/tos").unwrap())),
-            (Some(LanguageTag::new("sr-Cyrl".to_string())),
-             ToSUrl::new(Url::parse("https://example.com/tos-sr-cyrl").unwrap())),
+            (
+                None,
+                ToSUrl::new(Url::parse("https://example.com/tos").unwrap()),
+            ),
+            (
+                Some(LanguageTag::new("sr-Cyrl".to_string())),
+                ToSUrl::new(Url::parse("https://example.com/tos-sr-cyrl").unwrap()),
+            ),
         ]
     );
     assert_eq!(
@@ -458,7 +497,10 @@ fn test_response_serialization() {
         *client_metadata.sector_identifier_uri().unwrap(),
         SectorIdentifierUrl::new(Url::parse("https://example.com/sector").unwrap())
     );
-    assert_eq!(*client_metadata.subject_type().unwrap(), CoreSubjectIdentifierType::Pairwise);
+    assert_eq!(
+        *client_metadata.subject_type().unwrap(),
+        CoreSubjectIdentifierType::Pairwise
+    );
     assert_eq!(
         *client_metadata.id_token_signed_response_alg().unwrap(),
         CoreJwsSigningAlgorithm::HmacSha256
@@ -503,7 +545,10 @@ fn test_response_serialization() {
         *client_metadata.token_endpoint_auth_signing_alg().unwrap(),
         CoreJwsSigningAlgorithm::RsaSsaPssSha512
     );
-    assert_eq!(*client_metadata.default_max_age().unwrap(), Duration::from_secs(3600));
+    assert_eq!(
+        *client_metadata.default_max_age().unwrap(),
+        Duration::from_secs(3600)
+    );
     assert_eq!(client_metadata.require_auth_time().unwrap(), true);
     assert_eq!(
         *client_metadata.default_acr_values().unwrap(),
@@ -521,7 +566,7 @@ fn test_response_serialization() {
         *client_metadata.request_uris().unwrap(),
         vec![
             RequestUrl::new(Url::parse("https://example.com/request-1").unwrap()),
-            RequestUrl::new(Url::parse("https://example.com/request-2").unwrap())
+            RequestUrl::new(Url::parse("https://example.com/request-2").unwrap()),
         ]
     );
     let serialized_json = serde_json::to_string(&client_metadata).unwrap();

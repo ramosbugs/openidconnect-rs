@@ -1,179 +1,133 @@
-
 use std::fmt::{Display, Error as FormatterError, Formatter};
 use std::ops::Deref;
 
-use oauth2::{
-    ErrorResponseType,
-    ResponseType as OAuth2ResponseType,
-};
-use oauth2::basic::{
-    BasicErrorResponseType,
-    BasicTokenType,
-};
+use oauth2::basic::{BasicErrorResponseType, BasicTokenType};
 use oauth2::helpers::variant_name;
 use oauth2::prelude::*;
+use oauth2::{ErrorResponseType, ResponseType as OAuth2ResponseType};
 
-use super::{
-    ApplicationType,
-    AuthDisplay,
-    AuthPrompt,
-    ClaimName,
-    ClaimType,
-    Client,
-    ClientAuthMethod,
-    EmptyAdditionalClaims,
-    GenderClaim,
-    GrantType,
-    IdToken,
-    IdTokenClaims,
-    IdTokenVerifier,
-    JsonWebKeySet,
-    JweContentEncryptionAlgorithm,
-    JweKeyManagementAlgorithm,
-    JwsSigningAlgorithm,
-    ResponseMode,
-    ResponseType,
-    SubjectIdentifierType,
-    UserInfoClaims,
-    UserInfoVerifier,
-};
 use super::discovery::Discovery10ProviderMetadata;
-use super::registration::{
-    RegisterErrorResponseType,
-    Registration10ClientMetadata,
-    Registration10ClientRegistrationRequest,
-    Registration10ClientRegistrationResponse
-};
+use super::registration::{RegisterErrorResponseType, Registration10ClientMetadata,
+                          Registration10ClientRegistrationRequest,
+                          Registration10ClientRegistrationResponse};
+use super::{ApplicationType, AuthDisplay, AuthPrompt, ClaimName, ClaimType, Client,
+            ClientAuthMethod, EmptyAdditionalClaims, GenderClaim, GrantType, IdToken,
+            IdTokenClaims, IdTokenVerifier, JsonWebKeySet, JweContentEncryptionAlgorithm,
+            JweKeyManagementAlgorithm, JwsSigningAlgorithm, ResponseMode, ResponseType,
+            SubjectIdentifierType, UserInfoClaims, UserInfoVerifier};
 
-pub use self::jwk::{
-    CoreJsonWebKey,
-    CoreJsonWebKeyType,
-    CoreJsonWebKeyUse,
-};
+pub use self::jwk::{CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse};
 
 mod crypto;
 
 // Private purely for organizational reasons; exported publicly above.
 mod jwk;
 
-pub type CoreClient =
-    Client<
-        // FIXME: mixing these OAuth2 and OIDC types is a little messy. See if it makes sense
-        // to use type aliases to make this cleaner.
-        EmptyAdditionalClaims,
-        CoreAuthDisplay,
-        CoreGenderClaim,
-        CoreJweContentEncryptionAlgorithm,
-        CoreJwsSigningAlgorithm,
-        CoreJsonWebKeyType,
-        CoreAuthPrompt,
-// FIXME: use the right error types for the token response
-        BasicErrorResponseType,
-        BasicTokenType
-    >;
+pub type CoreClient = Client<
+    // FIXME: mixing these OAuth2 and OIDC types is a little messy. See if it makes sense
+    // to use type aliases to make this cleaner.
+    EmptyAdditionalClaims,
+    CoreAuthDisplay,
+    CoreGenderClaim,
+    CoreJweContentEncryptionAlgorithm,
+    CoreJwsSigningAlgorithm,
+    CoreJsonWebKeyType,
+    CoreAuthPrompt,
+    // FIXME: use the right error types for the token response
+    BasicErrorResponseType,
+    BasicTokenType,
+>;
 
-pub type CoreClientMetadata =
-    Registration10ClientMetadata<
-        CoreApplicationType,
-        CoreClientAuthMethod,
-        CoreGrantTypeWrapper,
-        CoreJweContentEncryptionAlgorithm,
-        CoreJweKeyManagementAlgorithm,
-        CoreJwsSigningAlgorithm,
-        CoreJsonWebKeyType,
-        CoreJsonWebKeyUse,
-        CoreJsonWebKey,
-        CoreResponseType,
-        CoreSubjectIdentifierType
-    >;
+pub type CoreClientMetadata = Registration10ClientMetadata<
+    CoreApplicationType,
+    CoreClientAuthMethod,
+    CoreGrantTypeWrapper,
+    CoreJweContentEncryptionAlgorithm,
+    CoreJweKeyManagementAlgorithm,
+    CoreJwsSigningAlgorithm,
+    CoreJsonWebKeyType,
+    CoreJsonWebKeyUse,
+    CoreJsonWebKey,
+    CoreResponseType,
+    CoreSubjectIdentifierType,
+>;
 
-pub type CoreClientRegistrationRequest =
-    Registration10ClientRegistrationRequest<
-        CoreApplicationType,
-        CoreClientAuthMethod,
-        CoreClientRegistrationResponse,
-        CoreRegisterErrorResponseType,
-        CoreGrantTypeWrapper,
-        CoreJweContentEncryptionAlgorithm,
-        CoreJweKeyManagementAlgorithm,
-        CoreJwsSigningAlgorithm,
-        CoreJsonWebKeyType,
-        CoreJsonWebKeyUse,
-        CoreJsonWebKey,
-        CoreResponseType,
-        CoreSubjectIdentifierType
-    >;
+pub type CoreClientRegistrationRequest = Registration10ClientRegistrationRequest<
+    CoreApplicationType,
+    CoreClientAuthMethod,
+    CoreClientRegistrationResponse,
+    CoreRegisterErrorResponseType,
+    CoreGrantTypeWrapper,
+    CoreJweContentEncryptionAlgorithm,
+    CoreJweKeyManagementAlgorithm,
+    CoreJwsSigningAlgorithm,
+    CoreJsonWebKeyType,
+    CoreJsonWebKeyUse,
+    CoreJsonWebKey,
+    CoreResponseType,
+    CoreSubjectIdentifierType,
+>;
 
-pub type CoreClientRegistrationResponse =
-    Registration10ClientRegistrationResponse<
-        CoreApplicationType,
-        CoreClientAuthMethod,
-        CoreClientMetadata,
-        CoreGrantTypeWrapper,
-        CoreJweContentEncryptionAlgorithm,
-        CoreJweKeyManagementAlgorithm,
-        CoreJwsSigningAlgorithm,
-        CoreJsonWebKeyType,
-        CoreJsonWebKeyUse,
-        CoreJsonWebKey,
-        CoreResponseType,
-        CoreSubjectIdentifierType
-    >;
+pub type CoreClientRegistrationResponse = Registration10ClientRegistrationResponse<
+    CoreApplicationType,
+    CoreClientAuthMethod,
+    CoreClientMetadata,
+    CoreGrantTypeWrapper,
+    CoreJweContentEncryptionAlgorithm,
+    CoreJweKeyManagementAlgorithm,
+    CoreJwsSigningAlgorithm,
+    CoreJsonWebKeyType,
+    CoreJsonWebKeyUse,
+    CoreJsonWebKey,
+    CoreResponseType,
+    CoreSubjectIdentifierType,
+>;
 
-pub type CoreIdToken =
-    IdToken<
-        EmptyAdditionalClaims,
-        CoreGenderClaim,
-        CoreJweContentEncryptionAlgorithm,
-        CoreJwsSigningAlgorithm,
-        CoreJsonWebKeyType
-    >;
+pub type CoreIdToken = IdToken<
+    EmptyAdditionalClaims,
+    CoreGenderClaim,
+    CoreJweContentEncryptionAlgorithm,
+    CoreJwsSigningAlgorithm,
+    CoreJsonWebKeyType,
+>;
 
 pub type CoreIdTokenClaims = IdTokenClaims<EmptyAdditionalClaims, CoreGenderClaim>;
 
-pub type CoreIdTokenVerifier<'a> =
-    IdTokenVerifier<
-        'a,
-        CoreJwsSigningAlgorithm,
-        CoreJsonWebKeyType,
-        CoreJsonWebKeyUse,
-        CoreJsonWebKey
-    >;
+pub type CoreIdTokenVerifier<'a> = IdTokenVerifier<
+    'a,
+    CoreJwsSigningAlgorithm,
+    CoreJsonWebKeyType,
+    CoreJsonWebKeyUse,
+    CoreJsonWebKey,
+>;
 
 pub type CoreJsonWebKeySet =
-    JsonWebKeySet<
-        CoreJwsSigningAlgorithm,
-        CoreJsonWebKeyType,
-        CoreJsonWebKeyUse,
-        CoreJsonWebKey
-    >;
+    JsonWebKeySet<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJsonWebKey>;
 
-pub type CoreProviderMetadata =
-    Discovery10ProviderMetadata<
-        CoreAuthDisplay,
-        CoreClientAuthMethod,
-        CoreClaimName,
-        CoreClaimType,
-        CoreGrantTypeWrapper,
-        CoreJweContentEncryptionAlgorithm,
-        CoreJweKeyManagementAlgorithm,
-        CoreJwsSigningAlgorithm,
-        CoreJsonWebKeyType,
-        CoreResponseMode,
-        CoreResponseType,
-        CoreSubjectIdentifierType,
-    >;
+pub type CoreProviderMetadata = Discovery10ProviderMetadata<
+    CoreAuthDisplay,
+    CoreClientAuthMethod,
+    CoreClaimName,
+    CoreClaimType,
+    CoreGrantTypeWrapper,
+    CoreJweContentEncryptionAlgorithm,
+    CoreJweKeyManagementAlgorithm,
+    CoreJwsSigningAlgorithm,
+    CoreJsonWebKeyType,
+    CoreResponseMode,
+    CoreResponseType,
+    CoreSubjectIdentifierType,
+>;
 
 pub type CoreUserInfoClaims = UserInfoClaims<EmptyAdditionalClaims, CoreGenderClaim>;
-pub type CoreUserInfoVerifier<'a> =
-    UserInfoVerifier<
-        'a,
-        CoreJweContentEncryptionAlgorithm,
-        CoreJwsSigningAlgorithm,
-        CoreJsonWebKeyType,
-        CoreJsonWebKeyUse,
-        CoreJsonWebKey,
-    >;
+pub type CoreUserInfoVerifier<'a> = UserInfoVerifier<
+    'a,
+    CoreJweContentEncryptionAlgorithm,
+    CoreJwsSigningAlgorithm,
+    CoreJsonWebKeyType,
+    CoreJsonWebKeyUse,
+    CoreJsonWebKey,
+>;
 
 ///
 /// Kind of client application.
@@ -302,7 +256,9 @@ impl AuthPrompt for CoreAuthPrompt {
     }
 }
 impl AsRef<str> for CoreAuthPrompt {
-    fn as_ref(&self) -> &str { self.to_str() }
+    fn as_ref(&self) -> &str {
+        self.to_str()
+    }
 }
 
 impl Display for CoreAuthPrompt {
@@ -346,7 +302,7 @@ pub enum CoreClaimType {
     ///     http://openid.net/specs/openid-connect-core-1_0.html#AggregatedDistributedClaims)
     /// for details.
     ///
-    Distributed
+    Distributed,
 }
 impl ClaimType for CoreClaimType {}
 
@@ -362,7 +318,7 @@ impl ClientAuthMethod for CoreClientAuthMethod {}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum CoreGenderClaim{
+pub enum CoreGenderClaim {
     Female,
     Male,
 }
@@ -416,16 +372,16 @@ impl PartialEq<CoreGrantType> for CoreGrantTypeWrapper {
 
 pub mod serde_core_grant_type {
     use oauth2::helpers::variant_name;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde::de::Error;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_json::{from_value, Value};
 
     use super::CoreGrantType;
 
-    pub fn deserialize<'de, D>(
-        deserializer: D
-    ) -> Result<CoreGrantType, D::Error>
-    where D: Deserializer<'de> {
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<CoreGrantType, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
         let value: Value = Deserialize::deserialize(deserializer)?;
 
         match from_value::<CoreGrantType>(value.clone()) {
@@ -437,14 +393,13 @@ pub mod serde_core_grant_type {
         }
     }
 
-    pub fn serialize<S>(
-        grant_type: &CoreGrantType,
-        serializer: S
-    ) -> Result<S::Ok, S::Error>
-    where S: Serializer {
+    pub fn serialize<S>(grant_type: &CoreGrantType, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
         match *grant_type {
             CoreGrantType::Extension(ref extension) => serializer.serialize_str(extension),
-            ref variant => variant_name(variant).serialize(serializer)
+            ref variant => variant_name(variant).serialize(serializer),
         }
     }
 }
@@ -673,29 +628,25 @@ pub enum CoreJwsSigningAlgorithm {
     #[serde(rename = "none")]
     None,
 }
-impl<> JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
+impl JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
     fn key_type(&self) -> Result<CoreJsonWebKeyType, String> {
-        Ok(
-            match *self {
-                CoreJwsSigningAlgorithm::HmacSha256 => CoreJsonWebKeyType::Symmetric,
-                CoreJwsSigningAlgorithm::HmacSha384 => CoreJsonWebKeyType::Symmetric,
-                CoreJwsSigningAlgorithm::HmacSha512 => CoreJsonWebKeyType::Symmetric,
-                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256 => CoreJsonWebKeyType::RSA,
-                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384 => CoreJsonWebKeyType::RSA,
-                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512 => CoreJsonWebKeyType::RSA,
-                CoreJwsSigningAlgorithm::EcdsaP256Sha256 => CoreJsonWebKeyType::EllipticCurve,
-                CoreJwsSigningAlgorithm::EcdsaP384Sha384 => CoreJsonWebKeyType::EllipticCurve,
-                CoreJwsSigningAlgorithm::EcdsaP521Sha512 => CoreJsonWebKeyType::EllipticCurve,
-                CoreJwsSigningAlgorithm::RsaSsaPssSha256 => CoreJsonWebKeyType::RSA,
-                CoreJwsSigningAlgorithm::RsaSsaPssSha384 => CoreJsonWebKeyType::RSA,
-                CoreJwsSigningAlgorithm::RsaSsaPssSha512 => CoreJsonWebKeyType::RSA,
-                CoreJwsSigningAlgorithm::None => {
-                    return Err(
-                        "signature algorithm `none` has no corresponding key type".to_string()
-                    );
-                },
+        Ok(match *self {
+            CoreJwsSigningAlgorithm::HmacSha256 => CoreJsonWebKeyType::Symmetric,
+            CoreJwsSigningAlgorithm::HmacSha384 => CoreJsonWebKeyType::Symmetric,
+            CoreJwsSigningAlgorithm::HmacSha512 => CoreJsonWebKeyType::Symmetric,
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256 => CoreJsonWebKeyType::RSA,
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384 => CoreJsonWebKeyType::RSA,
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512 => CoreJsonWebKeyType::RSA,
+            CoreJwsSigningAlgorithm::EcdsaP256Sha256 => CoreJsonWebKeyType::EllipticCurve,
+            CoreJwsSigningAlgorithm::EcdsaP384Sha384 => CoreJsonWebKeyType::EllipticCurve,
+            CoreJwsSigningAlgorithm::EcdsaP521Sha512 => CoreJsonWebKeyType::EllipticCurve,
+            CoreJwsSigningAlgorithm::RsaSsaPssSha256 => CoreJsonWebKeyType::RSA,
+            CoreJwsSigningAlgorithm::RsaSsaPssSha384 => CoreJsonWebKeyType::RSA,
+            CoreJwsSigningAlgorithm::RsaSsaPssSha512 => CoreJsonWebKeyType::RSA,
+            CoreJwsSigningAlgorithm::None => {
+                return Err("signature algorithm `none` has no corresponding key type".to_string());
             }
-        )
+        })
     }
 
     fn is_symmetric(&self) -> bool {
@@ -732,7 +683,6 @@ impl Display for CoreRegisterErrorResponseType {
         write!(f, "{}", variant_name(self))
     }
 }
-
 
 ///
 /// Informs the Authorization Server of the mechanism to be used for returning Authorization
@@ -827,7 +777,9 @@ impl ResponseType for CoreResponseType {
     }
 }
 impl AsRef<str> for CoreResponseType {
-    fn as_ref(&self) -> &str { variant_name(self) }
+    fn as_ref(&self) -> &str {
+        variant_name(self)
+    }
 }
 
 ///
@@ -849,6 +801,6 @@ pub enum CoreSubjectIdentifierType {
     /// This provides the same `sub` (subject) value to all Clients. It is the default if the
     /// provider has no `subject_types_supported` element in its discovery document.
     ///
-    Public
+    Public,
 }
 impl SubjectIdentifierType for CoreSubjectIdentifierType {}

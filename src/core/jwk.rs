@@ -3,19 +3,9 @@ use oauth2::prelude::*;
 use ring::digest;
 use ring::signature as ring_signature;
 
-use super::super::{
-    Base64UrlEncodedBytes,
-    JsonWebKey,
-    JsonWebKeyId,
-    JsonWebKeyType,
-    JsonWebKeyUse,
-    JwsSigningAlgorithm,
-    SignatureVerificationError,
-};
-use super::{
-    CoreJwsSigningAlgorithm,
-    crypto,
-};
+use super::super::{Base64UrlEncodedBytes, JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse,
+                   JwsSigningAlgorithm, SignatureVerificationError};
+use super::{crypto, CoreJwsSigningAlgorithm};
 
 // Other than the 'kty' (key type) parameter, which must be present in all JWKs, Section 4 of RFC
 // 7517 states that "member names used for representing key parameters for different keys types
@@ -42,9 +32,15 @@ pub struct CoreJsonWebKey {
     pub(crate) k: Option<Base64UrlEncodedBytes>,
 }
 impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> for CoreJsonWebKey {
-    fn key_id(&self) -> Option<&JsonWebKeyId> { self.kid.as_ref() }
-    fn key_type(&self) -> &CoreJsonWebKeyType { &self.kty }
-    fn key_use(&self) -> Option<&CoreJsonWebKeyUse> { self.use_.as_ref() }
+    fn key_id(&self) -> Option<&JsonWebKeyId> {
+        self.kid.as_ref()
+    }
+    fn key_type(&self) -> &CoreJsonWebKeyType {
+        &self.kty
+    }
+    fn key_use(&self) -> Option<&CoreJsonWebKeyUse> {
+        self.use_.as_ref()
+    }
 
     fn new_symmetric(key: Vec<u8>) -> Self {
         return Self {
@@ -54,86 +50,82 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
             n: None,
             e: None,
             k: Some(Base64UrlEncodedBytes::new(key)),
-        }
+        };
     }
 
     fn verify_signature(
         &self,
         signature_alg: &CoreJwsSigningAlgorithm,
         msg: &str,
-        signature: &[u8]
+        signature: &[u8],
     ) -> Result<(), SignatureVerificationError> {
         if let Some(key_use) = self.key_use() {
             if *key_use != CoreJsonWebKeyUse::Signature {
-                return Err(
-                    SignatureVerificationError::InvalidKey(
-                        "key usage not permitted for digital signatures".to_string()
-                    )
-                )
+                return Err(SignatureVerificationError::InvalidKey(
+                    "key usage not permitted for digital signatures".to_string(),
+                ));
             }
         }
 
-        let key_type = signature_alg.key_type().map_err(SignatureVerificationError::Other)?;
+        let key_type = signature_alg
+            .key_type()
+            .map_err(SignatureVerificationError::Other)?;
         if *self.key_type() != key_type {
-            return Err(
-                SignatureVerificationError::InvalidKey(
-                    "key type does not match signature algorithm".to_string()
-                )
-            )
+            return Err(SignatureVerificationError::InvalidKey(
+                "key type does not match signature algorithm".to_string(),
+            ));
         }
 
         // FIXME: add test cases for each of these
         match *signature_alg {
-            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256 =>
-                crypto::verify_rsa_signature(
-                    self,
-                    &ring_signature::RSA_PKCS1_2048_8192_SHA256,
-                    msg,
-                    signature
-                ),
-            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384 =>
-                crypto::verify_rsa_signature(
-                    self,
-                    &ring_signature::RSA_PKCS1_2048_8192_SHA384,
-                    msg,signature
-                ),
-            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512 =>
-                crypto::verify_rsa_signature(
-                    self,
-                    &ring_signature::RSA_PKCS1_2048_8192_SHA512,
-                    msg,
-                    signature
-                ),
-            CoreJwsSigningAlgorithm::RsaSsaPssSha256 =>
-                crypto::verify_rsa_signature(
-                    self,
-                    &ring_signature::RSA_PSS_2048_8192_SHA256,
-                    msg,
-                    signature
-                ),
-            CoreJwsSigningAlgorithm::RsaSsaPssSha384 =>
-                crypto::verify_rsa_signature(
-                    self,
-                    &ring_signature::RSA_PSS_2048_8192_SHA384,
-                    msg,
-                    signature
-                ),
-            CoreJwsSigningAlgorithm::RsaSsaPssSha512 =>
-                crypto::verify_rsa_signature(
-                    self,
-                    &ring_signature::RSA_PSS_2048_8192_SHA512,
-                    msg,
-                    signature
-                ),
-            CoreJwsSigningAlgorithm::HmacSha256 =>
-                crypto::verify_hmac(self, &digest::SHA256, msg, signature),
-            CoreJwsSigningAlgorithm::HmacSha384 =>
-                crypto::verify_hmac(self, &digest::SHA384, msg, signature),
-            CoreJwsSigningAlgorithm::HmacSha512 =>
-                crypto::verify_hmac(self, &digest::SHA512, msg, signature),
-            ref other => Err(
-                SignatureVerificationError::UnsupportedAlg(variant_name(other).to_string())
-            )
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256 => crypto::verify_rsa_signature(
+                self,
+                &ring_signature::RSA_PKCS1_2048_8192_SHA256,
+                msg,
+                signature,
+            ),
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384 => crypto::verify_rsa_signature(
+                self,
+                &ring_signature::RSA_PKCS1_2048_8192_SHA384,
+                msg,
+                signature,
+            ),
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512 => crypto::verify_rsa_signature(
+                self,
+                &ring_signature::RSA_PKCS1_2048_8192_SHA512,
+                msg,
+                signature,
+            ),
+            CoreJwsSigningAlgorithm::RsaSsaPssSha256 => crypto::verify_rsa_signature(
+                self,
+                &ring_signature::RSA_PSS_2048_8192_SHA256,
+                msg,
+                signature,
+            ),
+            CoreJwsSigningAlgorithm::RsaSsaPssSha384 => crypto::verify_rsa_signature(
+                self,
+                &ring_signature::RSA_PSS_2048_8192_SHA384,
+                msg,
+                signature,
+            ),
+            CoreJwsSigningAlgorithm::RsaSsaPssSha512 => crypto::verify_rsa_signature(
+                self,
+                &ring_signature::RSA_PSS_2048_8192_SHA512,
+                msg,
+                signature,
+            ),
+            CoreJwsSigningAlgorithm::HmacSha256 => {
+                crypto::verify_hmac(self, &digest::SHA256, msg, signature)
+            }
+            CoreJwsSigningAlgorithm::HmacSha384 => {
+                crypto::verify_hmac(self, &digest::SHA384, msg, signature)
+            }
+            CoreJwsSigningAlgorithm::HmacSha512 => {
+                crypto::verify_hmac(self, &digest::SHA512, msg, signature)
+            }
+            ref other => Err(SignatureVerificationError::UnsupportedAlg(
+                variant_name(other).to_string(),
+            )),
         }
     }
 }
