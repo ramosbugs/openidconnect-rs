@@ -14,10 +14,14 @@ use super::{
     JwsSigningAlgorithm, SignatureVerificationError,
 };
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 JsonWebTokenContentType(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 JsonWebTokenType(String)];
 
 #[derive(Clone, Debug, PartialEq)]

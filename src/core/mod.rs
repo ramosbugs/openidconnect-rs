@@ -272,7 +272,9 @@ impl Display for CoreAuthPrompt {
     }
 }
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 CoreClaimName(String)];
 impl ClaimName for CoreClaimName {}
 
@@ -354,7 +356,9 @@ impl PartialEq<CoreGrantTypeWrapper> for CoreGrantType {
 }
 
 // FIXME: remove this and implement a custom serializer/deserializer
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 CoreGrantTypeWrapper(
     #[serde(with = "serde_core_grant_type")]
     CoreGrantType

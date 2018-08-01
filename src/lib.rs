@@ -64,9 +64,8 @@ pub use types::{
     JsonWebKey, JsonWebKeyId, JsonWebKeySet, JsonWebKeyType, JsonWebKeyUse,
     JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag,
     LoginHint, LogoUrl, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl, RegistrationAccessToken,
-    RegistrationUrl, RequestUrl, ResponseMode, ResponseType, ResponseTypes, Seconds,
-    SectorIdentifierUrl, ServiceDocUrl, StreetAddress, SubjectIdentifier, SubjectIdentifierType,
-    ToSUrl,
+    RegistrationUrl, RequestUrl, ResponseMode, ResponseType, ResponseTypes, SectorIdentifierUrl,
+    ServiceDocUrl, StreetAddress, SubjectIdentifier, SubjectIdentifierType, ToSUrl,
 };
 pub use user_info::{UserInfoClaims, UserInfoError, UserInfoUrl};
 use verification::{AudiencesClaim, IssuerClaim};
@@ -337,10 +336,13 @@ where
         self
     }
 
-    pub fn acr_values(&self) -> Option<&Vec<AuthenticationContextClass>> {
+    pub fn auth_context_values(&self) -> Option<&Vec<AuthenticationContextClass>> {
         self.acr_values.as_ref()
     }
-    pub fn set_acr_values(mut self, acr_values: Option<Vec<AuthenticationContextClass>>) -> Self {
+    pub fn set_auth_context_values(
+        mut self,
+        acr_values: Option<Vec<AuthenticationContextClass>>,
+    ) -> Self {
         self.acr_values = acr_values;
         self
     }
@@ -441,7 +443,7 @@ where
     {
         // Create string versions of any options that need to be converted. This must be done
         // before creating extra_params so that the lifetimes extend beyond extra_params's lifetime.
-        let acr_values_opt = join_optional_vec(self.acr_values());
+        let acr_values_opt = join_optional_vec(self.auth_context_values());
         let claims_locales_opt = join_optional_vec(self.claims_locales());
         let max_age_opt = self.max_age().map(|max_age| max_age.as_secs().to_string());
         let prompts_opt = join_optional_vec(self.prompts());

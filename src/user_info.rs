@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::str;
 
+use chrono::{DateTime, Utc};
 use curl;
 use oauth2::helpers::{deserialize_url, serialize_url};
 use oauth2::prelude::*;
@@ -14,6 +15,7 @@ use super::http::{
     auth_bearer, HttpRequest, HttpRequestMethod, ACCEPT_JSON, HTTP_STATUS_OK, MIME_TYPE_JSON,
     MIME_TYPE_JWT,
 };
+use super::types::helpers::seconds_to_utc;
 use super::verification::UserInfoVerifier;
 use super::{
     AdditionalClaims, AddressClaim, Audience, AudiencesClaim, ClaimsVerificationError,
@@ -21,7 +23,7 @@ use super::{
     EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone,
     EndUserUsername, EndUserWebsiteUrl, GenderClaim, IssuerClaim, IssuerUrl, JsonWebKey,
     JsonWebKeyType, JsonWebKeyUse, JsonWebToken, JweContentEncryptionAlgorithm,
-    JwsSigningAlgorithm, LanguageTag, Seconds, StandardClaims, SubjectIdentifier,
+    JwsSigningAlgorithm, LanguageTag, StandardClaims, SubjectIdentifier,
 };
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -65,26 +67,28 @@ where
 {
     field_getters![
         self [self.standard_claims] {
-            sub[SubjectIdentifier],
-            name[Option<HashMap<Option<LanguageTag>, EndUserName>>],
-            given_name[Option<HashMap<Option<LanguageTag>, EndUserGivenName>>],
-            family_name[Option<HashMap<Option<LanguageTag>, EndUserGivenName>>],
-            middle_name[Option<HashMap<Option<LanguageTag>, EndUserMiddleName>>],
-            nickname[Option<HashMap<Option<LanguageTag>, EndUserNickname>>],
-            preferred_username[Option<EndUserUsername>],
-            profile[Option<HashMap<Option<LanguageTag>, EndUserProfileUrl>>],
-            picture[Option<HashMap<Option<LanguageTag>, EndUserPictureUrl>>],
-            website[Option<HashMap<Option<LanguageTag>, EndUserWebsiteUrl>>],
-            email[Option<EndUserEmail>],
+            sub[&SubjectIdentifier],
+            name[Option<&HashMap<Option<LanguageTag>, EndUserName>>],
+            given_name[Option<&HashMap<Option<LanguageTag>, EndUserGivenName>>],
+            family_name[Option<&HashMap<Option<LanguageTag>, EndUserGivenName>>],
+            middle_name[Option<&HashMap<Option<LanguageTag>, EndUserMiddleName>>],
+            nickname[Option<&HashMap<Option<LanguageTag>, EndUserNickname>>],
+            preferred_username[Option<&EndUserUsername>],
+            profile[Option<&HashMap<Option<LanguageTag>, EndUserProfileUrl>>],
+            picture[Option<&HashMap<Option<LanguageTag>, EndUserPictureUrl>>],
+            website[Option<&HashMap<Option<LanguageTag>, EndUserWebsiteUrl>>],
+            email[Option<&EndUserEmail>],
             email_verified[Option<bool>],
-            gender[Option<GC>],
-            birthday[Option<EndUserBirthday>],
-            zoneinfo[Option<EndUserTimezone>],
-            locale[Option<LanguageTag>],
-            phone_number[Option<EndUserPhoneNumber>],
+            gender[Option<&GC>],
+            birthday[Option<&EndUserBirthday>],
+            zoneinfo[Option<&EndUserTimezone>],
+            locale[Option<&LanguageTag>],
+            phone_number[Option<&EndUserPhoneNumber>],
             phone_number_verified[Option<bool>],
-            address[Option<AddressClaim>],
-            updated_at[Option<Seconds>],
+            address[Option<&AddressClaim>],
+            updated_at[Option<Result<DateTime<Utc>, ()>> {
+                self.standard_claims.updated_at.as_ref().map(seconds_to_utc)
+            }],
         }
     ];
 }
@@ -128,7 +132,7 @@ where
 }
 
 new_type![
-    #[derive(Deserialize, Serialize)]
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     UserInfoUrl(
         #[serde(
             deserialize_with = "deserialize_url",

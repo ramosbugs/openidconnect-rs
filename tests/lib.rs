@@ -58,7 +58,7 @@ fn test_authorize_url_full() {
             LanguageTag::new("fr".to_string()),
             LanguageTag::new("en".to_string()),
         ]))
-        .set_acr_values(Some(vec![AuthenticationContextClass::new(
+        .set_auth_context_values(Some(vec![AuthenticationContextClass::new(
             "urn:mace:incommon:iap:silver".to_string(),
         )]));
 

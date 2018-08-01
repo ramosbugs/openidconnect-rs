@@ -57,7 +57,31 @@ macro_rules! new_type {
         )
     ) => {
         new_type![
-            @new_type $(#[$attr])*,
+            @new_type_pub $(#[$attr])*,
+            $name(
+                $(#[$type_attr])*
+                $type
+            ),
+            concat!(
+                "Create a new `",
+                stringify!($name),
+                "` to wrap the given `",
+                stringify!($type),
+                "`."
+            ),
+            impl {}
+        ];
+    };
+    // Convenience pattern without an impl.
+    (
+        $(#[$attr:meta])*
+        pub(crate) $name:ident(
+            $(#[$type_attr:meta])*
+            $type:ty
+        )
+    ) => {
+        new_type![
+            @new_type_pub_crate $(#[$attr])*,
             $name(
                 $(#[$type_attr])*
                 $type
@@ -84,7 +108,36 @@ macro_rules! new_type {
         }
     ) => {
         new_type![
-            @new_type $(#[$attr])*,
+            @new_type_pub $(#[$attr])*,
+            $name(
+                $(#[$type_attr])*
+                $type
+            ),
+            concat!(
+                "Create a new `",
+                stringify!($name),
+                "` to wrap the given `",
+                stringify!($type),
+                "`."
+            ),
+            impl {
+                $($item)*
+            }
+        ];
+    };
+    // Main entry point with an impl.
+    (
+        $(#[$attr:meta])*
+        pub(crate) $name:ident(
+            $(#[$type_attr:meta])*
+            $type:ty
+        )
+        impl {
+            $($item:tt)*
+        }
+    ) => {
+        new_type![
+            @new_type_pub_crate $(#[$attr])*,
             $name(
                 $(#[$type_attr])*
                 $type
@@ -103,7 +156,7 @@ macro_rules! new_type {
     };
     // Actual implementation, after stringifying the #[doc] attr.
     (
-        @new_type $(#[$attr:meta])*,
+        @new_type_pub $(#[$attr:meta])*,
         $name:ident(
             $(#[$type_attr:meta])*
             $type:ty
@@ -114,7 +167,7 @@ macro_rules! new_type {
         }
     ) => {
         $(#[$attr])*
-        #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
+        #[derive(Clone, Debug, PartialEq)]
         pub struct $name(
             $(#[$type_attr])*
             $type
@@ -134,7 +187,41 @@ macro_rules! new_type {
                 &self.0
             }
         }
-    }
+    };
+    // Actual implementation, after stringifying the #[doc] attr.
+    (
+        @new_type_pub_crate $(#[$attr:meta])*,
+        $name:ident(
+            $(#[$type_attr:meta])*
+            $type:ty
+        ),
+        $new_doc:expr,
+        impl {
+            $($item:tt)*
+        }
+    ) => {
+        $(#[$attr])*
+        #[derive(Clone, Debug, PartialEq)]
+        pub(crate) struct $name(
+            $(#[$type_attr])*
+            $type
+        );
+        impl $name {
+            $($item)*
+        }
+        impl NewType<$type> for $name {
+            #[doc = $new_doc]
+            fn new(s: $type) -> Self {
+                $name(s)
+            }
+        }
+        impl Deref for $name {
+            type Target = $type;
+            fn deref(&self) -> &$type {
+                &self.0
+            }
+        }
+    };
 }
 
 ///
@@ -532,10 +619,10 @@ macro_rules! field_getter_decls {
         fn $field(&$self) -> Option<bool>;
     };
     (@case $self:ident $field:ident Option < $type:ty >) => {
-        fn $field(&$self) -> Option<&$type>;
+        fn $field(&$self) -> Option<$type>;
     };
     (@case $self:ident $field:ident $type:ty) => {
-        fn $field(&$self) -> &$type;
+        fn $field(&$self) -> $type;
     };
     // Main entry point
     (
@@ -557,14 +644,29 @@ macro_rules! field_getters {
             $zero.$field
         }
     };
-    (@case $self:ident [$zero:expr] $field:ident Option < $type:ty >) => {
+    (@case $self:ident [$zero:expr] $field:ident Option < bool > { $($body:tt)+ }) => {
+        fn $field(&$self) -> Option<bool> {
+            $($body)+
+        }
+    };
+    (@case $self:ident [$zero:expr] $field:ident Option <&$type:ty >) => {
         fn $field(&$self) -> Option<&$type> {
             $zero.$field.as_ref()
         }
     };
-    (@case $self:ident [$zero:expr] $field:ident $type:ty) => {
+    (@case $self:ident [$zero:expr] $field:ident Option < $type:ty > { $($body:tt)+ }) => {
+        fn $field(&$self) -> Option<$type> {
+            $($body)+
+        }
+    };
+    (@case $self:ident [$zero:expr] $field:ident &$type:ty) => {
         fn $field(&$self) -> &$type {
             &$zero.$field
+        }
+    };
+    (@case $self:ident [$zero:expr] $field:ident $type:ty { $($body:tt)+ }) => {
+        fn $field(&$self) -> $type {
+            $($body)+
         }
     };
     (@case pub $self:ident [$zero:expr] $field:ident Option < bool >) => {
@@ -572,14 +674,29 @@ macro_rules! field_getters {
             $zero.$field
         }
     };
-    (@case pub $self:ident [$zero:expr] $field:ident Option < $type:ty >) => {
+    (@case pub $self:ident [$zero:expr] $field:ident Option < bool > { $($body:tt)+ }) => {
+        pub fn $field(&$self) -> Option<bool> {
+            $($body)+
+        }
+    };
+    (@case pub $self:ident [$zero:expr] $field:ident Option <&$type:ty >) => {
        pub  fn $field(&$self) -> Option<&$type> {
             $zero.$field.as_ref()
         }
     };
-    (@case pub $self:ident [$zero:expr] $field:ident $type:ty) => {
+    (@case pub $self:ident [$zero:expr] $field:ident Option < $type:ty > { $($body:tt)+ }) => {
+       pub  fn $field(&$self) -> Option<$type> {
+            $($body)+
+        }
+    };
+    (@case pub $self:ident [$zero:expr] $field:ident &$type:ty) => {
         pub fn $field(&$self) -> &$type {
             &$zero.$field
+        }
+    };
+    (@case pub $self:ident [$zero:expr] $field:ident $type:ty { $($body:tt)+ }) => {
+        pub fn $field(&$self) -> $type {
+            $($body)+
         }
     };
     (@case $self:ident [$zero:expr] $field:ident() Option < bool >) => {
@@ -587,14 +704,29 @@ macro_rules! field_getters {
             $zero.$field()
         }
     };
-    (@case $self:ident [$zero:expr] $field:ident() Option < $type:ty >) => {
+    (@case $self:ident [$zero:expr] $field:ident() Option < bool > { $($body:tt)+ }) => {
+        fn $field(&$self) -> Option<bool> {
+            $($body)+
+        }
+    };
+    (@case $self:ident [$zero:expr] $field:ident() Option <&$type:ty >) => {
         fn $field(&$self) -> Option<&$type> {
             $zero.$field()
         }
     };
-    (@case $self:ident [$zero:expr] $field:ident() $type:ty) => {
+    (@case $self:ident [$zero:expr] $field:ident() Option < $type:ty > { $($body:tt)+ }) => {
+        fn $field(&$self) -> Option<$type> {
+            $($body)+
+        }
+    };
+    (@case $self:ident [$zero:expr] $field:ident() &$type:ty) => {
         fn $field(&$self) -> &$type {
             $zero.$field()
+        }
+    };
+    (@case $self:ident [$zero:expr] $field:ident() $type:ty { $($body:tt)+ }) => {
+        fn $field(&$self) -> $type {
+            $($body)+
         }
     };
     // Main entry points

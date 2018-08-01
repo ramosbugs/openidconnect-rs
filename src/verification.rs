@@ -3,6 +3,7 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::Deref;
 
+use chrono::{DateTime, Utc};
 use oauth2::helpers::variant_name;
 use oauth2::prelude::*;
 use oauth2::{ClientId, ClientSecret};
@@ -12,10 +13,10 @@ use serde::Serialize;
 use super::jwt::JsonWebToken;
 use super::user_info::UnverifiedUserInfoClaims;
 use super::{
-    AdditionalClaims, Audience, GenderClaim, IdTokenClaims, IssuerUrl, JsonWebKey, JsonWebKeySet,
-    JsonWebKeyType, JsonWebKeyUse, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenHeader,
-    JweContentEncryptionAlgorithm, JwsSigningAlgorithm, Nonce, StandardClaims, SubjectIdentifier,
-    UserInfoClaims,
+    AdditionalClaims, Audience, AuthenticationContextClass, GenderClaim, IdTokenClaims, IssuerUrl,
+    JsonWebKey, JsonWebKeySet, JsonWebKeyType, JsonWebKeyUse, JsonWebTokenAccess,
+    JsonWebTokenAlgorithm, JsonWebTokenHeader, JweContentEncryptionAlgorithm, JwsSigningAlgorithm,
+    Nonce, StandardClaims, SubjectIdentifier, UserInfoClaims,
 };
 
 /*
@@ -36,7 +37,7 @@ ID token validation only:
      https://bitbucket.org/openid/connect/issues/973/
      https://stackoverflow.com/questions/41231018/openid-connect-standard-authorized-party-azp-contradiction/41240814
  - maximum expiration time (default to current timestamp in UTC); this should be a closure
- - earliest acceptable 'iat' (issue time); this should be a closure
+
  - custom nonce validation function?
  - custom acr validation function
  - custom auth_time validation function
@@ -57,11 +58,17 @@ pub trait IssuerClaim {
 
 #[derive(Clone, Debug, Fail, PartialEq)]
 pub enum ClaimsVerificationError {
+    #[fail(display = "Expired: {}", _0)]
+    Expired(String),
     #[fail(display = "Invalid audiences: {}", _0)]
     InvalidAudience(String),
-    // FIXME: do we need this one?
-    #[fail(display = "Invalid token header: {}", _0)]
-    InvalidHeader(String),
+    #[fail(
+        display = "Invalid authorization context class reference: {}",
+        _0
+    )]
+    InvalidAuthContext(String),
+    #[fail(display = "Invalid authentication time: {}", _0)]
+    InvalidAuthTime(String),
     #[fail(display = "Invalid issuer: {}", _0)]
     InvalidIssuer(String),
     #[fail(display = "Invalid nonce: {}", _0)]
@@ -88,6 +95,21 @@ pub enum SignatureVerificationError {
     DisallowedAlg(String),
     #[fail(display = "Invalid cryptographic key: {}", _0)]
     InvalidKey(String),
+    /// The signing key needed for verifying the
+    /// [JSON Web Token](https://tools.ietf.org/html/rfc7519)'s signature/MAC could not be found.
+    /// This error can occur if the key ID (`kid`) specified in the JWT's
+    /// [JOSE header](https://tools.ietf.org/html/rfc7519#section-5) does not match the ID of any
+    /// key in the OpenID Connect provider's JSON Web Key Set (JWKS), typically retrieved from
+    /// the provider's [JWKS document](
+    /// http://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata). To support
+    /// [rotation of asyimmetric signing keys](
+    /// http://openid.net/specs/openid-connect-core-1_0.html#RotateSigKeys), client applications
+    /// should consider refreshing the JWKS document (via
+    /// [`JsonWebKeySetUrl::get_keys`][`::discovery::JsonWebKeySetUrl::get_keys`]).
+    ///
+    /// This error can also occur if the identified
+    /// [JSON Web Key](https://tools.ietf.org/html/rfc7517) is of the wrong type (e.g., an RSA key
+    /// when the JOSE header specifies an ECDSA algorithm) or does not support signing.
     #[fail(display = "No matching key found")]
     NoMatchingKey,
     #[fail(display = "Unsupported signature algorithm: {}", _0)]
@@ -388,8 +410,6 @@ where
                 .collect::<Vec<&K>>()
         };
         if public_keys.is_empty() {
-            // FIXME: if there's a KID but no matching key, try re-fetching the
-            // JWKS to support KeyRotation
             return Err(ClaimsVerificationError::SignatureVerification(
                 SignatureVerificationError::NoMatchingKey,
             ));
@@ -430,7 +450,11 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
+    acr_verifier_fn: Box<Fn(Option<&AuthenticationContextClass>) -> Result<(), String>>,
+    auth_time_verifier_fn: Box<Fn(Option<&DateTime<Utc>>) -> Result<(), String>>,
+    iat_verifier_fn: Box<Fn(&DateTime<Utc>) -> Result<(), String>>,
     jwt_verifier: JwtClaimsVerifier<JS, JT, JU, K>,
+    time_fn: Box<Fn() -> DateTime<Utc>>,
 }
 impl<JS, JT, JU, K> IdTokenVerifier<JS, JT, JU, K>
 where
@@ -439,14 +463,25 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
+    fn new(jwt_verifier: JwtClaimsVerifier<JS, JT, JU, K>) -> Self {
+        IdTokenVerifier {
+            // By default, accept authorization context reference (acr claim).
+            acr_verifier_fn: Box::new(|_| Ok(())),
+            auth_time_verifier_fn: Box::new(|_| Ok(())),
+            // By default, accept any issued time (iat claim).
+            iat_verifier_fn: Box::new(|_| Ok(())),
+            jwt_verifier,
+            // By default, use the current system time.
+            time_fn: Box::new(Utc::now),
+        }
+    }
+
     pub fn new_public_client(
         client_id: ClientId,
         issuer: IssuerUrl,
         signature_keys: JsonWebKeySet<JS, JT, JU, K>,
     ) -> Self {
-        IdTokenVerifier {
-            jwt_verifier: JwtClaimsVerifier::new(client_id, issuer, signature_keys),
-        }
+        Self::new(JwtClaimsVerifier::new(client_id, issuer, signature_keys))
     }
 
     pub fn new_private_client(
@@ -455,10 +490,10 @@ where
         issuer: IssuerUrl,
         signature_keys: JsonWebKeySet<JS, JT, JU, K>,
     ) -> Self {
-        IdTokenVerifier {
-            jwt_verifier: JwtClaimsVerifier::new(client_id, issuer, signature_keys)
+        Self::new(
+            JwtClaimsVerifier::new(client_id, issuer, signature_keys)
                 .set_client_secret(client_secret),
-        }
+        )
     }
 
     pub fn set_allowed_algs<I>(mut self, algs: I) -> Self
@@ -473,6 +508,22 @@ where
         self
     }
 
+    pub fn set_auth_context_verifier_fn(
+        mut self,
+        acr_verifier_fn: Box<Fn(Option<&AuthenticationContextClass>) -> Result<(), String>>,
+    ) -> Self {
+        self.acr_verifier_fn = acr_verifier_fn;
+        self
+    }
+
+    pub fn set_auth_time_verifier_fn(
+        mut self,
+        auth_time_verifier_fn: Box<Fn(Option<&DateTime<Utc>>) -> Result<(), String>>,
+    ) -> Self {
+        self.auth_time_verifier_fn = auth_time_verifier_fn;
+        self
+    }
+
     pub fn enable_signature_check(mut self) -> Self {
         self.jwt_verifier = self.jwt_verifier.require_signature_check(true);
         self
@@ -482,6 +533,21 @@ where
         self
     }
 
+    pub fn set_time_fn(mut self, time_fn: Box<Fn() -> DateTime<Utc>>) -> Self {
+        self.time_fn = time_fn;
+        self
+    }
+
+    pub fn set_issue_time_verifier_fn(
+        mut self,
+        iat_verifier_fn: Box<Fn(&DateTime<Utc>) -> Result<(), String>>,
+    ) -> Self {
+        self.iat_verifier_fn = iat_verifier_fn;
+        self
+    }
+
+    // TODO: Add a version that accepts a nonce validation function. Some client applications may
+    // use crypto or some other mechanism to validate nonces instead of storing every nonce.
     pub(super) fn verified_claims<'b, AC, GC, JE>(
         &self,
         jwt: &'b JsonWebToken<IdTokenClaims<AC, GC>, JE, JS, JT>,
@@ -501,16 +567,63 @@ where
         // 4. If the ID Token contains multiple audiences, the Client SHOULD verify that an azp
         //    Claim is present.
 
+        // FIXME(docs): add a reference in the module documentation describing this intentional
+        // deviation from the spec.
+
+        // There is significant confusion and contradiction in the OpenID Connect Core spec around
+        // the azp claim. See https://bitbucket.org/openid/connect/issues/973/ for a detailed
+        // discussion. Given the lack of clarity around how this claim should be used, we defer
+        // any verification of it here until a use case becomes apparent. If such a use case does
+        // arise, we most likely want to allow clients to pass in a function for validating the
+        // azp claim rather than introducing logic that affects all clients of this library.
+
+        // This naive implementation of the spec would almost certainly not be useful in practice:
+        /*
+        let azp_required = partially_verified_claims.audiences().len() > 1;
+
         // 5. If an azp (authorized party) Claim is present, the Client SHOULD verify that its
         //    client_id is the Claim Value.
+        if let Some(authorized_party) = partially_verified_claims.authorized_party() {
+            if *authorized_party != self.client_id {
+                return Err(ClaimsVerificationError::InvalidAudience(format!(
+                    "authorized party must match client ID `{}` (found `{}`",
+                    *self.client_id, **authorized_party
+                )));
+            }
+        } else if azp_required {
+            return Err(ClaimsVerificationError::InvalidAudience(format!(
+                "missing authorized party claim but multiple audiences found"
+            )));
+        }
+        */
 
         // Steps 6--8 are handled by the generic JwtClaimsVerifier.
 
         // 9. The current time MUST be before the time represented by the exp Claim.
+        let cur_time = (*self.time_fn)();
+        if let Ok(expiration) = partially_verified_claims.expiration() {
+            if cur_time > expiration {
+                return Err(ClaimsVerificationError::Expired(format!(
+                    "ID token expired at {} (current time is {})",
+                    expiration, cur_time
+                )));
+            }
+        } else {
+            return Err(ClaimsVerificationError::Other(
+                "expiration out of bounds".to_string(),
+            ));
+        }
 
         // 10. The iat Claim can be used to reject tokens that were issued too far away from the
         //     current time, limiting the amount of time that nonces need to be stored to prevent
         //     attacks. The acceptable range is Client specific.
+        if let Ok(ref issue_time) = partially_verified_claims.issue_time() {
+            (*self.iat_verifier_fn)(issue_time).map_err(ClaimsVerificationError::Expired)?;
+        } else {
+            return Err(ClaimsVerificationError::Other(
+                "issue time out of bounds".to_string(),
+            ));
+        }
 
         // 11. If a nonce value was sent in the Authentication Request, a nonce Claim MUST be
         //     present and its value checked to verify that it is the same value as the one that was
@@ -533,13 +646,22 @@ where
         // 12. If the acr Claim was requested, the Client SHOULD check that the asserted Claim Value
         //     is appropriate. The meaning and processing of acr Claim Values is out of scope for
         //     this specification.
+        (*self.acr_verifier_fn)(partially_verified_claims.auth_context_ref())
+            .map_err(ClaimsVerificationError::InvalidAuthContext)?;
 
         // 13. If the auth_time Claim was requested, either through a specific request for this
         //     Claim or by using the max_age parameter, the Client SHOULD check the auth_time Claim
         //     value and request re-authentication if it determines too much time has elapsed since
         //     the last End-User authentication.
+        match partially_verified_claims.auth_time() {
+            Some(ref auth_time_result) => auth_time_result
+                .map(|auth_time| (*self.auth_time_verifier_fn)(Some(&auth_time)))
+                .map_err(|_| ClaimsVerificationError::Other("auth time out of bounds".to_string()))?
+                .map_err(ClaimsVerificationError::InvalidAuthTime)?,
+            None => (*self.auth_time_verifier_fn)(None)
+                .map_err(ClaimsVerificationError::InvalidAuthTime)?,
+        };
 
-        // FIXME: implement validation above
         Ok(partially_verified_claims)
     }
 }

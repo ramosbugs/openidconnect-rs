@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use oauth2::ClientId;
 
 use super::claims::StandardClaimsImpl;
-use super::types::helpers::deserialize_string_or_vec;
+use super::types::helpers::{deserialize_string_or_vec, seconds_to_utc};
+use super::types::Seconds;
 use super::{
     AccessTokenHash, AdditionalClaims, AddressClaim, Audience, AudiencesClaim,
     AuthenticationContextClass, AuthenticationMethodReference, AuthorizationCodeHash,
@@ -13,18 +14,13 @@ use super::{
     EndUserName, EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl,
     EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, ExtraTokenFields, GenderClaim,
     IdTokenVerifier, IssuerClaim, IssuerUrl, JsonWebKey, JsonWebKeyType, JsonWebKeyUse,
-    JsonWebToken, JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, Nonce, Seconds,
+    JsonWebToken, JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, Nonce,
     StandardClaims, SubjectIdentifier,
 };
 
-// FIXME: remove this wrapper layer, and have the functions that return IdToken currently
-// directly call claims() to perform the verification and extract the result. There's nothing
-// a caller can do with this IdToken other than call claims() on it, so we might as well
-// do that automatically. If there's ever a reasonable use case for wanting to do lower
-// level stuff, we could always expose another interface that returns something like this.
-// For now, let's optimize for ease of (secure) use.
 // This wrapper layer exists instead of directly verifying the JWT and returning the claims so that
-//
+// we can pass it around and easily access a serialized JWT representation of it (e.g., for passing
+// to the authorization endpoint as an id_token_hint).
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct IdToken<
     AC: AdditionalClaims,
@@ -97,21 +93,13 @@ where
         &self.aud
     }
     pub fn expiration(&self) -> Result<DateTime<Utc>, ()> {
-        Utc.timestamp_opt(*(&self.exp as &u64) as i64, 0)
-            .single()
-            .ok_or(())
+        seconds_to_utc(&self.exp)
     }
     pub fn issue_time(&self) -> Result<DateTime<Utc>, ()> {
-        Utc.timestamp_opt(*(&self.iat as &u64) as i64, 0)
-            .single()
-            .ok_or(())
+        seconds_to_utc(&self.iat)
     }
     pub fn auth_time(&self) -> Option<Result<DateTime<Utc>, ()>> {
-        self.auth_time.as_ref().map(|seconds| {
-            Utc.timestamp_opt(*(seconds as &u64) as i64, 0)
-                .single()
-                .ok_or(())
-        })
+        self.auth_time.as_ref().map(seconds_to_utc)
     }
     pub fn nonce(&self) -> Option<&Nonce> {
         self.nonce.as_ref()
@@ -143,26 +131,28 @@ where
 {
     field_getters![
         self [self.standard_claims] {
-            sub[SubjectIdentifier],
-            name[Option<HashMap<Option<LanguageTag>, EndUserName>>],
-            given_name[Option<HashMap<Option<LanguageTag>, EndUserGivenName>>],
-            family_name[Option<HashMap<Option<LanguageTag>, EndUserGivenName>>],
-            middle_name[Option<HashMap<Option<LanguageTag>, EndUserMiddleName>>],
-            nickname[Option<HashMap<Option<LanguageTag>, EndUserNickname>>],
-            preferred_username[Option<EndUserUsername>],
-            profile[Option<HashMap<Option<LanguageTag>, EndUserProfileUrl>>],
-            picture[Option<HashMap<Option<LanguageTag>, EndUserPictureUrl>>],
-            website[Option<HashMap<Option<LanguageTag>, EndUserWebsiteUrl>>],
-            email[Option<EndUserEmail>],
+            sub[&SubjectIdentifier],
+            name[Option<&HashMap<Option<LanguageTag>, EndUserName>>],
+            given_name[Option<&HashMap<Option<LanguageTag>, EndUserGivenName>>],
+            family_name[Option<&HashMap<Option<LanguageTag>, EndUserGivenName>>],
+            middle_name[Option<&HashMap<Option<LanguageTag>, EndUserMiddleName>>],
+            nickname[Option<&HashMap<Option<LanguageTag>, EndUserNickname>>],
+            preferred_username[Option<&EndUserUsername>],
+            profile[Option<&HashMap<Option<LanguageTag>, EndUserProfileUrl>>],
+            picture[Option<&HashMap<Option<LanguageTag>, EndUserPictureUrl>>],
+            website[Option<&HashMap<Option<LanguageTag>, EndUserWebsiteUrl>>],
+            email[Option<&EndUserEmail>],
             email_verified[Option<bool>],
-            gender[Option<GC>],
-            birthday[Option<EndUserBirthday>],
-            zoneinfo[Option<EndUserTimezone>],
-            locale[Option<LanguageTag>],
-            phone_number[Option<EndUserPhoneNumber>],
+            gender[Option<&GC>],
+            birthday[Option<&EndUserBirthday>],
+            zoneinfo[Option<&EndUserTimezone>],
+            locale[Option<&LanguageTag>],
+            phone_number[Option<&EndUserPhoneNumber>],
             phone_number_verified[Option<bool>],
-            address[Option<AddressClaim>],
-            updated_at[Option<Seconds>],
+            address[Option<&AddressClaim>],
+            updated_at[Option<Result<DateTime<Utc>, ()>> {
+                self.standard_claims.updated_at.as_ref().map(seconds_to_utc)
+            }],
         }
     ];
 }

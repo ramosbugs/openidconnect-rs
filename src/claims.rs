@@ -3,17 +3,19 @@ use std::fmt::{Debug, Formatter, Result as FormatterResult};
 use std::marker::PhantomData;
 use std::str;
 
+use chrono::{DateTime, Utc};
 use serde;
 use serde::de::{Deserialize, DeserializeOwned, Deserializer, MapAccess, Visitor};
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
 
 use super::types::helpers::split_language_tag_key;
+use super::types::Seconds;
 use super::{
     AddressCountry, AddressLocality, AddressPostalCode, AddressRegion, EndUserBirthday,
     EndUserEmail, EndUserGivenName, EndUserMiddleName, EndUserName, EndUserNickname,
     EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone, EndUserUsername,
-    EndUserWebsiteUrl, FormattedAddress, LanguageTag, Seconds, StreetAddress, SubjectIdentifier,
+    EndUserWebsiteUrl, FormattedAddress, LanguageTag, StreetAddress, SubjectIdentifier,
 };
 
 pub trait AdditionalClaims: Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
@@ -34,12 +36,12 @@ pub struct AddressClaim {
 impl AddressClaim {
     field_getters![
         pub self [self] {
-            formatted[Option<FormattedAddress>],
-            street_address[Option<StreetAddress>],
-            locality[Option<AddressLocality>],
-            region[Option<AddressRegion>],
-            postal_code[Option<AddressPostalCode>],
-            country[Option<AddressCountry>],
+            formatted[Option<&FormattedAddress>],
+            street_address[Option<&StreetAddress>],
+            locality[Option<&AddressLocality>],
+            region[Option<&AddressRegion>],
+            postal_code[Option<&AddressPostalCode>],
+            country[Option<&AddressCountry>],
         }
     ];
 }
@@ -53,26 +55,26 @@ where
 {
     field_getter_decls![
         self {
-            sub[SubjectIdentifier],
-            name[Option<HashMap<Option<LanguageTag>, EndUserName>>],
-            given_name[Option<HashMap<Option<LanguageTag>, EndUserGivenName>>],
-            family_name[Option<HashMap<Option<LanguageTag>, EndUserGivenName>>],
-            middle_name[Option<HashMap<Option<LanguageTag>, EndUserMiddleName>>],
-            nickname[Option<HashMap<Option<LanguageTag>, EndUserNickname>>],
-            preferred_username[Option<EndUserUsername>],
-            profile[Option<HashMap<Option<LanguageTag>, EndUserProfileUrl>>],
-            picture[Option<HashMap<Option<LanguageTag>, EndUserPictureUrl>>],
-            website[Option<HashMap<Option<LanguageTag>, EndUserWebsiteUrl>>],
-            email[Option<EndUserEmail>],
+            sub[&SubjectIdentifier],
+            name[Option<&HashMap<Option<LanguageTag>, EndUserName>>],
+            given_name[Option<&HashMap<Option<LanguageTag>, EndUserGivenName>>],
+            family_name[Option<&HashMap<Option<LanguageTag>, EndUserGivenName>>],
+            middle_name[Option<&HashMap<Option<LanguageTag>, EndUserMiddleName>>],
+            nickname[Option<&HashMap<Option<LanguageTag>, EndUserNickname>>],
+            preferred_username[Option<&EndUserUsername>],
+            profile[Option<&HashMap<Option<LanguageTag>, EndUserProfileUrl>>],
+            picture[Option<&HashMap<Option<LanguageTag>, EndUserPictureUrl>>],
+            website[Option<&HashMap<Option<LanguageTag>, EndUserWebsiteUrl>>],
+            email[Option<&EndUserEmail>],
             email_verified[Option<bool>],
-            gender[Option<GC>],
-            birthday[Option<EndUserBirthday>],
-            zoneinfo[Option<EndUserTimezone>],
-            locale[Option<LanguageTag>],
-            phone_number[Option<EndUserPhoneNumber>],
+            gender[Option<&GC>],
+            birthday[Option<&EndUserBirthday>],
+            zoneinfo[Option<&EndUserTimezone>],
+            locale[Option<&LanguageTag>],
+            phone_number[Option<&EndUserPhoneNumber>],
             phone_number_verified[Option<bool>],
-            address[Option<AddressClaim>],
-            updated_at[Option<Seconds>],
+            address[Option<&AddressClaim>],
+            updated_at[Option<Result<DateTime<Utc>, ()>>],
         }
     ];
 }

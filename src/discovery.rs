@@ -211,7 +211,7 @@ pub enum DiscoveryError {
 }
 
 new_type![
-    #[derive(Deserialize, Serialize)]
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     JsonWebKeySetUrl(
         #[serde(
             deserialize_with = "deserialize_url",

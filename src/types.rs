@@ -10,6 +10,7 @@ use oauth2::prelude::*;
 use rand::{thread_rng, Rng};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde_json;
 use url;
 use url::Url;
 
@@ -92,7 +93,9 @@ pub trait ResponseType:
 pub trait SubjectIdentifierType: Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
 
 // FIXME: make this a trait so that callers can add their own enums if desired
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 AuthenticationContextClass(String)];
 impl AsRef<str> for AuthenticationContextClass {
     fn as_ref(&self) -> &str {
@@ -101,42 +104,62 @@ impl AsRef<str> for AuthenticationContextClass {
 }
 
 // FIXME: make this a trait so that callers can add their own enums if desired
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 AuthenticationMethodReference(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 AccessTokenHash(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 AddressCountry(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 AddressLocality(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 AddressPostalCode(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 AddressRegion(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 Audience(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 AuthorizationCodeHash(String)];
 
 new_type![
-    #[derive(Deserialize, Serialize)]
+    #[derive(Deserialize, Eq, Hash, Serialize)]
     Base64UrlEncodedBytes(
         #[serde(with = "serde_base64url_byte_array")]
         Vec<u8>
     )
 ];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 ClientName(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 ClientConfigUrl(
     #[serde(
         deserialize_with = "deserialize_url",
@@ -145,7 +168,9 @@ ClientConfigUrl(
     Url
 )];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 ClientUrl(
     #[serde(
         deserialize_with = "deserialize_url",
@@ -154,31 +179,49 @@ ClientUrl(
     Url
 )];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 ContactEmail(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 EndUserBirthday(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 EndUserEmail(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 EndUserGivenName(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 EndUserMiddleName(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 EndUserName(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 EndUserNickname(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 EndUserPhoneNumber(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 EndUserPictureUrl(
     #[serde(
         deserialize_with = "deserialize_url",
@@ -187,7 +230,9 @@ EndUserPictureUrl(
     Url
 )];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 EndUserProfileUrl(
     #[serde(
         deserialize_with = "deserialize_url",
@@ -196,10 +241,14 @@ EndUserProfileUrl(
     Url
 )];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 EndUserTimezone(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 EndUserWebsiteUrl(
     #[serde(
         deserialize_with = "deserialize_url",
@@ -208,13 +257,19 @@ EndUserWebsiteUrl(
     Url
 )];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 EndUserUsername(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 FormattedAddress(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 InitiateLoginUrl(
     #[serde(
         deserialize_with = "deserialize_url",
@@ -224,7 +279,7 @@ InitiateLoginUrl(
 )];
 
 new_type![
-    #[derive(Deserialize, Serialize)]
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     IssuerUrl(
         #[serde(
             deserialize_with = "deserialize_url",
@@ -244,7 +299,9 @@ new_type![
     }
 ];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 JsonWebKeyId(String)];
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -282,7 +339,9 @@ where
     }
 }
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 LanguageTag(String)];
 impl AsRef<str> for LanguageTag {
     fn as_ref(&self) -> &str {
@@ -290,10 +349,14 @@ impl AsRef<str> for LanguageTag {
     }
 }
 
-new_secret_type![#[derive(Deserialize, Serialize)]
+new_secret_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 LoginHint(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 LogoUrl(
     #[serde(
         deserialize_with = "deserialize_url",
@@ -303,7 +366,7 @@ LogoUrl(
 )];
 
 new_secret_type![
-    #[derive(Deserialize, Serialize)]
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     Nonce(String)
     impl {
         ///
@@ -326,7 +389,9 @@ new_secret_type![
     }
 ];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 OpPolicyUrl(
     #[serde(
         deserialize_with = "deserialize_url",
@@ -335,7 +400,9 @@ OpPolicyUrl(
     Url
 )];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 OpTosUrl(
     #[serde(
         deserialize_with = "deserialize_url",
@@ -344,7 +411,9 @@ OpTosUrl(
     Url
 )];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 PolicyUrl(
     #[serde(
         deserialize_with = "deserialize_url",
@@ -353,10 +422,14 @@ PolicyUrl(
     Url
 )];
 
-new_secret_type![#[derive(Deserialize, Serialize)]
+new_secret_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 RegistrationAccessToken(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 RegistrationUrl(
     #[serde(
         deserialize_with = "deserialize_url",
@@ -365,7 +438,9 @@ RegistrationUrl(
     Url
 )];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 RequestUrl(
     #[serde(
         deserialize_with = "deserialize_url",
@@ -406,9 +481,11 @@ impl<RT: ResponseType> Deref for ResponseTypes<RT> {
 }
 
 new_type![#[derive(Deserialize, Serialize)]
-Seconds(u64)];
+pub(crate) Seconds(serde_json::Number)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 SectorIdentifierUrl(
     #[serde(
         deserialize_with = "deserialize_url",
@@ -417,7 +494,9 @@ SectorIdentifierUrl(
     Url
 )];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 ServiceDocUrl(
     #[serde(
         deserialize_with = "deserialize_url",
@@ -426,13 +505,19 @@ ServiceDocUrl(
     Url
 )];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 StreetAddress(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 SubjectIdentifier(String)];
 
-new_type![#[derive(Deserialize, Serialize)]
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 ToSUrl(
     #[serde(
         deserialize_with = "deserialize_url",
@@ -442,12 +527,13 @@ ToSUrl(
 )];
 
 pub(crate) mod helpers {
+    use chrono::{DateTime, TimeZone, Utc};
     use oauth2::prelude::*;
     use serde::de::DeserializeOwned;
     use serde::{Deserialize, Deserializer, Serializer};
     use serde_json::{from_value, Value};
 
-    use super::LanguageTag;
+    use super::{LanguageTag, Seconds};
 
     pub fn deserialize_string_or_vec<'de, T, D>(deserializer: D) -> Result<Vec<T>, D::Error>
     where
@@ -493,19 +579,26 @@ pub(crate) mod helpers {
         // String::splitn(2) always returns at least one element.
         let field_name = lang_tag_sep.next().unwrap();
 
-        // TODO: rewrite using Option::filter after
-        // https://github.com/rust-lang/rust/pull/49575 is released.
-        let language_tag = if let Some(language_tag) = lang_tag_sep.next() {
-            if !language_tag.is_empty() {
-                Some(LanguageTag::new(language_tag.to_string()))
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        let language_tag = lang_tag_sep
+            .next()
+            .filter(|language_tag| !language_tag.is_empty())
+            .map(|language_tag| LanguageTag::new(language_tag.to_string()));
 
         (field_name, language_tag)
+    }
+
+    pub(crate) fn seconds_to_utc(seconds: &Seconds) -> Result<DateTime<Utc>, ()> {
+        let (secs, nsecs) = if seconds.is_i64() {
+            (seconds.as_i64().ok_or(())?, 0u32)
+        } else {
+            let secs_f64 = seconds.as_f64().ok_or(())?;
+            let secs = secs_f64.floor();
+            (
+                secs as i64,
+                ((secs_f64 - secs) * 1000000000.).floor() as u32,
+            )
+        };
+        Utc.timestamp_opt(secs, nsecs).single().ok_or(())
     }
 }
 
