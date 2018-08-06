@@ -26,8 +26,6 @@ mod crypto;
 mod jwk;
 
 pub type CoreClient = Client<
-    // FIXME: mixing these OAuth2 and OIDC types is a little messy. See if it makes sense
-    // to use type aliases to make this cleaner.
     EmptyAdditionalClaims,
     CoreAuthDisplay,
     CoreClientAuthMethod,

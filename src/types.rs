@@ -552,6 +552,23 @@ pub(crate) mod helpers {
         }
     }
 
+    // Attempt to deserialize the value; if the value is null or an error occurs, return None.
+    // This is useful when deserializing fields that may mean different things in different
+    // contexts, and where we would rather ignore the result than fail to deserialize. For example,
+    // the fields in JWKs are not well defined; extensions could theoretically define their own
+    // field names that overload field names used by other JWK types.
+    pub fn deserialize_option_or_none<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
+    where
+        T: DeserializeOwned,
+        D: Deserializer<'de>,
+    {
+        let value: Value = Deserialize::deserialize(deserializer)?;
+        match from_value::<Option<T>>(value) {
+            Ok(val) => Ok(val),
+            Err(_) => Ok(None),
+        }
+    }
+
     ///
     /// Serde space-delimited string serializer for an `Option<Vec<String>>`.
     ///
