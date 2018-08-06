@@ -109,8 +109,7 @@ fn main() {
                     .find(|pair| {
                         let &(ref key, _) = pair;
                         key == "code"
-                    })
-                    .unwrap();
+                    }).unwrap();
 
                 let (_, value) = code_pair;
                 code = AuthorizationCode::new(value.into_owned());
@@ -120,8 +119,7 @@ fn main() {
                     .find(|pair| {
                         let &(ref key, _) = pair;
                         key == "state"
-                    })
-                    .unwrap();
+                    }).unwrap();
 
                 let (_, value) = state_pair;
                 state = CsrfToken::new(value.into_owned());

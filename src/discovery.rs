@@ -50,7 +50,7 @@ where
         headers: &vec![ACCEPT_JSON],
         post_body: &vec![],
     }.request()
-        .map_err(DiscoveryError::Request)?;
+    .map_err(DiscoveryError::Request)?;
 
     // FIXME: improve error handling (i.e., is there a body response?)
     if discover_response.status_code != HTTP_STATUS_OK {

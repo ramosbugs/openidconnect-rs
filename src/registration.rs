@@ -339,7 +339,7 @@ where
             headers: &headers,
             post_body: &request_json,
         }.request()
-            .map_err(ClientRegistrationError::Request)?;
+        .map_err(ClientRegistrationError::Request)?;
 
         // FIXME: check for WWW-Authenticate response header if bearer auth was used (see
         //   https://tools.ietf.org/html/rfc6750#section-3)

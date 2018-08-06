@@ -134,8 +134,7 @@ impl TestState {
                 self.authorization_code
                     .take()
                     .expect("no authorization_code"),
-            )
-            .panic_if_fail("failed to exchange authorization code for token");
+            ).panic_if_fail("failed to exchange authorization code for token");
         log_debug!(
             "Authorization Server returned token response: {:?}",
             token_response
@@ -235,7 +234,8 @@ fn rp_response_type_code() {
         test_state
             .authorization_code
             .expect("no authorization_code")
-            .secret() != ""
+            .secret()
+            != ""
     );
     log_info!("SUCCESS");
 }
@@ -301,8 +301,8 @@ fn rp_token_endpoint_client_secret_basic() {
     let test_state = TestState::init("rp-token_endpoint-client_secret_basic", |reg| {
         reg.set_token_endpoint_auth_method(Some(CoreClientAuthMethod::ClientSecretBasic))
     }).set_auth_type(AuthType::BasicAuth)
-        .authorize(&vec![])
-        .exchange_code();
+    .authorize(&vec![])
+    .exchange_code();
 
     let id_token_claims = test_state.id_token_claims();
     log_debug!("ID token: {:?}", id_token_claims);
@@ -315,8 +315,8 @@ fn rp_token_endpoint_client_secret_post() {
     let test_state = TestState::init("rp-token_endpoint-client_secret_post", |reg| {
         reg.set_token_endpoint_auth_method(Some(CoreClientAuthMethod::ClientSecretPost))
     }).set_auth_type(AuthType::RequestBody)
-        .authorize(&vec![])
-        .exchange_code();
+    .authorize(&vec![])
+    .exchange_code();
 
     let id_token_claims = test_state.id_token_claims();
     log_debug!("ID token: {:?}", id_token_claims);
@@ -547,7 +547,7 @@ fn rp_userinfo_sig() {
     let test_state = TestState::init("rp-userinfo-sig", |reg| {
         reg.set_userinfo_signed_response_alg(Some(CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256))
     }).authorize(&vec![Scope::new("profile".to_string())])
-        .exchange_code();
+    .exchange_code();
     let id_token_claims = test_state.id_token_claims();
     log_debug!("ID token: {:?}", id_token_claims);
 

@@ -49,16 +49,14 @@ fn test_authorize_url_full() {
         .add_scope(Scope::new("email".to_string()))
         .set_redirect_uri(RedirectUrl::new(
             Url::parse("http://localhost:8888/").unwrap(),
-        ))
-        .set_display(Some(CoreAuthDisplay::Touch))
+        )).set_display(Some(CoreAuthDisplay::Touch))
         .set_prompts(Some(vec![CoreAuthPrompt::Login, CoreAuthPrompt::Consent]))
         .set_max_age(Some(Duration::from_secs(1800)))
         .set_ui_locales(Some(vec![
             LanguageTag::new("fr-CA".to_string()),
             LanguageTag::new("fr".to_string()),
             LanguageTag::new("en".to_string()),
-        ]))
-        .set_auth_context_values(Some(vec![AuthenticationContextClass::new(
+        ])).set_auth_context_values(Some(vec![AuthenticationContextClass::new(
             "urn:mace:incommon:iap:silver".to_string(),
         )]));
 

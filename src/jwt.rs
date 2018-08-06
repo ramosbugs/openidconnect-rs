@@ -320,13 +320,14 @@ where
                         DeserializeError::custom(format!("Failed to parse claims JSON: {:?}", err))
                     })?;
 
-                    signature =
-                        base64::decode_config(parts[2], base64::URL_SAFE_NO_PAD).map_err(|err| {
+                    signature = base64::decode_config(parts[2], base64::URL_SAFE_NO_PAD).map_err(
+                        |err| {
                             DeserializeError::custom(format!(
                                 "Invalid base64url signature encoding: {:?}",
                                 err
                             ))
-                        })?;
+                        },
+                    )?;
 
                     signing_input = format!("{}.{}", parts[0], parts[1]);
                 }

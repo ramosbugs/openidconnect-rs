@@ -131,8 +131,8 @@ where
     let registration_request_pre = CoreClientRegistrationRequest::new(vec![RedirectUrl::new(
         Url::parse(RP_REDIRECT_URI).unwrap(),
     )]).set_application_type(Some(CoreApplicationType::Native))
-        .set_client_name(Some(ClientName::new(RP_NAME.to_string())), None)
-        .set_contacts(Some(vec![ContactEmail::new(RP_CONTACT_EMAIL.to_string())]));
+    .set_client_name(Some(ClientName::new(RP_NAME.to_string())), None)
+    .set_contacts(Some(vec![ContactEmail::new(RP_CONTACT_EMAIL.to_string())]));
 
     let registration_request_post = request_fn(registration_request_pre);
 

@@ -287,9 +287,9 @@ fn test_discovery_deserialization() {
                 "offline_access",
                 "openid",
             ].iter()
-                .map(|s| s.to_string())
-                .map(Scope::new)
-                .collect::<Vec<_>>()
+            .map(|s| s.to_string())
+            .map(Scope::new)
+            .collect::<Vec<_>>()
         ),
         provider_metadata.scopes_supported()
     );
@@ -313,8 +313,8 @@ fn test_discovery_deserialization() {
                 CoreGrantType::Extension("urn:ietf:params:oauth:grant-type:jwt-bearer".to_string()),
                 CoreGrantType::RefreshToken,
             ].into_iter()
-                .map(Into::<CoreGrantTypeWrapper>::into)
-                .collect::<Vec<_>>()
+            .map(Into::<CoreGrantTypeWrapper>::into)
+            .collect::<Vec<_>>()
         ),
         provider_metadata.grant_types_supported()
     );

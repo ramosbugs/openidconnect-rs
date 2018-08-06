@@ -500,9 +500,9 @@ where
                                 core::CoreResponseType::IdToken,
                                 core::CoreResponseType::Token,
                             ].iter()
-                                .map(variant_name)
-                                .collect::<Vec<_>>()
-                                .join(" "),
+                            .map(variant_name)
+                            .collect::<Vec<_>>()
+                            .join(" "),
                         )
                     } else {
                         core::CoreResponseType::IdToken.to_oauth2()

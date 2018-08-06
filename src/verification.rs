@@ -406,8 +406,7 @@ where
                         // Either the JWT doesn't include a 'kid' (in which case any 'kid'
                         // is acceptable), or the 'kid' matches the key's ID.
                         (jose_header.kid.is_none() ||
-                            jose_header.kid.as_ref() == key.key_id()))
-                .collect::<Vec<&K>>()
+                            jose_header.kid.as_ref() == key.key_id())).collect::<Vec<&K>>()
         };
         if public_keys.is_empty() {
             return Err(ClaimsVerificationError::SignatureVerification(
@@ -427,8 +426,7 @@ where
                                 .map(|kid| format!("`{}`", **kid))
                                 .unwrap_or_else(|| "null ID".to_string()),
                             variant_name(key.key_type())
-                        ))
-                        .collect::<Vec<_>>()
+                        )).collect::<Vec<_>>()
                         .join(", ")
                 )),
             ));
