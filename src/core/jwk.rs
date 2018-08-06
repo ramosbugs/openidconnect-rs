@@ -175,7 +175,6 @@ impl JsonWebKeyUse for CoreJsonWebKeyUse {
 #[cfg(test)]
 mod tests {
     use oauth2::prelude::*;
-    use serde::Deserialize;
     use serde_json;
 
     use super::super::super::{Base64UrlEncodedBytes, JsonWebKeyId};
