@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter, Result as FormatterResult};
-use std::marker::PhantomData;
+use std::marker::{PhantomData, Send, Sync};
 use std::time::Duration;
 
 use chrono::{DateTime, TimeZone, Utc};
@@ -722,7 +722,7 @@ where
 
 // FIXME: implement client configuration endpoint request (Section 4)
 
-pub trait RegisterErrorResponseType: Clone + ErrorResponseType {}
+pub trait RegisterErrorResponseType: 'static + Clone + ErrorResponseType + Send + Sync {}
 
 #[derive(Debug, Fail)]
 pub enum ClientRegistrationError<T: RegisterErrorResponseType> {
