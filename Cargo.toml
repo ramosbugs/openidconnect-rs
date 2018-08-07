@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["David A. Ramos <ramos@cs.stanford.edu>"]
 description = "OpenID Connect library for Relying Parties"
 license = "MIT"
+repository = "https://github.com/ramosbugs/openidconnect-rs"
 
 [dependencies]
 base64 = "0.9"
