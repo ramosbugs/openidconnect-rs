@@ -546,3 +546,73 @@ where
         None => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use oauth2::prelude::*;
+    use oauth2::{AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl};
+    use url::Url;
+
+    use super::core::{CoreAuthDisplay, CoreAuthPrompt, CoreClient, CoreResponseType};
+    use super::{AuthenticationContextClass, AuthenticationFlow, LanguageTag, Nonce};
+
+    fn new_client() -> CoreClient {
+        CoreClient::new(
+            ClientId::new("aaa".to_string()),
+            Some(ClientSecret::new("bbb".to_string())),
+            AuthUrl::new(Url::parse("https://example/authorize").unwrap()),
+            Some(TokenUrl::new(Url::parse("https://example/token").unwrap())),
+        )
+    }
+
+    #[test]
+    fn test_authorize_url_minimal() {
+        let client = new_client();
+
+        let (authorize_url, _, _) = client.authorize_url(
+            &AuthenticationFlow::AuthorizationCode::<CoreResponseType>,
+            || CsrfToken::new("CSRF123".to_string()),
+            || Nonce::new("NONCE456".to_string()),
+        );
+
+        assert_eq!(
+            "https://example/authorize?response_type=code&client_id=aaa&scope=openid&\
+             state=CSRF123&nonce=NONCE456",
+            authorize_url.to_string()
+        );
+    }
+
+    #[test]
+    fn test_authorize_url_full() {
+        let client = new_client()
+            .add_scope(Scope::new("email".to_string()))
+            .set_redirect_uri(RedirectUrl::new(
+                Url::parse("http://localhost:8888/").unwrap(),
+            )).set_display(Some(CoreAuthDisplay::Touch))
+            .set_prompts(Some(vec![CoreAuthPrompt::Login, CoreAuthPrompt::Consent]))
+            .set_max_age(Some(Duration::from_secs(1800)))
+            .set_ui_locales(Some(vec![
+                LanguageTag::new("fr-CA".to_string()),
+                LanguageTag::new("fr".to_string()),
+                LanguageTag::new("en".to_string()),
+            ])).set_auth_context_values(Some(vec![AuthenticationContextClass::new(
+                "urn:mace:incommon:iap:silver".to_string(),
+            )]));
+
+        let (authorize_url, _, _) = client.authorize_url(
+            &AuthenticationFlow::AuthorizationCode::<CoreResponseType>,
+            || CsrfToken::new("CSRF123".to_string()),
+            || Nonce::new("NONCE456".to_string()),
+        );
+
+        assert_eq!(
+            "https://example/authorize?response_type=code&client_id=aaa&\
+             redirect_uri=http%3A%2F%2Flocalhost%3A8888%2F&scope=openid+email&state=CSRF123&\
+             nonce=NONCE456&acr_values=urn%3Amace%3Aincommon%3Aiap%3Asilver&display=touch&\
+             max_age=1800&prompt=login+consent&ui_locales=fr-CA+fr+en",
+            authorize_url.to_string()
+        );
+    }
+}

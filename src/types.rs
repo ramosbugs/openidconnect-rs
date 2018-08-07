@@ -648,3 +648,60 @@ mod serde_base64url_byte_array {
         serializer.serialize_str(&base64_encoded)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use oauth2::prelude::*;
+    use serde_json;
+    use url::Url;
+
+    use super::super::IssuerUrl;
+
+    #[test]
+    fn test_issuer_url_append() {
+        assert_eq!(
+            "http://example.com/.well-known/openid-configuration",
+            IssuerUrl::new(Url::parse("http://example.com").unwrap())
+                .join(".well-known/openid-configuration")
+                .unwrap()
+                .to_string()
+        );
+        assert_eq!(
+            "http://example.com/.well-known/openid-configuration",
+            IssuerUrl::new(Url::parse("http://example.com/").unwrap())
+                .join(".well-known/openid-configuration")
+                .unwrap()
+                .to_string()
+        );
+        assert_eq!(
+            "http://example.com/x/.well-known/openid-configuration",
+            IssuerUrl::new(Url::parse("http://example.com/x").unwrap())
+                .join(".well-known/openid-configuration")
+                .unwrap()
+                .to_string()
+        );
+        assert_eq!(
+            "http://example.com/x/.well-known/openid-configuration",
+            IssuerUrl::new(Url::parse("http://example.com/x/").unwrap())
+                .join(".well-known/openid-configuration")
+                .unwrap()
+                .to_string()
+        );
+    }
+
+    #[test]
+    fn test_url_serialize() {
+        let issuer_url = IssuerUrl::new(
+            Url::parse("http://example.com/.well-known/openid-configuration").unwrap(),
+        );
+        let serialized_url = serde_json::to_string(&issuer_url).unwrap();
+
+        assert_eq!(
+            "\"http://example.com/.well-known/openid-configuration\"",
+            serialized_url
+        );
+
+        let deserialized_url = serde_json::from_str(&serialized_url).unwrap();
+        assert_eq!(issuer_url, deserialized_url);
+    }
+}

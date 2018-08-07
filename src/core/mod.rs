@@ -807,3 +807,6 @@ pub enum CoreSubjectIdentifierType {
     Public,
 }
 impl SubjectIdentifierType for CoreSubjectIdentifierType {}
+
+#[cfg(test)]
+mod tests;
