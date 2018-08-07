@@ -32,7 +32,7 @@ after_success: |
   make install DESTDIR=../../kcov-build &&
   cd ../.. &&
   rm -rf kcov-master &&
-  for file in $(for file in openidconnect $(ls tests/*.rs | sed 's/.rs//'); do ls target/debug/$(basename $file)-*[^\.d]; done); do
+  for file in $(for file in openidconnect $(ls tests/*.rs | grep -v "^tests/rp_" | sed 's/.rs//'); do ls target/debug/$(basename $file)-*[^\.d]; done); do
     mkdir -p "target/cov/$(basename $file)"
     ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"
   done &&
