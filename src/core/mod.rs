@@ -1,10 +1,12 @@
-use std::fmt::{Display, Error as FormatterError, Formatter};
+use std::fmt::{Display, Error as FormatterError, Formatter, Result as FormatterResult};
 use std::ops::Deref;
 
 use oauth2::basic::{BasicErrorResponseType, BasicTokenType};
 use oauth2::helpers::variant_name;
 use oauth2::prelude::*;
 use oauth2::{ErrorResponseType, ResponseType as OAuth2ResponseType};
+use serde::de::{Error as DeserializeError, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::discovery::Discovery10ProviderMetadata;
 use super::registration::{
@@ -31,7 +33,7 @@ pub type CoreClient = Client<
     CoreClientAuthMethod,
     CoreClaimName,
     CoreClaimType,
-    CoreGrantTypeWrapper,
+    CoreGrantType,
     CoreGenderClaim,
     CoreJweContentEncryptionAlgorithm,
     CoreJweKeyManagementAlgorithm,
@@ -42,7 +44,6 @@ pub type CoreClient = Client<
     CoreResponseMode,
     CoreResponseType,
     CoreSubjectIdentifierType,
-    // FIXME: use the right error types for the token response
     BasicErrorResponseType,
     BasicTokenType,
 >;
@@ -50,7 +51,7 @@ pub type CoreClient = Client<
 pub type CoreClientMetadata = Registration10ClientMetadata<
     CoreApplicationType,
     CoreClientAuthMethod,
-    CoreGrantTypeWrapper,
+    CoreGrantType,
     CoreJweContentEncryptionAlgorithm,
     CoreJweKeyManagementAlgorithm,
     CoreJwsSigningAlgorithm,
@@ -66,7 +67,7 @@ pub type CoreClientRegistrationRequest = Registration10ClientRegistrationRequest
     CoreClientAuthMethod,
     CoreClientRegistrationResponse,
     CoreRegisterErrorResponseType,
-    CoreGrantTypeWrapper,
+    CoreGrantType,
     CoreJweContentEncryptionAlgorithm,
     CoreJweKeyManagementAlgorithm,
     CoreJwsSigningAlgorithm,
@@ -81,7 +82,7 @@ pub type CoreClientRegistrationResponse = Registration10ClientRegistrationRespon
     CoreApplicationType,
     CoreClientAuthMethod,
     CoreClientMetadata,
-    CoreGrantTypeWrapper,
+    CoreGrantType,
     CoreJweContentEncryptionAlgorithm,
     CoreJweKeyManagementAlgorithm,
     CoreJwsSigningAlgorithm,
@@ -113,7 +114,7 @@ pub type CoreProviderMetadata = Discovery10ProviderMetadata<
     CoreClientAuthMethod,
     CoreClaimName,
     CoreClaimType,
-    CoreGrantTypeWrapper,
+    CoreGrantType,
     CoreJweContentEncryptionAlgorithm,
     CoreJweKeyManagementAlgorithm,
     CoreJwsSigningAlgorithm,
@@ -327,83 +328,62 @@ pub enum CoreGenderClaim {
 }
 impl GenderClaim for CoreGenderClaim {}
 
-// This `enum` intentionally does not implement the `GrantType` trait. Instead, the
-// `CoreGrantTypeWrapper` type should be used to ensure proper serialization/deserialization
-// of extensions.
-#[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
-#[serde(rename_all = "snake_case")]
+// These are defined in various specs, including the Client Registration spec:
+//   http://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CoreGrantType {
     AuthorizationCode,
     ClientCredentials,
     Implicit,
     Password,
     RefreshToken,
-    #[serde(skip_deserializing)]
-    #[serde(skip_serializing)]
     Extension(String),
 }
-impl From<CoreGrantTypeWrapper> for CoreGrantType {
-    fn from(grant_type_wrapper: CoreGrantTypeWrapper) -> Self {
-        grant_type_wrapper.0
-    }
-}
-impl PartialEq<CoreGrantTypeWrapper> for CoreGrantType {
-    fn eq(&self, rhs: &CoreGrantTypeWrapper) -> bool {
-        *self == rhs.0
-    }
-}
-
-// FIXME: remove this and implement a custom serializer/deserializer
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-CoreGrantTypeWrapper(
-    #[serde(with = "serde_core_grant_type")]
-    CoreGrantType
-)];
-impl GrantType for CoreGrantTypeWrapper {}
-impl From<CoreGrantType> for CoreGrantTypeWrapper {
-    fn from(grant_type: CoreGrantType) -> Self {
-        CoreGrantTypeWrapper(grant_type)
-    }
-}
-impl PartialEq<CoreGrantType> for CoreGrantTypeWrapper {
-    fn eq(&self, rhs: &CoreGrantType) -> bool {
-        self.0 == *rhs
-    }
-}
-
-pub mod serde_core_grant_type {
-    use oauth2::helpers::variant_name;
-    use serde::de::Error;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    use serde_json::{from_value, Value};
-
-    use super::CoreGrantType;
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<CoreGrantType, D::Error>
+impl GrantType for CoreGrantType {}
+impl<'de> Deserialize<'de> for CoreGrantType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let value: Value = Deserialize::deserialize(deserializer)?;
+        struct CoreGrantTypeVisitor;
+        impl<'de> Visitor<'de> for CoreGrantTypeVisitor {
+            type Value = CoreGrantType;
 
-        match from_value::<CoreGrantType>(value.clone()) {
-            Ok(val) => Ok(val),
-            Err(_) => {
-                let extension: String = from_value(value).map_err(D::Error::custom)?;
-                Ok(CoreGrantType::Extension(extension))
+            fn expecting(&self, formatter: &mut Formatter) -> FormatterResult {
+                formatter.write_str("CoreGrantType")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: DeserializeError,
+            {
+                Ok(match v {
+                    "authorization_code" => CoreGrantType::AuthorizationCode,
+                    "client_credentials" => CoreGrantType::ClientCredentials,
+                    "implicit" => CoreGrantType::Implicit,
+                    "password" => CoreGrantType::Password,
+                    "refresh_token" => CoreGrantType::RefreshToken,
+                    other => CoreGrantType::Extension(other.to_string()),
+                })
             }
         }
+        deserializer.deserialize_str(CoreGrantTypeVisitor {})
     }
-
-    pub fn serialize<S>(grant_type: &CoreGrantType, serializer: S) -> Result<S::Ok, S::Error>
+}
+impl Serialize for CoreGrantType {
+    fn serialize<SE>(&self, serializer: SE) -> Result<SE::Ok, SE::Error>
     where
-        S: Serializer,
+        SE: Serializer,
     {
-        match *grant_type {
-            CoreGrantType::Extension(ref extension) => serializer.serialize_str(extension),
-            ref variant => variant_name(variant).serialize(serializer),
-        }
+        let grant_type_str = match *self {
+            CoreGrantType::AuthorizationCode => "authorization_code",
+            CoreGrantType::ClientCredentials => "client_credentials",
+            CoreGrantType::Implicit => "implicit",
+            CoreGrantType::Password => "password",
+            CoreGrantType::RefreshToken => "refresh_token",
+            CoreGrantType::Extension(ref extension) => extension,
+        };
+        serializer.serialize_str(grant_type_str)
     }
 }
 

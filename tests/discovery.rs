@@ -11,9 +11,8 @@ use url::Url;
 
 use openidconnect::core::{
     CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClientAuthMethod, CoreGrantType,
-    CoreGrantTypeWrapper, CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm,
-    CoreJwsSigningAlgorithm, CoreProviderMetadata, CoreResponseMode, CoreResponseType,
-    CoreSubjectIdentifierType,
+    CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm,
+    CoreProviderMetadata, CoreResponseMode, CoreResponseType, CoreSubjectIdentifierType,
 };
 use openidconnect::discovery::{JsonWebKeySetUrl, ProviderMetadata};
 use openidconnect::{
@@ -313,7 +312,6 @@ fn test_discovery_deserialization() {
                 CoreGrantType::Extension("urn:ietf:params:oauth:grant-type:jwt-bearer".to_string()),
                 CoreGrantType::RefreshToken,
             ].into_iter()
-            .map(Into::<CoreGrantTypeWrapper>::into)
             .collect::<Vec<_>>()
         ),
         provider_metadata.grant_types_supported()
