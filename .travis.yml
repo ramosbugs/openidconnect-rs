@@ -4,6 +4,7 @@ rust:
   - beta
   - nightly
 sudo: required
+dist: trusty
 branches:
   only:
     - master
@@ -18,24 +19,13 @@ addons:
       - gcc
       - binutils-dev
       - libiberty-dev
+      - libssl-dev
 script:
   - cargo test -- --test-threads=1
   - cargo test --example google
 after_success: |
-  wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
-  tar xzf master.tar.gz &&
-  cd kcov-master &&
-  mkdir build &&
-  cd build &&
-  cmake .. &&
-  make &&
-  make install DESTDIR=../../kcov-build &&
-  cd ../.. &&
-  rm -rf kcov-master &&
-  for file in $(for file in openidconnect $(ls tests/*.rs | grep -v "^tests/rp_" | sed 's/.rs//'); do ls target/debug/$(basename $file)-*[^\.d]; done); do
-    mkdir -p "target/cov/$(basename $file)"
-    ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"
-  done &&
+  RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin &&
+  cargo tarpaulin --out Xml &&
   bash <(curl -s https://codecov.io/bash) &&
   echo "Uploaded code coverage"
 notifications:
