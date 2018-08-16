@@ -226,6 +226,8 @@ where
         // implementation doesn't understand any of them, unconditionally reject the JWT. Note that
         // the spec prohibits this field from containing any of the standard headers or being empty.
         if let Some(_) = jose_header.crit {
+            // FIXME: add a test case using this test vector:
+            // https://tools.ietf.org/html/rfc7515#appendix-E
             return Err(ClaimsVerificationError::Unsupported(
                 "critical JWT header fields are unsupported".to_string(),
             ));
