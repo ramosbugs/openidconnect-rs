@@ -177,6 +177,7 @@ mod tests {
     use oauth2::prelude::*;
     use serde_json;
 
+    use super::super::super::verification::SignatureVerificationError;
     use super::super::super::{Base64UrlEncodedBytes, JsonWebKey, JsonWebKeyId};
     use super::{CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJwsSigningAlgorithm};
 
@@ -282,36 +283,14 @@ mod tests {
 
         assert!(
             serde_json::from_str::<CoreJsonWebKey>(json)
-            .expect_err("deserialization must fail when duplicate fields are present")
-            .to_string()
-            // This is probably not ideal since the serde/serde_json contracts don't guarantee this
-            // error message. However, we want to be sure that this fails for the expected reason
-            // and not by happenstance, so this is fine for now.
-            .contains("duplicate field")
+                .expect_err("deserialization must fail when duplicate fields are present")
+                .to_string()
+                // This is probably not ideal since the serde/serde_json contracts don't guarantee this
+                // error message. However, we want to be sure that this fails for the expected reason
+                // and not by happenstance, so this is fine for now.
+                .contains("duplicate field")
         );
     }
-
-    const RFC7520_RSA_KEY: &str = "{
-        \"kty\": \"RSA\",
-        \"kid\": \"bilbo.baggins@hobbiton.example\",
-        \"use\": \"sig\",
-        \"n\": \"n4EPtAOCc9AlkeQHPzHStgAbgs7bTZLwUBZdR8_KuKPEHLd4rHVTeT\
-                 -O-XV2jRojdNhxJWTDvNd7nqQ0VEiZQHz_AJmSCpMaJMRBSFKrKb2wqV\
-                 wGU_NsYOYL-QtiWN2lbzcEe6XC0dApr5ydQLrHqkHHig3RBordaZ6Aj-\
-                 oBHqFEHYpPe7Tpe-OfVfHd1E6cS6M1FZcD1NNLYD5lFHpPI9bTwJlsde\
-                 3uhGqC0ZCuEHg8lhzwOHrtIQbS0FVbb9k3-tVTU4fg_3L_vniUFAKwuC\
-                 LqKnS2BYwdq_mzSnbLY7h_qixoR7jig3__kRhuaxwUkRz5iaiQkqgc5g\
-                 HdrNP5zw\",
-        \"e\": \"AQAB\"
-    }";
-
-    const RFC7520_HMAC_KEY: &str = "{
-        \"kty\": \"oct\",
-        \"kid\": \"018c0ae5-4d9b-471b-bfd6-eef314bc7037\",
-        \"use\": \"sig\",
-        \"alg\": \"HS256\",
-        \"k\": \"hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg\"
-    }";
 
     fn verify_signature(
         key: &CoreJsonWebKey,
@@ -319,34 +298,38 @@ mod tests {
         signing_input: &str,
         signature_base64: &str,
     ) {
-        let signature =
-            base64::decode_config(signature_base64, base64::URL_SAFE_NO_PAD)
-                .expect("failed to base64url decode");
-        key.verify_signature(
-            alg,
-            signing_input,
-            &signature,
-        ).expect("signature verification failed");
-        key.verify_signature(
-            alg,
-            &(signing_input.to_string() + "foobar"),
-            &signature,
-        ).expect_err("signature verification should fail");
+        let signature = base64::decode_config(signature_base64, base64::URL_SAFE_NO_PAD)
+            .expect("failed to base64url decode");
+        key.verify_signature(alg, signing_input, &signature)
+            .expect("signature verification failed");
+        key.verify_signature(alg, &(signing_input.to_string() + "foobar"), &signature)
+            .expect_err("signature verification should fail");
     }
 
     #[test]
     fn test_rsa_verification() {
-        let key: CoreJsonWebKey = serde_json::from_str(RFC7520_RSA_KEY)
-            .expect("deserialization failed");
+        let key_json = "{
+            \"kty\": \"RSA\",
+            \"kid\": \"bilbo.baggins@hobbiton.example\",
+            \"use\": \"sig\",
+            \"n\": \"n4EPtAOCc9AlkeQHPzHStgAbgs7bTZLwUBZdR8_KuKPEHLd4rHVTeT\
+                     -O-XV2jRojdNhxJWTDvNd7nqQ0VEiZQHz_AJmSCpMaJMRBSFKrKb2wqV\
+                     wGU_NsYOYL-QtiWN2lbzcEe6XC0dApr5ydQLrHqkHHig3RBordaZ6Aj-\
+                     oBHqFEHYpPe7Tpe-OfVfHd1E6cS6M1FZcD1NNLYD5lFHpPI9bTwJlsde\
+                     3uhGqC0ZCuEHg8lhzwOHrtIQbS0FVbb9k3-tVTU4fg_3L_vniUFAKwuC\
+                     LqKnS2BYwdq_mzSnbLY7h_qixoR7jig3__kRhuaxwUkRz5iaiQkqgc5g\
+                     HdrNP5zw\",
+            \"e\": \"AQAB\"
+        }";
+        let key: CoreJsonWebKey = serde_json::from_str(key_json).expect("deserialization failed");
 
         // Source: https://tools.ietf.org/html/rfc7520#section-4.1
-        let pkcs1_signing_input =
-            "eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZX\
-             hhbXBsZSJ9.\
-             SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\
-             lvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\
-             b24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\
-             UgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4";
+        let pkcs1_signing_input = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZX\
+                                   hhbXBsZSJ9.\
+                                   SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\
+                                   lvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\
+                                   b24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\
+                                   UgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4";
 
         verify_signature(
             &key,
@@ -385,13 +368,12 @@ mod tests {
         );
 
         // Source: https://tools.ietf.org/html/rfc7520#section-4.2
-        let pss_signing_input =
-            "eyJhbGciOiJQUzM4NCIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZX\
-             hhbXBsZSJ9.\
-             SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\
-             lvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\
-             b24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\
-             UgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4";
+        let pss_signing_input = "eyJhbGciOiJQUzM4NCIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZX\
+                                 hhbXBsZSJ9.\
+                                 SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\
+                                 lvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\
+                                 b24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\
+                                 UgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4";
 
         verify_signature(
             &key,
@@ -428,20 +410,92 @@ mod tests {
              c_FEXn6fZ21up5mU9vg5_LdeBoSh4Idmz8HLn5rpVd57AsQ2PbLMsKXcpVUhwP_ID1\
              7zsAFuCEFJqA",
         );
+
+        // Wrong key type
+        match key
+            .verify_signature(
+                &CoreJwsSigningAlgorithm::EcdsaP256Sha256,
+                pkcs1_signing_input,
+                &Vec::new(),
+            ).expect_err("signature verification should fail")
+        {
+            SignatureVerificationError::InvalidKey(_) => {}
+            other => panic!(format!("unexpected error: {:?}", other)),
+        }
+
+        // Wrong key usage
+        let enc_key_json = "{
+            \"kty\": \"RSA\",
+            \"kid\": \"bilbo.baggins@hobbiton.example\",
+            \"use\": \"enc\",
+            \"n\": \"n4EPtAOCc9AlkeQHPzHStgAbgs7bTZLwUBZdR8_KuKPEHLd4rHVTeT\
+                     -O-XV2jRojdNhxJWTDvNd7nqQ0VEiZQHz_AJmSCpMaJMRBSFKrKb2wqV\
+                     wGU_NsYOYL-QtiWN2lbzcEe6XC0dApr5ydQLrHqkHHig3RBordaZ6Aj-\
+                     oBHqFEHYpPe7Tpe-OfVfHd1E6cS6M1FZcD1NNLYD5lFHpPI9bTwJlsde\
+                     3uhGqC0ZCuEHg8lhzwOHrtIQbS0FVbb9k3-tVTU4fg_3L_vniUFAKwuC\
+                     LqKnS2BYwdq_mzSnbLY7h_qixoR7jig3__kRhuaxwUkRz5iaiQkqgc5g\
+                     HdrNP5zw\",
+            \"e\": \"AQAB\"
+        }";
+        let enc_key: CoreJsonWebKey =
+            serde_json::from_str(enc_key_json).expect("deserialization failed");
+        match enc_key
+            .verify_signature(
+                &CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
+                pkcs1_signing_input,
+                &Vec::new(),
+            ).expect_err("signature verification should fail")
+        {
+            SignatureVerificationError::InvalidKey(_) => {}
+            other => panic!(format!("unexpected error: {:?}", other)),
+        }
+
+        // Key without usage specified should work
+        let nousage_key_json = "{
+            \"kty\": \"RSA\",
+            \"kid\": \"bilbo.baggins@hobbiton.example\",
+            \"n\": \"n4EPtAOCc9AlkeQHPzHStgAbgs7bTZLwUBZdR8_KuKPEHLd4rHVTeT\
+                     -O-XV2jRojdNhxJWTDvNd7nqQ0VEiZQHz_AJmSCpMaJMRBSFKrKb2wqV\
+                     wGU_NsYOYL-QtiWN2lbzcEe6XC0dApr5ydQLrHqkHHig3RBordaZ6Aj-\
+                     oBHqFEHYpPe7Tpe-OfVfHd1E6cS6M1FZcD1NNLYD5lFHpPI9bTwJlsde\
+                     3uhGqC0ZCuEHg8lhzwOHrtIQbS0FVbb9k3-tVTU4fg_3L_vniUFAKwuC\
+                     LqKnS2BYwdq_mzSnbLY7h_qixoR7jig3__kRhuaxwUkRz5iaiQkqgc5g\
+                     HdrNP5zw\",
+            \"e\": \"AQAB\"
+        }";
+        let nousage_key: CoreJsonWebKey =
+            serde_json::from_str(nousage_key_json).expect("deserialization failed");
+        verify_signature(
+            &nousage_key,
+            &CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
+            pkcs1_signing_input,
+            "MRjdkly7_-oTPTS3AXP41iQIGKa80A0ZmTuV5MEaHoxnW2e5CZ5NlKtainoFmK\
+             ZopdHM1O2U4mwzJdQx996ivp83xuglII7PNDi84wnB-BDkoBwA78185hX-Es4J\
+             IwmDLJK3lfWRa-XtL0RnltuYv746iYTh_qHRD68BNt1uSNCrUCTJDt5aAE6x8w\
+             W1Kt9eRo4QPocSadnHXFxnt8Is9UzpERV0ePPQdLuW3IS_de3xyIrDaLGdjluP\
+             xUAhb6L2aXic1U12podGU0KLUQSE_oI-ZnmKJ3F4uOZDnd6QZWJushZ41Axf_f\
+             cIe8u9ipH84ogoree7vjbU5y18kDquDg",
+        );
     }
 
     #[test]
     fn test_hmac_sha256_verification() {
-        let key: CoreJsonWebKey = serde_json::from_str(RFC7520_HMAC_KEY)
-            .expect("deserialization failed");
+        let key_json = "{
+            \"kty\": \"oct\",
+            \"kid\": \"018c0ae5-4d9b-471b-bfd6-eef314bc7037\",
+            \"use\": \"sig\",
+            \"alg\": \"HS256\",
+            \"k\": \"hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg\"
+        }";
+
+        let key: CoreJsonWebKey = serde_json::from_str(key_json).expect("deserialization failed");
         // Source: https://tools.ietf.org/html/rfc7520#section-4.4
-        let signing_input =
-            "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LW\
-             VlZjMxNGJjNzAzNyJ9.\
-             SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\
-             lvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\
-             b24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\
-             UgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4";
+        let signing_input = "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LW\
+                             VlZjMxNGJjNzAzNyJ9.\
+                             SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\
+                             lvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\
+                             b24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\
+                             UgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4";
 
         verify_signature(
             &key,
