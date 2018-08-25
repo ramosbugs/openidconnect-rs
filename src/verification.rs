@@ -10,7 +10,7 @@ use oauth2::{ClientId, ClientSecret};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use super::jwt::JsonWebToken;
+use super::jwt::{JsonWebToken, JsonWebTokenJsonPayloadDeserializer};
 use super::user_info::UnverifiedUserInfoClaims;
 use super::{
     AdditionalClaims, Audience, AuthenticationContextClass, GenderClaim, IdTokenClaims, IssuerUrl,
@@ -550,7 +550,13 @@ where
     // use crypto or some other mechanism to validate nonces instead of storing every nonce.
     pub(super) fn verified_claims<'b, AC, GC, JE>(
         &self,
-        jwt: &'b JsonWebToken<IdTokenClaims<AC, GC>, JE, JS, JT>,
+        jwt: &'b JsonWebToken<
+            IdTokenClaims<AC, GC>,
+            JE,
+            JS,
+            JT,
+            JsonWebTokenJsonPayloadDeserializer,
+        >,
         nonce: Option<&Nonce>,
     ) -> Result<&'b IdTokenClaims<AC, GC>, ClaimsVerificationError>
     where

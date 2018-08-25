@@ -5,6 +5,7 @@ use chrono::{DateTime, Utc};
 use oauth2::ClientId;
 
 use super::claims::StandardClaimsImpl;
+use super::jwt::JsonWebTokenJsonPayloadDeserializer;
 use super::types::helpers::{deserialize_string_or_vec, seconds_to_utc};
 use super::types::Seconds;
 use super::{
@@ -28,7 +29,10 @@ pub struct IdToken<
     JE: JweContentEncryptionAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
->(#[serde(bound = "AC: AdditionalClaims")] JsonWebToken<IdTokenClaims<AC, GC>, JE, JS, JT>);
+>(
+    #[serde(bound = "AC: AdditionalClaims")]
+    JsonWebToken<IdTokenClaims<AC, GC>, JE, JS, JT, JsonWebTokenJsonPayloadDeserializer>,
+);
 impl<AC, GC, JE, JS, JT> IdToken<AC, GC, JE, JS, JT>
 where
     AC: AdditionalClaims,

@@ -15,6 +15,7 @@ use super::http::{
     auth_bearer, HttpRequest, HttpRequestMethod, ACCEPT_JSON, HTTP_STATUS_OK, MIME_TYPE_JSON,
     MIME_TYPE_JWT,
 };
+use super::jwt::JsonWebTokenJsonPayloadDeserializer;
 use super::types::helpers::seconds_to_utc;
 use super::verification::UserInfoVerifier;
 use super::{
@@ -245,6 +246,7 @@ where
 {
     JsonClaims(#[serde(bound = "AC: AdditionalClaims")] UserInfoClaims<AC, GC>),
     JwtClaims(
-        #[serde(bound = "AC: AdditionalClaims")] JsonWebToken<UserInfoClaims<AC, GC>, JE, JS, JT>,
+        #[serde(bound = "AC: AdditionalClaims")]
+        JsonWebToken<UserInfoClaims<AC, GC>, JE, JS, JT, JsonWebTokenJsonPayloadDeserializer>,
     ),
 }
