@@ -399,7 +399,8 @@ mod tests {
     };
     use super::super::JsonWebKeyId;
     use super::{
-        JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenPayloadDeserialize,
+        JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm,
+        JsonWebTokenJsonPayloadDeserializer, JsonWebTokenPayloadDeserialize,
     };
 
     type CoreAlgorithm = JsonWebTokenAlgorithm<
@@ -460,6 +461,9 @@ mod tests {
             serde_json::from_str::<CoreAlgorithm>("\"none\"").expect("failed to deserialize"),
             JsonWebTokenAlgorithm::None,
         );
+
+        serde_json::from_str::<CoreAlgorithm>("\"invalid\"")
+            .expect_err("deserialization should have failed");
     }
 
     #[test]
@@ -506,8 +510,8 @@ mod tests {
     }
 
     #[test]
-    fn test_jwt() {
-        fn verify_jwt<A>(jwt_access: A)
+    fn test_jwt_basic() {
+        fn verify_jwt<A>(jwt_access: A, key: &CoreJsonWebKey, expected_payload: &str)
         where
             A: JsonWebTokenAccess<
                 String,
@@ -517,12 +521,6 @@ mod tests {
             >,
             A::ReturnType: ToString,
         {
-            let key: CoreJsonWebKey =
-                serde_json::from_str(TEST_RSA_PUB_KEY).expect("deserialization failed");
-            let expected_payload = "It\u{2019}s a dangerous business, Frodo, going out your \
-                                    door. You step onto the road, and if you don't keep your feet, \
-                                    there\u{2019}s no knowing where you might be swept off \
-                                    to.";
             {
                 let header = jwt_access.unverified_header();
                 assert_eq!(
@@ -546,12 +544,19 @@ mod tests {
 
             assert_eq!(
                 jwt_access
-                    .claims(&CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256, &key)
+                    .claims(&CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256, key)
                     .expect("failed to validate claims")
                     .to_string(),
                 expected_payload
             );
         }
+
+        let key: CoreJsonWebKey =
+            serde_json::from_str(TEST_RSA_PUB_KEY).expect("deserialization failed");
+        let expected_payload = "It\u{2019}s a dangerous business, Frodo, going out your \
+                                door. You step onto the road, and if you don't keep your feet, \
+                                there\u{2019}s no knowing where you might be swept off \
+                                to.";
 
         let jwt: JsonWebToken<
             String,
@@ -562,8 +567,15 @@ mod tests {
         > = serde_json::from_value(serde_json::Value::String(TEST_JWT.to_string()))
             .expect("failed to deserialize");
 
-        verify_jwt(&jwt);
-        verify_jwt(jwt);
+        assert_eq!(
+            serde_json::to_value(&jwt).expect("failed to serialize"),
+            serde_json::Value::String(TEST_JWT.to_string())
+        );
+
+        verify_jwt(&jwt, &key, &expected_payload);
+        assert_eq!((&jwt).unverified_claims(), expected_payload);
+
+        verify_jwt(jwt, &key, &expected_payload);
     }
 
     #[test]
@@ -585,7 +597,92 @@ mod tests {
         let key: CoreJsonWebKey =
             serde_json::from_str(TEST_RSA_PUB_KEY).expect("deserialization failed");
 
+        // JsonWebTokenAccess for reference.
+        (&jwt)
+            .claims(&CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256, &key)
+            .expect_err("signature verification should have failed");
+
+        // JsonWebTokenAccess for owned value.
         jwt.claims(&CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256, &key)
             .expect_err("signature verification should have failed");
+    }
+
+    #[test]
+    fn test_invalid_deserialization() {
+        #[derive(Debug, Deserialize, Serialize)]
+        struct TestPayload {
+            foo: String,
+        }
+
+        fn expect_deserialization_err<I: Into<String>>(jwt_str: I, pattern: &str) {
+            let err =
+                serde_json::from_value::<JsonWebToken<
+                    TestPayload,
+                    CoreJweContentEncryptionAlgorithm,
+                    CoreJwsSigningAlgorithm,
+                    CoreJsonWebKeyType,
+                    JsonWebTokenJsonPayloadDeserializer,
+                >>(
+                    serde_json::Value::String(jwt_str.into())
+                )
+                    .expect_err("deserialization should have failed");
+
+            assert!(
+                format!("{}", err).contains(pattern),
+                format!("Error `{}` must contain string `{}`", err, pattern),
+            );
+        }
+
+        // Too many dots
+        expect_deserialization_err("a.b.c.d", "found 4 parts (expected 3)");
+
+        // Invalid header base64
+        expect_deserialization_err("a!.b.c", "Invalid base64url header encoding");
+
+        // Invalid header utf-8 (after base64 decoding)
+        expect_deserialization_err("gA.b.c", "Invalid UTF-8 header encoding");
+
+        // Invalid header JSON
+        expect_deserialization_err("bm90X2pzb24.b.c", "Failed to parse header JSON");
+
+        let valid_header =
+            "eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9";
+
+        // Invalid payload base64
+        expect_deserialization_err(
+            format!("{}.b!.c", valid_header),
+            "Invalid base64url claims encoding",
+        );
+
+        // Invalid payload utf-8 (after base64 decoding)
+        expect_deserialization_err(format!("{}.gA.c", valid_header), "Invalid UTF-8 encoding");
+
+        // Invalid payload JSON
+        expect_deserialization_err(
+            format!("{}.bm90X2pzb24.c", valid_header),
+            "Failed to parse claims JSON",
+        );
+
+        let valid_body = "eyJmb28iOiAiYmFyIn0";
+
+        // Invalid signature base64
+        expect_deserialization_err(
+            format!("{}.{}.c!", valid_header, valid_body),
+            "Invalid base64url signature encoding",
+        );
+
+        let deserialized = serde_json::from_value::<
+            JsonWebToken<
+                TestPayload,
+                CoreJweContentEncryptionAlgorithm,
+                CoreJwsSigningAlgorithm,
+                CoreJsonWebKeyType,
+                JsonWebTokenJsonPayloadDeserializer,
+            >,
+        >(serde_json::Value::String(format!(
+            "{}.{}.e2FiY30",
+            valid_header, valid_body
+        ))).expect("failed to deserialize");
+        assert_eq!(deserialized.unverified_claims().foo, "bar");
     }
 }
