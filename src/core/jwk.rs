@@ -20,22 +20,35 @@ use super::{crypto, CoreJwsSigningAlgorithm};
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct CoreJsonWebKey {
     pub(crate) kty: CoreJsonWebKeyType,
-    #[serde(rename = "use")]
+    #[serde(rename = "use", skip_serializing_if = "Option::is_none")]
     pub(crate) use_: Option<CoreJsonWebKeyUse>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) kid: Option<JsonWebKeyId>,
 
     // From RFC 7517, Section 4: "Additional members can be present in the JWK; if not understood
     // by implementations encountering them, they MUST be ignored.  Member names used for
     // representing key parameters for different keys types need not be distinct."
     // Hence, we set fields we fail to deserialize (understand) as None.
-    #[serde(default, deserialize_with = "deserialize_option_or_none")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_option_or_none",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub(crate) n: Option<Base64UrlEncodedBytes>,
-    #[serde(default, deserialize_with = "deserialize_option_or_none")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_option_or_none",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub(crate) e: Option<Base64UrlEncodedBytes>,
 
     // Used for symmetric keys, which we only generate internally from the client secret; these
     // are never part of the JWK set.
-    #[serde(default, deserialize_with = "deserialize_option_or_none")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_option_or_none",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub(crate) k: Option<Base64UrlEncodedBytes>,
 }
 impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> for CoreJsonWebKey {

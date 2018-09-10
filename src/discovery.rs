@@ -120,57 +120,72 @@ trait_struct![
     ] {
         issuer(&IssuerUrl) <- IssuerUrl,
         authorization_endpoint(&AuthUrl) <- AuthUrl,
+        #[serde(skip_serializing_if="Option::is_none")]
         token_endpoint(Option<&TokenUrl>) <- Option<TokenUrl>,
+        #[serde(skip_serializing_if="Option::is_none")]
         userinfo_endpoint(Option<&UserInfoUrl>) <- Option<UserInfoUrl>,
+        #[serde(skip_serializing_if="Option::is_none")]
         jwks_uri(Option<&JsonWebKeySetUrl>) <- Option<JsonWebKeySetUrl>,
+        #[serde(skip_serializing_if="Option::is_none")]
         registration_endpoint(Option<&RegistrationUrl>) <- Option<RegistrationUrl>,
+        #[serde(skip_serializing_if="Option::is_none")]
         scopes_supported(Option<&Vec<Scope>>) <- Option<Vec<Scope>>,
         #[serde(bound(deserialize = "RT: ResponseType"))]
         response_types_supported(&Vec<ResponseTypes<RT>>) <- Vec<ResponseTypes<RT>>,
-        #[serde(bound(deserialize = "RM: ResponseMode"))]
+        #[serde(bound(deserialize = "RM: ResponseMode"), skip_serializing_if="Option::is_none")]
         response_modes_supported(Option<&Vec<RM>>) <- Option<Vec<RM>>,
-        #[serde(bound(deserialize = "G: GrantType"))]
+        #[serde(bound(deserialize = "G: GrantType"), skip_serializing_if="Option::is_none")]
         grant_types_supported(Option<&Vec<G>>) <- Option<Vec<G>>,
+        #[serde(skip_serializing_if="Option::is_none")]
         acr_values_supported(Option<&Vec<AuthenticationContextClass>>)
             <- Option<Vec<AuthenticationContextClass>>,
         #[serde(bound(deserialize = "S: SubjectIdentifierType"))]
         subject_types_supported(&Vec<S>) <- Vec<S>,
         #[serde(bound(deserialize = "JS: JwsSigningAlgorithm<JT>"))]
         id_token_signing_alg_values_supported(&Vec<JS>) <- Vec<JS>,
-        #[serde(bound(deserialize = "JK: JweKeyManagementAlgorithm"))]
+        #[serde(bound(deserialize = "JK: JweKeyManagementAlgorithm"), skip_serializing_if="Option::is_none")]
         id_token_encryption_alg_values_supported(Option<&Vec<JK>>) <- Option<Vec<JK>>,
-        #[serde(bound(deserialize = "JE: JweContentEncryptionAlgorithm"))]
+        #[serde(bound(deserialize = "JE: JweContentEncryptionAlgorithm"), skip_serializing_if="Option::is_none")]
         id_token_encryption_enc_values_supported(Option<&Vec<JE>>) <- Option<Vec<JE>>,
-        #[serde(bound(deserialize = "JS: JwsSigningAlgorithm<JT>"))]
+        #[serde(bound(deserialize = "JS: JwsSigningAlgorithm<JT>"), skip_serializing_if="Option::is_none")]
         userinfo_signing_alg_values_supported(Option<&Vec<JS>>) <- Option<Vec<JS>>,
-        #[serde(bound(deserialize = "JK: JweKeyManagementAlgorithm"))]
+        #[serde(bound(deserialize = "JK: JweKeyManagementAlgorithm"), skip_serializing_if="Option::is_none")]
         userinfo_encryption_alg_values_supported(Option<&Vec<JK>>) <- Option<Vec<JK>>,
-        #[serde(bound(deserialize = "JE: JweContentEncryptionAlgorithm"))]
+        #[serde(bound(deserialize = "JE: JweContentEncryptionAlgorithm"), skip_serializing_if="Option::is_none")]
         userinfo_encryption_enc_values_supported(Option<&Vec<JE>>) <- Option<Vec<JE>>,
-        #[serde(bound(deserialize = "JS: JwsSigningAlgorithm<JT>"))]
+        #[serde(bound(deserialize = "JS: JwsSigningAlgorithm<JT>"), skip_serializing_if="Option::is_none")]
         request_object_signing_alg_values_supported(Option<&Vec<JS>>) <- Option<Vec<JS>>,
-        #[serde(bound(deserialize = "JK: JweKeyManagementAlgorithm"))]
+        #[serde(bound(deserialize = "JK: JweKeyManagementAlgorithm"), skip_serializing_if="Option::is_none")]
         request_object_encryption_alg_values_supported(Option<&Vec<JK>>) <- Option<Vec<JK>>,
-        #[serde(bound(deserialize = "JE: JweContentEncryptionAlgorithm"))]
+        #[serde(bound(deserialize = "JE: JweContentEncryptionAlgorithm"), skip_serializing_if="Option::is_none")]
         request_object_encryption_enc_values_supported(Option<&Vec<JE>>) <- Option<Vec<JE>>,
-        #[serde(bound(deserialize = "CA: ClientAuthMethod"))]
+        #[serde(bound(deserialize = "CA: ClientAuthMethod"), skip_serializing_if="Option::is_none")]
         token_endpoint_auth_methods_supported(Option<&Vec<CA>>) <- Option<Vec<CA>>,
-        #[serde(bound(deserialize = "JS: JwsSigningAlgorithm<JT>"))]
+        #[serde(bound(deserialize = "JS: JwsSigningAlgorithm<JT>"), skip_serializing_if="Option::is_none")]
         token_endpoint_auth_signing_alg_values_supported(Option<&Vec<JS>>) <- Option<Vec<JS>>,
-        #[serde(bound(deserialize = "AD: AuthDisplay"))]
+        #[serde(bound(deserialize = "AD: AuthDisplay"), skip_serializing_if="Option::is_none")]
         display_values_supported(Option<&Vec<AD>>) <- Option<Vec<AD>>,
-        #[serde(bound(deserialize = "CT: ClaimType"))]
+        #[serde(bound(deserialize = "CT: ClaimType"), skip_serializing_if="Option::is_none")]
         claim_types_supported(Option<&Vec<CT>>) <- Option<Vec<CT>>,
-        #[serde(bound(deserialize = "CN: ClaimName"))]
+        #[serde(bound(deserialize = "CN: ClaimName"), skip_serializing_if="Option::is_none")]
         claims_supported(Option<&Vec<CN>>) <- Option<Vec<CN>>,
+        #[serde(skip_serializing_if="Option::is_none")]
         service_documentation(Option<&ServiceDocUrl>) <- Option<ServiceDocUrl>,
+        #[serde(skip_serializing_if="Option::is_none")]
         claims_locales_supported(Option<&Vec<LanguageTag>>) <- Option<Vec<LanguageTag>>,
+        #[serde(skip_serializing_if="Option::is_none")]
         ui_locales_supported(Option<&Vec<LanguageTag>>) <- Option<Vec<LanguageTag>>,
+        #[serde(skip_serializing_if="Option::is_none")]
         claims_parameter_supported(Option<bool>) <- Option<bool>,
+        #[serde(skip_serializing_if="Option::is_none")]
         request_parameter_supported(Option<bool>) <- Option<bool>,
+        #[serde(skip_serializing_if="Option::is_none")]
         request_uri_parameter_supported(Option<bool>) <- Option<bool>,
+        #[serde(skip_serializing_if="Option::is_none")]
         require_request_uri_registration(Option<bool>) <- Option<bool>,
+        #[serde(skip_serializing_if="Option::is_none")]
         op_policy_uri(Option<&OpPolicyUrl>) <- Option<OpPolicyUrl>,
+        #[serde(skip_serializing_if="Option::is_none")]
         op_tos_uri(Option<&OpTosUrl>) <- Option<OpTosUrl>,
         // FIXME: remove trait method
         #[serde(skip)]

@@ -26,11 +26,17 @@ impl AdditionalClaims for EmptyAdditionalClaims {}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct AddressClaim {
+    #[serde(skip_serializing_if = "Option::is_none")]
     formatted: Option<FormattedAddress>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     street_address: Option<StreetAddress>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     locality: Option<AddressLocality>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     region: Option<AddressRegion>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     postal_code: Option<AddressPostalCode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     country: Option<AddressCountry>,
 }
 impl AddressClaim {

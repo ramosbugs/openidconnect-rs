@@ -111,9 +111,13 @@ where
     // we don't understand any such extensions, we reject any JWT with this value present (the
     // spec specifically prohibits including public (standard) headers in this field).
     // See https://tools.ietf.org/html/rfc7515#section-4.1.11.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub crit: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cty: Option<JsonWebTokenContentType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub kid: Option<JsonWebKeyId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub typ: Option<JsonWebTokenType>,
     // Other JOSE header fields are omitted since the OpenID Connect spec specifically says that
     // the "x5u", "x5c", "jku", "jwk" header parameter fields SHOULD NOT be used.

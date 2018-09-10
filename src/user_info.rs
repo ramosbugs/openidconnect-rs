@@ -33,8 +33,10 @@ where
     AC: AdditionalClaims,
     GC: GenderClaim,
 {
+    #[serde(skip_serializing_if = "Option::is_none")]
     iss: Option<IssuerUrl>,
     // FIXME: this needs to be a vector, but it may also come as a single string
+    #[serde(skip_serializing_if = "Option::is_none")]
     aud: Option<Vec<Audience>>,
 
     #[serde(bound = "GC: GenderClaim")]

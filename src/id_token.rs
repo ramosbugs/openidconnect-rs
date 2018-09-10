@@ -68,12 +68,19 @@ where
     aud: Vec<Audience>,
     exp: Seconds,
     iat: Seconds,
+    #[serde(skip_serializing_if = "Option::is_none")]
     auth_time: Option<Seconds>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     nonce: Option<Nonce>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     acr: Option<AuthenticationContextClass>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     amr: Option<Vec<AuthenticationMethodReference>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     azp: Option<ClientId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     at_hash: Option<AccessTokenHash>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     c_hash: Option<AuthorizationCodeHash>,
 
     #[serde(bound = "GC: GenderClaim")]

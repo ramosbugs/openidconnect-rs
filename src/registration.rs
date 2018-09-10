@@ -598,13 +598,20 @@ where
     S: SubjectIdentifierType,
 {
     client_id: ClientId,
+    #[serde(skip_serializing_if = "Option::is_none")]
     client_secret: Option<ClientSecret>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     registration_access_token: Option<RegistrationAccessToken>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     registration_client_uri: Option<ClientConfigUrl>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     client_id_issued_at: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     client_secret_expires_at: Option<u64>,
-    #[serde(flatten)]
-    #[serde(bound = "CM: ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>")]
+    #[serde(
+        flatten,
+        bound = "CM: ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>"
+    )]
     client_metadata: CM,
     #[serde(skip)]
     _phantom_at: PhantomData<AT>,
