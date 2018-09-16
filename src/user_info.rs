@@ -18,10 +18,10 @@ use super::types::helpers::seconds_to_utc;
 use super::verification::UserInfoVerifier;
 use super::{
     AdditionalClaims, AddressClaim, Audience, AudiencesClaim, ClaimsVerificationError,
-    EndUserBirthday, EndUserEmail, EndUserGivenName, EndUserMiddleName, EndUserName,
-    EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone,
-    EndUserUsername, EndUserWebsiteUrl, GenderClaim, IssuerClaim, IssuerUrl, JsonWebKey,
-    JsonWebKeyType, JsonWebKeyUse, JsonWebToken, JweContentEncryptionAlgorithm,
+    EndUserBirthday, EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName,
+    EndUserName, EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl,
+    EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, GenderClaim, IssuerClaim, IssuerUrl,
+    JsonWebKey, JsonWebKeyType, JsonWebKeyUse, JsonWebToken, JweContentEncryptionAlgorithm,
     JwsSigningAlgorithm, LanguageTag, StandardClaims, SubjectIdentifier,
 };
 
@@ -71,7 +71,7 @@ where
             sub[&SubjectIdentifier],
             name[Option<&HashMap<Option<LanguageTag>, EndUserName>>],
             given_name[Option<&HashMap<Option<LanguageTag>, EndUserGivenName>>],
-            family_name[Option<&HashMap<Option<LanguageTag>, EndUserGivenName>>],
+            family_name[Option<&HashMap<Option<LanguageTag>, EndUserFamilyName>>],
             middle_name[Option<&HashMap<Option<LanguageTag>, EndUserMiddleName>>],
             nickname[Option<&HashMap<Option<LanguageTag>, EndUserNickname>>],
             preferred_username[Option<&EndUserUsername>],

@@ -13,13 +13,16 @@ use super::types::helpers::split_language_tag_key;
 use super::types::Seconds;
 use super::{
     AddressCountry, AddressLocality, AddressPostalCode, AddressRegion, EndUserBirthday,
-    EndUserEmail, EndUserGivenName, EndUserMiddleName, EndUserName, EndUserNickname,
-    EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone, EndUserUsername,
-    EndUserWebsiteUrl, FormattedAddress, LanguageTag, StreetAddress, SubjectIdentifier,
+    EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName, EndUserName,
+    EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone,
+    EndUserUsername, EndUserWebsiteUrl, FormattedAddress, LanguageTag, StreetAddress,
+    SubjectIdentifier,
 };
 
 pub trait AdditionalClaims: Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
 
+// In order to support serde flatten, this must be an empty struct rather than an empty
+// tuple struct.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct EmptyAdditionalClaims {}
 impl AdditionalClaims for EmptyAdditionalClaims {}
@@ -64,7 +67,7 @@ where
             sub[&SubjectIdentifier],
             name[Option<&HashMap<Option<LanguageTag>, EndUserName>>],
             given_name[Option<&HashMap<Option<LanguageTag>, EndUserGivenName>>],
-            family_name[Option<&HashMap<Option<LanguageTag>, EndUserGivenName>>],
+            family_name[Option<&HashMap<Option<LanguageTag>, EndUserFamilyName>>],
             middle_name[Option<&HashMap<Option<LanguageTag>, EndUserMiddleName>>],
             nickname[Option<&HashMap<Option<LanguageTag>, EndUserNickname>>],
             preferred_username[Option<&EndUserUsername>],
@@ -94,7 +97,7 @@ where
     pub sub: SubjectIdentifier,
     pub name: Option<HashMap<Option<LanguageTag>, EndUserName>>,
     pub given_name: Option<HashMap<Option<LanguageTag>, EndUserGivenName>>,
-    pub family_name: Option<HashMap<Option<LanguageTag>, EndUserGivenName>>,
+    pub family_name: Option<HashMap<Option<LanguageTag>, EndUserFamilyName>>,
     pub middle_name: Option<HashMap<Option<LanguageTag>, EndUserMiddleName>>,
     pub nickname: Option<HashMap<Option<LanguageTag>, EndUserNickname>>,
     pub preferred_username: Option<EndUserUsername>,

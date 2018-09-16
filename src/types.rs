@@ -179,6 +179,11 @@ EndUserEmail(String)];
 new_type![#[derive(
     Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
 )]
+EndUserFamilyName(String)];
+
+new_type![#[derive(
+    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
+)]
 EndUserGivenName(String)];
 
 new_type![#[derive(
@@ -383,6 +388,7 @@ SubjectIdentifier(String)];
 
 new_url_type![ToSUrl];
 
+// FIXME: Add tests
 pub(crate) mod helpers {
     use chrono::{DateTime, TimeZone, Utc};
     use oauth2::prelude::*;

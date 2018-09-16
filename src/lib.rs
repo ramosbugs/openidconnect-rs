@@ -30,6 +30,9 @@ extern crate serde_json;
 extern crate untrusted;
 extern crate url;
 
+#[cfg(test)]
+extern crate itertools;
+
 use std::marker::PhantomData;
 use std::str;
 use std::time::Duration;
@@ -58,14 +61,15 @@ pub use types::{
     ApplicationType, Audience, AuthDisplay, AuthPrompt, AuthenticationContextClass,
     AuthenticationMethodReference, AuthorizationCodeHash, Base64UrlEncodedBytes, ClaimName,
     ClaimType, ClientAuthMethod, ClientConfigUrl, ClientName, ClientUrl, ContactEmail,
-    EndUserBirthday, EndUserEmail, EndUserGivenName, EndUserMiddleName, EndUserName,
-    EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone,
-    EndUserUsername, EndUserWebsiteUrl, FormattedAddress, GrantType, InitiateLoginUrl, IssuerUrl,
-    JsonWebKey, JsonWebKeyId, JsonWebKeySet, JsonWebKeyType, JsonWebKeyUse,
-    JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag,
-    LoginHint, LogoUrl, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl, RegistrationAccessToken,
-    RegistrationUrl, RequestUrl, ResponseMode, ResponseType, ResponseTypes, SectorIdentifierUrl,
-    ServiceDocUrl, StreetAddress, SubjectIdentifier, SubjectIdentifierType, ToSUrl,
+    EndUserBirthday, EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName,
+    EndUserName, EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl,
+    EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, FormattedAddress, GrantType,
+    InitiateLoginUrl, IssuerUrl, JsonWebKey, JsonWebKeyId, JsonWebKeySet, JsonWebKeyType,
+    JsonWebKeyUse, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm,
+    LanguageTag, LoginHint, LogoUrl, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl,
+    RegistrationAccessToken, RegistrationUrl, RequestUrl, ResponseMode, ResponseType,
+    ResponseTypes, SectorIdentifierUrl, ServiceDocUrl, StreetAddress, SubjectIdentifier,
+    SubjectIdentifierType, ToSUrl,
 };
 pub use user_info::{UserInfoClaims, UserInfoError, UserInfoUrl};
 use verification::{AudiencesClaim, IssuerClaim};
