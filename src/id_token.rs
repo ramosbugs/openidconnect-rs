@@ -259,8 +259,8 @@ mod tests {
 
     use super::super::claims::{AdditionalClaims, EmptyAdditionalClaims, StandardClaims};
     use super::super::core::{
-        CoreGenderClaim, CoreIdTokenClaims, CoreJsonWebKeyType, CoreJweContentEncryptionAlgorithm,
-        CoreJwsSigningAlgorithm,
+        CoreGenderClaim, CoreIdToken, CoreIdTokenClaims, CoreJsonWebKeyType,
+        CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm,
     };
     use super::super::jwt::JsonWebTokenAccess;
     use super::super::{
@@ -275,7 +275,84 @@ mod tests {
 
     #[test]
     fn test_id_token() {
-        // deserialize, serialize, .claims() for IdToken
+        let id_token_str = "\"eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL3NlcnZlci5leGFtcGxlLmNvbSI\
+            sImF1ZCI6WyJzNkJoZFJrcXQzIl0sImV4cCI6MTMxMTI4MTk3MCwiaWF0IjoxMzExMjgwOTcwLCJzdWIiOiIyND\
+            QwMDMyMCIsInRmYV9tZXRob2QiOiJ1MmYifQ.aW52YWxpZF9zaWduYXR1cmU\"";
+
+        let id_token =
+            serde_json::from_str::<CoreIdToken>(id_token_str).expect("failed to deserialize");
+
+        let claims = id_token.0.unverified_claims_ref();
+
+        assert_eq!(
+            *claims.issuer().url(),
+            Url::parse("https://server.example.com").unwrap()
+        );
+        assert_eq!(
+            *claims.audiences(),
+            vec![Audience::new("s6BhdRkqt3".to_string())]
+        );
+        assert_eq!(claims.expiration().unwrap(), Utc.timestamp(1311281970, 0));
+        assert_eq!(claims.issue_time().unwrap(), Utc.timestamp(1311280970, 0));
+        assert_eq!(
+            *claims.sub(),
+            SubjectIdentifier::new("24400320".to_string())
+        );
+
+        assert_eq!(
+            serde_json::to_string(&id_token).expect("failed to serialize"),
+            id_token_str
+        );
+    }
+
+    #[test]
+    fn test_oauth2_response() {
+        type CoreIdTokenFields = IdTokenFields<
+            EmptyAdditionalClaims,
+            CoreGenderClaim,
+            CoreJweContentEncryptionAlgorithm,
+            CoreJwsSigningAlgorithm,
+            CoreJsonWebKeyType,
+        >;
+        let response_str = "{\
+            \"access_token\":\"foobar\",\
+            \"token_type\":\"bearer\",\
+            \"id_token\":\"eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL3NlcnZlci5leGFtcGxlLmNvbSIsImF\
+            1ZCI6WyJzNkJoZFJrcXQzIl0sImV4cCI6MTMxMTI4MTk3MCwiaWF0IjoxMzExMjgwOTcwLCJzdWIiOiIyNDQwMD\
+            MyMCIsInRmYV9tZXRob2QiOiJ1MmYifQ.aW52YWxpZF9zaWduYXR1cmU\"\
+        }";
+        let response =
+            serde_json::from_str::<TokenResponse<CoreIdTokenFields, BasicTokenType>>(response_str)
+                .expect("failed to deserialize");
+
+        assert_eq!(
+            *response.access_token(),
+            AccessToken::new("foobar".to_string())
+        );
+        assert_eq!(*response.token_type(), BasicTokenType::Bearer);
+
+        let id_token = response.extra_fields().id_token();
+        let claims = id_token.0.unverified_claims_ref();
+
+        assert_eq!(
+            *claims.issuer().url(),
+            Url::parse("https://server.example.com").unwrap()
+        );
+        assert_eq!(
+            *claims.audiences(),
+            vec![Audience::new("s6BhdRkqt3".to_string())]
+        );
+        assert_eq!(claims.expiration().unwrap(), Utc.timestamp(1311281970, 0));
+        assert_eq!(claims.issue_time().unwrap(), Utc.timestamp(1311280970, 0));
+        assert_eq!(
+            *claims.sub(),
+            SubjectIdentifier::new("24400320".to_string())
+        );
+
+        assert_eq!(
+            serde_json::to_string(&response).expect("failed to serialize"),
+            response_str
+        );
     }
 
     #[test]
@@ -766,55 +843,5 @@ mod tests {
         }
         verify_issuer(&claims);
         verify_issuer(&&claims);
-    }
-
-    #[test]
-    fn test_oauth2_response() {
-        type CoreIdTokenFields = IdTokenFields<
-            EmptyAdditionalClaims,
-            CoreGenderClaim,
-            CoreJweContentEncryptionAlgorithm,
-            CoreJwsSigningAlgorithm,
-            CoreJsonWebKeyType,
-        >;
-        let response_str = "{\
-            \"access_token\":\"foobar\",\
-            \"token_type\":\"bearer\",\
-            \"id_token\":\"eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL3NlcnZlci5leGFtcGxlLmNvbSIsImF\
-            1ZCI6WyJzNkJoZFJrcXQzIl0sImV4cCI6MTMxMTI4MTk3MCwiaWF0IjoxMzExMjgwOTcwLCJzdWIiOiIyNDQwMD\
-            MyMCIsInRmYV9tZXRob2QiOiJ1MmYifQ.aW52YWxpZF9zaWduYXR1cmU\"\
-        }";
-        let response =
-            serde_json::from_str::<TokenResponse<CoreIdTokenFields, BasicTokenType>>(response_str)
-                .expect("failed to deserialize");
-
-        assert_eq!(
-            *response.access_token(),
-            AccessToken::new("foobar".to_string())
-        );
-        assert_eq!(*response.token_type(), BasicTokenType::Bearer);
-
-        let id_token = response.extra_fields().id_token();
-        let claims = id_token.0.unverified_claims_ref();
-
-        assert_eq!(
-            *claims.issuer().url(),
-            Url::parse("https://server.example.com").unwrap()
-        );
-        assert_eq!(
-            *claims.audiences(),
-            vec![Audience::new("s6BhdRkqt3".to_string())]
-        );
-        assert_eq!(claims.expiration().unwrap(), Utc.timestamp(1311281970, 0));
-        assert_eq!(claims.issue_time().unwrap(), Utc.timestamp(1311280970, 0));
-        assert_eq!(
-            *claims.sub(),
-            SubjectIdentifier::new("24400320".to_string())
-        );
-
-        assert_eq!(
-            serde_json::to_string(&response).expect("failed to serialize"),
-            response_str
-        );
     }
 }
