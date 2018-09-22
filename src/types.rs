@@ -5,7 +5,7 @@ use std::ops::Deref;
 
 use base64;
 use oauth2;
-use oauth2::helpers::{deserialize_space_delimited_vec, deserialize_url, serialize_url};
+use oauth2::helpers::deserialize_space_delimited_vec;
 use oauth2::prelude::*;
 use rand::{thread_rng, Rng};
 use serde::de::DeserializeOwned;
@@ -157,27 +157,9 @@ new_type![#[derive(
 )]
 ClientName(String)];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-ClientConfigUrl(
-    #[serde(
-        deserialize_with = "deserialize_url",
-        serialize_with = "serialize_url"
-    )]
-    Url
-)];
+new_url_type![ClientConfigUrl];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-ClientUrl(
-    #[serde(
-        deserialize_with = "deserialize_url",
-        serialize_with = "serialize_url"
-    )]
-    Url
-)];
+new_url_type![ClientUrl];
 
 new_type![#[derive(
     Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
@@ -219,43 +201,16 @@ new_type![#[derive(
 )]
 EndUserPhoneNumber(String)];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-EndUserPictureUrl(
-    #[serde(
-        deserialize_with = "deserialize_url",
-        serialize_with = "serialize_url"
-    )]
-    Url
-)];
+new_url_type![EndUserPictureUrl];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-EndUserProfileUrl(
-    #[serde(
-        deserialize_with = "deserialize_url",
-        serialize_with = "serialize_url"
-    )]
-    Url
-)];
+new_url_type![EndUserProfileUrl];
 
 new_type![#[derive(
     Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
 )]
 EndUserTimezone(String)];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-EndUserWebsiteUrl(
-    #[serde(
-        deserialize_with = "deserialize_url",
-        serialize_with = "serialize_url"
-    )]
-    Url
-)];
+new_url_type![EndUserWebsiteUrl];
 
 new_type![#[derive(
     Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
@@ -267,33 +222,16 @@ new_type![#[derive(
 )]
 FormattedAddress(String)];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-InitiateLoginUrl(
-    #[serde(
-        deserialize_with = "deserialize_url",
-        serialize_with = "serialize_url"
-    )]
-    Url
-)];
+new_url_type![InitiateLoginUrl];
 
-new_type![
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
-    IssuerUrl(
-        #[serde(
-            deserialize_with = "deserialize_url",
-            serialize_with = "serialize_url"
-        )]
-        Url
-    )
+new_url_type![
+    IssuerUrl
     impl {
         pub fn join(&self, suffix: &str) -> Result<Url, url::ParseError> {
-            let prefix = self.0.as_str().to_string();
-            if let Some('/') = prefix.chars().next_back() {
-                Url::parse(&(prefix + suffix))
+            if let Some('/') = self.1.chars().next_back() {
+                Url::parse(&(self.1.clone() + suffix))
             } else {
-                Url::parse(&(prefix + "/" + suffix))
+                Url::parse(&(self.1.clone() + "/" + suffix))
             }
         }
     }
@@ -354,16 +292,7 @@ new_secret_type![#[derive(
 )]
 LoginHint(String)];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-LogoUrl(
-    #[serde(
-        deserialize_with = "deserialize_url",
-        serialize_with = "serialize_url"
-    )]
-    Url
-)];
+new_url_type![LogoUrl];
 
 new_secret_type![
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
@@ -389,65 +318,20 @@ new_secret_type![
     }
 ];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-OpPolicyUrl(
-    #[serde(
-        deserialize_with = "deserialize_url",
-        serialize_with = "serialize_url"
-    )]
-    Url
-)];
+new_url_type![OpPolicyUrl];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-OpTosUrl(
-    #[serde(
-        deserialize_with = "deserialize_url",
-        serialize_with = "serialize_url"
-    )]
-    Url
-)];
+new_url_type![OpTosUrl];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-PolicyUrl(
-    #[serde(
-        deserialize_with = "deserialize_url",
-        serialize_with = "serialize_url"
-    )]
-    Url
-)];
+new_url_type![PolicyUrl];
 
 new_secret_type![#[derive(
     Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
 )]
 RegistrationAccessToken(String)];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-RegistrationUrl(
-    #[serde(
-        deserialize_with = "deserialize_url",
-        serialize_with = "serialize_url"
-    )]
-    Url
-)];
+new_url_type![RegistrationUrl];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-RequestUrl(
-    #[serde(
-        deserialize_with = "deserialize_url",
-        serialize_with = "serialize_url"
-    )]
-    Url
-)];
+new_url_type![RequestUrl];
 
 ///
 /// Informs the Authorization Server of the desired authorization processing flow, including what
@@ -483,27 +367,9 @@ impl<RT: ResponseType> Deref for ResponseTypes<RT> {
 new_type![#[derive(Deserialize, Serialize)]
 pub(crate) Seconds(serde_json::Number)];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-SectorIdentifierUrl(
-    #[serde(
-        deserialize_with = "deserialize_url",
-        serialize_with = "serialize_url"
-    )]
-    Url
-)];
+new_url_type![SectorIdentifierUrl];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-ServiceDocUrl(
-    #[serde(
-        deserialize_with = "deserialize_url",
-        serialize_with = "serialize_url"
-    )]
-    Url
-)];
+new_url_type![ServiceDocUrl];
 
 new_type![#[derive(
     Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
@@ -515,16 +381,7 @@ new_type![#[derive(
 )]
 SubjectIdentifier(String)];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-ToSUrl(
-    #[serde(
-        deserialize_with = "deserialize_url",
-        serialize_with = "serialize_url"
-    )]
-    Url
-)];
+new_url_type![ToSUrl];
 
 pub(crate) mod helpers {
     use chrono::{DateTime, TimeZone, Utc};
@@ -651,9 +508,7 @@ mod serde_base64url_byte_array {
 
 #[cfg(test)]
 mod tests {
-    use oauth2::prelude::*;
     use serde_json;
-    use url::Url;
 
     use super::super::IssuerUrl;
 
@@ -661,28 +516,32 @@ mod tests {
     fn test_issuer_url_append() {
         assert_eq!(
             "http://example.com/.well-known/openid-configuration",
-            IssuerUrl::new(Url::parse("http://example.com").unwrap())
+            IssuerUrl::new("http://example.com".to_string())
+                .unwrap()
                 .join(".well-known/openid-configuration")
                 .unwrap()
                 .to_string()
         );
         assert_eq!(
             "http://example.com/.well-known/openid-configuration",
-            IssuerUrl::new(Url::parse("http://example.com/").unwrap())
+            IssuerUrl::new("http://example.com/".to_string())
+                .unwrap()
                 .join(".well-known/openid-configuration")
                 .unwrap()
                 .to_string()
         );
         assert_eq!(
             "http://example.com/x/.well-known/openid-configuration",
-            IssuerUrl::new(Url::parse("http://example.com/x").unwrap())
+            IssuerUrl::new("http://example.com/x".to_string())
+                .unwrap()
                 .join(".well-known/openid-configuration")
                 .unwrap()
                 .to_string()
         );
         assert_eq!(
             "http://example.com/x/.well-known/openid-configuration",
-            IssuerUrl::new(Url::parse("http://example.com/x/").unwrap())
+            IssuerUrl::new("http://example.com/x/".to_string())
+                .unwrap()
                 .join(".well-known/openid-configuration")
                 .unwrap()
                 .to_string()
@@ -691,9 +550,9 @@ mod tests {
 
     #[test]
     fn test_url_serialize() {
-        let issuer_url = IssuerUrl::new(
-            Url::parse("http://example.com/.well-known/openid-configuration").unwrap(),
-        );
+        let issuer_url =
+            IssuerUrl::new("http://example.com/.well-known/openid-configuration".to_string())
+                .unwrap();
         let serialized_url = serde_json::to_string(&issuer_url).unwrap();
 
         assert_eq!(
@@ -703,5 +562,11 @@ mod tests {
 
         let deserialized_url = serde_json::from_str(&serialized_url).unwrap();
         assert_eq!(issuer_url, deserialized_url);
+
+        assert_eq!(
+            serde_json::to_string(&IssuerUrl::new("http://example.com".to_string()).unwrap())
+                .unwrap(),
+            "\"http://example.com\"",
+        );
     }
 }

@@ -105,12 +105,10 @@ where
 }
 
 pub fn issuer_url(test_id: &str) -> IssuerUrl {
-    IssuerUrl::new(
-        Url::parse(&format!(
-            "{}/{}/{}",
-            CERTIFICATION_BASE_URL, RP_NAME, test_id
-        )).expect("Failed to parse issuer URL"),
-    )
+    IssuerUrl::new(format!(
+        "{}/{}/{}",
+        CERTIFICATION_BASE_URL, RP_NAME, test_id
+    )).expect("Failed to parse issuer URL")
 }
 
 pub fn get_provider_metadata(test_id: &str) -> CoreProviderMetadata {

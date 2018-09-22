@@ -3,8 +3,6 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 
 use curl;
-use oauth2::helpers::{deserialize_url, serialize_url};
-use oauth2::prelude::*;
 use oauth2::{AuthUrl, Scope, TokenUrl};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -94,8 +92,8 @@ trait_struct![
                         format!(
                             "unexpected issuer URI `{}` (expected `{}`); this may indicate an \
                                 OpenID Provider impersonation attack",
-                            **self.issuer(),
-                            **issuer_uri
+                            self.issuer().url(),
+                            issuer_uri.url()
                         )
                     )
                 )
@@ -225,15 +223,8 @@ pub enum DiscoveryError {
     Other(String),
 }
 
-new_type![
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
-    JsonWebKeySetUrl(
-        #[serde(
-            deserialize_with = "deserialize_url",
-            serialize_with = "serialize_url"
-        )]
-        Url
-    )
+new_url_type![
+    JsonWebKeySetUrl
     impl {
         // FIXME: don't depend on super::discovery in this module (factor this out into some kind
         // of HttpError?

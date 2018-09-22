@@ -126,11 +126,11 @@ fn test_metadata_serialization() {
         vec![
             (
                 None,
-                LogoUrl::new(Url::parse("https://example.com/logo.png").unwrap()),
+                LogoUrl::new("https://example.com/logo.png".to_string()).unwrap(),
             ),
             (
                 Some(LanguageTag::new("fr".to_string())),
-                LogoUrl::new(Url::parse("https://example.com/logo-fr.png").unwrap()),
+                LogoUrl::new("https://example.com/logo-fr.png".to_string()).unwrap(),
             ),
         ]
     );
@@ -139,11 +139,11 @@ fn test_metadata_serialization() {
         vec![
             (
                 None,
-                ClientUrl::new(Url::parse("https://example.com/client-app").unwrap()),
+                ClientUrl::new("https://example.com/client-app".to_string()).unwrap(),
             ),
             (
                 Some(LanguageTag::new("de".to_string())),
-                ClientUrl::new(Url::parse("https://example.com/client-app-de").unwrap()),
+                ClientUrl::new("https://example.com/client-app-de".to_string()).unwrap(),
             ),
         ]
     );
@@ -152,11 +152,11 @@ fn test_metadata_serialization() {
         vec![
             (
                 None,
-                PolicyUrl::new(Url::parse("https://example.com/policy").unwrap()),
+                PolicyUrl::new("https://example.com/policy".to_string()).unwrap(),
             ),
             (
                 Some(LanguageTag::new("sr-Latn".to_string())),
-                PolicyUrl::new(Url::parse("https://example.com/policy-sr-latin").unwrap()),
+                PolicyUrl::new("https://example.com/policy-sr-latin".to_string()).unwrap(),
             ),
         ]
     );
@@ -165,23 +165,23 @@ fn test_metadata_serialization() {
         vec![
             (
                 None,
-                ToSUrl::new(Url::parse("https://example.com/tos").unwrap()),
+                ToSUrl::new("https://example.com/tos".to_string()).unwrap(),
             ),
             (
                 Some(LanguageTag::new("sr-Cyrl".to_string())),
-                ToSUrl::new(Url::parse("https://example.com/tos-sr-cyrl").unwrap()),
+                ToSUrl::new("https://example.com/tos-sr-cyrl".to_string()).unwrap(),
             ),
         ]
     );
     assert_eq!(
         *client_metadata.jwks_uri().unwrap(),
-        JsonWebKeySetUrl::new(Url::parse("https://example.com/jwks").unwrap())
+        JsonWebKeySetUrl::new("https://example.com/jwks".to_string()).unwrap()
     );
     // FIXME: set this field to something
     assert_eq!(client_metadata.jwks(), None);
     assert_eq!(
         *client_metadata.sector_identifier_uri().unwrap(),
-        SectorIdentifierUrl::new(Url::parse("https://example.com/sector").unwrap())
+        SectorIdentifierUrl::new("https://example.com/sector".to_string()).unwrap()
     );
     assert_eq!(
         *client_metadata.subject_type().unwrap(),
@@ -246,13 +246,13 @@ fn test_metadata_serialization() {
     );
     assert_eq!(
         *client_metadata.sector_identifier_uri().unwrap(),
-        SectorIdentifierUrl::new(Url::parse("https://example.com/sector").unwrap())
+        SectorIdentifierUrl::new("https://example.com/sector".to_string()).unwrap()
     );
     assert_eq!(
         *client_metadata.request_uris().unwrap(),
         vec![
-            RequestUrl::new(Url::parse("https://example.com/request-1").unwrap()),
-            RequestUrl::new(Url::parse("https://example.com/request-2").unwrap()),
+            RequestUrl::new("https://example.com/request-1".to_string()).unwrap(),
+            RequestUrl::new("https://example.com/request-2".to_string()).unwrap(),
         ]
     );
     let serialized_json = serde_json::to_string(&client_metadata).unwrap();
@@ -378,7 +378,7 @@ fn test_response_serialization() {
     );
     assert_eq!(
         *client_metadata.registration_client_uri().unwrap(),
-        ClientConfigUrl::new(Url::parse("https://example-provider.com/registration").unwrap())
+        ClientConfigUrl::new("https://example-provider.com/registration".to_string()).unwrap()
     );
     assert_eq!(
         client_metadata.client_id_issued_at().unwrap().unwrap(),
@@ -443,11 +443,11 @@ fn test_response_serialization() {
         vec![
             (
                 None,
-                LogoUrl::new(Url::parse("https://example.com/logo.png").unwrap()),
+                LogoUrl::new("https://example.com/logo.png".to_string()).unwrap(),
             ),
             (
                 Some(LanguageTag::new("fr".to_string())),
-                LogoUrl::new(Url::parse("https://example.com/logo-fr.png").unwrap()),
+                LogoUrl::new("https://example.com/logo-fr.png".to_string()).unwrap(),
             ),
         ]
     );
@@ -456,11 +456,11 @@ fn test_response_serialization() {
         vec![
             (
                 None,
-                ClientUrl::new(Url::parse("https://example.com/client-app").unwrap()),
+                ClientUrl::new("https://example.com/client-app".to_string()).unwrap(),
             ),
             (
                 Some(LanguageTag::new("de".to_string())),
-                ClientUrl::new(Url::parse("https://example.com/client-app-de").unwrap()),
+                ClientUrl::new("https://example.com/client-app-de".to_string()).unwrap(),
             ),
         ]
     );
@@ -469,11 +469,11 @@ fn test_response_serialization() {
         vec![
             (
                 None,
-                PolicyUrl::new(Url::parse("https://example.com/policy").unwrap()),
+                PolicyUrl::new("https://example.com/policy".to_string()).unwrap(),
             ),
             (
                 Some(LanguageTag::new("sr-Latn".to_string())),
-                PolicyUrl::new(Url::parse("https://example.com/policy-sr-latin").unwrap()),
+                PolicyUrl::new("https://example.com/policy-sr-latin".to_string()).unwrap(),
             ),
         ]
     );
@@ -482,23 +482,23 @@ fn test_response_serialization() {
         vec![
             (
                 None,
-                ToSUrl::new(Url::parse("https://example.com/tos").unwrap()),
+                ToSUrl::new("https://example.com/tos".to_string()).unwrap(),
             ),
             (
                 Some(LanguageTag::new("sr-Cyrl".to_string())),
-                ToSUrl::new(Url::parse("https://example.com/tos-sr-cyrl").unwrap()),
+                ToSUrl::new("https://example.com/tos-sr-cyrl".to_string()).unwrap(),
             ),
         ]
     );
     assert_eq!(
         *client_metadata.jwks_uri().unwrap(),
-        JsonWebKeySetUrl::new(Url::parse("https://example.com/jwks").unwrap())
+        JsonWebKeySetUrl::new("https://example.com/jwks".to_string()).unwrap()
     );
     // FIXME: set this field to something
     assert_eq!(client_metadata.jwks(), None);
     assert_eq!(
         *client_metadata.sector_identifier_uri().unwrap(),
-        SectorIdentifierUrl::new(Url::parse("https://example.com/sector").unwrap())
+        SectorIdentifierUrl::new("https://example.com/sector".to_string()).unwrap()
     );
     assert_eq!(
         *client_metadata.subject_type().unwrap(),
@@ -563,13 +563,13 @@ fn test_response_serialization() {
     );
     assert_eq!(
         *client_metadata.sector_identifier_uri().unwrap(),
-        SectorIdentifierUrl::new(Url::parse("https://example.com/sector").unwrap())
+        SectorIdentifierUrl::new("https://example.com/sector".to_string()).unwrap()
     );
     assert_eq!(
         *client_metadata.request_uris().unwrap(),
         vec![
-            RequestUrl::new(Url::parse("https://example.com/request-1").unwrap()),
-            RequestUrl::new(Url::parse("https://example.com/request-2").unwrap()),
+            RequestUrl::new("https://example.com/request-1".to_string()).unwrap(),
+            RequestUrl::new("https://example.com/request-2".to_string()).unwrap(),
         ]
     );
     let serialized_json = serde_json::to_string(&client_metadata).unwrap();

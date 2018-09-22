@@ -57,7 +57,7 @@ fn main() {
             .expect("Missing the GOOGLE_CLIENT_SECRET environment variable."),
     );
     let issuer_url =
-        IssuerUrl::new(Url::parse("https://accounts.google.com").expect("Invalid issuer URL"));
+        IssuerUrl::new("https://accounts.google.com".to_string()).expect("Invalid issuer URL");
 
     // Set up the config for the Google OAuth2 process.
     let client = CoreClient::discover(google_client_id, Some(google_client_secret), &issuer_url)

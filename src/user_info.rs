@@ -4,8 +4,6 @@ use std::str;
 
 use chrono::{DateTime, Utc};
 use curl;
-use oauth2::helpers::{deserialize_url, serialize_url};
-use oauth2::prelude::*;
 use oauth2::AccessToken;
 use serde_json;
 use url::Url;
@@ -134,15 +132,8 @@ where
     }
 }
 
-new_type![
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
-    UserInfoUrl(
-        #[serde(
-            deserialize_with = "deserialize_url",
-            serialize_with = "serialize_url"
-        )]
-        Url
-    )
+new_url_type![
+    UserInfoUrl
     impl {
         pub fn get_user_info<AC, GC, JE, JS, JT, JU, K>(
             &self,

@@ -334,7 +334,7 @@ where
         }
 
         let register_response = HttpRequest {
-            url: registration_endpoint,
+            url: registration_endpoint.url(),
             method: HttpRequestMethod::Post,
             headers: &headers,
             post_body: &request_json,
