@@ -792,10 +792,7 @@ mod tests {
             *response.access_token(),
             AccessToken::new("foobar".to_string())
         );
-        assert_eq!(
-            *response.token_type(),
-            BasicTokenType::Bearer
-        );
+        assert_eq!(*response.token_type(), BasicTokenType::Bearer);
 
         let id_token = response.extra_fields().id_token();
         let claims = id_token.0.unverified_claims_ref();

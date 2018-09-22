@@ -61,21 +61,18 @@ fn main() {
 
     // Set up the config for the Google OAuth2 process.
     let client = CoreClient::discover(google_client_id, Some(google_client_secret), &issuer_url)
-            .unwrap_or_else(|err| {
-                handle_error(&err, "Failed to discover OpenID Provider");
-                unreachable!();
-            })
-            // This example is requesting access to the "calendar" features and the user's profile.
-            .add_scope(Scope::new("email".to_string()))
-            .add_scope(Scope::new("profile".to_string()))
-            // This example will be running its own server at localhost:8080.
-            // See below for the server implementation.
-            .set_redirect_uri(
-                RedirectUrl::new(
-                    Url::parse("http://localhost:8080")
-                        .expect("Invalid redirect URL")
-                )
-            );
+        .unwrap_or_else(|err| {
+            handle_error(&err, "Failed to discover OpenID Provider");
+            unreachable!();
+        })
+        // This example is requesting access to the "calendar" features and the user's profile.
+        .add_scope(Scope::new("email".to_string()))
+        .add_scope(Scope::new("profile".to_string()))
+        // This example will be running its own server at localhost:8080.
+        // See below for the server implementation.
+        .set_redirect_uri(RedirectUrl::new(
+            Url::parse("http://localhost:8080").expect("Invalid redirect URL"),
+        ));
 
     // Generate the authorization URL to which we'll redirect the user.
     let (authorize_url, csrf_state, nonce) = client.authorize_url(

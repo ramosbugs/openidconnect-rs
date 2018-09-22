@@ -552,12 +552,14 @@ fn rp_userinfo_sig() {
     log_debug!("ID token: {:?}", id_token_claims);
 
     let verifier = test_state
-            .user_info_verifier(test_state.jwks(), test_state.id_token_claims().sub().clone())
-            .require_signed_response(true)
-            // For some reason, the test suite omits these claims even though the Core spec says
-            // that the RP SHOULD verify these.
-            .require_audience_match(false)
-            .require_issuer_match(false);
+        .user_info_verifier(
+            test_state.jwks(),
+            test_state.id_token_claims().sub().clone(),
+        ).require_signed_response(true)
+        // For some reason, the test suite omits these claims even though the Core spec says
+        // that the RP SHOULD verify these.
+        .require_audience_match(false)
+        .require_issuer_match(false);
     let user_info_claims: CoreUserInfoClaims = test_state
         .provider_metadata
         .userinfo_endpoint()
