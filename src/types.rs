@@ -277,6 +277,14 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
+    pub fn new(keys: Vec<K>) -> Self {
+        Self {
+            keys,
+            _phantom_js: PhantomData,
+            _phantom_jt: PhantomData,
+            _phantom_ju: PhantomData,
+        }
+    }
     pub fn keys(&self) -> &Vec<K> {
         &self.keys
     }

@@ -389,7 +389,7 @@ where
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use std::marker::PhantomData;
     use std::string::ToString;
 
@@ -413,7 +413,7 @@ mod tests {
         CoreJsonWebKeyType,
     >;
 
-    const TEST_JWT: &str =
+    pub const TEST_JWT: &str =
         "eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9.SXTigJlzIGEgZ\
          GFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGU\
          gcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlc\
@@ -423,7 +423,7 @@ mod tests {
          0ePPQdLuW3IS_de3xyIrDaLGdjluPxUAhb6L2aXic1U12podGU0KLUQSE_oI-ZnmKJ3F4uOZDnd6QZWJushZ41\
          Axf_fcIe8u9ipH84ogoree7vjbU5y18kDquDg";
 
-    const TEST_RSA_PUB_KEY: &str = "{
+    pub const TEST_RSA_PUB_KEY: &str = "{
             \"kty\": \"RSA\",
             \"kid\": \"bilbo.baggins@hobbiton.example\",
             \"use\": \"sig\",

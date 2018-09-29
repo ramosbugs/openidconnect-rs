@@ -56,43 +56,66 @@ pub trait IssuerClaim {
     fn issuer(&self) -> Option<&IssuerUrl>;
 }
 
+///
+/// Error verifying claims.
+///
 #[derive(Clone, Debug, Fail, PartialEq)]
 pub enum ClaimsVerificationError {
+    /// Claims have expired.
     #[fail(display = "Expired: {}", _0)]
     Expired(String),
+    /// Audience claim is invalid.
     #[fail(display = "Invalid audiences: {}", _0)]
     InvalidAudience(String),
+    /// Authorization context class reference (`acr`) claim is invalid.
     #[fail(
         display = "Invalid authorization context class reference: {}",
         _0
     )]
     InvalidAuthContext(String),
+    /// User authenticated too long ago.
     #[fail(display = "Invalid authentication time: {}", _0)]
     InvalidAuthTime(String),
+    /// Issuer claim is invalid.
     #[fail(display = "Invalid issuer: {}", _0)]
     InvalidIssuer(String),
+    /// Nonce is invalid.
     #[fail(display = "Invalid nonce: {}", _0)]
     InvalidNonce(String),
+    /// Subject claim is invalid.
     #[fail(display = "Invalid subject: {}", _0)]
     InvalidSubject(String),
+    /// No signature present but claims must be signed.
     #[fail(display = "Claims must be signed")]
     NoSignature,
+    /// An unexpected error occurred.
     #[fail(display = "{}", _0)]
     Other(String),
+    /// Failed to verify the claims signature.
     #[fail(display = "Signature verification failed")]
     SignatureVerification(#[cause] SignatureVerificationError),
+    /// Unsupported argument or value.
     #[fail(display = "Unsupported: {}", _0)]
     Unsupported(String),
 }
 
+///
+/// Error verifying claims signature.
+///
 #[derive(Clone, Debug, Fail, PartialEq)]
 pub enum SignatureVerificationError {
+    /// More than one key matches the supplied key constraints (e.g., key ID).
     #[fail(display = "Ambiguous key identification: {}", _0)]
     AmbiguousKeyId(String),
+    /// Invalid signature for the supplied claims and signing key.
     #[fail(display = "Crypto error: {}", _0)]
     CryptoError(String),
+    /// The supplied signature algorithm is disallowed by the verifier.
     #[fail(display = "Disallowed signature algorithm: {}", _0)]
     DisallowedAlg(String),
+    /// The supplied key cannot be used in this context. This may occur if the key type does not
+    /// match the signature type (e.g., an RSA key used to validate an HMAC) or the JWK usage
+    /// disallows signatures.
     #[fail(display = "Invalid cryptographic key: {}", _0)]
     InvalidKey(String),
     /// The signing key needed for verifying the
@@ -102,7 +125,7 @@ pub enum SignatureVerificationError {
     /// key in the OpenID Connect provider's JSON Web Key Set (JWKS), typically retrieved from
     /// the provider's [JWKS document](
     /// http://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata). To support
-    /// [rotation of asyimmetric signing keys](
+    /// [rotation of asymmetric signing keys](
     /// http://openid.net/specs/openid-connect-core-1_0.html#RotateSigKeys), client applications
     /// should consider refreshing the JWKS document (via
     /// [`JsonWebKeySetUrl::get_keys`][`::discovery::JsonWebKeySetUrl::get_keys`]).
@@ -112,13 +135,16 @@ pub enum SignatureVerificationError {
     /// when the JOSE header specifies an ECDSA algorithm) or does not support signing.
     #[fail(display = "No matching key found")]
     NoMatchingKey,
+    /// Unsupported signature algorithm.
     #[fail(display = "Unsupported signature algorithm: {}", _0)]
     UnsupportedAlg(String),
+    /// An unexpected error occurred.
     #[fail(display = "Other error: {}", _0)]
     Other(String),
 }
 
 // This struct is intentionally private.
+#[derive(Clone, Debug)]
 struct JwtClaimsVerifier<JS, JT, JU, K>
 where
     JS: JwsSigningAlgorithm<JT>,
@@ -326,7 +352,7 @@ where
         // early exit calling jwt.unverified_claims(), which takes ownership of the JWT.
         let signature_alg = match jwt.unverified_header().alg {
             // Encryption is handled above.
-            JsonWebTokenAlgorithm::Encryption(_) => panic!("unreachable"),
+            JsonWebTokenAlgorithm::Encryption(_) => unreachable!(),
             JsonWebTokenAlgorithm::Signature(ref signature_alg, _) => signature_alg,
             // Section 2 of OpenID Connect Core 1.0 specifies that "ID Tokens MUST NOT use
             // none as the alg value unless the Response Type used returns no ID Token from
@@ -443,6 +469,9 @@ where
     }
 }
 
+///
+/// ID token verifier.
+///
 pub struct IdTokenVerifier<JS, JT, JU, K>
 where
     JS: JwsSigningAlgorithm<JT>,
@@ -672,6 +701,9 @@ where
     }
 }
 
+///
+/// User info verifier.
+///
 pub struct UserInfoVerifier<JE, JS, JT, JU, K>
 where
     JE: JweContentEncryptionAlgorithm,
@@ -738,7 +770,6 @@ where
                 user_info
             }
             UnverifiedUserInfoClaims::JwtClaims(user_info_jwt) => {
-                trace!("here: {:?}", user_info_jwt);
                 self.jwt_verifier.verified_claims(user_info_jwt)?
             }
         };
@@ -753,4 +784,577 @@ where
 
         Ok(user_info)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use oauth2::prelude::*;
+    use oauth2::{ClientId, ClientSecret};
+    use serde_json;
+
+    use super::super::core::{
+        CoreJsonWebKey, CoreJsonWebKeySet, CoreJsonWebKeyType, CoreJsonWebKeyUse,
+        CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm,
+    };
+    use super::super::jwt::tests::TEST_RSA_PUB_KEY;
+    use super::super::jwt::{JsonWebToken, JsonWebTokenJsonPayloadDeserializer};
+    use super::super::{Audience, Base64UrlEncodedBytes, IssuerUrl, JsonWebKeyId};
+    use super::{
+        AudiencesClaim, ClaimsVerificationError, IssuerClaim, JsonWebTokenHeader,
+        JwtClaimsVerifier, SignatureVerificationError,
+    };
+
+    type CoreJsonWebTokenHeader = JsonWebTokenHeader<
+        CoreJweContentEncryptionAlgorithm,
+        CoreJwsSigningAlgorithm,
+        CoreJsonWebKeyType,
+    >;
+
+    type CoreJwtClaimsVerifier = JwtClaimsVerifier<
+        CoreJwsSigningAlgorithm,
+        CoreJsonWebKeyType,
+        CoreJsonWebKeyUse,
+        CoreJsonWebKey,
+    >;
+
+    // ** JwtClaimsVerifier **
+
+    // require_audience_match
+
+    // require_issuer_match
+
+    // require_signature_check
+
+    // allowed_algs, including default (RS256), set_allowed_algs, allow_any_alg
+
+    // set_client_secret
+
+    fn assert_unsupported<T>(result: Result<T, ClaimsVerificationError>, expected_substr: &str) {
+        match result {
+            Err(ClaimsVerificationError::Unsupported(msg)) => {
+                assert!(msg.contains(expected_substr))
+            }
+            Err(err) => panic!("unexpected error: {:?}", err),
+            Ok(_) => panic!("validation should fail"),
+        }
+    }
+
+    #[test]
+    fn test_jose_header() {
+        // Unexpected JWT type.
+        assert_unsupported(
+            CoreJwtClaimsVerifier::validate_jose_header(
+                &serde_json::from_str::<CoreJsonWebTokenHeader>(
+                    "{\"alg\":\"RS256\",\"typ\":\"NOT_A_JWT\"}",
+                ).expect("failed to deserialize"),
+            ),
+            "unsupported JWT type",
+        );
+
+        // Nested JWTs.
+        assert_unsupported(
+            CoreJwtClaimsVerifier::validate_jose_header(
+                &serde_json::from_str::<CoreJsonWebTokenHeader>(
+                    "{\"alg\":\"RS256\",\"cty\":\"JWT\"}",
+                ).expect("failed to deserialize"),
+            ),
+            "nested JWT",
+        );
+        assert_unsupported(
+            CoreJwtClaimsVerifier::validate_jose_header(
+                &serde_json::from_str::<CoreJsonWebTokenHeader>(
+                    "{\"alg\":\"RS256\",\"cty\":\"NOT_A_JWT\"}",
+                ).expect("failed to deserialize"),
+            ),
+            "unsupported JWT content type",
+        );
+
+        // Critical fields. Adapted from https://tools.ietf.org/html/rfc7515#appendix-E
+        assert_unsupported(
+            CoreJwtClaimsVerifier::validate_jose_header(
+                &serde_json::from_str::<CoreJsonWebTokenHeader>(
+                    "{\
+                     \"alg\":\"RS256\",\
+                     \"crit\":[\"http://example.invalid/UNDEFINED\"],\
+                     \"http://example.invalid/UNDEFINED\":true\
+                     }",
+                ).expect("failed to deserialize"),
+            ),
+            "critical JWT header fields are unsupported",
+        );
+    }
+
+    #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+    struct TestClaims {
+        aud: Option<Vec<Audience>>,
+        iss: Option<IssuerUrl>,
+        payload: String,
+    }
+    impl AudiencesClaim for TestClaims {
+        fn audiences(&self) -> Option<&Vec<Audience>> {
+            self.aud.as_ref()
+        }
+    }
+    impl IssuerClaim for TestClaims {
+        fn issuer(&self) -> Option<&IssuerUrl> {
+            self.iss.as_ref()
+        }
+    }
+    type TestClaimsJsonWebToken = JsonWebToken<
+        TestClaims,
+        CoreJweContentEncryptionAlgorithm,
+        CoreJwsSigningAlgorithm,
+        CoreJsonWebKeyType,
+        JsonWebTokenJsonPayloadDeserializer,
+    >;
+
+    #[test]
+    fn test_jwt_verified_claims() {
+        let rsa_key = serde_json::from_str::<CoreJsonWebKey>(TEST_RSA_PUB_KEY)
+            .expect("deserialization failed");
+
+        let client_id = ClientId::new("my_client".to_string());
+        let issuer = IssuerUrl::new("https://example.com".to_string()).unwrap();
+        let verifier = CoreJwtClaimsVerifier::new(
+            client_id.clone(),
+            issuer.clone(),
+            CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
+        );
+
+        // Invalid JOSE header.
+        assert_unsupported(
+            verifier.verified_claims(
+                serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                    "eyJhbGciOiJBMjU2R0NNIiwiY3R5IjoiSldUIn0.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Im\
+                     h0dHBzOi8vZXhhbXBsZS5jb20iLCJwYXlsb2FkIjoiaGVsbG8gd29ybGQifQ.YmFkX2hhc2g"
+                        .to_string(),
+                )).expect("failed to deserialize"),
+            ),
+            "nested JWT",
+        );
+
+        // JWE-encrypted JWT.
+        assert_unsupported(
+            verifier.verified_claims(
+                serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                    "eyJhbGciOiJBMjU2R0NNIn0.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhbX\
+                     BsZS5jb20iLCJwYXlsb2FkIjoiaGVsbG8gd29ybGQifQ.YmFkX2hhc2g"
+                        .to_string(),
+                )).expect("failed to deserialize"),
+            ),
+            "JWE encryption",
+        );
+
+        // Wrong issuer.
+        match verifier.verified_claims(
+            serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                "eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vYXR0YWNrZXIuY\
+                 29tIiwicGF5bG9hZCI6ImhlbGxvIHdvcmxkIn0.YmFkX2hhc2g"
+                    .to_string(),
+            )).expect("failed to deserialize"),
+        ) {
+            Err(ClaimsVerificationError::InvalidIssuer(_)) => {},
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        // Missing issuer.
+        match verifier.verified_claims(
+            serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                "eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOlsibXlfY2xpZW50Il0sInBheWxvYWQiOiJoZWxsbyB3b3JsZCJ9.\
+                 YmFkX2hhc2g"
+                    .to_string(),
+            )).expect("failed to deserialize"),
+        ) {
+            Err(ClaimsVerificationError::InvalidIssuer(_)) => {},
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        // Ignore missing issuer.
+        verifier
+            .clone()
+            .require_issuer_match(false)
+            .verified_claims(
+            serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                "eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOlsibXlfY2xpZW50Il0sInBheWxvYWQiOiJoZWxsbyB3b3JsZCJ9.\
+                 nv09al63NNDfb8cF3IozegXKbPaUC08zknRPKmQ5qKgXv80hjVxknkpRz7BxocB3JYTBjhYd0gyN9wAuJj\
+                 byZ1QaUC14HOB83awAGbehy5yFLkLadTfPT7-siBCvE2V7AF73a_21YvwdkKmJ-RaKWHzFnG8CDmioma3X\
+                 cWyrsdRLgvUkrWllajLRo8DCIXQ8OuZo1_o4n17PSlPxSkhKIrgaWCvG6tan40Y_1DZOFv47bx4hQUGd-J\
+                 h2aEjiwn65WV3M_Xb2vQMP7VgYNVaNlfxzpL4yDASItbPMWaXBt3ZUa_IOGoSx2GMnPkrQ4xp56qUth6U7\
+                 esWPqRSqqolnHg"
+                    .to_string(),
+            )).expect("failed to deserialize"),
+        ).expect("verification should succeed");
+
+        // Wrong audience.
+        match verifier.verified_claims(
+            serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                "eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOlsib3RoZXJfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhbXBsZ\
+                 S5jb20iLCJwYXlsb2FkIjoiaGVsbG8gd29ybGQifQ.YmFkX2hhc2g"
+                    .to_string(),
+            )).expect("failed to deserialize"),
+        ) {
+            Err(ClaimsVerificationError::InvalidAudience(_)) => {},
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        // Missing audience.
+        match verifier.verified_claims(
+            serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwicGF5bG9hZCI6ImhlbGxvI\
+                 HdvcmxkIn0.YmFkX2hhc2g"
+                    .to_string(),
+            )).expect("failed to deserialize"),
+        ) {
+            Err(ClaimsVerificationError::InvalidAudience(_)) => {},
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        // Ignore missing audience.
+        verifier
+            .clone()
+            .require_audience_match(false)
+            .verified_claims(
+                serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                    "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwicGF5bG9hZCI6Imhlb\
+                     GxvIHdvcmxkIn0.lP-Z_zGPNoKIbLQsnrZc2LAc5qJrKyb7t07ZtJUKVhcwHiCUou4bBhq5RHlElCh\
+                     0ElRRP6I25lp6UszkRvIC46UV3GVze0x73kVkHSvCVI7MO75LbL9BRqrm5b4CN2zCiFBY8-EwTXnJd\
+                     Ri0d_U8K29TV24L2I-Z5ZILebwUue1N59AGDjx2yYLFx5NOw3TUsPyscG62aZAT321pL_jcYwTWTWw\
+                     2FYm07zguwx-PUTZwGXlJiOgXQqRIbY_1bS3I_D8UWsmEB3DmV0f9z-iklgIPFawa4wHaE-hpzBAEx\
+                     pSieyOavA5pl0Se3XRYA-CkdDVgzG0Pt4IdnxFanfUXTw"
+                        .to_string(),
+                )).expect("failed to deserialize"),
+            ).expect("verification should succeed");
+
+        // Multiple audiences, where one is a match
+        verifier.verified_claims(
+            serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                "eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOlsiYXVkMSIsIm15X2NsaWVudCIsImF1ZDIiXSwiaXNzIjoia\
+                 HR0cHM6Ly9leGFtcGxlLmNvbSIsInBheWxvYWQiOiJoZWxsbyB3b3JsZCJ9.N9ibisEe0kKLe1GDWM\
+                 ON3PmYqbL73dag-loM8pjKJNinF9SB7n4JuSu4FrNkeW4F1Cz8MIbLuWfKvDa_4v_3FstMA3GODZWH\
+                 BVIiuNFay2ovCfGFyykwe47dF_47g_OM5AkJc_teE5MN8lPh9V5zYCy3ON3zZ3acFPJMOPTdbU56xD\
+                 eFe7lil6DmV4JU9A52t5ZkJILFaIuxxXJUIDmqpPTvHkggh_QOj9C2US9bgg5b543JwT4j-HbDp51L\
+                 dDB4k3azOssT1ddtoAuuDOctnraMKUtqffJXexxfwA1uM6EIofSrK5v11xwgTciL9xDXAvav_G2buP\
+                 ol1bjGLa2t0Q"
+                    .to_string(),
+            )).expect("failed to deserialize"),
+        ).expect("verification should succeed");
+
+        // Multiple audiences, where none is a match
+        match verifier.verified_claims(
+            serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                "eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOlsiYXVkMSIsImF1ZDIiXSwiaXNzIjoiaHR0cHM6Ly9leGFtcGxlL\
+                 mNvbSIsInBheWxvYWQiOiJoZWxsbyB3b3JsZCJ9.YmFkX2hhc2g"
+                    .to_string(),
+            )).expect("failed to deserialize"),
+        ) {
+            Err(ClaimsVerificationError::InvalidAudience(_)) => {},
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        // Disable signature check.
+        verifier
+            .clone()
+            .require_signature_check(false)
+            .verified_claims(
+                serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                    "eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhbXBsZ\
+                     S5jb20iLCJwYXlsb2FkIjoiaGVsbG8gd29ybGQifQ.YmFkX2hhc2g"
+                        .to_string(),
+                )).expect("failed to deserialize"),
+            ).expect("verification should succeed");
+
+        // "none" algorithm (unsigned JWT).
+        match verifier.verified_claims(
+            serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                "eyJhbGciOiJub25lIn0.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhbXBsZ\
+                 S5jb20iLCJwYXlsb2FkIjoiaGVsbG8gd29ybGQifQ."
+                    .to_string(),
+            )).expect("failed to deserialize"),
+        ) {
+            Err(ClaimsVerificationError::NoSignature) => {}
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        let valid_rs256_jwt =
+            serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                "eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhbXBsZ\
+                 S5jb20iLCJwYXlsb2FkIjoiaGVsbG8gd29ybGQifQ.UZ7vmAsDmOBzeB6e2_0POUfyhMRZKM6WSKz3\
+                 jB2QdmO-eZ9605EzhkJufJQ8515ryWnHv-gUHtZHQi3zilrzhBwvE2cVP83Gv2XIL1EKaMMmfISeEB\
+                 ShWez_FvqxN_bamh5yTROhWmoZTmof-MweBCHgINcsEd7K4e_BHHgq3aaRBpvSFlL_z4l_1NwNcTBo\
+                 kqjNScKZITk42AbsSuGR39L94BWLhz6WXQZ_Sn6R1Ro6roOm1b7E82jJiQEtlseQiCCvPR2JJ6LgW6\
+                 XTMzQ0vCqSh1A7U_IBDsjY_yag8_X3xxFh2URCtHJ47ZSjqfv6hq7OAq8tmVecOVgfIvABOg"
+                    .to_string(),
+            )).expect("failed to deserialize");
+        // Default algs + RS256 -> allowed
+        verifier
+            .verified_claims(valid_rs256_jwt.clone())
+            .expect("verification should succeed");
+
+        let verifier_with_client_secret = CoreJwtClaimsVerifier::new(
+            client_id.clone(),
+            issuer.clone(),
+            CoreJsonWebKeySet::new(vec![]),
+        ).set_client_secret(ClientSecret::new("my_secret".to_string()));
+        let valid_hs256_jwt =
+            serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhbXBsZ\
+                 S5jb20iLCJwYXlsb2FkIjoiaGVsbG8gd29ybGQifQ.dTXvSWen74_rC4oiWw0ziLZNe4KZk8Jw2VZe\
+                 N6vLCDo"
+                    .to_string(),
+            )).expect("failed to deserialize");
+
+        // Default algs + HS256 -> disallowed
+        match verifier_with_client_secret.verified_claims(valid_hs256_jwt.clone()) {
+            Err(ClaimsVerificationError::SignatureVerification(
+                SignatureVerificationError::DisallowedAlg(_),
+            )) => {}
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        // none algs + RS256 -> allowed
+        verifier
+            .clone()
+            .allow_any_alg()
+            .verified_claims(valid_rs256_jwt.clone())
+            .expect("verification should succeed");
+
+        // none algs + HS256 -> allowed
+        verifier_with_client_secret
+            .clone()
+            .allow_any_alg()
+            .verified_claims(valid_hs256_jwt.clone())
+            .expect("verification should succeed");
+
+        // none algs + none -> disallowed
+        match verifier.clone().allow_any_alg().verified_claims(
+            serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                "eyJhbGciOiJub25lIn0.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhbXBsZ\
+                 S5jb20iLCJwYXlsb2FkIjoiaGVsbG8gd29ybGQifQ."
+                    .to_string(),
+            )).expect("failed to deserialize"),
+        ) {
+            Err(ClaimsVerificationError::NoSignature) => {}
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        // HS256 + no client secret -> disallowed
+        match verifier
+            .clone()
+            .allow_any_alg()
+            .verified_claims(valid_hs256_jwt.clone())
+        {
+            Err(ClaimsVerificationError::SignatureVerification(
+                SignatureVerificationError::DisallowedAlg(_),
+            )) => {}
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        // HS256 + valid signature
+        verifier_with_client_secret
+            .clone()
+            .set_allowed_algs(vec![CoreJwsSigningAlgorithm::HmacSha256])
+            .verified_claims(valid_hs256_jwt.clone())
+            .expect("verification should succeed");
+
+        // HS256 + invalid signature
+        match verifier_with_client_secret
+            .clone()
+            .set_allowed_algs(vec![CoreJwsSigningAlgorithm::HmacSha256])
+            .verified_claims(
+                serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                    "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhbXBsZ\
+                     S5jb20iLCJwYXlsb2FkIjoiaGVsbG8gd29ybGQifQ.dTXvSWen74_rC4oiWw0ziLZNe4KZk8Jw2VZe\
+                     N6vLCEo"
+                        .to_string(),
+                )).expect("failed to deserialize")
+            )
+        {
+            Err(ClaimsVerificationError::SignatureVerification(
+                    SignatureVerificationError::CryptoError(_),
+                )) => {}
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        // No public keys
+        match CoreJwtClaimsVerifier::new(
+            client_id.clone(),
+            issuer.clone(),
+            CoreJsonWebKeySet::new(vec![]),
+        ).verified_claims(valid_rs256_jwt.clone())
+        {
+            Err(ClaimsVerificationError::SignatureVerification(
+                SignatureVerificationError::NoMatchingKey,
+            )) => {}
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        let kid = JsonWebKeyId::new("bilbo.baggins@hobbiton.example".to_string());
+        let n = Base64UrlEncodedBytes::new(vec![
+            159, 129, 15, 180, 3, 130, 115, 208, 37, 145, 228, 7, 63, 49, 210, 182, 0, 27, 130,
+            206, 219, 77, 146, 240, 80, 22, 93, 71, 207, 202, 184, 163, 196, 28, 183, 120, 172,
+            117, 83, 121, 63, 142, 249, 117, 118, 141, 26, 35, 116, 216, 113, 37, 100, 195, 188,
+            215, 123, 158, 164, 52, 84, 72, 153, 64, 124, 255, 0, 153, 146, 10, 147, 26, 36, 196,
+            65, 72, 82, 171, 41, 189, 176, 169, 92, 6, 83, 243, 108, 96, 230, 11, 249, 11, 98, 88,
+            221, 165, 111, 55, 4, 123, 165, 194, 209, 208, 41, 175, 156, 157, 64, 186, 199, 170,
+            65, 199, 138, 13, 209, 6, 138, 221, 105, 158, 128, 143, 234, 1, 30, 161, 68, 29, 138,
+            79, 123, 180, 233, 123, 227, 159, 85, 241, 221, 212, 78, 156, 75, 163, 53, 21, 151, 3,
+            212, 211, 75, 96, 62, 101, 20, 122, 79, 35, 214, 211, 192, 153, 108, 117, 237, 238,
+            132, 106, 130, 209, 144, 174, 16, 120, 60, 150, 28, 240, 56, 122, 237, 33, 6, 210, 208,
+            85, 91, 111, 217, 55, 250, 213, 83, 83, 135, 224, 255, 114, 255, 190, 120, 148, 20, 2,
+            176, 184, 34, 234, 42, 116, 182, 5, 140, 29, 171, 249, 179, 74, 118, 203, 99, 184, 127,
+            170, 44, 104, 71, 184, 226, 131, 127, 255, 145, 24, 110, 107, 28, 20, 145, 28, 249,
+            137, 168, 144, 146, 168, 28, 230, 1, 221, 172, 211, 249, 207,
+        ]);
+        let e = Base64UrlEncodedBytes::new(vec![1, 0, 1]);
+
+        // Wrong key type (symmetric key)
+        match CoreJwtClaimsVerifier::new(
+            client_id.clone(),
+            issuer.clone(),
+            CoreJsonWebKeySet::new(vec![CoreJsonWebKey {
+                kty: CoreJsonWebKeyType::Symmetric,
+                use_: Some(CoreJsonWebKeyUse::Signature),
+                kid: Some(kid.clone()),
+                n: None,
+                e: None,
+                k: Some(Base64UrlEncodedBytes::new(vec![1, 2, 3, 4])),
+            }]),
+        ).verified_claims(valid_rs256_jwt.clone())
+        {
+            Err(ClaimsVerificationError::SignatureVerification(
+                SignatureVerificationError::NoMatchingKey,
+            )) => {}
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        // Correct public key, but with signing disallowed
+        match CoreJwtClaimsVerifier::new(
+            client_id.clone(),
+            issuer.clone(),
+            CoreJsonWebKeySet::new(vec![CoreJsonWebKey {
+                kty: CoreJsonWebKeyType::RSA,
+                use_: Some(CoreJsonWebKeyUse::Encryption),
+                kid: Some(kid.clone()),
+                n: Some(n.clone()),
+                e: Some(e.clone()),
+                k: None,
+            }]),
+        ).verified_claims(valid_rs256_jwt.clone())
+        {
+            Err(ClaimsVerificationError::SignatureVerification(
+                SignatureVerificationError::NoMatchingKey,
+            )) => {}
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        // Wrong key ID
+        match verifier.verified_claims(
+            serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                "eyJhbGciOiJSUzI1NiIsImtpZCI6Indyb25nX2tleSJ9.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6I\
+                 mh0dHBzOi8vZXhhbXBsZS5jb20iLCJwYXlsb2FkIjoiaGVsbG8gd29ybGQifQ.lVLomyIyO8WmyS1VZWPu\
+                 cGhRTUyK9RCw90fJC5CfDWUCgt1CBn-aP_ieWWBGfjb4ccR4dl57OYxdLl0Day8QN5pTCBud9QKpQ0rKQX\
+                 K8eBlOW8uSosx8q5pwU_bRyy-XuKJiPlDCOwTEHOp_hOgZFGjoN27MH3Xm8kc0iT3PgyqQ46-wsqHY9S02\
+                 hdJORX7vqYwQLZF8_k_L8K0IG_dC-1Co0g5oAf37oVSdl8hE-ScQ9K-AiSpS-cGYyldbMhyKNDL3ry2cuI\
+                 EUgYSIznkVFuM7RrEdNK222z5PF11ijYx-TM7BIDggbcIyJm-UqpmvVaJImmj5FNkMzuHYznLtdg"
+                    .to_string(),
+            )).expect("failed to deserialize")
+        ) {
+            Err(ClaimsVerificationError::SignatureVerification(
+                    SignatureVerificationError::NoMatchingKey,
+                )) => {}
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        // Client secret + public key
+        verifier
+            .clone()
+            .set_client_secret(ClientSecret::new("my_secret".to_string()))
+            .verified_claims(valid_rs256_jwt.clone())
+            .expect("verification should succeed");
+
+        // Multiple matching public keys: no KID specified
+        match CoreJwtClaimsVerifier::new(
+            client_id.clone(),
+            issuer.clone(),
+            CoreJsonWebKeySet::new(vec![rsa_key.clone(), rsa_key.clone()]),
+        ).verified_claims(valid_rs256_jwt.clone())
+        {
+            Err(ClaimsVerificationError::SignatureVerification(
+                SignatureVerificationError::AmbiguousKeyId(_),
+            )) => {}
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        // Multiple matching public keys: KID specified
+        match CoreJwtClaimsVerifier::new(
+            client_id.clone(),
+            issuer.clone(),
+            CoreJsonWebKeySet::new(vec![rsa_key.clone(), rsa_key.clone()]),
+        ).verified_claims(
+            serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                "eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9.eyJhdWQiO\
+                 lsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhbXBsZS5jb20iLCJwYXlsb2FkIjoiaGVsbG8gd29\
+                 ybGQifQ.jH0v2fQGvH2MD0jn5pQP6W6AF5rJlizyofdyRUIt7E3GraGA1LYDiLAVIfhST3uwJopP-TgtBk\
+                 zc-zyJSvgTR63S8iI1YlHypItpx7r4I9ydzo8GSN5RrZudcU2esY4uEnLbVl17ZVNu4IyTExeKJ0sPM0Hj\
+                 qkOA4XaP2cJwsK-bookNHSA8NRE6adRMrHAKJbor5jrGjpkZAKHbnQFK-wu-nEV_OjS9jpN_FboRZVcDTZ\
+                 GFzeFbqFqHdRn6UWPFnVpVnUhih16UjNH1om6gwc0uFoPWTDxJlXQCFbHMhZtgCbUkXQBH7twPMc4YUziw\
+                 S8GIRKCcXjdrP5oyxmcitQ"
+                    .to_string(),
+            )).expect("failed to deserialize")
+        ) {
+            Err(ClaimsVerificationError::SignatureVerification(
+                    SignatureVerificationError::AmbiguousKeyId(_),
+                )) => {}
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        // RS256 + valid signature
+        verifier
+            .verified_claims(valid_rs256_jwt.clone())
+            .expect("verification should succeed");
+
+        // RS256 + invalid signature
+        match verifier.verified_claims(
+            serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                "eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhbXBsZS5jb\
+                 20iLCJwYXlsb2FkIjoiaGVsbG8gd29ybGQifQ.YmFkX2hhc2g"
+                    .to_string(),
+            )).expect("failed to deserialize"),
+        ) {
+            Err(ClaimsVerificationError::SignatureVerification(
+                    SignatureVerificationError::CryptoError(_),
+                )) => {}
+            other => panic!("unexpected result: {:?}", other),
+        }
+    }
+
+    // ** IdTokenVerifier **
+
+    // public client
+
+    // private client
+
+    // allowed algs
+
+    // set_auth_context_verifier_fn
+
+    // set_auth_time_verifier_fn
+
+    // enable/disable signature check
+
+    // set_time_fn
+
+    // set_issue_time_verifier_fn
+
+    // verification failures (error conditions in verified_claims)
+
+    // ** UserInfoVerifier **
+
+    // require_signed_response (JSON and JWT response)
+
+    // require_issuer_match
+
+    // require_audience_match
+
+    // invalid subject
 }
