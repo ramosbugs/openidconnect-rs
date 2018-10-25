@@ -15,11 +15,11 @@ failure_derive = "0.1"
 log = "0.4"
 oauth2 = { git = "https://github.com/ramosbugs/oauth2-rs.git", branch = "master" }
 rand = "0.4"
-ring = "0.12"
+ring = "0.13"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
-untrusted = "0.5"
+untrusted = "0.6"
 url = "1.0"
 
 [dev-dependencies]
