@@ -248,7 +248,7 @@ where
         // If 'crit' fields are specified, we must reject any we do not understand. Since this
         // implementation doesn't understand any of them, unconditionally reject the JWT. Note that
         // the spec prohibits this field from containing any of the standard headers or being empty.
-        if let Some(_) = jose_header.crit {
+        if jose_header.crit.is_some() {
             // FIXME: add a test case using this test vector:
             // https://tools.ietf.org/html/rfc7515#appendix-E
             return Err(ClaimsVerificationError::Unsupported(
@@ -470,6 +470,12 @@ where
     }
 }
 
+pub type AuthenticationContextClassVerifier =
+    Fn(Option<&AuthenticationContextClass>) -> Result<(), String>;
+pub type OptTimeVerifier = Fn(Option<&DateTime<Utc>>) -> Result<(), String>;
+pub type TimeVerifier = Fn(&DateTime<Utc>) -> Result<(), String>;
+pub type TimeGetter = Fn() -> DateTime<Utc>;
+
 ///
 /// ID token verifier.
 ///
@@ -480,11 +486,11 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
-    acr_verifier_fn: Box<Fn(Option<&AuthenticationContextClass>) -> Result<(), String>>,
-    auth_time_verifier_fn: Box<Fn(Option<&DateTime<Utc>>) -> Result<(), String>>,
-    iat_verifier_fn: Box<Fn(&DateTime<Utc>) -> Result<(), String>>,
+    acr_verifier_fn: Box<AuthenticationContextClassVerifier>,
+    auth_time_verifier_fn: Box<OptTimeVerifier>,
+    iat_verifier_fn: Box<TimeVerifier>,
     jwt_verifier: JwtClaimsVerifier<JS, JT, JU, K>,
-    time_fn: Box<Fn() -> DateTime<Utc>>,
+    time_fn: Box<TimeGetter>,
 }
 impl<JS, JT, JU, K> IdTokenVerifier<JS, JT, JU, K>
 where
@@ -540,7 +546,7 @@ where
 
     pub fn set_auth_context_verifier_fn(
         mut self,
-        acr_verifier_fn: Box<Fn(Option<&AuthenticationContextClass>) -> Result<(), String>>,
+        acr_verifier_fn: Box<AuthenticationContextClassVerifier>,
     ) -> Self {
         self.acr_verifier_fn = acr_verifier_fn;
         self
@@ -548,7 +554,7 @@ where
 
     pub fn set_auth_time_verifier_fn(
         mut self,
-        auth_time_verifier_fn: Box<Fn(Option<&DateTime<Utc>>) -> Result<(), String>>,
+        auth_time_verifier_fn: Box<OptTimeVerifier>,
     ) -> Self {
         self.auth_time_verifier_fn = auth_time_verifier_fn;
         self
@@ -563,14 +569,14 @@ where
         self
     }
 
-    pub fn set_time_fn(mut self, time_fn: Box<Fn() -> DateTime<Utc>>) -> Self {
+    pub fn set_time_fn(mut self, time_fn: Box<TimeGetter>) -> Self {
         self.time_fn = time_fn;
         self
     }
 
     pub fn set_issue_time_verifier_fn(
         mut self,
-        iat_verifier_fn: Box<Fn(&DateTime<Utc>) -> Result<(), String>>,
+        iat_verifier_fn: Box<TimeVerifier>,
     ) -> Self {
         self.iat_verifier_fn = iat_verifier_fn;
         self

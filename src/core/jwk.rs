@@ -63,14 +63,14 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
     }
 
     fn new_symmetric(key: Vec<u8>) -> Self {
-        return Self {
+        Self {
             kty: CoreJsonWebKeyType::Symmetric,
             use_: None,
             kid: None,
             n: None,
             e: None,
             k: Some(Base64UrlEncodedBytes::new(key)),
-        };
+        }
     }
 
     fn verify_signature(

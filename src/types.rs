@@ -483,7 +483,7 @@ pub(crate) mod helpers {
             let secs = secs_f64.floor();
             (
                 secs as i64,
-                ((secs_f64 - secs) * 1000000000.).floor() as u32,
+                ((secs_f64 - secs) * 1_000_000_000.).floor() as u32,
             )
         };
         Utc.timestamp_opt(secs, nsecs).single().ok_or(())
