@@ -5,6 +5,7 @@ rust:
   - nightly
 sudo: required
 dist: trusty
+cache: cargo
 branches:
   only:
     - master
