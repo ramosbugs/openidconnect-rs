@@ -453,12 +453,10 @@ where
         let prompts_opt = join_optional_vec(self.prompts());
         let ui_locales_opt = join_optional_vec(self.ui_locales());
 
-        let state = state_fn();
         let nonce = nonce_fn();
 
-        let url = {
-            let mut extra_params: Vec<(&str, &str)> =
-                vec![("state", state.secret()), ("nonce", nonce.secret())];
+        let (url, state) = {
+            let mut extra_params: Vec<(&str, &str)> = vec![("nonce", nonce.secret())];
 
             if let Some(ref acr_values) = acr_values_opt {
                 extra_params.push(("acr_values", acr_values));
@@ -522,7 +520,7 @@ where
             };
 
             self.oauth2_client
-                .authorize_url_extension(&response_type, &extra_params)
+                .authorize_url_extension(&response_type, state_fn, &extra_params)
         };
         (url, state, nonce)
     }
