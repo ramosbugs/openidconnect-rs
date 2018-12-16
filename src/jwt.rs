@@ -475,27 +475,31 @@ pub mod tests {
         assert_eq!(
             serde_json::to_string::<CoreAlgorithm>(&JsonWebTokenAlgorithm::Encryption(
                 CoreJweContentEncryptionAlgorithm::Aes128CbcHmacSha256
-            )).expect("failed to serialize"),
+            ))
+            .expect("failed to serialize"),
             "\"A128CBC-HS256\"",
         );
         assert_eq!(
             serde_json::to_string::<CoreAlgorithm>(&JsonWebTokenAlgorithm::Encryption(
                 CoreJweContentEncryptionAlgorithm::Aes128Gcm
-            )).expect("failed to serialize"),
+            ))
+            .expect("failed to serialize"),
             "\"A128GCM\"",
         );
         assert_eq!(
             serde_json::to_string::<CoreAlgorithm>(&JsonWebTokenAlgorithm::Signature(
                 CoreJwsSigningAlgorithm::HmacSha256,
                 PhantomData,
-            )).expect("failed to serialize"),
+            ))
+            .expect("failed to serialize"),
             "\"HS256\"",
         );
         assert_eq!(
             serde_json::to_string::<CoreAlgorithm>(&JsonWebTokenAlgorithm::Signature(
                 CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
                 PhantomData,
-            )).expect("failed to serialize"),
+            ))
+            .expect("failed to serialize"),
             "\"RS256\"",
         );
         assert_eq!(
@@ -619,17 +623,16 @@ pub mod tests {
         }
 
         fn expect_deserialization_err<I: Into<String>>(jwt_str: I, pattern: &str) {
-            let err =
-                serde_json::from_value::<JsonWebToken<
+            let err = serde_json::from_value::<
+                JsonWebToken<
                     TestPayload,
                     CoreJweContentEncryptionAlgorithm,
                     CoreJwsSigningAlgorithm,
                     CoreJsonWebKeyType,
                     JsonWebTokenJsonPayloadDeserializer,
-                >>(
-                    serde_json::Value::String(jwt_str.into())
-                )
-                    .expect_err("deserialization should have failed");
+                >,
+            >(serde_json::Value::String(jwt_str.into()))
+            .expect_err("deserialization should have failed");
 
             assert!(
                 format!("{}", err).contains(pattern),
@@ -686,7 +689,8 @@ pub mod tests {
         >(serde_json::Value::String(format!(
             "{}.{}.e2FiY30",
             valid_header, valid_body
-        ))).expect("failed to deserialize");
+        )))
+        .expect("failed to deserialize");
         assert_eq!(deserialized.unverified_claims().foo, "bar");
     }
 }

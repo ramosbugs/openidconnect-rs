@@ -47,7 +47,8 @@ where
         method: HttpRequestMethod::Get,
         headers: &vec![ACCEPT_JSON],
         post_body: &vec![],
-    }.request()
+    }
+    .request()
     .map_err(DiscoveryError::Request)?;
 
     // FIXME: improve error handling (i.e., is there a body response?)

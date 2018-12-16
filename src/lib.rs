@@ -214,7 +214,8 @@ where
             client_secret.clone(),
             auth_url,
             token_url,
-        ).add_scope(Scope::new(OPENID_SCOPE.to_string()));
+        )
+        .add_scope(Scope::new(OPENID_SCOPE.to_string()));
         Client {
             oauth2_client,
             acr_values: None,
@@ -250,7 +251,8 @@ where
             client_secret.clone(),
             provider_metadata.authorization_endpoint().clone(),
             provider_metadata.token_endpoint().cloned(),
-        ).add_scope(Scope::new(OPENID_SCOPE.to_string()));
+        )
+        .add_scope(Scope::new(OPENID_SCOPE.to_string()));
         Ok(Client {
             oauth2_client,
             acr_values: None,
@@ -288,7 +290,8 @@ where
             registration_response.client_secret().cloned(),
             provider_metadata.authorization_endpoint().clone(),
             provider_metadata.token_endpoint().cloned(),
-        ).add_scope(Scope::new(OPENID_SCOPE.to_string()));
+        )
+        .add_scope(Scope::new(OPENID_SCOPE.to_string()));
         Client {
             oauth2_client,
             acr_values: None,
@@ -471,11 +474,11 @@ where
             }
 
             // FIXME: uncomment
-/*
-            if let Some(id_token_hint) = id_token_hint {
-                extra_params.push(("id_token_hint", id_token_hint));
-            }
-*/
+            /*
+                        if let Some(id_token_hint) = id_token_hint {
+                            extra_params.push(("id_token_hint", id_token_hint));
+                        }
+            */
 
             if let Some(login_hint) = login_hint {
                 extra_params.push(("login_hint", login_hint.secret()));
@@ -501,7 +504,8 @@ where
                             vec![
                                 core::CoreResponseType::IdToken,
                                 core::CoreResponseType::Token,
-                            ].iter()
+                            ]
+                            .iter()
                             .map(variant_name)
                             .collect::<Vec<_>>()
                             .join(" "),
@@ -592,14 +596,16 @@ mod tests {
             .add_scope(Scope::new("email".to_string()))
             .set_redirect_uri(RedirectUrl::new(
                 Url::parse("http://localhost:8888/").unwrap(),
-            )).set_display(Some(CoreAuthDisplay::Touch))
+            ))
+            .set_display(Some(CoreAuthDisplay::Touch))
             .set_prompts(Some(vec![CoreAuthPrompt::Login, CoreAuthPrompt::Consent]))
             .set_max_age(Some(Duration::from_secs(1800)))
             .set_ui_locales(Some(vec![
                 LanguageTag::new("fr-CA".to_string()),
                 LanguageTag::new("fr".to_string()),
                 LanguageTag::new("en".to_string()),
-            ])).set_auth_context_values(Some(vec![AuthenticationContextClass::new(
+            ]))
+            .set_auth_context_values(Some(vec![AuthenticationContextClass::new(
                 "urn:mace:incommon:iap:silver".to_string(),
             )]));
 

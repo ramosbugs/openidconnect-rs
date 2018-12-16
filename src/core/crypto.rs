@@ -42,7 +42,8 @@ pub fn verify_rsa_signature(
                 (Input::from(n), Input::from(e)),
                 Input::from(msg.as_bytes()),
                 Input::from(signature),
-            ).map_err(|_| SignatureVerificationError::CryptoError("bad signature".to_string()))
+            )
+            .map_err(|_| SignatureVerificationError::CryptoError("bad signature".to_string()))
         } else {
             Err(SignatureVerificationError::InvalidKey(
                 "RSA exponent `e` is missing".to_string(),

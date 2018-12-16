@@ -227,7 +227,8 @@ fn test_discovery_deserialization() {
         IssuerUrl::new(
             "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code"
                 .to_string()
-        ).unwrap(),
+        )
+        .unwrap(),
         *provider_metadata.issuer()
     );
     assert_eq!(
@@ -235,7 +236,8 @@ fn test_discovery_deserialization() {
             Url::parse(
                 "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
                  /authorization"
-            ).unwrap()
+            )
+            .unwrap()
         ),
         *provider_metadata.authorization_endpoint()
     );
@@ -244,7 +246,8 @@ fn test_discovery_deserialization() {
             Url::parse(
                 "https://rp.certification.openid.net:8080/openidconnect-rs\
                  /rp-response_type-code/token"
-            ).unwrap()
+            )
+            .unwrap()
         )),
         provider_metadata.token_endpoint()
     );
@@ -254,7 +257,8 @@ fn test_discovery_deserialization() {
                 "https://rp.certification.openid.net:8080/openidconnect-rs\
                  /rp-response_type-code/userinfo"
                     .to_string()
-            ).unwrap()
+            )
+            .unwrap()
         ),
         provider_metadata.userinfo_endpoint()
     );
@@ -263,7 +267,8 @@ fn test_discovery_deserialization() {
             &JsonWebKeySetUrl::new(
                 "https://rp.certification.openid.net:8080/static/jwks_3INbZl52IrrPCp2j.json"
                     .to_string()
-            ).unwrap()
+            )
+            .unwrap()
         ),
         provider_metadata.jwks_uri()
     );
@@ -273,7 +278,8 @@ fn test_discovery_deserialization() {
                 "https://rp.certification.openid.net:8080/openidconnect-rs\
                  /rp-response_type-code/registration"
                     .to_string()
-            ).unwrap()
+            )
+            .unwrap()
         ),
         provider_metadata.registration_endpoint()
     );
@@ -287,7 +293,8 @@ fn test_discovery_deserialization() {
                 "address",
                 "offline_access",
                 "openid",
-            ].iter()
+            ]
+            .iter()
             .map(|s| s.to_string())
             .map(Scope::new)
             .collect::<Vec<_>>()
@@ -313,7 +320,8 @@ fn test_discovery_deserialization() {
                 CoreGrantType::Implicit,
                 CoreGrantType::Extension("urn:ietf:params:oauth:grant-type:jwt-bearer".to_string()),
                 CoreGrantType::RefreshToken,
-            ].into_iter()
+            ]
+            .into_iter()
             .collect::<Vec<_>>()
         ),
         provider_metadata.grant_types_supported()
@@ -604,7 +612,8 @@ fn test_discovery_deserialization_other_fields() {
         IssuerUrl::new(
             "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code"
                 .to_string()
-        ).unwrap(),
+        )
+        .unwrap(),
         *provider_metadata.issuer()
     );
     assert_eq!(
@@ -612,7 +621,8 @@ fn test_discovery_deserialization_other_fields() {
             Url::parse(
                 "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
                  /authorization"
-            ).unwrap()
+            )
+            .unwrap()
         ),
         *provider_metadata.authorization_endpoint()
     );
@@ -719,7 +729,8 @@ fn test_discovery_deserialization_other_fields() {
                 "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
                  /documentation"
                     .to_string()
-            ).unwrap()
+            )
+            .unwrap()
         ),
         provider_metadata.service_documentation()
     );
@@ -749,7 +760,8 @@ fn test_discovery_deserialization_other_fields() {
                 "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
                  /op_policy"
                     .to_string()
-            ).unwrap()
+            )
+            .unwrap()
         ),
         provider_metadata.op_policy_uri()
     );
@@ -759,7 +771,8 @@ fn test_discovery_deserialization_other_fields() {
                 "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
                  /op_tos"
                     .to_string()
-            ).unwrap()
+            )
+            .unwrap()
         ),
         provider_metadata.op_tos_uri()
     );

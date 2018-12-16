@@ -294,15 +294,13 @@ mod tests {
             \"k\":\"GawgguFyGrWKav7AX4VKVg\"
         }";
 
-        assert!(
-            serde_json::from_str::<CoreJsonWebKey>(json)
-                .expect_err("deserialization must fail when duplicate fields are present")
-                .to_string()
-                // This is probably not ideal since the serde/serde_json contracts don't guarantee this
-                // error message. However, we want to be sure that this fails for the expected reason
-                // and not by happenstance, so this is fine for now.
-                .contains("duplicate field")
-        );
+        assert!(serde_json::from_str::<CoreJsonWebKey>(json)
+            .expect_err("deserialization must fail when duplicate fields are present")
+            .to_string()
+            // This is probably not ideal since the serde/serde_json contracts don't guarantee this
+            // error message. However, we want to be sure that this fails for the expected reason
+            // and not by happenstance, so this is fine for now.
+            .contains("duplicate field"));
     }
 
     fn verify_signature(
@@ -430,7 +428,8 @@ mod tests {
                 &CoreJwsSigningAlgorithm::EcdsaP256Sha256,
                 pkcs1_signing_input,
                 &Vec::new(),
-            ).expect_err("signature verification should fail")
+            )
+            .expect_err("signature verification should fail")
         {
             SignatureVerificationError::InvalidKey(_) => {}
             other => panic!(format!("unexpected error: {:?}", other)),
@@ -457,7 +456,8 @@ mod tests {
                 &CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
                 pkcs1_signing_input,
                 &Vec::new(),
-            ).expect_err("signature verification should fail")
+            )
+            .expect_err("signature verification should fail")
         {
             SignatureVerificationError::InvalidKey(_) => {}
             other => panic!(format!("unexpected error: {:?}", other)),

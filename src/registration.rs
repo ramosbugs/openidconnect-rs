@@ -181,7 +181,7 @@ where
             where
                 V: MapAccess<'de>,
             {
-                deserialize_fields!{
+                deserialize_fields! {
                     map {
                         [redirect_uris]
                         [Option(response_types)]
@@ -251,7 +251,7 @@ where
     where
         SE: Serializer,
     {
-        serialize_fields!{
+        serialize_fields! {
             self -> serializer {
                 [redirect_uris]
                 [Option(response_types)]
@@ -338,7 +338,8 @@ where
             method: HttpRequestMethod::Post,
             headers: &headers,
             post_body: &request_json,
-        }.request()
+        }
+        .request()
         .map_err(ClientRegistrationError::Request)?;
 
         // FIXME: check for WWW-Authenticate response header if bearer auth was used (see

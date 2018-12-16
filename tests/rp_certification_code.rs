@@ -134,7 +134,8 @@ impl TestState {
                 self.authorization_code
                     .take()
                     .expect("no authorization_code"),
-            ).panic_if_fail("failed to exchange authorization code for token");
+            )
+            .panic_if_fail("failed to exchange authorization code for token");
         log_debug!(
             "Authorization Server returned token response: {:?}",
             token_response
@@ -256,26 +257,20 @@ fn rp_scope_userinfo_claims() {
     log_debug!("UserInfo response: {:?}", user_info_claims);
 
     assert!(id_token_claims.sub() == user_info_claims.sub());
-    assert!(
-        !user_info_claims
-            .email()
-            .expect("no email returned by UserInfo endpoint")
-            .is_empty()
-    );
-    assert!(
-        !user_info_claims
-            .address()
-            .expect("no address returned by UserInfo endpoint")
-            .street_address()
-            .expect("no street address returned by UserInfo endpoint")
-            .is_empty()
-    );
-    assert!(
-        !user_info_claims
-            .phone_number()
-            .expect("no phone_number returned by UserInfo endpoint")
-            .is_empty()
-    );
+    assert!(!user_info_claims
+        .email()
+        .expect("no email returned by UserInfo endpoint")
+        .is_empty());
+    assert!(!user_info_claims
+        .address()
+        .expect("no address returned by UserInfo endpoint")
+        .street_address()
+        .expect("no street address returned by UserInfo endpoint")
+        .is_empty());
+    assert!(!user_info_claims
+        .phone_number()
+        .expect("no phone_number returned by UserInfo endpoint")
+        .is_empty());
 
     log_info!("SUCCESS");
 }
@@ -300,7 +295,8 @@ fn rp_nonce_invalid() {
 fn rp_token_endpoint_client_secret_basic() {
     let test_state = TestState::init("rp-token_endpoint-client_secret_basic", |reg| {
         reg.set_token_endpoint_auth_method(Some(CoreClientAuthMethod::ClientSecretBasic))
-    }).set_auth_type(AuthType::BasicAuth)
+    })
+    .set_auth_type(AuthType::BasicAuth)
     .authorize(&vec![])
     .exchange_code();
 
@@ -314,7 +310,8 @@ fn rp_token_endpoint_client_secret_basic() {
 fn rp_token_endpoint_client_secret_post() {
     let test_state = TestState::init("rp-token_endpoint-client_secret_post", |reg| {
         reg.set_token_endpoint_auth_method(Some(CoreClientAuthMethod::ClientSecretPost))
-    }).set_auth_type(AuthType::RequestBody)
+    })
+    .set_auth_type(AuthType::RequestBody)
     .authorize(&vec![])
     .exchange_code();
 
@@ -546,7 +543,8 @@ fn rp_userinfo_bearer_header() {
 fn rp_userinfo_sig() {
     let test_state = TestState::init("rp-userinfo-sig", |reg| {
         reg.set_userinfo_signed_response_alg(Some(CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256))
-    }).authorize(&vec![Scope::new("profile".to_string())])
+    })
+    .authorize(&vec![Scope::new("profile".to_string())])
     .exchange_code();
     let id_token_claims = test_state.id_token_claims();
     log_debug!("ID token: {:?}", id_token_claims);
@@ -555,7 +553,8 @@ fn rp_userinfo_sig() {
         .user_info_verifier(
             test_state.jwks(),
             test_state.id_token_claims().sub().clone(),
-        ).require_signed_response(true)
+        )
+        .require_signed_response(true)
         // For some reason, the test suite omits these claims even though the Core spec says
         // that the RP SHOULD verify these.
         .require_audience_match(false)

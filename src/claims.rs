@@ -141,7 +141,7 @@ where
             where
                 V: MapAccess<'de>,
             {
-                deserialize_fields!{
+                deserialize_fields! {
                     map {
                         [sub]
                         [LanguageTag(name)]
@@ -178,7 +178,7 @@ where
     where
         SE: Serializer,
     {
-        serialize_fields!{
+        serialize_fields! {
             self -> serializer {
                 [sub]
                 [LanguageTag(name)]

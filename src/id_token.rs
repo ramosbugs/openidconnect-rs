@@ -245,7 +245,8 @@ where
     JE: JweContentEncryptionAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
-{}
+{
+}
 
 #[cfg(test)]
 mod tests {
@@ -589,7 +590,8 @@ mod tests {
                     Some(LanguageTag::new("es".to_string())),
                     EndUserProfileUrl::new(
                         "https://example.com/profile?id=12345&lang=es".to_string()
-                    ).unwrap(),
+                    )
+                    .unwrap(),
                 ),
             ]
         );
@@ -605,7 +607,8 @@ mod tests {
                     Some(LanguageTag::new("es".to_string())),
                     EndUserPictureUrl::new(
                         "https://example.com/avatar?id=12345&lang=es".to_string()
-                    ).unwrap(),
+                    )
+                    .unwrap(),
                 ),
             ]
         );
@@ -689,7 +692,8 @@ mod tests {
                     \"exp\": 1311281970,
                     \"iat\": 1311280970
                 }",
-        ).expect("failed to deserialize");
+        )
+        .expect("failed to deserialize");
         assert_eq!(
             *single_aud_str_claims.audiences(),
             vec![Audience::new("s6BhdRkqt3".to_string())],
@@ -715,7 +719,8 @@ mod tests {
                     \"exp\": 1311281970,
                     \"iat\": 1311280970
                 }",
-        ).expect("failed to deserialize");
+        )
+        .expect("failed to deserialize");
         assert_eq!(
             *single_aud_vec_claims.audiences(),
             vec![Audience::new("s6BhdRkqt3".to_string())],
@@ -739,7 +744,8 @@ mod tests {
                     \"exp\": 1311281970,
                     \"iat\": 1311280970
                 }",
-        ).expect("failed to deserialize");
+        )
+        .expect("failed to deserialize");
         assert_eq!(
             *multi_aud_claims.audiences(),
             vec![
@@ -776,7 +782,8 @@ mod tests {
                 \"iat\": 1311280970,
                 \"tfa_method\": \"u2f\"
             }",
-        ).expect("failed to deserialize");
+        )
+        .expect("failed to deserialize");
         assert_eq!(claims.additional_claims().tfa_method, "u2f");
         assert_eq!(
             serde_json::to_string(&claims).expect("failed to serialize"),
@@ -798,7 +805,8 @@ mod tests {
                 \"exp\": 1311281970,
                 \"iat\": 1311280970
             }",
-        ).expect_err("missing claim should fail to deserialize");
+        )
+        .expect_err("missing claim should fail to deserialize");
     }
 
     #[test]
@@ -811,7 +819,8 @@ mod tests {
                     \"exp\": 1311281970,
                     \"iat\": 1311280970
                 }",
-        ).expect("failed to deserialize");
+        )
+        .expect("failed to deserialize");
 
         fn verify_audiences<A: AudiencesClaim>(audiences_claim: &A) {
             assert_eq!(
@@ -833,7 +842,8 @@ mod tests {
                     \"exp\": 1311281970,
                     \"iat\": 1311280970
                 }",
-        ).expect("failed to deserialize");
+        )
+        .expect("failed to deserialize");
 
         fn verify_issuer<I: IssuerClaim>(issuer_claim: &I) {
             assert_eq!(

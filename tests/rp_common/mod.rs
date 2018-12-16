@@ -108,7 +108,8 @@ pub fn issuer_url(test_id: &str) -> IssuerUrl {
     IssuerUrl::new(format!(
         "{}/{}/{}",
         CERTIFICATION_BASE_URL, RP_NAME, test_id
-    )).expect("Failed to parse issuer URL")
+    ))
+    .expect("Failed to parse issuer URL")
 }
 
 pub fn get_provider_metadata(test_id: &str) -> CoreProviderMetadata {
@@ -128,7 +129,8 @@ where
 {
     let registration_request_pre = CoreClientRegistrationRequest::new(vec![RedirectUrl::new(
         Url::parse(RP_REDIRECT_URI).unwrap(),
-    )]).set_application_type(Some(CoreApplicationType::Native))
+    )])
+    .set_application_type(Some(CoreApplicationType::Native))
     .set_client_name(Some(ClientName::new(RP_NAME.to_string())), None)
     .set_contacts(Some(vec![ContactEmail::new(RP_CONTACT_EMAIL.to_string())]));
 

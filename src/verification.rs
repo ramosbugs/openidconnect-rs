@@ -68,10 +68,7 @@ pub enum ClaimsVerificationError {
     #[fail(display = "Invalid audiences: {}", _0)]
     InvalidAudience(String),
     /// Authorization context class reference (`acr`) claim is invalid.
-    #[fail(
-        display = "Invalid authorization context class reference: {}",
-        _0
-    )]
+    #[fail(display = "Invalid authorization context class reference: {}", _0)]
     InvalidAuthContext(String),
     /// User authenticated too long ago.
     #[fail(display = "Invalid authentication time: {}", _0)]
@@ -363,7 +360,8 @@ where
             // support it for now to protect against accidental misuse. If demand arises,
             // we can figure out a API that mitigates the risk.
             JsonWebTokenAlgorithm::None => return Err(ClaimsVerificationError::NoSignature),
-        }.clone();
+        }
+        .clone();
 
         // 7. The alg value SHOULD be the default of RS256 or the algorithm sent by the Client
         //    in the id_token_signed_response_alg parameter during Registration.
@@ -434,7 +432,8 @@ where
                         // Either the JWT doesn't include a 'kid' (in which case any 'kid'
                         // is acceptable), or the 'kid' matches the key's ID.
                         (jose_header.kid.is_none() ||
-                            jose_header.kid.as_ref() == key.key_id())).collect::<Vec<&K>>()
+                            jose_header.kid.as_ref() == key.key_id()))
+                .collect::<Vec<&K>>()
         };
         if public_keys.is_empty() {
             return Err(ClaimsVerificationError::SignatureVerification(
@@ -454,7 +453,8 @@ where
                                 .map(|kid| format!("`{}`", **kid))
                                 .unwrap_or_else(|| "null ID".to_string()),
                             variant_name(key.key_type())
-                        )).collect::<Vec<_>>()
+                        ))
+                        .collect::<Vec<_>>()
                         .join(", ")
                 )),
             ));
@@ -463,7 +463,8 @@ where
         jwt.claims(
             &signature_alg.clone(),
             *public_keys.first().expect("unreachable"),
-        ).map_err(ClaimsVerificationError::SignatureVerification)
+        )
+        .map_err(ClaimsVerificationError::SignatureVerification)
 
         // Steps 9--13 are specific to the ID token.
     }
@@ -846,7 +847,8 @@ mod tests {
             CoreJwtClaimsVerifier::validate_jose_header(
                 &serde_json::from_str::<CoreJsonWebTokenHeader>(
                     "{\"alg\":\"RS256\",\"typ\":\"NOT_A_JWT\"}",
-                ).expect("failed to deserialize"),
+                )
+                .expect("failed to deserialize"),
             ),
             "unsupported JWT type",
         );
@@ -856,7 +858,8 @@ mod tests {
             CoreJwtClaimsVerifier::validate_jose_header(
                 &serde_json::from_str::<CoreJsonWebTokenHeader>(
                     "{\"alg\":\"RS256\",\"cty\":\"JWT\"}",
-                ).expect("failed to deserialize"),
+                )
+                .expect("failed to deserialize"),
             ),
             "nested JWT",
         );
@@ -864,7 +867,8 @@ mod tests {
             CoreJwtClaimsVerifier::validate_jose_header(
                 &serde_json::from_str::<CoreJsonWebTokenHeader>(
                     "{\"alg\":\"RS256\",\"cty\":\"NOT_A_JWT\"}",
-                ).expect("failed to deserialize"),
+                )
+                .expect("failed to deserialize"),
             ),
             "unsupported JWT content type",
         );
@@ -878,7 +882,8 @@ mod tests {
                      \"crit\":[\"http://example.invalid/UNDEFINED\"],\
                      \"http://example.invalid/UNDEFINED\":true\
                      }",
-                ).expect("failed to deserialize"),
+                )
+                .expect("failed to deserialize"),
             ),
             "critical JWT header fields are unsupported",
         );
@@ -1069,7 +1074,8 @@ mod tests {
                 "eyJhbGciOiJub25lIn0.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhbXBsZ\
                  S5jb20iLCJwYXlsb2FkIjoiaGVsbG8gd29ybGQifQ."
                     .to_string(),
-            )).expect("failed to deserialize"),
+            ))
+            .expect("failed to deserialize"),
         ) {
             Err(ClaimsVerificationError::NoSignature) => {}
             other => panic!("unexpected result: {:?}", other),
@@ -1084,7 +1090,8 @@ mod tests {
                  kqjNScKZITk42AbsSuGR39L94BWLhz6WXQZ_Sn6R1Ro6roOm1b7E82jJiQEtlseQiCCvPR2JJ6LgW6\
                  XTMzQ0vCqSh1A7U_IBDsjY_yag8_X3xxFh2URCtHJ47ZSjqfv6hq7OAq8tmVecOVgfIvABOg"
                     .to_string(),
-            )).expect("failed to deserialize");
+            ))
+            .expect("failed to deserialize");
         // Default algs + RS256 -> allowed
         verifier
             .verified_claims(valid_rs256_jwt.clone())
@@ -1094,14 +1101,16 @@ mod tests {
             client_id.clone(),
             issuer.clone(),
             CoreJsonWebKeySet::new(vec![]),
-        ).set_client_secret(ClientSecret::new("my_secret".to_string()));
+        )
+        .set_client_secret(ClientSecret::new("my_secret".to_string()));
         let valid_hs256_jwt =
             serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
                 "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhbXBsZ\
                  S5jb20iLCJwYXlsb2FkIjoiaGVsbG8gd29ybGQifQ.dTXvSWen74_rC4oiWw0ziLZNe4KZk8Jw2VZe\
                  N6vLCDo"
                     .to_string(),
-            )).expect("failed to deserialize");
+            ))
+            .expect("failed to deserialize");
 
         // Default algs + HS256 -> disallowed
         match verifier_with_client_secret.verified_claims(valid_hs256_jwt.clone()) {
@@ -1131,7 +1140,8 @@ mod tests {
                 "eyJhbGciOiJub25lIn0.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhbXBsZ\
                  S5jb20iLCJwYXlsb2FkIjoiaGVsbG8gd29ybGQifQ."
                     .to_string(),
-            )).expect("failed to deserialize"),
+            ))
+            .expect("failed to deserialize"),
         ) {
             Err(ClaimsVerificationError::NoSignature) => {}
             other => panic!("unexpected result: {:?}", other),
@@ -1180,7 +1190,8 @@ mod tests {
             client_id.clone(),
             issuer.clone(),
             CoreJsonWebKeySet::new(vec![]),
-        ).verified_claims(valid_rs256_jwt.clone())
+        )
+        .verified_claims(valid_rs256_jwt.clone())
         {
             Err(ClaimsVerificationError::SignatureVerification(
                 SignatureVerificationError::NoMatchingKey,
@@ -1219,7 +1230,8 @@ mod tests {
                 e: None,
                 k: Some(Base64UrlEncodedBytes::new(vec![1, 2, 3, 4])),
             }]),
-        ).verified_claims(valid_rs256_jwt.clone())
+        )
+        .verified_claims(valid_rs256_jwt.clone())
         {
             Err(ClaimsVerificationError::SignatureVerification(
                 SignatureVerificationError::NoMatchingKey,
@@ -1239,7 +1251,8 @@ mod tests {
                 e: Some(e.clone()),
                 k: None,
             }]),
-        ).verified_claims(valid_rs256_jwt.clone())
+        )
+        .verified_claims(valid_rs256_jwt.clone())
         {
             Err(ClaimsVerificationError::SignatureVerification(
                 SignatureVerificationError::NoMatchingKey,
@@ -1277,7 +1290,8 @@ mod tests {
             client_id.clone(),
             issuer.clone(),
             CoreJsonWebKeySet::new(vec![rsa_key.clone(), rsa_key.clone()]),
-        ).verified_claims(valid_rs256_jwt.clone())
+        )
+        .verified_claims(valid_rs256_jwt.clone())
         {
             Err(ClaimsVerificationError::SignatureVerification(
                 SignatureVerificationError::AmbiguousKeyId(_),
