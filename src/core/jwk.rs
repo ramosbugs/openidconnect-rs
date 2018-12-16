@@ -190,6 +190,7 @@ mod tests {
     use oauth2::prelude::*;
     use serde_json;
 
+    use super::super::super::jwt::tests::TEST_RSA_PUB_KEY;
     use super::super::super::verification::SignatureVerificationError;
     use super::super::super::{Base64UrlEncodedBytes, JsonWebKey, JsonWebKeyId};
     use super::{CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJwsSigningAlgorithm};
@@ -318,21 +319,9 @@ mod tests {
     }
 
     #[test]
-    fn test_rsa_verification() {
-        let key_json = "{
-            \"kty\": \"RSA\",
-            \"kid\": \"bilbo.baggins@hobbiton.example\",
-            \"use\": \"sig\",
-            \"n\": \"n4EPtAOCc9AlkeQHPzHStgAbgs7bTZLwUBZdR8_KuKPEHLd4rHVTeT\
-                     -O-XV2jRojdNhxJWTDvNd7nqQ0VEiZQHz_AJmSCpMaJMRBSFKrKb2wqV\
-                     wGU_NsYOYL-QtiWN2lbzcEe6XC0dApr5ydQLrHqkHHig3RBordaZ6Aj-\
-                     oBHqFEHYpPe7Tpe-OfVfHd1E6cS6M1FZcD1NNLYD5lFHpPI9bTwJlsde\
-                     3uhGqC0ZCuEHg8lhzwOHrtIQbS0FVbb9k3-tVTU4fg_3L_vniUFAKwuC\
-                     LqKnS2BYwdq_mzSnbLY7h_qixoR7jig3__kRhuaxwUkRz5iaiQkqgc5g\
-                     HdrNP5zw\",
-            \"e\": \"AQAB\"
-        }";
-        let key: CoreJsonWebKey = serde_json::from_str(key_json).expect("deserialization failed");
+    fn test_rsa_pkcs1_verification() {
+        let key: CoreJsonWebKey =
+            serde_json::from_str(TEST_RSA_PUB_KEY).expect("deserialization failed");
 
         // Source: https://tools.ietf.org/html/rfc7520#section-4.1
         let pkcs1_signing_input = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZX\
@@ -376,50 +365,6 @@ mod tests {
              nzVXXy6QI_r6nqmguo5DMFlPeploS-aQ7ArfYqR3gKEp3l5gWWKn86lwVKRGjv\
              zeRMf3ubhKxvHUyU8cE5p1VPpOzTJ3cPwUe68s24Ehf2jpgZIIXb9XQv4L0Unf\
              GAXTBY7Rszx9LvGByoFx3eOpbMvtLQxA",
-        );
-
-        // Source: https://tools.ietf.org/html/rfc7520#section-4.2
-        let pss_signing_input = "eyJhbGciOiJQUzM4NCIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZX\
-                                 hhbXBsZSJ9.\
-                                 SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\
-                                 lvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\
-                                 b24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\
-                                 UgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4";
-
-        verify_signature(
-            &key,
-            &CoreJwsSigningAlgorithm::RsaSsaPssSha256,
-            pss_signing_input,
-            "Y62we_hs07d0qJ2cT_QpbrodwDhPK9rEpNX2b3GqLHFM18YtDlPCr40Xf_yLIosIrt\
-             mMP4NgDSCkn2qOcRJBD8zrHumER4JIkGZbRIwU8gYms8xKX2HaveK9vrOjbHoWLjOU\
-             nyNpprYUFGdRZ6oebT61bqU2CZrJG_GcqR87W8FOn7kqrCPI7B8oNHgliMke49hOpz\
-             mluL20BKN5Mb3O42nwgmiONZK0Pjm2GTIAYRUvNQ741aCWVJ3rnWvo99qWhe86ap_H\
-             v40SUSaMwJig5AqC-wHIzYaYU0PlQbi83Dgw7Zft9kL2dGB0vMWY_h2HDgZU0teAcK\
-             SkhyH8ZDRyYQ",
-        );
-
-        verify_signature(
-            &key,
-            &CoreJwsSigningAlgorithm::RsaSsaPssSha384,
-            pss_signing_input,
-            "cu22eBqkYDKgIlTpzDXGvaFfz6WGoz7fUDcfT0kkOy42miAh2qyBzk1xEsnk2I\
-             pN6-tPid6VrklHkqsGqDqHCdP6O8TTB5dDDItllVo6_1OLPpcbUrhiUSMxbbXU\
-             vdvWXzg-UD8biiReQFlfz28zGWVsdiNAUf8ZnyPEgVFn442ZdNqiVJRmBqrYRX\
-             e8P_ijQ7p8Vdz0TTrxUeT3lm8d9shnr2lfJT8ImUjvAA2Xez2Mlp8cBE5awDzT\
-             0qI0n6uiP1aCN_2_jLAeQTlqRHtfa64QQSUmFAAjVKPbByi7xho0uTOcbH510a\
-             6GYmJUAfmWjwZ6oD4ifKo8DYM-X72Eaw",
-        );
-
-        verify_signature(
-            &key,
-            &CoreJwsSigningAlgorithm::RsaSsaPssSha512,
-            pss_signing_input,
-            "G8vtysTFbSXht_PU6NdXeYDOSIQhxcp6zFWuvtx2NCtgsm-J22CKqlapp1zjPkXTo4\
-             xrYlIgFjQVQZ9Cr7KWJXK7qYUkdfJNkB1E96EQR32ocx_9RQDS_eQNlGWjoDRduD9z\
-             2hKs-S0EhOy39wUeUYbcKA1MpkW71hUPI56Ou5kzclNbe22slB4mYd6Mx0dLOeFDF2\
-             C7ZUDxso-cHMh4hU2E8vlp-TZUf9eqAri9T1F_pjRF8WNBj-vrqwy3bCROgIslYA8u\
-             c_FEXn6fZ21up5mU9vg5_LdeBoSh4Idmz8HLn5rpVd57AsQ2PbLMsKXcpVUhwP_ID1\
-             7zsAFuCEFJqA",
         );
 
         // Wrong key type
@@ -488,6 +433,55 @@ mod tests {
              W1Kt9eRo4QPocSadnHXFxnt8Is9UzpERV0ePPQdLuW3IS_de3xyIrDaLGdjluP\
              xUAhb6L2aXic1U12podGU0KLUQSE_oI-ZnmKJ3F4uOZDnd6QZWJushZ41Axf_f\
              cIe8u9ipH84ogoree7vjbU5y18kDquDg",
+        );
+    }
+
+    #[test]
+    fn test_rsa_pss_verification() {
+        let key: CoreJsonWebKey =
+            serde_json::from_str(TEST_RSA_PUB_KEY).expect("deserialization failed");
+        // Source: https://tools.ietf.org/html/rfc7520#section-4.2
+        let pss_signing_input =
+            "eyJhbGciOiJQUzM4NCIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9.\
+             SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\
+             lvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\
+             b24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\
+             UgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4";
+
+        verify_signature(
+            &key,
+            &CoreJwsSigningAlgorithm::RsaSsaPssSha256,
+            pss_signing_input,
+            "Y62we_hs07d0qJ2cT_QpbrodwDhPK9rEpNX2b3GqLHFM18YtDlPCr40Xf_yLIosIrt\
+             mMP4NgDSCkn2qOcRJBD8zrHumER4JIkGZbRIwU8gYms8xKX2HaveK9vrOjbHoWLjOU\
+             nyNpprYUFGdRZ6oebT61bqU2CZrJG_GcqR87W8FOn7kqrCPI7B8oNHgliMke49hOpz\
+             mluL20BKN5Mb3O42nwgmiONZK0Pjm2GTIAYRUvNQ741aCWVJ3rnWvo99qWhe86ap_H\
+             v40SUSaMwJig5AqC-wHIzYaYU0PlQbi83Dgw7Zft9kL2dGB0vMWY_h2HDgZU0teAcK\
+             SkhyH8ZDRyYQ",
+        );
+
+        verify_signature(
+            &key,
+            &CoreJwsSigningAlgorithm::RsaSsaPssSha384,
+            pss_signing_input,
+            "cu22eBqkYDKgIlTpzDXGvaFfz6WGoz7fUDcfT0kkOy42miAh2qyBzk1xEsnk2I\
+             pN6-tPid6VrklHkqsGqDqHCdP6O8TTB5dDDItllVo6_1OLPpcbUrhiUSMxbbXU\
+             vdvWXzg-UD8biiReQFlfz28zGWVsdiNAUf8ZnyPEgVFn442ZdNqiVJRmBqrYRX\
+             e8P_ijQ7p8Vdz0TTrxUeT3lm8d9shnr2lfJT8ImUjvAA2Xez2Mlp8cBE5awDzT\
+             0qI0n6uiP1aCN_2_jLAeQTlqRHtfa64QQSUmFAAjVKPbByi7xho0uTOcbH510a\
+             6GYmJUAfmWjwZ6oD4ifKo8DYM-X72Eaw",
+        );
+
+        verify_signature(
+            &key,
+            &CoreJwsSigningAlgorithm::RsaSsaPssSha512,
+            pss_signing_input,
+            "G8vtysTFbSXht_PU6NdXeYDOSIQhxcp6zFWuvtx2NCtgsm-J22CKqlapp1zjPkXTo4\
+             xrYlIgFjQVQZ9Cr7KWJXK7qYUkdfJNkB1E96EQR32ocx_9RQDS_eQNlGWjoDRduD9z\
+             2hKs-S0EhOy39wUeUYbcKA1MpkW71hUPI56Ou5kzclNbe22slB4mYd6Mx0dLOeFDF2\
+             C7ZUDxso-cHMh4hU2E8vlp-TZUf9eqAri9T1F_pjRF8WNBj-vrqwy3bCROgIslYA8u\
+             c_FEXn6fZ21up5mU9vg5_LdeBoSh4Idmz8HLn5rpVd57AsQ2PbLMsKXcpVUhwP_ID1\
+             7zsAFuCEFJqA",
         );
     }
 

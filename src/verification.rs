@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::Deref;
+use std::rc::Rc;
 
 use chrono::{DateTime, Utc};
 use oauth2::helpers::variant_name;
@@ -18,35 +19,6 @@ use super::{
     JsonWebTokenAlgorithm, JsonWebTokenHeader, JweContentEncryptionAlgorithm, JwsSigningAlgorithm,
     Nonce, StandardClaims, SubjectIdentifier, UserInfoClaims,
 };
-
-/*
-
-Things to control in our validator:
-
-All JWT validations (ID token and user info):
- - whether to disable the integrity check altogether
- - whether or not to consider a symmetric key (i.e., the client secret)
- - expected issuer ('iss')
- - the client_id that should be one of the 'aud'iences
- - whether to allow 'aud' to include other audiences. if so, which?
- - which 'alg' values to allow (RS256-only by default, unless others are specified during registration)
-
-ID token validation only:
- - whether to validate the azp claim (which SHOULD be provided if there are multiple audiences), and
-   which to expect. there's some confusion:
-     https://bitbucket.org/openid/connect/issues/973/
-     https://stackoverflow.com/questions/41231018/openid-connect-standard-authorized-party-azp-contradiction/41240814
- - maximum expiration time (default to current timestamp in UTC); this should be a closure
-
- - custom nonce validation function?
- - custom acr validation function
- - custom auth_time validation function
-
-Possible factory methods to have:
- - public client
- - private client (w/ client secret)
-
-*/
 
 pub trait AudiencesClaim {
     fn audiences(&self) -> Option<&Vec<Audience>>;
@@ -470,29 +442,24 @@ where
     }
 }
 
-pub type AuthenticationContextClassVerifier =
-    Fn(Option<&AuthenticationContextClass>) -> Result<(), String>;
-pub type OptTimeVerifier = Fn(Option<&DateTime<Utc>>) -> Result<(), String>;
-pub type TimeVerifier = Fn(&DateTime<Utc>) -> Result<(), String>;
-pub type TimeGetter = Fn() -> DateTime<Utc>;
-
 ///
 /// ID token verifier.
 ///
-pub struct IdTokenVerifier<JS, JT, JU, K>
+#[derive(Clone)]
+pub struct IdTokenVerifier<'a, JS, JT, JU, K>
 where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
-    acr_verifier_fn: Box<AuthenticationContextClassVerifier>,
-    auth_time_verifier_fn: Box<OptTimeVerifier>,
-    iat_verifier_fn: Box<TimeVerifier>,
+    acr_verifier_fn: Rc<Fn(Option<&AuthenticationContextClass>) -> Result<(), String> + 'a>,
+    auth_time_verifier_fn: Rc<Fn(Option<&DateTime<Utc>>) -> Result<(), String> + 'a>,
+    iat_verifier_fn: Rc<Fn(&DateTime<Utc>) -> Result<(), String> + 'a>,
     jwt_verifier: JwtClaimsVerifier<JS, JT, JU, K>,
-    time_fn: Box<TimeGetter>,
+    time_fn: Rc<Fn() -> DateTime<Utc> + 'a>,
 }
-impl<JS, JT, JU, K> IdTokenVerifier<JS, JT, JU, K>
+impl<'a, JS, JT, JU, K> IdTokenVerifier<'a, JS, JT, JU, K>
 where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
@@ -502,13 +469,13 @@ where
     fn new(jwt_verifier: JwtClaimsVerifier<JS, JT, JU, K>) -> Self {
         IdTokenVerifier {
             // By default, accept authorization context reference (acr claim).
-            acr_verifier_fn: Box::new(|_| Ok(())),
-            auth_time_verifier_fn: Box::new(|_| Ok(())),
+            acr_verifier_fn: Rc::new(|_| Ok(())),
+            auth_time_verifier_fn: Rc::new(|_| Ok(())),
             // By default, accept any issued time (iat claim).
-            iat_verifier_fn: Box::new(|_| Ok(())),
+            iat_verifier_fn: Rc::new(|_| Ok(())),
             jwt_verifier,
             // By default, use the current system time.
-            time_fn: Box::new(Utc::now),
+            time_fn: Rc::new(Utc::now),
         }
     }
 
@@ -544,19 +511,19 @@ where
         self
     }
 
-    pub fn set_auth_context_verifier_fn(
-        mut self,
-        acr_verifier_fn: Box<AuthenticationContextClassVerifier>,
-    ) -> Self {
-        self.acr_verifier_fn = acr_verifier_fn;
+    pub fn set_auth_context_verifier_fn<T>(mut self, acr_verifier_fn: T) -> Self
+    where
+        T: Fn(Option<&AuthenticationContextClass>) -> Result<(), String> + 'a,
+    {
+        self.acr_verifier_fn = Rc::new(acr_verifier_fn);
         self
     }
 
-    pub fn set_auth_time_verifier_fn(
-        mut self,
-        auth_time_verifier_fn: Box<OptTimeVerifier>,
-    ) -> Self {
-        self.auth_time_verifier_fn = auth_time_verifier_fn;
+    pub fn set_auth_time_verifier_fn<T>(mut self, auth_time_verifier_fn: T) -> Self
+    where
+        T: Fn(Option<&DateTime<Utc>>) -> Result<(), String> + 'a,
+    {
+        self.auth_time_verifier_fn = Rc::new(auth_time_verifier_fn);
         self
     }
 
@@ -569,16 +536,19 @@ where
         self
     }
 
-    pub fn set_time_fn(mut self, time_fn: Box<TimeGetter>) -> Self {
-        self.time_fn = time_fn;
+    pub fn set_time_fn<T>(mut self, time_fn: T) -> Self
+    where
+        T: Fn() -> DateTime<Utc> + 'a,
+    {
+        self.time_fn = Rc::new(time_fn);
         self
     }
 
-    pub fn set_issue_time_verifier_fn(
-        mut self,
-        iat_verifier_fn: Box<TimeVerifier>,
-    ) -> Self {
-        self.iat_verifier_fn = iat_verifier_fn;
+    pub fn set_issue_time_verifier_fn<T>(mut self, iat_verifier_fn: T) -> Self
+    where
+        T: Fn(&DateTime<Utc>) -> Result<(), String> + 'a,
+    {
+        self.iat_verifier_fn = Rc::new(iat_verifier_fn);
         self
     }
 
@@ -644,7 +614,7 @@ where
         // 9. The current time MUST be before the time represented by the exp Claim.
         let cur_time = (*self.time_fn)();
         if let Ok(expiration) = partially_verified_claims.expiration() {
-            if cur_time > expiration {
+            if cur_time >= expiration {
                 return Err(ClaimsVerificationError::Expired(format!(
                     "ID token expired at {} (current time is {})",
                     expiration, cur_time
@@ -795,17 +765,22 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::cell::Cell;
+
     use oauth2::prelude::*;
     use oauth2::{ClientId, ClientSecret};
     use serde_json;
 
     use super::super::core::{
-        CoreJsonWebKey, CoreJsonWebKeySet, CoreJsonWebKeyType, CoreJsonWebKeyUse,
-        CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm,
+        CoreIdTokenClaims, CoreIdTokenVerifier, CoreJsonWebKey, CoreJsonWebKeySet,
+        CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm,
+        CoreJwsSigningAlgorithm,
     };
     use super::super::jwt::tests::TEST_RSA_PUB_KEY;
     use super::super::jwt::{JsonWebToken, JsonWebTokenJsonPayloadDeserializer};
-    use super::super::{Audience, Base64UrlEncodedBytes, IssuerUrl, JsonWebKeyId};
+    use super::super::types::helpers::seconds_to_utc;
+    use super::super::types::Seconds;
+    use super::super::{Audience, Base64UrlEncodedBytes, IssuerUrl, JsonWebKeyId, Nonce};
     use super::{
         AudiencesClaim, ClaimsVerificationError, IssuerClaim, JsonWebTokenHeader,
         JwtClaimsVerifier, SignatureVerificationError,
@@ -823,18 +798,6 @@ mod tests {
         CoreJsonWebKeyUse,
         CoreJsonWebKey,
     >;
-
-    // ** JwtClaimsVerifier **
-
-    // require_audience_match
-
-    // require_issuer_match
-
-    // require_signature_check
-
-    // allowed_algs, including default (RS256), set_allowed_algs, allow_any_alg
-
-    // set_client_secret
 
     fn assert_unsupported<T>(result: Result<T, ClaimsVerificationError>, expected_substr: &str) {
         match result {
@@ -1348,25 +1311,262 @@ mod tests {
         }
     }
 
-    // ** IdTokenVerifier **
+    type CoreIdToken = JsonWebToken<
+        CoreIdTokenClaims,
+        CoreJweContentEncryptionAlgorithm,
+        CoreJwsSigningAlgorithm,
+        CoreJsonWebKeyType,
+        JsonWebTokenJsonPayloadDeserializer,
+    >;
 
-    // public client
+    #[test]
+    fn test_id_token_verified_claims() {
+        let rsa_key = serde_json::from_str::<CoreJsonWebKey>(TEST_RSA_PUB_KEY)
+            .expect("deserialization failed");
 
-    // private client
+        let client_id = ClientId::new("my_client".to_string());
+        let issuer = IssuerUrl::new("https://example.com".to_string()).unwrap();
+        let mock_current_time = Cell::new(1544932149);
+        let mock_is_valid_issue_time = Cell::new(true);
+        // Extra scope needed to ensure closures are destroyed before the values they borrow.
+        {
+            let public_client_verifier = CoreIdTokenVerifier::new_public_client(
+                client_id.clone(),
+                issuer.clone(),
+                CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
+            )
+            .set_time_fn(|| seconds_to_utc(&Seconds::new(mock_current_time.get().into())).unwrap())
+            .set_issue_time_verifier_fn(|_| {
+                if mock_is_valid_issue_time.get() {
+                    Ok(())
+                } else {
+                    Err("Invalid iat claim".to_string())
+                }
+            });
 
-    // allowed algs
+            type IdTokenJwt = JsonWebToken<
+                CoreIdTokenClaims,
+                CoreJweContentEncryptionAlgorithm,
+                CoreJwsSigningAlgorithm,
+                CoreJsonWebKeyType,
+                JsonWebTokenJsonPayloadDeserializer,
+            >;
 
-    // set_auth_context_verifier_fn
+            // This JWTs below have an issue time of 1544928549 and an expiration time of 1544932149.
 
-    // set_auth_time_verifier_fn
+            let test_jwt_without_nonce: IdTokenJwt =
+                serde_json::from_value::<CoreIdToken>(serde_json::Value::String(
+                    "eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhbXBsZ\
+                     S5jb20iLCJzdWIiOiJzdWJqZWN0IiwiZXhwIjoxNTQ0OTMyMTQ5LCJpYXQiOjE1NDQ5Mjg1NDl9.nN\
+                     aTxNwclnTHd1Q9POkddm5wB1w3wJ-gwQWHomhimttk3SWQTLhxI0SSjWrHahGxlfkjufJlSyt-t_VO\
+                     SdcROvIYZTDznDfFZz3oSOev-p9XiZ-EZTS-U6N11Y923sDQjbTMeukz1F3ZFEfn5Mv2xjdEoJccCe\
+                     7SaGuDmVqMqTLXMtsw9NCE_KDd0oKSwDzbJIBBPEfG3JjbKg0Dln7ENHg9wzoNFQzPXrkKzjneBgD3\
+                     vuwFCV5y-e8xUBdLaLZF1kdkDZJIA48uRROLlWjsM8pEptosA5QK07luQCZNqcaZWEczoGXeQs8PyA\
+                     zkNV7JEmti3bJnWSN-ud4cFU0LiQ"
+                            .to_string(),
+                ))
+                .expect("failed to deserialize");
 
-    // enable/disable signature check
+            // Invalid JWT claims
+            match public_client_verifier.verified_claims(
+                &serde_json::from_value::<CoreIdToken>(serde_json::Value::String(
+                    "eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vYXR0YWNrZ\
+                     XIuY29tIiwic3ViIjoic3ViamVjdCIsImV4cCI6MTU0NDkzMjE0OSwiaWF0IjoxNTQ0OTI4NTQ5LCJ\
+                     ub25jZSI6InRoZV9ub25jZSIsImFjciI6InRoZV9hY3IifQ.Pkicxk0dTU5BkSxgqTON6lE7A7ir3l\
+                     aADRyoeRoCNDX3AOx7BXCbfzbda6HJiPskN2nu56w0q-0OdkDSIHls-2xTUlLEJv2Bv0BLYwV5ZVJ8\
+                     hoc-rTd0_oLUb5NzyD80RyVByjVMK8bh6cwysTnr8QDxsEiFZbFo3mVJob2yjPZnNOdcNJWPcVVueP\
+                     8vqMJnx5kHih1gKZpWj_dMN9b2AW6zVLOInW3Ox__gx6fsFFz7rjxItG-PTY_OQMzthqeHUyq4o9y7\
+                     Jv8mB_jFkTZGVKHTPpObHV-qptJ_rnlwvF_mP5GARBLng-4Yd7nmSr31onYL48QDjGOrwPqQ-IyaCQ"
+                        .to_string(),
+                ))
+                    .expect("failed to deserialize"), None) {
+                Err(ClaimsVerificationError::InvalidIssuer(_)) => {}
+                other => panic!("unexpected result: {:?}", other),
+            }
 
-    // set_time_fn
+            // TODO: disallowed algs
 
-    // set_issue_time_verifier_fn
+            // Expired token
+            mock_current_time.set(1544928549 + 3600);
+            match public_client_verifier.verified_claims(&test_jwt_without_nonce, None) {
+                Err(ClaimsVerificationError::Expired(_)) => {}
+                other => panic!("unexpected result: {:?}", other),
+            }
+            mock_current_time.set(1544928549 + 1);
 
-    // verification failures (error conditions in verified_claims)
+            // Invalid issue time
+            mock_is_valid_issue_time.set(false);
+            match public_client_verifier.verified_claims(&test_jwt_without_nonce, None) {
+                Err(ClaimsVerificationError::Expired(_)) => {}
+                other => panic!("unexpected result: {:?}", other),
+            }
+            mock_is_valid_issue_time.set(true);
+
+            let valid_nonce = Nonce::new("the_nonce".to_string());
+
+            // Successful verification w/o checking nonce
+            public_client_verifier
+                .verified_claims(&test_jwt_without_nonce, None)
+                .expect("verification should succeed");
+
+            // Missing nonce
+            match public_client_verifier
+                .verified_claims(&test_jwt_without_nonce, Some(&valid_nonce))
+            {
+                Err(ClaimsVerificationError::InvalidNonce(_)) => {}
+                other => panic!("unexpected result: {:?}", other),
+            }
+
+            let test_jwt_with_nonce: IdTokenJwt =
+                serde_json::from_value::<CoreIdToken>(serde_json::Value::String(
+                    "eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhbXBsZ\
+                     S5jb20iLCJzdWIiOiJzdWJqZWN0IiwiZXhwIjoxNTQ0OTMyMTQ5LCJpYXQiOjE1NDQ5Mjg1NDksIm5\
+                     vbmNlIjoidGhlX25vbmNlIiwiYWNyIjoidGhlX2FjciIsImF1dGhfdGltZSI6MTU0NDkyODU0OH0.W\
+                     XA7SS9aMh_6rvBEgQce5D2J84OqphmmnCLGgEKRTN5G-UuQTNOBp8VS5_4f3xgzMEEMvGJJauJoALk\
+                     muUeHB-N_ESrkmB3tgDzBSYBa7kuYPHUPYpdjZM2UVolqI9RYyHaWwKjL_Io5YyAazB5lH5ibPaiBl\
+                     UNKGs3cmVsEB22UGMFKM6cek7GinrHQe_aJQsMU839-c2zzlEyFSeI8QBphQtG6AN82IPkNRv8QWmw\
+                     ZjUiB5a-W73Z3gURYMNs7f32BjAUNoJzW0Qj34vzD2djoSHhltE0wHKBzPqGhUM1Y3A-a3q-LS2g1h\
+                     6qgXb_KQ_Mmok8v8ld0cW_aYRLfNg"
+                        .to_string(),
+                ))
+                .expect("failed to deserialize");
+
+            // Invalid nonce
+            match public_client_verifier.verified_claims(
+                &test_jwt_with_nonce,
+                Some(&Nonce::new("different_nonce".to_string())),
+            ) {
+                Err(ClaimsVerificationError::InvalidNonce(_)) => {}
+                other => panic!("unexpected result: {:?}", other),
+            }
+
+            // Invalid AuthenticationContextClass reference
+            match public_client_verifier
+                .clone()
+                .set_auth_context_verifier_fn(|acr| {
+                    assert_eq!(**acr.unwrap(), "the_acr");
+                    Err("Invalid acr claim".to_string())
+                })
+                .verified_claims(&test_jwt_with_nonce, Some(&valid_nonce))
+            {
+                Err(ClaimsVerificationError::InvalidAuthContext(_)) => {}
+                other => panic!("unexpected result: {:?}", other),
+            }
+
+            let test_jwt_without_auth_time: IdTokenJwt =
+                serde_json::from_value::<CoreIdToken>(serde_json::Value::String(
+                    "eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhbXBsZ\
+                     S5jb20iLCJzdWIiOiJzdWJqZWN0IiwiZXhwIjoxNTQ0OTMyMTQ5LCJpYXQiOjE1NDQ5Mjg1NDksIm5\
+                     vbmNlIjoidGhlX25vbmNlIiwiYWNyIjoidGhlX2FjciJ9.c_lU1VRasTg0mB4lwdOzbzvFS_XShMLN\
+                     lAPUpHBaMtCSPtI71L2x3hIByfkqIrAED-Qc_am2gNJ20bifidlkTOO6nyaBrJuaSjwT8aqajEbXon\
+                     5JFswwPvqCIWjd0eV5dXC1MZunpd7ANXSC7Qw16v3m_crc9wcI_fLFCzuAKrWYokGvNy0gr1CxcgVg\
+                     aE9qR0eqaatetzCuaOJhYOq4njrRlGZWtbj5Q56q3zhxJ_yS8K8gv1QcB4sHjUyXIj21jzjUD87zVG\
+                     dJsn8E-nFJSltBdQhEaLksTBH6ZZhkeGicQ8cEPnNeS4L1vfVyAd_cjl64JHLmzw8RUp8XuoF9nA"
+                        .to_string(),
+                ))
+                .expect("failed to deserialize");
+
+            // Missing auth_time (ok)
+            public_client_verifier
+                .verified_claims(&test_jwt_without_auth_time, None)
+                .expect("verification should succeed");
+
+            // Missing auth_time (error)
+            match public_client_verifier
+                .clone()
+                .set_auth_time_verifier_fn(|auth_time| {
+                    assert!(auth_time.is_none());
+                    Err("Invalid auth_time claim".to_string())
+                })
+                .verified_claims(&test_jwt_without_auth_time, None)
+            {
+                Err(ClaimsVerificationError::InvalidAuthTime(_)) => {}
+                other => panic!("unexpected result: {:?}", other),
+            }
+
+            // Invalid auth_time
+            match public_client_verifier
+                .clone()
+                .set_auth_time_verifier_fn(|auth_time| {
+                    assert_eq!(
+                        *auth_time.unwrap(),
+                        seconds_to_utc(&Seconds::new(1544928548.into())).unwrap(),
+                    );
+                    Err("Invalid auth_time claim".to_string())
+                })
+                .verified_claims(&test_jwt_with_nonce, Some(&valid_nonce))
+            {
+                Err(ClaimsVerificationError::InvalidAuthTime(_)) => {}
+                other => panic!("unexpected result: {:?}", other),
+            }
+
+            // Successful verification with nonce, acr, and auth_time specified
+            public_client_verifier
+                .verified_claims(&test_jwt_with_nonce, None)
+                .expect("verification should succeed");
+
+            // HS256 w/ default algs
+            let test_jwt_hs256: IdTokenJwt =
+                serde_json::from_value::<CoreIdToken>(serde_json::Value::String(
+                    "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhbXBsZ\
+                     S5jb20iLCJzdWIiOiJzdWJqZWN0IiwiZXhwIjoxNTQ0OTMyMTQ5LCJpYXQiOjE1NDQ5Mjg1NDksIm5\
+                     vbmNlIjoidGhlX25vbmNlIn0.xUnSwSbcHsHWyJxwKGg69BIo_CktcyN5BVulGDb_QzE"
+                        .to_string(),
+                ))
+                .expect("failed to deserialize");
+            let private_client_verifier = CoreIdTokenVerifier::new_private_client(
+                client_id.clone(),
+                ClientSecret::new("my_secret".to_string()),
+                issuer.clone(),
+                CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
+            )
+            .set_time_fn(|| seconds_to_utc(&Seconds::new(mock_current_time.get().into())).unwrap());
+            match private_client_verifier.verified_claims(&test_jwt_hs256, Some(&valid_nonce)) {
+                Err(ClaimsVerificationError::SignatureVerification(_)) => {}
+                other => panic!("unexpected result: {:?}", other),
+            }
+
+            // HS256 w/ set_allowed_algs
+            private_client_verifier
+                .clone()
+                .set_allowed_algs(vec![CoreJwsSigningAlgorithm::HmacSha256])
+                .verified_claims(&test_jwt_hs256, Some(&valid_nonce))
+                .expect("verification should succeed");
+
+            // HS256 w/ allow_any_alg
+            private_client_verifier
+                .clone()
+                .allow_any_alg()
+                .verified_claims(&test_jwt_hs256, Some(&valid_nonce))
+                .expect("verification should succeed");
+
+            // Invalid signature
+            let private_client_verifier_with_other_secret =
+                CoreIdTokenVerifier::new_private_client(
+                    client_id.clone(),
+                    ClientSecret::new("other_secret".to_string()),
+                    issuer.clone(),
+                    CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
+                )
+                .allow_any_alg()
+                .set_time_fn(|| {
+                    seconds_to_utc(&Seconds::new(mock_current_time.get().into())).unwrap()
+                });
+            match private_client_verifier_with_other_secret
+                .verified_claims(&test_jwt_hs256, Some(&valid_nonce))
+            {
+                Err(ClaimsVerificationError::SignatureVerification(_)) => {}
+                other => panic!("unexpected result: {:?}", other),
+            }
+
+            // Invalid signature w/ signature check disabled
+            private_client_verifier_with_other_secret
+                .clone()
+                .insecure_disable_signature_check()
+                .verified_claims(&test_jwt_hs256, Some(&valid_nonce))
+                .expect("verification should succeed");
+        };
+    }
 
     // ** UserInfoVerifier **
 

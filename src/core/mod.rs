@@ -103,8 +103,13 @@ pub type CoreIdToken = IdToken<
 
 pub type CoreIdTokenClaims = IdTokenClaims<EmptyAdditionalClaims, CoreGenderClaim>;
 
-pub type CoreIdTokenVerifier =
-    IdTokenVerifier<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJsonWebKey>;
+pub type CoreIdTokenVerifier<'a> = IdTokenVerifier<
+    'a,
+    CoreJwsSigningAlgorithm,
+    CoreJsonWebKeyType,
+    CoreJsonWebKeyUse,
+    CoreJsonWebKey,
+>;
 
 pub type CoreJsonWebKeySet =
     JsonWebKeySet<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJsonWebKey>;
