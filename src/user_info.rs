@@ -182,21 +182,19 @@ new_url_type![
                 }
                 Some(MIME_TYPE_JWT) => {
                     let jwt_str =
-                        str::from_utf8(&user_info_response.body)
+                        String::from_utf8(user_info_response.body)
                             .map_err(|_|
                                 UserInfoError::Other(
                                     "response body has invalid UTF-8 encoding".to_string()
                                 )
                             )?;
-                    // TODO: Implement a simple deserializer so that we can go straight from a str
-                    // to a JsonWebToken without first converting to/from JSON.
-                    let jwt_json =
-                        serde_json::to_string(&jwt_str)
-                            .map_err(UserInfoError::Json)?;
                     verifier
                         .verified_claims(
                             UnverifiedUserInfoClaims::JwtClaims(
-                                serde_json::from_str(&jwt_json)
+                                // TODO: Implement a simple deserializer so that we can go straight
+                                // from a str to a JsonWebToken without first converting to/from
+                                // JSON.
+                                serde_json::from_value(serde_json::Value::String(jwt_str))
                                     .map_err(UserInfoError::Json)?
                             )
                         )

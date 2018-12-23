@@ -681,6 +681,7 @@ where
 ///
 /// User info verifier.
 ///
+#[derive(Clone)]
 pub struct UserInfoVerifier<JE, JS, JT, JU, K>
 where
     JE: JweContentEncryptionAlgorithm,
@@ -771,19 +772,23 @@ mod tests {
     use oauth2::{ClientId, ClientSecret};
     use serde_json;
 
+    use super::super::claims::StandardClaims;
     use super::super::core::{
         CoreIdTokenClaims, CoreIdTokenVerifier, CoreJsonWebKey, CoreJsonWebKeySet,
         CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm,
-        CoreJwsSigningAlgorithm,
+        CoreJwsSigningAlgorithm, CoreUserInfoClaims, CoreUserInfoVerifier,
     };
     use super::super::jwt::tests::TEST_RSA_PUB_KEY;
     use super::super::jwt::{JsonWebToken, JsonWebTokenJsonPayloadDeserializer};
     use super::super::types::helpers::seconds_to_utc;
     use super::super::types::Seconds;
-    use super::super::{Audience, Base64UrlEncodedBytes, IssuerUrl, JsonWebKeyId, Nonce};
+    use super::super::user_info::UnverifiedUserInfoClaims;
+    use super::super::{
+        Audience, Base64UrlEncodedBytes, EndUserName, IssuerUrl, JsonWebKeyId, Nonce,
+    };
     use super::{
         AudiencesClaim, ClaimsVerificationError, IssuerClaim, JsonWebTokenHeader,
-        JwtClaimsVerifier, SignatureVerificationError,
+        JwtClaimsVerifier, SignatureVerificationError, SubjectIdentifier,
     };
 
     type CoreJsonWebTokenHeader = JsonWebTokenHeader<
@@ -1568,13 +1573,161 @@ mod tests {
         };
     }
 
-    // ** UserInfoVerifier **
+    #[test]
+    fn test_user_info_verified_claims() {
+        let rsa_key = serde_json::from_str::<CoreJsonWebKey>(TEST_RSA_PUB_KEY)
+            .expect("deserialization failed");
 
-    // require_signed_response (JSON and JWT response)
+        let client_id = ClientId::new("my_client".to_string());
+        let issuer = IssuerUrl::new("https://example.com".to_string()).unwrap();
+        let sub = SubjectIdentifier::new("the_subject".to_string());
 
-    // require_issuer_match
+        let verifier = CoreUserInfoVerifier::new(
+            client_id.clone(),
+            issuer.clone(),
+            CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
+            sub.clone(),
+        );
 
-    // require_audience_match
+        let json_claims = UnverifiedUserInfoClaims::JsonClaims(
+            serde_json::from_str::<CoreUserInfoClaims>(
+                "{
+                    \"sub\": \"the_subject\",
+                    \"name\": \"Jane Doe\"
+                }",
+            )
+            .expect("failed to deserialize"),
+        );
+        // JSON response (default args)
+        {
+            let user_info_claims = verifier
+                .verified_claims(json_claims.clone())
+                .expect("verification should succeed");
+            assert_eq!(
+                user_info_claims.name().unwrap().iter().collect::<Vec<_>>(),
+                vec![(&None, &EndUserName::new("Jane Doe".to_string()))],
+            );
+        }
 
-    // invalid subject
+        // JSON response (JWT required)
+        match verifier
+            .clone()
+            .require_signed_response(true)
+            .verified_claims(json_claims.clone())
+        {
+            Err(ClaimsVerificationError::NoSignature) => {}
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        // Invalid subject
+        match CoreUserInfoVerifier::new(
+            client_id.clone(),
+            issuer.clone(),
+            CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
+            SubjectIdentifier::new("wrong_subject".to_string()),
+        )
+        .verified_claims(json_claims.clone())
+        {
+            Err(ClaimsVerificationError::InvalidSubject(_)) => {}
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        let jwt_claims = UnverifiedUserInfoClaims::JwtClaims(
+            serde_json::from_value::<JsonWebToken<CoreUserInfoClaims, _, _, _, _>>(
+                serde_json::Value::String(
+                    "eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhb\
+                     XBsZS5jb20iLCJzdWIiOiJ0aGVfc3ViamVjdCIsIm5hbWUiOiJKYW5lIERvZSJ9.aX7VpexLAd\
+                     43HtC1cFTot3jmqsr105rB50mzTcS1TXzWcxLbqYf1K7Kf-S1oP-ZCL_dnL9-nu3iDK_vRa6xT\
+                     nGGt3I1JwhoIv6znSS3JOPT1wtekyD-sLcUwqsJHWBBiTSBwlmGG_kVRuGkBtXgVZ9aGlqg9u1\
+                     FlxvyGUJ5q1o9gdb8mKql5ojgsThTNo9qdW3lPIVsiDO-n4mMp4HuOp1re4ZDDkHxiExjtLQAV\
+                     kR4q3SlhJC2mkr4mw3_0a2AW52ocWDiwY_lPcdmohmwFaB8aHlivYLFnmKGQIatEW-KDaW5fFo\
+                     JYreNkplo4FvzXYyxgxAsqHjHMI8MZVEa1IA"
+                        .to_string(),
+                ),
+            )
+            .expect("failed to deserialize"),
+        );
+
+        // Valid JWT response (default args)
+        verifier
+            .verified_claims(jwt_claims.clone())
+            .expect("verification should succeed");
+
+        // Valid JWT response (JWT required)
+        verifier
+            .clone()
+            .require_signed_response(true)
+            .verified_claims(jwt_claims.clone())
+            .expect("verification should succeed");
+
+        // JWT response with invalid signature
+        match verifier.verified_claims(UnverifiedUserInfoClaims::JwtClaims(
+            serde_json::from_value::<JsonWebToken<CoreUserInfoClaims, _, _, _, _>>(
+                serde_json::Value::String(
+                    "eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhb\
+                     XBsZS5jb20iLCJzdWIiOiJ0aGVfc3ViamVjdCIsIm5hbWUiOiJKYW5lIERvZSJ9.bX7VpexLAd\
+                     43HtC1cFTot3jmqsr105rB50mzTcS1TXzWcxLbqYf1K7Kf-S1oP-ZCL_dnL9-nu3iDK_vRa6xT\
+                     nGGt3I1JwhoIv6znSS3JOPT1wtekyD-sLcUwqsJHWBBiTSBwlmGG_kVRuGkBtXgVZ9aGlqg9u1\
+                     FlxvyGUJ5q1o9gdb8mKql5ojgsThTNo9qdW3lPIVsiDO-n4mMp4HuOp1re4ZDDkHxiExjtLQAV\
+                     kR4q3SlhJC2mkr4mw3_0a2AW52ocWDiwY_lPcdmohmwFaB8aHlivYLFnmKGQIatEW-KDaW5fFo\
+                     JYreNkplo4FvzXYyxgxAsqHjHMI8MZVEa1IA"
+                        .to_string(),
+                ),
+            )
+            .expect("failed to deserialize"),
+        )) {
+            Err(ClaimsVerificationError::SignatureVerification(
+                SignatureVerificationError::CryptoError(_),
+            )) => {}
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        // JWT response with invalid issuer claim (error)
+        match CoreUserInfoVerifier::new(
+            client_id.clone(),
+            IssuerUrl::new("https://attacker.com".to_string()).unwrap(),
+            CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
+            sub.clone(),
+        )
+        .verified_claims(jwt_claims.clone())
+        {
+            Err(ClaimsVerificationError::InvalidIssuer(_)) => {}
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        // JWT response with invalid issuer claim (allowed)
+        CoreUserInfoVerifier::new(
+            client_id.clone(),
+            IssuerUrl::new("https://attacker.com".to_string()).unwrap(),
+            CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
+            sub.clone(),
+        )
+        .require_issuer_match(false)
+        .verified_claims(jwt_claims.clone())
+        .expect("verification should succeed");
+
+        // JWT response with invalid audience claim (error)
+        match CoreUserInfoVerifier::new(
+            ClientId::new("wrong_client".to_string()),
+            issuer.clone(),
+            CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
+            sub.clone(),
+        )
+        .verified_claims(jwt_claims.clone())
+        {
+            Err(ClaimsVerificationError::InvalidAudience(_)) => {}
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        // JWT response with invalid audience claim (allowed)
+        CoreUserInfoVerifier::new(
+            ClientId::new("wrong_client".to_string()),
+            issuer.clone(),
+            CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
+            sub.clone(),
+        )
+        .require_audience_match(false)
+        .verified_claims(jwt_claims.clone())
+        .expect("verification should succeed");
+    }
 }
