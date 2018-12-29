@@ -84,6 +84,9 @@ mod macros;
 
 pub mod core;
 pub mod discovery;
+pub mod prelude {
+    pub use oauth2::prelude::*;
+}
 pub mod registration;
 
 // Private modules since we may move types between different modules; these are exported publicly
