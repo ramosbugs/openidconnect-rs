@@ -39,11 +39,11 @@ use std::time::Duration;
 
 use oauth2::helpers::variant_name;
 use oauth2::prelude::*;
-use oauth2::{
+pub use oauth2::{
     AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, ErrorResponseType,
-    ExtraTokenFields, RedirectUrl, RequestTokenError, ResponseType as OAuth2ResponseType, Scope,
-    TokenResponse, TokenType, TokenUrl,
+    ExtraTokenFields, RedirectUrl, RequestTokenError, Scope, TokenResponse, TokenType, TokenUrl,
 };
+use oauth2::ResponseType as OAuth2ResponseType;
 use url::Url;
 
 pub use claims::{
