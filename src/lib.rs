@@ -433,8 +433,8 @@ where
         nonce_fn: NF,
     ) -> (Url, CsrfToken, Nonce)
     where
-        NF: Fn() -> Nonce,
-        SF: Fn() -> CsrfToken,
+        NF: FnOnce() -> Nonce,
+        SF: FnOnce() -> CsrfToken,
     {
         self.authorize_url_with_hint(authentication_flow, state_fn, nonce_fn, None, None)
     }
@@ -448,8 +448,8 @@ where
         login_hint: Option<&LoginHint>,
     ) -> (Url, CsrfToken, Nonce)
     where
-        NF: Fn() -> Nonce,
-        SF: Fn() -> CsrfToken,
+        NF: FnOnce() -> Nonce,
+        SF: FnOnce() -> CsrfToken,
     {
         // Create string versions of any options that need to be converted. This must be done
         // before creating extra_params so that the lifetimes extend beyond extra_params's lifetime.
