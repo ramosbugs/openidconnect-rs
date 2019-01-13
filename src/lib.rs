@@ -538,6 +538,16 @@ where
     ) -> Result<TokenResponse<IdTokenFields<AC, GC, JE, JS, JT>, TT>, RequestTokenError<TE>> {
         self.oauth2_client.exchange_code(code)
     }
+
+    ///
+    /// Returns the associated provider metadata (if present).
+    ///
+    /// The provider metadata is only available if the Client was created using the `discover`
+    /// or `from_dynamic_registration` methods. Otherwise, this function returns `None`.
+    ///
+    pub fn provider_metadata(&self) -> Option<&PM> {
+        self.provider_metadata.as_ref()
+    }
 }
 
 fn join_optional_vec<T>(vec_opt: Option<&Vec<T>>) -> Option<String>
