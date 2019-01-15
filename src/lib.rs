@@ -39,11 +39,11 @@ use std::time::Duration;
 
 use oauth2::helpers::variant_name;
 use oauth2::prelude::*;
+use oauth2::ResponseType as OAuth2ResponseType;
 pub use oauth2::{
     AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, ErrorResponseType,
     ExtraTokenFields, RedirectUrl, RequestTokenError, Scope, TokenResponse, TokenType, TokenUrl,
 };
-use oauth2::ResponseType as OAuth2ResponseType;
 use url::Url;
 
 pub use claims::{
@@ -74,7 +74,8 @@ pub use types::{
 pub use user_info::{UserInfoClaims, UserInfoError, UserInfoUrl};
 use verification::{AudiencesClaim, IssuerClaim};
 pub use verification::{
-    ClaimsVerificationError, IdTokenVerifier, SignatureVerificationError, UserInfoVerifier,
+    ClaimsVerificationError, IdTokenVerifier, NonceVerifier, SignatureVerificationError,
+    UserInfoVerifier,
 };
 
 // Defined first since other modules need the macros, and definition order is significant for

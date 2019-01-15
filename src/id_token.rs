@@ -16,7 +16,7 @@ use super::{
     EndUserProfileUrl, EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, ExtraTokenFields,
     GenderClaim, IdTokenVerifier, IssuerClaim, IssuerUrl, JsonWebKey, JsonWebKeyType,
     JsonWebKeyUse, JsonWebToken, JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag,
-    Nonce, StandardClaims, SubjectIdentifier,
+    Nonce, NonceVerifier, StandardClaims, SubjectIdentifier,
 };
 
 // This wrapper layer exists instead of directly verifying the JWT and returning the claims so that
@@ -41,16 +41,17 @@ where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
-    pub fn claims<JU, K>(
-        &self,
-        verifier: &IdTokenVerifier<JS, JT, JU, K>,
-        nonce: &Nonce,
-    ) -> Result<&IdTokenClaims<AC, GC>, ClaimsVerificationError>
+    pub fn claims<'a, 'b, JU, K, N>(
+        &'a self,
+        verifier: &'b IdTokenVerifier<JS, JT, JU, K>,
+        nonce_verifier: N,
+    ) -> Result<&'a IdTokenClaims<AC, GC>, ClaimsVerificationError>
     where
         JU: JsonWebKeyUse,
         K: JsonWebKey<JS, JT, JU>,
+        N: NonceVerifier<'a>,
     {
-        verifier.verified_claims(&self.0, Some(nonce))
+        verifier.verified_claims(&self.0, nonce_verifier)
     }
 }
 

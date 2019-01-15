@@ -442,6 +442,32 @@ where
     }
 }
 
+pub trait NonceVerifier<'a> {
+    fn verify(self, nonce: Option<&'a Nonce>) -> Result<(), String>;
+}
+
+impl<'a> NonceVerifier<'a> for &Nonce {
+    fn verify(self, nonce: Option<&'a Nonce>) -> Result<(), String> {
+        if let Some(claims_nonce) = nonce {
+            if claims_nonce != self {
+                return Err("nonce mismatch".to_string());
+            }
+        } else {
+            return Err("missing nonce claim".to_string());
+        }
+        Ok(())
+    }
+}
+
+impl<'a, F> NonceVerifier<'a> for F
+where
+    F: FnOnce(Option<&'a Nonce>) -> Result<(), String>,
+{
+    fn verify(self, nonce: Option<&'a Nonce>) -> Result<(), String> {
+        self(nonce)
+    }
+}
+
 ///
 /// ID token verifier.
 ///
@@ -552,9 +578,7 @@ where
         self
     }
 
-    // TODO: Add a version that accepts a nonce validation function. Some client applications may
-    // use crypto or some other mechanism to validate nonces instead of storing every nonce.
-    pub(super) fn verified_claims<'b, AC, GC, JE>(
+    pub(super) fn verified_claims<'b, AC, GC, JE, N>(
         &self,
         jwt: &'b JsonWebToken<
             IdTokenClaims<AC, GC>,
@@ -563,12 +587,13 @@ where
             JT,
             JsonWebTokenJsonPayloadDeserializer,
         >,
-        nonce: Option<&Nonce>,
+        nonce_verifier: N,
     ) -> Result<&'b IdTokenClaims<AC, GC>, ClaimsVerificationError>
     where
         AC: AdditionalClaims,
         GC: GenderClaim,
         JE: JweContentEncryptionAlgorithm,
+        N: NonceVerifier<'b>,
     {
         // The code below roughly follows the validation steps described in
         // https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
@@ -641,19 +666,9 @@ where
         //     present and its value checked to verify that it is the same value as the one that was
         //     sent in the Authentication Request. The Client SHOULD check the nonce value for
         //     replay attacks. The precise method for detecting replay attacks is Client specific.
-        if let Some(expected_nonce) = nonce {
-            if let Some(claims_nonce) = partially_verified_claims.nonce() {
-                if claims_nonce != expected_nonce {
-                    return Err(ClaimsVerificationError::InvalidNonce(
-                        "nonce mismatch".to_string(),
-                    ));
-                }
-            } else {
-                return Err(ClaimsVerificationError::InvalidNonce(
-                    "missing nonce claim".to_string(),
-                ));
-            }
-        }
+        nonce_verifier
+            .verify(partially_verified_claims.nonce())
+            .map_err(ClaimsVerificationError::InvalidNonce)?;
 
         // 12. If the acr Claim was requested, the Client SHOULD check that the asserted Claim Value
         //     is appropriate. The meaning and processing of acr Claim Values is out of scope for
@@ -1384,7 +1399,7 @@ mod tests {
                      Jv8mB_jFkTZGVKHTPpObHV-qptJ_rnlwvF_mP5GARBLng-4Yd7nmSr31onYL48QDjGOrwPqQ-IyaCQ"
                         .to_string(),
                 ))
-                    .expect("failed to deserialize"), None) {
+                    .expect("failed to deserialize"), |_| Ok(())) {
                 Err(ClaimsVerificationError::InvalidIssuer(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
             }
@@ -1393,7 +1408,7 @@ mod tests {
 
             // Expired token
             mock_current_time.set(1544928549 + 3600);
-            match public_client_verifier.verified_claims(&test_jwt_without_nonce, None) {
+            match public_client_verifier.verified_claims(&test_jwt_without_nonce, |_| Ok(())) {
                 Err(ClaimsVerificationError::Expired(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
             }
@@ -1401,7 +1416,7 @@ mod tests {
 
             // Invalid issue time
             mock_is_valid_issue_time.set(false);
-            match public_client_verifier.verified_claims(&test_jwt_without_nonce, None) {
+            match public_client_verifier.verified_claims(&test_jwt_without_nonce, |_| Ok(())) {
                 Err(ClaimsVerificationError::Expired(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
             }
@@ -1411,13 +1426,23 @@ mod tests {
 
             // Successful verification w/o checking nonce
             public_client_verifier
-                .verified_claims(&test_jwt_without_nonce, None)
+                .verified_claims(&test_jwt_without_nonce, |_| Ok(()))
                 .expect("verification should succeed");
 
             // Missing nonce
-            match public_client_verifier
-                .verified_claims(&test_jwt_without_nonce, Some(&valid_nonce))
-            {
+            match public_client_verifier.verified_claims(&test_jwt_without_nonce, &valid_nonce) {
+                Err(ClaimsVerificationError::InvalidNonce(_)) => {}
+                other => panic!("unexpected result: {:?}", other),
+            }
+
+            // Missing nonce w/ closure
+            match public_client_verifier.verified_claims(&test_jwt_without_nonce, |nonce| {
+                if nonce == Some(&valid_nonce) {
+                    Ok(())
+                } else {
+                    Err("invalid nonce".to_string())
+                }
+            }) {
                 Err(ClaimsVerificationError::InvalidNonce(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
             }
@@ -1439,7 +1464,7 @@ mod tests {
             // Invalid nonce
             match public_client_verifier.verified_claims(
                 &test_jwt_with_nonce,
-                Some(&Nonce::new("different_nonce".to_string())),
+                &Nonce::new("different_nonce".to_string()),
             ) {
                 Err(ClaimsVerificationError::InvalidNonce(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
@@ -1452,7 +1477,7 @@ mod tests {
                     assert_eq!(**acr.unwrap(), "the_acr");
                     Err("Invalid acr claim".to_string())
                 })
-                .verified_claims(&test_jwt_with_nonce, Some(&valid_nonce))
+                .verified_claims(&test_jwt_with_nonce, &valid_nonce)
             {
                 Err(ClaimsVerificationError::InvalidAuthContext(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
@@ -1473,7 +1498,7 @@ mod tests {
 
             // Missing auth_time (ok)
             public_client_verifier
-                .verified_claims(&test_jwt_without_auth_time, None)
+                .verified_claims(&test_jwt_without_auth_time, |_| Ok(()))
                 .expect("verification should succeed");
 
             // Missing auth_time (error)
@@ -1483,7 +1508,7 @@ mod tests {
                     assert!(auth_time.is_none());
                     Err("Invalid auth_time claim".to_string())
                 })
-                .verified_claims(&test_jwt_without_auth_time, None)
+                .verified_claims(&test_jwt_without_auth_time, |_| Ok(()))
             {
                 Err(ClaimsVerificationError::InvalidAuthTime(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
@@ -1499,15 +1524,31 @@ mod tests {
                     );
                     Err("Invalid auth_time claim".to_string())
                 })
-                .verified_claims(&test_jwt_with_nonce, Some(&valid_nonce))
+                .verified_claims(&test_jwt_with_nonce, &valid_nonce)
             {
                 Err(ClaimsVerificationError::InvalidAuthTime(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
             }
 
-            // Successful verification with nonce, acr, and auth_time specified
+            // Successful verification with nonce, acr, and auth_time specified (no expected Nonce)
             public_client_verifier
-                .verified_claims(&test_jwt_with_nonce, None)
+                .verified_claims(&test_jwt_with_nonce, |_| Ok(()))
+                .expect("verification should succeed");
+
+            // Successful verification with nonce, acr, and auth_time specified (w/ expected Nonce)
+            public_client_verifier
+                .verified_claims(&test_jwt_with_nonce, &valid_nonce)
+                .expect("verification should succeed");
+
+            // Successful verification with nonce, acr, and auth_time specified (w/ closure)
+            public_client_verifier
+                .verified_claims(&test_jwt_with_nonce, |nonce| {
+                    if nonce == Some(&valid_nonce) {
+                        Ok(())
+                    } else {
+                        Err("invalid nonce".to_string())
+                    }
+                })
                 .expect("verification should succeed");
 
             // HS256 w/ default algs
@@ -1526,7 +1567,7 @@ mod tests {
                 CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
             )
             .set_time_fn(|| seconds_to_utc(&Seconds::new(mock_current_time.get().into())).unwrap());
-            match private_client_verifier.verified_claims(&test_jwt_hs256, Some(&valid_nonce)) {
+            match private_client_verifier.verified_claims(&test_jwt_hs256, &valid_nonce) {
                 Err(ClaimsVerificationError::SignatureVerification(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
             }
@@ -1535,14 +1576,14 @@ mod tests {
             private_client_verifier
                 .clone()
                 .set_allowed_algs(vec![CoreJwsSigningAlgorithm::HmacSha256])
-                .verified_claims(&test_jwt_hs256, Some(&valid_nonce))
+                .verified_claims(&test_jwt_hs256, &valid_nonce)
                 .expect("verification should succeed");
 
             // HS256 w/ allow_any_alg
             private_client_verifier
                 .clone()
                 .allow_any_alg()
-                .verified_claims(&test_jwt_hs256, Some(&valid_nonce))
+                .verified_claims(&test_jwt_hs256, &valid_nonce)
                 .expect("verification should succeed");
 
             // Invalid signature
@@ -1558,7 +1599,7 @@ mod tests {
                     seconds_to_utc(&Seconds::new(mock_current_time.get().into())).unwrap()
                 });
             match private_client_verifier_with_other_secret
-                .verified_claims(&test_jwt_hs256, Some(&valid_nonce))
+                .verified_claims(&test_jwt_hs256, &valid_nonce)
             {
                 Err(ClaimsVerificationError::SignatureVerification(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
@@ -1568,7 +1609,7 @@ mod tests {
             private_client_verifier_with_other_secret
                 .clone()
                 .insecure_disable_signature_check()
-                .verified_claims(&test_jwt_hs256, Some(&valid_nonce))
+                .verified_claims(&test_jwt_hs256, &valid_nonce)
                 .expect("verification should succeed");
         };
     }
