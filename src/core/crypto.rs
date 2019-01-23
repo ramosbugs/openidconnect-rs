@@ -25,7 +25,7 @@ pub fn verify_hmac(
 
 pub fn verify_rsa_signature(
     key: &CoreJsonWebKey,
-    params: &ring_signature::RSAParameters,
+    params: &ring_signature::RsaParameters,
     msg: &str,
     signature: &[u8],
 ) -> Result<(), SignatureVerificationError> {
