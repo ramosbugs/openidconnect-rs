@@ -5,8 +5,6 @@ use std::cell::RefCell;
 use std::sync::{Once, ONCE_INIT};
 
 use failure::Fail;
-use oauth2::prelude::NewType;
-use oauth2::RedirectUrl;
 use url::Url;
 
 use openidconnect;
@@ -15,7 +13,9 @@ use openidconnect::core::{
     CoreProviderMetadata,
 };
 use openidconnect::discovery::ProviderMetadata;
+use openidconnect::prelude::*;
 use openidconnect::registration::ClientRegistrationRequest;
+use openidconnect::RedirectUrl;
 use openidconnect::{ClientName, ContactEmail, IssuerUrl};
 
 pub const CERTIFICATION_BASE_URL: &str = "https://rp.certification.openid.net:8080";

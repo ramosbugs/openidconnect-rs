@@ -41,8 +41,9 @@ use oauth2::helpers::variant_name;
 use oauth2::prelude::*;
 use oauth2::ResponseType as OAuth2ResponseType;
 pub use oauth2::{
-    AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, ErrorResponseType,
-    ExtraTokenFields, RedirectUrl, RequestTokenError, Scope, TokenResponse, TokenType, TokenUrl,
+    AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken,
+    ErrorResponseType, ExtraTokenFields, RedirectUrl, RequestTokenError, Scope, TokenResponse,
+    TokenType, TokenUrl,
 };
 use url::Url;
 
@@ -86,6 +87,7 @@ mod macros;
 pub mod core;
 pub mod discovery;
 pub mod prelude {
+    pub use super::OpenIdConnect;
     pub use oauth2::prelude::*;
 }
 pub mod registration;
@@ -141,6 +143,95 @@ pub enum AuthenticationFlow<RT: ResponseType> {
     Hybrid(Vec<RT>),
 }
 
+pub trait OpenIdConnect<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TT>:
+    Sized
+where
+    AC: AdditionalClaims,
+    AD: AuthDisplay,
+    CA: ClientAuthMethod,
+    CN: ClaimName,
+    CT: ClaimType,
+    G: GrantType,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm,
+    JK: JweKeyManagementAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    P: AuthPrompt,
+    PM: ProviderMetadata<AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
+    RM: ResponseMode,
+    RT: ResponseType,
+    S: SubjectIdentifierType,
+    TE: ErrorResponseType,
+    TT: TokenType,
+{
+    fn new(
+        client_id: ClientId,
+        client_secret: Option<ClientSecret>,
+        auth_url: AuthUrl,
+        token_url: Option<TokenUrl>,
+    ) -> Self;
+    fn discover(
+        client_id: ClientId,
+        client_secret: Option<ClientSecret>,
+        issuer_url: &IssuerUrl,
+    ) -> Result<Self, DiscoveryError>;
+    fn from_dynamic_registration<AT, CR, JU, K>(
+        provider_metadata: &PM,
+        registration_response: &CR,
+    ) -> Self
+    where
+        AT: ApplicationType,
+        CR: ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+        JU: JsonWebKeyUse,
+        K: JsonWebKey<JS, JT, JU>;
+    fn add_scope(self, scope: Scope) -> Self;
+    fn set_auth_type(self, auth_type: AuthType) -> Self;
+    fn set_redirect_uri(self, redirect_uri: RedirectUrl) -> Self;
+    fn auth_context_values(&self) -> Option<&Vec<AuthenticationContextClass>>;
+    fn set_auth_context_values(self, acr_values: Option<Vec<AuthenticationContextClass>>) -> Self;
+    fn claims_locales(&self) -> Option<&Vec<LanguageTag>>;
+    fn set_claims_locales(self, claims_locales: Option<Vec<LanguageTag>>) -> Self;
+    fn display(&self) -> Option<&AD>;
+    fn set_display(self, display: Option<AD>) -> Self;
+    fn max_age(&self) -> Option<&Duration>;
+    fn set_max_age(self, max_age: Option<Duration>) -> Self;
+    fn prompts(&self) -> Option<&Vec<P>>;
+    fn set_prompts(self, prompts: Option<Vec<P>>) -> Self;
+    fn ui_locales(&self) -> Option<&Vec<LanguageTag>>;
+    fn set_ui_locales(self, ui_locales: Option<Vec<LanguageTag>>) -> Self;
+    fn id_token_verifier<JU, K>(&self) -> Result<IdTokenVerifier<JS, JT, JU, K>, DiscoveryError>
+    where
+        JU: JsonWebKeyUse,
+        K: JsonWebKey<JS, JT, JU>;
+    fn authorize_url<NF, SF>(
+        &self,
+        authentication_flow: &AuthenticationFlow<RT>,
+        state_fn: SF,
+        nonce_fn: NF,
+    ) -> (Url, CsrfToken, Nonce)
+    where
+        NF: FnOnce() -> Nonce,
+        SF: FnOnce() -> CsrfToken;
+    fn authorize_url_with_hint<NF, SF>(
+        &self,
+        authentication_flow: &AuthenticationFlow<RT>,
+        state_fn: SF,
+        nonce_fn: NF,
+        id_token_hint: Option<&IdToken<AC, GC, JE, JS, JT>>,
+        login_hint: Option<&LoginHint>,
+    ) -> (Url, CsrfToken, Nonce)
+    where
+        NF: FnOnce() -> Nonce,
+        SF: FnOnce() -> CsrfToken;
+    fn exchange_code(
+        &self,
+        code: AuthorizationCode,
+    ) -> Result<TokenResponse<IdTokenFields<AC, GC, JE, JS, JT>, TT>, RequestTokenError<TE>>;
+    fn provider_metadata(&self) -> Option<&PM>;
+}
+
+#[derive(Clone, Debug)]
 pub struct Client<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TT>
 where
     AC: AdditionalClaims,
@@ -186,7 +277,8 @@ where
     // specification.
 }
 impl<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TT>
-    Client<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TT>
+    OpenIdConnect<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TT>
+    for Client<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TT>
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
@@ -207,12 +299,12 @@ where
     TE: ErrorResponseType,
     TT: TokenType,
 {
-    pub fn new(
+    fn new(
         client_id: ClientId,
         client_secret: Option<ClientSecret>,
         auth_url: AuthUrl,
         token_url: Option<TokenUrl>,
-    ) -> Client<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TT> {
+    ) -> Self {
         let oauth2_client = oauth2::Client::new(
             client_id.clone(),
             client_secret.clone(),
@@ -243,7 +335,7 @@ where
         }
     }
 
-    pub fn discover(
+    fn discover(
         client_id: ClientId,
         client_secret: Option<ClientSecret>,
         issuer_url: &IssuerUrl,
@@ -279,7 +371,8 @@ where
             _phantom_s: PhantomData,
         })
     }
-    pub fn from_dynamic_registration<AT, CR, JU, K>(
+
+    fn from_dynamic_registration<AT, CR, JU, K>(
         provider_metadata: &PM,
         registration_response: &CR,
     ) -> Self
@@ -322,7 +415,7 @@ where
     ///
     /// Appends a new scope to the authorization URL.
     ///
-    pub fn add_scope(mut self, scope: Scope) -> Self {
+    fn add_scope(mut self, scope: Scope) -> Self {
         self.oauth2_client = self.oauth2_client.add_scope(scope);
         self
     }
@@ -334,7 +427,7 @@ where
     /// The default is to use HTTP Basic authentication, as recommended in
     /// [Section 2.3.1 of RFC 6749](https://tools.ietf.org/html/rfc6749#section-2.3.1).
     ///
-    pub fn set_auth_type(mut self, auth_type: AuthType) -> Self {
+    fn set_auth_type(mut self, auth_type: AuthType) -> Self {
         self.oauth2_client = self.oauth2_client.set_auth_type(auth_type);
         self
     }
@@ -342,15 +435,15 @@ where
     ///
     /// Sets the the redirect URL used by the authorization endpoint.
     ///
-    pub fn set_redirect_uri(mut self, redirect_uri: RedirectUrl) -> Self {
+    fn set_redirect_uri(mut self, redirect_uri: RedirectUrl) -> Self {
         self.oauth2_client = self.oauth2_client.set_redirect_url(redirect_uri);
         self
     }
 
-    pub fn auth_context_values(&self) -> Option<&Vec<AuthenticationContextClass>> {
+    fn auth_context_values(&self) -> Option<&Vec<AuthenticationContextClass>> {
         self.acr_values.as_ref()
     }
-    pub fn set_auth_context_values(
+    fn set_auth_context_values(
         mut self,
         acr_values: Option<Vec<AuthenticationContextClass>>,
     ) -> Self {
@@ -358,47 +451,47 @@ where
         self
     }
 
-    pub fn claims_locales(&self) -> Option<&Vec<LanguageTag>> {
+    fn claims_locales(&self) -> Option<&Vec<LanguageTag>> {
         self.claims_locales.as_ref()
     }
-    pub fn set_claims_locales(mut self, claims_locales: Option<Vec<LanguageTag>>) -> Self {
+    fn set_claims_locales(mut self, claims_locales: Option<Vec<LanguageTag>>) -> Self {
         self.claims_locales = claims_locales;
         self
     }
 
-    pub fn display(&self) -> Option<&AD> {
+    fn display(&self) -> Option<&AD> {
         self.display.as_ref()
     }
-    pub fn set_display(mut self, display: Option<AD>) -> Self {
+    fn set_display(mut self, display: Option<AD>) -> Self {
         self.display = display;
         self
     }
 
-    pub fn max_age(&self) -> Option<&Duration> {
+    fn max_age(&self) -> Option<&Duration> {
         self.max_age.as_ref()
     }
-    pub fn set_max_age(mut self, max_age: Option<Duration>) -> Self {
+    fn set_max_age(mut self, max_age: Option<Duration>) -> Self {
         self.max_age = max_age;
         self
     }
 
-    pub fn prompts(&self) -> Option<&Vec<P>> {
+    fn prompts(&self) -> Option<&Vec<P>> {
         self.prompts.as_ref()
     }
-    pub fn set_prompts(mut self, prompts: Option<Vec<P>>) -> Self {
+    fn set_prompts(mut self, prompts: Option<Vec<P>>) -> Self {
         self.prompts = prompts;
         self
     }
 
-    pub fn ui_locales(&self) -> Option<&Vec<LanguageTag>> {
+    fn ui_locales(&self) -> Option<&Vec<LanguageTag>> {
         self.ui_locales.as_ref()
     }
-    pub fn set_ui_locales(mut self, ui_locales: Option<Vec<LanguageTag>>) -> Self {
+    fn set_ui_locales(mut self, ui_locales: Option<Vec<LanguageTag>>) -> Self {
         self.ui_locales = ui_locales;
         self
     }
 
-    pub fn id_token_verifier<JU, K>(&self) -> Result<IdTokenVerifier<JS, JT, JU, K>, DiscoveryError>
+    fn id_token_verifier<JU, K>(&self) -> Result<IdTokenVerifier<JS, JT, JU, K>, DiscoveryError>
     where
         JU: JsonWebKeyUse,
         K: JsonWebKey<JS, JT, JU>,
@@ -427,7 +520,7 @@ where
         }
     }
 
-    pub fn authorize_url<NF, SF>(
+    fn authorize_url<NF, SF>(
         &self,
         authentication_flow: &AuthenticationFlow<RT>,
         state_fn: SF,
@@ -440,7 +533,7 @@ where
         self.authorize_url_with_hint(authentication_flow, state_fn, nonce_fn, None, None)
     }
 
-    pub fn authorize_url_with_hint<NF, SF>(
+    fn authorize_url_with_hint<NF, SF>(
         &self,
         authentication_flow: &AuthenticationFlow<RT>,
         state_fn: SF,
@@ -533,7 +626,7 @@ where
         (url, state, nonce)
     }
 
-    pub fn exchange_code(
+    fn exchange_code(
         &self,
         code: AuthorizationCode,
     ) -> Result<TokenResponse<IdTokenFields<AC, GC, JE, JS, JT>, TT>, RequestTokenError<TE>> {
@@ -546,7 +639,7 @@ where
     /// The provider metadata is only available if the Client was created using the `discover`
     /// or `from_dynamic_registration` methods. Otherwise, this function returns `None`.
     ///
-    pub fn provider_metadata(&self) -> Option<&PM> {
+    fn provider_metadata(&self) -> Option<&PM> {
         self.provider_metadata.as_ref()
     }
 }
@@ -571,11 +664,11 @@ where
 mod tests {
     use std::time::Duration;
 
-    use oauth2::prelude::*;
     use oauth2::{AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl};
     use url::Url;
 
     use super::core::{CoreAuthDisplay, CoreAuthPrompt, CoreClient, CoreResponseType};
+    use super::prelude::*;
     use super::{AuthenticationContextClass, AuthenticationFlow, LanguageTag, Nonce};
 
     fn new_client() -> CoreClient {

@@ -3,7 +3,6 @@ extern crate env_logger;
 extern crate failure;
 #[macro_use]
 extern crate log;
-extern crate oauth2;
 extern crate openidconnect;
 #[macro_use]
 extern crate pretty_assertions;
@@ -12,8 +11,6 @@ extern crate url;
 use std::collections::HashMap;
 
 use curl::easy::Easy;
-use oauth2::prelude::*;
-use oauth2::{AccessToken, AuthType, AuthorizationCode, CsrfToken, RequestTokenError, Scope};
 use url::Url;
 
 use openidconnect::core::{
@@ -23,10 +20,14 @@ use openidconnect::core::{
     CoreUserInfoClaims, CoreUserInfoVerifier,
 };
 use openidconnect::discovery::ProviderMetadata;
+use openidconnect::prelude::*;
 use openidconnect::registration::{
     ClientMetadata, ClientRegistrationRequest, ClientRegistrationResponse,
 };
 use openidconnect::Nonce;
+use openidconnect::{
+    AccessToken, AuthType, AuthorizationCode, CsrfToken, RequestTokenError, Scope,
+};
 use openidconnect::{
     AuthenticationFlow, ClaimsVerificationError, SignatureVerificationError, StandardClaims,
     SubjectIdentifier, UserInfoError,

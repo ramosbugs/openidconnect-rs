@@ -3,7 +3,6 @@ extern crate env_logger;
 extern crate failure;
 #[macro_use]
 extern crate log;
-extern crate oauth2;
 extern crate openidconnect;
 #[macro_use]
 extern crate pretty_assertions;

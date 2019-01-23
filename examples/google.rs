@@ -17,7 +17,6 @@
 extern crate base64;
 extern crate env_logger;
 extern crate failure;
-extern crate oauth2;
 extern crate openidconnect;
 extern crate rand;
 extern crate url;
@@ -28,12 +27,14 @@ use std::net::TcpListener;
 use std::process::exit;
 
 use failure::Fail;
-use oauth2::prelude::*;
-use oauth2::{AuthorizationCode, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope};
 use url::Url;
 
 use openidconnect::core::{CoreClient, CoreIdTokenClaims, CoreIdTokenVerifier};
-use openidconnect::{AuthenticationFlow, IssuerUrl, Nonce};
+use openidconnect::prelude::*;
+use openidconnect::{
+    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce,
+    RedirectUrl, Scope,
+};
 
 fn handle_error<T: Fail>(fail: &T, msg: &'static str) {
     let mut err_msg = format!("ERROR: {}", msg);
