@@ -162,8 +162,8 @@ where
     RM: ResponseMode,
     RT: ResponseType,
     S: SubjectIdentifierType,
-    TE: ErrorResponseType,
-    TT: TokenType,
+    TE: ErrorResponseType + 'static,
+    TT: TokenType + 'static,
 {
     fn new(
         client_id: ClientId,
@@ -211,8 +211,8 @@ where
         nonce_fn: NF,
     ) -> (Url, CsrfToken, Nonce)
     where
-        NF: FnOnce() -> Nonce,
-        SF: FnOnce() -> CsrfToken;
+        NF: FnOnce() -> Nonce + 'static,
+        SF: FnOnce() -> CsrfToken + 'static;
     fn authorize_url_with_hint<NF, SF>(
         &self,
         authentication_flow: &AuthenticationFlow<RT>,
@@ -222,8 +222,8 @@ where
         login_hint: Option<&LoginHint>,
     ) -> (Url, CsrfToken, Nonce)
     where
-        NF: FnOnce() -> Nonce,
-        SF: FnOnce() -> CsrfToken;
+        NF: FnOnce() -> Nonce + 'static,
+        SF: FnOnce() -> CsrfToken + 'static;
     fn exchange_code(
         &self,
         code: AuthorizationCode,
@@ -250,8 +250,8 @@ where
     RM: ResponseMode,
     RT: ResponseType,
     S: SubjectIdentifierType,
-    TE: ErrorResponseType,
-    TT: TokenType,
+    TE: ErrorResponseType + 'static,
+    TT: TokenType + 'static,
 {
     oauth2_client: oauth2::Client<IdTokenFields<AC, GC, JE, JS, JT>, TT, TE>,
     acr_values: Option<Vec<AuthenticationContextClass>>,
@@ -527,8 +527,8 @@ where
         nonce_fn: NF,
     ) -> (Url, CsrfToken, Nonce)
     where
-        NF: FnOnce() -> Nonce,
-        SF: FnOnce() -> CsrfToken,
+        NF: FnOnce() -> Nonce + 'static,
+        SF: FnOnce() -> CsrfToken + 'static,
     {
         self.authorize_url_with_hint(authentication_flow, state_fn, nonce_fn, None, None)
     }
@@ -542,8 +542,8 @@ where
         login_hint: Option<&LoginHint>,
     ) -> (Url, CsrfToken, Nonce)
     where
-        NF: FnOnce() -> Nonce,
-        SF: FnOnce() -> CsrfToken,
+        NF: FnOnce() -> Nonce + 'static,
+        SF: FnOnce() -> CsrfToken + 'static,
     {
         // Create string versions of any options that need to be converted. This must be done
         // before creating extra_params so that the lifetimes extend beyond extra_params's lifetime.

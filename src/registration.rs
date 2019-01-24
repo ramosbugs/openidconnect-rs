@@ -42,7 +42,7 @@ trait_struct![
         K: JsonWebKey<JS, JT, JU>,
         RT: ResponseType,
         S: SubjectIdentifierType,
-    ] : [Clone + Debug + DeserializeOwned + PartialEq + Serialize] {}
+    ] : [Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static] {}
     #[derive(Clone, Debug, PartialEq)]
     struct Registration10ClientMetadata[
         AT: ApplicationType,
@@ -290,7 +290,7 @@ where
 
 // FIXME: switch to embedding a flattened extra_fields struct
 pub trait ClientRegistrationRequest<AT, CA, CM, CR, ET, G, JE, JK, JS, JT, JU, K, RT, S>:
-    Debug + PartialEq
+    Debug + PartialEq + 'static
 where
     AT: ApplicationType,
     CA: ClientAuthMethod,
@@ -562,6 +562,7 @@ pub trait ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>:
     + DeserializeOwned
     + PartialEq
     + Serialize
+    + 'static
 where
     AT: ApplicationType,
     CA: ClientAuthMethod,
@@ -730,7 +731,7 @@ where
 
 // FIXME: implement client configuration endpoint request (Section 4)
 
-pub trait RegisterErrorResponseType: 'static + Clone + ErrorResponseType + Send + Sync {}
+pub trait RegisterErrorResponseType: Clone + ErrorResponseType + Send + Sync + 'static {}
 
 #[derive(Debug, Fail)]
 pub enum ClientRegistrationError<T: RegisterErrorResponseType> {

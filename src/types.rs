@@ -16,30 +16,37 @@ use url::Url;
 
 use super::SignatureVerificationError;
 
-pub trait ApplicationType: Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
+pub trait ApplicationType:
+    Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
+{
+}
 
 ///
 /// How the Authorization Server displays the authentication and consent user interface pages to
 /// the End-User.
 ///
-pub trait AuthDisplay: Clone + Debug + DeserializeOwned + PartialEq + Serialize {
+pub trait AuthDisplay: Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static {
     fn to_str(&self) -> &str;
 }
 
 ///
 /// Whether the Authorization Server should prompt the End-User for reauthentication and consent.
 ///
-pub trait AuthPrompt: AsRef<str> + Display + PartialEq {
+pub trait AuthPrompt: AsRef<str> + Display + PartialEq + 'static {
     fn to_str(&self) -> &str;
 }
 
-pub trait ClaimName: Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
-pub trait ClaimType: Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
+pub trait ClaimName: Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static {}
+pub trait ClaimType: Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static {}
 
-pub trait ClientAuthMethod: Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
-pub trait GrantType: Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
+pub trait ClientAuthMethod:
+    Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
+{
+}
+pub trait GrantType: Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static {}
 
-pub trait JsonWebKey<JS, JT, JU>: Clone + Debug + DeserializeOwned + PartialEq + Serialize
+pub trait JsonWebKey<JS, JT, JU>:
+    Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
 where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
@@ -57,24 +64,29 @@ where
     ) -> Result<(), SignatureVerificationError>;
 }
 
-pub trait JsonWebKeyType: Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
-pub trait JsonWebKeyUse: Clone + Debug + DeserializeOwned + PartialEq + Serialize {
+pub trait JsonWebKeyType:
+    Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
+{
+}
+pub trait JsonWebKeyUse:
+    Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
+{
     fn allows_signature(&self) -> bool;
     fn allows_encryption(&self) -> bool;
 }
 // FIXME: add a key_type() method
 pub trait JweContentEncryptionAlgorithm:
-    Clone + Debug + DeserializeOwned + Eq + Hash + PartialEq + Serialize
+    Clone + Debug + DeserializeOwned + Eq + Hash + PartialEq + Serialize + 'static
 {
 }
 // FIXME: add a key_type() method?
 pub trait JweKeyManagementAlgorithm:
-    Clone + Debug + DeserializeOwned + Eq + Hash + PartialEq + Serialize
+    Clone + Debug + DeserializeOwned + Eq + Hash + PartialEq + Serialize + 'static
 {
 }
 
 pub trait JwsSigningAlgorithm<JT>:
-    Clone + Debug + DeserializeOwned + Eq + Hash + PartialEq + Serialize
+    Clone + Debug + DeserializeOwned + Eq + Hash + PartialEq + Serialize + 'static
 where
     JT: JsonWebKeyType,
 {
@@ -84,13 +96,16 @@ where
     fn rsa_sha_256() -> Self;
 }
 
-pub trait ResponseMode: Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
+pub trait ResponseMode: Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static {}
 pub trait ResponseType:
-    AsRef<str> + Clone + Debug + DeserializeOwned + PartialEq + Serialize
+    AsRef<str> + Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
 {
     fn to_oauth2(&self) -> oauth2::ResponseType;
 }
-pub trait SubjectIdentifierType: Clone + Debug + DeserializeOwned + PartialEq + Serialize {}
+pub trait SubjectIdentifierType:
+    Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
+{
+}
 
 // FIXME: make this a trait so that callers can add their own enums if desired
 new_type![#[derive(
