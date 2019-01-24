@@ -2,11 +2,12 @@ use std::fmt::{Display, Error as FormatterError, Formatter, Result as FormatterR
 use std::ops::Deref;
 
 pub use oauth2::basic::{
-    BasicErrorResponseType as CoreErrorResponseType, BasicTokenType as CoreTokenType,
+    BasicErrorResponseType as CoreErrorResponseType,
+    BasicRequestTokenError as CoreRequestTokenError, BasicTokenType as CoreTokenType,
 };
 use oauth2::helpers::variant_name;
 use oauth2::prelude::*;
-use oauth2::{ErrorResponseType, ResponseType as OAuth2ResponseType};
+use oauth2::{ErrorResponseType, ResponseType as OAuth2ResponseType, TokenResponse};
 use serde::de::{Error as DeserializeError, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -17,9 +18,10 @@ use super::registration::{
 };
 use super::{
     ApplicationType, AuthDisplay, AuthPrompt, ClaimName, ClaimType, Client, ClientAuthMethod,
-    EmptyAdditionalClaims, GenderClaim, GrantType, IdToken, IdTokenClaims, IdTokenVerifier,
-    JsonWebKeySet, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm,
-    ResponseMode, ResponseType, SubjectIdentifierType, UserInfoClaims, UserInfoVerifier,
+    EmptyAdditionalClaims, GenderClaim, GrantType, IdToken, IdTokenClaims, IdTokenFields,
+    IdTokenVerifier, JsonWebKeySet, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm,
+    JwsSigningAlgorithm, ResponseMode, ResponseType, SubjectIdentifierType, UserInfoClaims,
+    UserInfoVerifier,
 };
 
 pub use self::jwk::{CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse};
@@ -105,6 +107,14 @@ pub type CoreIdToken = IdToken<
 
 pub type CoreIdTokenClaims = IdTokenClaims<EmptyAdditionalClaims, CoreGenderClaim>;
 
+pub type CoreIdTokenFields = IdTokenFields<
+    EmptyAdditionalClaims,
+    CoreGenderClaim,
+    CoreJweContentEncryptionAlgorithm,
+    CoreJwsSigningAlgorithm,
+    CoreJsonWebKeyType,
+>;
+
 pub type CoreIdTokenVerifier<'a> = IdTokenVerifier<
     'a,
     CoreJwsSigningAlgorithm,
@@ -112,6 +122,8 @@ pub type CoreIdTokenVerifier<'a> = IdTokenVerifier<
     CoreJsonWebKeyUse,
     CoreJsonWebKey,
 >;
+
+pub type CoreTokenResponse = TokenResponse<CoreIdTokenFields, CoreTokenType>;
 
 pub type CoreJsonWebKeySet =
     JsonWebKeySet<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJsonWebKey>;
