@@ -1,7 +1,9 @@
 use std::fmt::{Display, Error as FormatterError, Formatter, Result as FormatterResult};
 use std::ops::Deref;
 
-use oauth2::basic::{BasicErrorResponseType, BasicTokenType};
+pub use oauth2::basic::{
+    BasicErrorResponseType as CoreErrorResponseType, BasicTokenType as CoreTokenType,
+};
 use oauth2::helpers::variant_name;
 use oauth2::prelude::*;
 use oauth2::{ErrorResponseType, ResponseType as OAuth2ResponseType};
@@ -44,8 +46,8 @@ pub type CoreClient = Client<
     CoreResponseMode,
     CoreResponseType,
     CoreSubjectIdentifierType,
-    BasicErrorResponseType,
-    BasicTokenType,
+    CoreErrorResponseType,
+    CoreTokenType,
 >;
 
 pub type CoreClientMetadata = Registration10ClientMetadata<
