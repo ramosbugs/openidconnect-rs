@@ -7,7 +7,7 @@ pub use oauth2::basic::{
 };
 use oauth2::helpers::variant_name;
 use oauth2::prelude::*;
-use oauth2::{ErrorResponseType, ResponseType as OAuth2ResponseType, TokenResponse};
+use oauth2::{ErrorResponseType, ResponseType as OAuth2ResponseType, StandardTokenResponse};
 use serde::de::{Error as DeserializeError, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -49,6 +49,7 @@ pub type CoreClient = Client<
     CoreResponseType,
     CoreSubjectIdentifierType,
     CoreErrorResponseType,
+    CoreTokenResponse,
     CoreTokenType,
 >;
 
@@ -123,7 +124,7 @@ pub type CoreIdTokenVerifier<'a> = IdTokenVerifier<
     CoreJsonWebKey,
 >;
 
-pub type CoreTokenResponse = TokenResponse<CoreIdTokenFields, CoreTokenType>;
+pub type CoreTokenResponse = StandardTokenResponse<CoreIdTokenFields, CoreTokenType>;
 
 pub type CoreJsonWebKeySet =
     JsonWebKeySet<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJsonWebKey>;

@@ -260,10 +260,7 @@ mod tests {
     use url::Url;
 
     use super::super::claims::{AdditionalClaims, EmptyAdditionalClaims, StandardClaims};
-    use super::super::core::{
-        CoreGenderClaim, CoreIdToken, CoreIdTokenClaims, CoreJsonWebKeyType,
-        CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm,
-    };
+    use super::super::core::{CoreGenderClaim, CoreIdToken, CoreIdTokenClaims, CoreTokenResponse};
     use super::super::jwt::JsonWebTokenAccess;
     use super::super::{
         AccessTokenHash, AddressCountry, AddressLocality, AddressPostalCode, AddressRegion,
@@ -273,7 +270,7 @@ mod tests {
         EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, FormattedAddress, IssuerUrl,
         LanguageTag, Nonce, StreetAddress, SubjectIdentifier,
     };
-    use super::{AudiencesClaim, IdTokenClaims, IdTokenFields, IssuerClaim};
+    use super::{AudiencesClaim, IdTokenClaims, IssuerClaim};
 
     #[test]
     fn test_id_token() {
@@ -309,13 +306,6 @@ mod tests {
 
     #[test]
     fn test_oauth2_response() {
-        type CoreIdTokenFields = IdTokenFields<
-            EmptyAdditionalClaims,
-            CoreGenderClaim,
-            CoreJweContentEncryptionAlgorithm,
-            CoreJwsSigningAlgorithm,
-            CoreJsonWebKeyType,
-        >;
         let response_str = "{\
             \"access_token\":\"foobar\",\
             \"token_type\":\"bearer\",\
@@ -324,8 +314,7 @@ mod tests {
             MyMCIsInRmYV9tZXRob2QiOiJ1MmYifQ.aW52YWxpZF9zaWduYXR1cmU\"\
         }";
         let response =
-            serde_json::from_str::<TokenResponse<CoreIdTokenFields, BasicTokenType>>(response_str)
-                .expect("failed to deserialize");
+            serde_json::from_str::<CoreTokenResponse>(response_str).expect("failed to deserialize");
 
         assert_eq!(
             *response.access_token(),

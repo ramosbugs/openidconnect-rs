@@ -346,7 +346,7 @@ fn rp_id_token_iat() {
     );
 
     match token_response {
-        Err(RequestTokenError::Parse(_)) => {
+        Err(RequestTokenError::Parse(_, _)) => {
             log_error!("ID token failed to parse without `iat` claim (expected result)")
         }
         other => panic!("Unexpected result verifying ID token claims: {:?}", other),
@@ -447,7 +447,7 @@ fn rp_id_token_sub() {
     );
 
     match token_response {
-        Err(RequestTokenError::Parse(_)) => {
+        Err(RequestTokenError::Parse(_, _)) => {
             log_error!("ID token failed to parse without `sub` claim (expected result)")
         }
         other => panic!("Unexpected result verifying ID token claims: {:?}", other),

@@ -42,8 +42,8 @@ use oauth2::prelude::*;
 use oauth2::ResponseType as OAuth2ResponseType;
 pub use oauth2::{
     AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken,
-    ErrorResponseType, ExtraTokenFields, RedirectUrl, RequestTokenError, Scope, TokenResponse,
-    TokenType, TokenUrl,
+    ErrorResponseType, ExtraTokenFields, RedirectUrl, RequestTokenError, Scope,
+    StandardTokenResponse, TokenResponse as OAuth2TokenResponse, TokenType, TokenUrl,
 };
 use url::Url;
 
@@ -87,7 +87,7 @@ mod macros;
 pub mod core;
 pub mod discovery;
 pub mod prelude {
-    pub use super::OpenIdConnect;
+    pub use super::{OAuth2TokenResponse, OpenIdConnect};
     pub use oauth2::prelude::*;
 }
 pub mod registration;
@@ -143,7 +143,7 @@ pub enum AuthenticationFlow<RT: ResponseType> {
     Hybrid(Vec<RT>),
 }
 
-pub trait OpenIdConnect<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TT>:
+pub trait OpenIdConnect<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TR, TT>:
     Sized
 where
     AC: AdditionalClaims,
@@ -163,6 +163,7 @@ where
     RT: ResponseType,
     S: SubjectIdentifierType,
     TE: ErrorResponseType + 'static,
+    TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
     TT: TokenType + 'static,
 {
     fn new(
@@ -224,15 +225,12 @@ where
     where
         NF: FnOnce() -> Nonce + 'static,
         SF: FnOnce() -> CsrfToken + 'static;
-    fn exchange_code(
-        &self,
-        code: AuthorizationCode,
-    ) -> Result<TokenResponse<IdTokenFields<AC, GC, JE, JS, JT>, TT>, RequestTokenError<TE>>;
+    fn exchange_code(&self, code: AuthorizationCode) -> Result<TR, RequestTokenError<TE>>;
     fn provider_metadata(&self) -> Option<&PM>;
 }
 
 #[derive(Clone, Debug)]
-pub struct Client<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TT>
+pub struct Client<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TR, TT>
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
@@ -251,9 +249,10 @@ where
     RT: ResponseType,
     S: SubjectIdentifierType,
     TE: ErrorResponseType + 'static,
+    TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
     TT: TokenType + 'static,
 {
-    oauth2_client: oauth2::Client<IdTokenFields<AC, GC, JE, JS, JT>, TT, TE>,
+    oauth2_client: oauth2::Client<TE, TR, TT>,
     acr_values: Option<Vec<AuthenticationContextClass>>,
     claims_locales: Option<Vec<LanguageTag>>,
     client_id: ClientId,
@@ -263,11 +262,15 @@ where
     prompts: Option<Vec<P>>,
     provider_metadata: Option<PM>,
     ui_locales: Option<Vec<LanguageTag>>,
+    _phantom_ac: PhantomData<AC>,
     _phantom_ca: PhantomData<CA>,
     _phantom_cn: PhantomData<CN>,
     _phantom_ct: PhantomData<CT>,
     _phantom_g: PhantomData<G>,
+    _phantom_gc: PhantomData<GC>,
+    _phantom_je: PhantomData<JE>,
     _phantom_jk: PhantomData<JK>,
+    _phantom_js: PhantomData<JS>,
     _phantom_jt: PhantomData<JT>,
     _phantom_rm: PhantomData<RM>,
     _phantom_rt: PhantomData<RT>,
@@ -276,9 +279,9 @@ where
     // additional Authorization Request parameters and parameter values defined by this
     // specification.
 }
-impl<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TT>
-    OpenIdConnect<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TT>
-    for Client<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TT>
+impl<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TR, TT>
+    OpenIdConnect<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TR, TT>
+    for Client<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TR, TT>
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
@@ -297,6 +300,7 @@ where
     RT: ResponseType,
     S: SubjectIdentifierType,
     TE: ErrorResponseType,
+    TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
     TT: TokenType,
 {
     fn new(
@@ -323,11 +327,15 @@ where
             prompts: None,
             provider_metadata: None,
             ui_locales: None,
+            _phantom_ac: PhantomData,
             _phantom_ca: PhantomData,
             _phantom_cn: PhantomData,
             _phantom_ct: PhantomData,
             _phantom_g: PhantomData,
+            _phantom_gc: PhantomData,
+            _phantom_je: PhantomData,
             _phantom_jk: PhantomData,
+            _phantom_js: PhantomData,
             _phantom_jt: PhantomData,
             _phantom_rm: PhantomData,
             _phantom_rt: PhantomData,
@@ -360,11 +368,15 @@ where
             prompts: None,
             provider_metadata: Some(provider_metadata),
             ui_locales: None,
+            _phantom_ac: PhantomData,
             _phantom_ca: PhantomData,
             _phantom_cn: PhantomData,
             _phantom_ct: PhantomData,
             _phantom_g: PhantomData,
+            _phantom_gc: PhantomData,
+            _phantom_je: PhantomData,
             _phantom_jk: PhantomData,
+            _phantom_js: PhantomData,
             _phantom_jt: PhantomData,
             _phantom_rm: PhantomData,
             _phantom_rt: PhantomData,
@@ -400,11 +412,15 @@ where
             prompts: None,
             provider_metadata: Some(provider_metadata.clone()),
             ui_locales: None,
+            _phantom_ac: PhantomData,
             _phantom_ca: PhantomData,
             _phantom_cn: PhantomData,
             _phantom_ct: PhantomData,
             _phantom_g: PhantomData,
+            _phantom_gc: PhantomData,
+            _phantom_je: PhantomData,
             _phantom_jk: PhantomData,
+            _phantom_js: PhantomData,
             _phantom_jt: PhantomData,
             _phantom_rm: PhantomData,
             _phantom_rt: PhantomData,
@@ -626,10 +642,7 @@ where
         (url, state, nonce)
     }
 
-    fn exchange_code(
-        &self,
-        code: AuthorizationCode,
-    ) -> Result<TokenResponse<IdTokenFields<AC, GC, JE, JS, JT>, TT>, RequestTokenError<TE>> {
+    fn exchange_code(&self, code: AuthorizationCode) -> Result<TR, RequestTokenError<TE>> {
         self.oauth2_client.exchange_code(code)
     }
 
@@ -641,6 +654,33 @@ where
     ///
     fn provider_metadata(&self) -> Option<&PM> {
         self.provider_metadata.as_ref()
+    }
+}
+
+pub trait TokenResponse<AC, GC, JE, JS, JT, TT>: OAuth2TokenResponse<TT>
+where
+    AC: AdditionalClaims,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    TT: TokenType,
+{
+    fn id_token(&self) -> &IdToken<AC, GC, JE, JS, JT>;
+}
+
+impl<AC, GC, JE, JS, JT, TT> TokenResponse<AC, GC, JE, JS, JT, TT>
+    for StandardTokenResponse<IdTokenFields<AC, GC, JE, JS, JT>, TT>
+where
+    AC: AdditionalClaims,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    TT: TokenType,
+{
+    fn id_token(&self) -> &IdToken<AC, GC, JE, JS, JT> {
+        self.extra_fields().id_token()
     }
 }
 
