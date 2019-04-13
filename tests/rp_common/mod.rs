@@ -131,7 +131,11 @@ where
         Url::parse(RP_REDIRECT_URI).unwrap(),
     )])
     .set_application_type(Some(CoreApplicationType::Native))
-    .set_client_name(Some(ClientName::new(RP_NAME.to_string())), None)
+    .set_client_name(Some(
+        vec![(None, ClientName::new(RP_NAME.to_string()))]
+            .into_iter()
+            .collect(),
+    ))
     .set_contacts(Some(vec![ContactEmail::new(RP_CONTACT_EMAIL.to_string())]));
 
     let registration_request_post = request_fn(registration_request_pre);

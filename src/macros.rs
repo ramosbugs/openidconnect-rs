@@ -604,19 +604,19 @@ macro_rules! deserialize_fields {
         $field = $map.next_value()?;
     };
     (@case $map:ident $key:ident $language_tag_opt:ident LanguageTag($field:ident)) => {
-        let hash_map =
-            if let Some(ref mut hash_map) = $field {
-                hash_map
+        let localized_claim =
+            if let Some(ref mut localized_claim) = $field {
+                localized_claim
             } else {
-                let new = HashMap::new();
+                let new = LocalizedClaim::new();
                 $field = Some(new);
                 $field.as_mut().unwrap()
             };
-        if hash_map.contains_key(&$language_tag_opt) {
+        if localized_claim.contains_key(&$language_tag_opt) {
             return Err(serde::de::Error::custom(format!("duplicate field `{}`", $key)));
         }
 
-        hash_map.insert($language_tag_opt, $map.next_value()?);
+        localized_claim.insert($language_tag_opt, $map.next_value()?);
     };
     (@case $map:ident $key:ident $language_tag_opt:ident $field:ident) => {
         if $field.is_some() {
@@ -720,7 +720,7 @@ macro_rules! serialize_fields {
     };
     (@case $self:ident $map:ident LanguageTag($field:ident)) => {
         if let Some(ref field_map) = $self.$field {
-            for (language_tag_opt, $field) in field_map {
+            for (language_tag_opt, $field) in field_map.iter() {
                 if let Some(ref language_tag) = *language_tag_opt {
                     $map.serialize_entry(
                         &format!(concat!(stringify!($field), "#{}"), language_tag.as_ref()),
@@ -750,25 +750,23 @@ macro_rules! serialize_fields {
 }
 
 macro_rules! field_getter_decls {
-    (@case $self:ident $field:ident Option < bool >) => {
-        fn $field(&$self) -> Option<bool>;
+    (@case $field:ident Option < bool >) => {
+        fn $field(&self) -> Option<bool>;
     };
-    (@case $self:ident $field:ident Option < $type:ty >) => {
-        fn $field(&$self) -> Option<$type>;
+    (@case $field:ident Option < $type:ty >) => {
+        fn $field(&self) -> Option<&$type>;
     };
-    (@case $self:ident $field:ident $type:ty) => {
-        fn $field(&$self) -> $type;
+    (@case $field:ident $type:ty) => {
+        fn $field(&self) -> &$type;
     };
     // Main entry point
     (
-        $self:ident {
-            $(
-                $field:ident[$($entry:tt)+],
-            )+
-        }
+        $(
+            $field:ident[$($entry:tt)+],
+        )+
     ) => {
         $(
-            field_getter_decls![@case $self $field $($entry)+];
+            field_getter_decls![@case $field $($entry)+];
         )+
     };
 }
@@ -784,17 +782,12 @@ macro_rules! field_getters {
             $($body)+
         }
     };
-    (@case $self:ident [$zero:expr] $field:ident Option <&$type:ty >) => {
+    (@case $self:ident [$zero:expr] $field:ident Option <$type:ty >) => {
         fn $field(&$self) -> Option<&$type> {
             $zero.$field.as_ref()
         }
     };
-    (@case $self:ident [$zero:expr] $field:ident Option < $type:ty > { $($body:tt)+ }) => {
-        fn $field(&$self) -> Option<$type> {
-            $($body)+
-        }
-    };
-    (@case $self:ident [$zero:expr] $field:ident &$type:ty) => {
+    (@case $self:ident [$zero:expr] $field:ident $type:ty) => {
         fn $field(&$self) -> &$type {
             &$zero.$field
         }
@@ -814,7 +807,7 @@ macro_rules! field_getters {
             $($body)+
         }
     };
-    (@case pub $self:ident [$zero:expr] $field:ident Option <&$type:ty >) => {
+    (@case pub $self:ident [$zero:expr] $field:ident Option <$type:ty >) => {
        pub  fn $field(&$self) -> Option<&$type> {
             $zero.$field.as_ref()
         }
@@ -824,7 +817,7 @@ macro_rules! field_getters {
             $($body)+
         }
     };
-    (@case pub $self:ident [$zero:expr] $field:ident &$type:ty) => {
+    (@case pub $self:ident [$zero:expr] $field:ident $type:ty) => {
         pub fn $field(&$self) -> &$type {
             &$zero.$field
         }
@@ -844,7 +837,7 @@ macro_rules! field_getters {
             $($body)+
         }
     };
-    (@case $self:ident [$zero:expr] $field:ident() Option <&$type:ty >) => {
+    (@case $self:ident [$zero:expr] $field:ident() Option < $type:ty >) => {
         fn $field(&$self) -> Option<&$type> {
             $zero.$field()
         }
@@ -854,9 +847,9 @@ macro_rules! field_getters {
             $($body)+
         }
     };
-    (@case $self:ident [$zero:expr] $field:ident() &$type:ty) => {
+    (@case $self:ident [$zero:expr] $field:ident() $type:ty) => {
         fn $field(&$self) -> &$type {
-            $zero.$field()
+            &$zero.$field()
         }
     };
     (@case $self:ident [$zero:expr] $field:ident() $type:ty { $($body:tt)+ }) => {
@@ -901,13 +894,6 @@ macro_rules! field_getters {
 }
 
 macro_rules! field_setter_decls {
-    (@case $setter:ident $field:ident Option < HashMap < Option < LanguageTag > , $type:ty > >) => {
-        fn $setter(
-            self,
-            $field: Option<$type>,
-            language_tag: Option<LanguageTag>
-        ) -> Self;
-    };
     (@case $setter:ident $field:ident $type:ty) => {
         fn $setter(
             self,
@@ -927,31 +913,12 @@ macro_rules! field_setter_decls {
 }
 
 macro_rules! field_setters {
-    (@case $self:ident [$zero:expr] $setter:ident $field:ident Option < HashMap < Option < LanguageTag > , $type:ty > >) => {
-        fn $setter(
+    (@case pub $self:ident [$zero:expr] $setter:ident $field:ident $type:ty) => {
+        pub fn $setter(
             mut $self,
-            $field: Option<$type>,
-            language_tag: Option<LanguageTag>
+            $field: $type
         ) -> Self {
-            if let Some(temp) = $field {
-                if $zero.$field.is_none() {
-                    $zero.$field = Some(HashMap::new());
-                }
-                if let Some(ref mut hash_map) = $zero.$field {
-                    hash_map.insert(language_tag, temp);
-                }
-            } else {
-                let set_to_none =
-                    if let Some(ref mut hash_map) = $zero.$field {
-                        hash_map.remove(&language_tag);
-                        hash_map.is_empty()
-                    } else {
-                        false
-                    };
-                if set_to_none {
-                    $zero.$field = None;
-                }
-            }
+            $zero.$field = $field;
             $self
         }
     };
@@ -966,6 +933,17 @@ macro_rules! field_setters {
     };
     // Main entry point
     (
+        pub $self:ident [$zero:expr] {
+            $(
+                $setter:ident -> $field:ident[$($entry:tt)+],
+            )+
+        }
+    ) => {
+        $(
+            field_setters![@case pub $self [$zero] $setter $field $($entry)+];
+        )+
+    };
+    (
         $self:ident [$zero:expr] {
             $(
                 $setter:ident -> $field:ident[$($entry:tt)+],
@@ -976,4 +954,49 @@ macro_rules! field_setters {
             field_setters![@case $self [$zero] $setter $field $($entry)+];
         )+
     };
+}
+
+macro_rules! field_getter_setter_decls {
+    (
+        $(
+            $setter:ident -> $field:ident[$($entry:tt)+],
+        )+
+    ) => {
+        field_getter_decls![$($field[$($entry)+],)+];
+        field_setter_decls![$($setter -> $field[$($entry)+],)+];
+    };
+}
+
+macro_rules! field_getters_setters {
+    (
+        $self:ident [$zero:expr] {
+            $(
+                $setter:ident -> $field:ident[$($entry:tt)+],
+            )+
+        }
+    ) => {
+        field_getters![$self [$zero] { $($field[$($entry)+],)+ }];
+        field_setters![$self [$zero] { $($setter -> $field[$($entry)+],)+ }];
+    };
+    (
+        pub $self:ident [$zero:expr] {
+            $(
+                $setter:ident -> $field:ident[$($entry:tt)+],
+            )+
+        }
+    ) => {
+        field_getters![pub $self [$zero] { $($field[$($entry)+],)+ }];
+        field_setters![pub $self [$zero] { $($setter -> $field[$($entry)+],)+ }];
+    };
+    (
+        $self:ident [$zero:expr]() {
+            $(
+                $setter:ident -> $field:ident[$($entry:tt)+],
+            )+
+        }
+    ) => {
+        field_getters![$self [$zero]() { $($field[$($entry)+],)+ }];
+        field_setters![$self [$zero] { $($setter -> $field[$($entry)+],)+ }];
+    };
+
 }

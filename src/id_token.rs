@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use chrono::{DateTime, Utc};
@@ -6,8 +5,8 @@ use oauth2::ClientId;
 
 use super::claims::StandardClaimsImpl;
 use super::jwt::JsonWebTokenJsonPayloadDeserializer;
-use super::types::helpers::{deserialize_string_or_vec, seconds_to_utc};
-use super::types::Seconds;
+use super::types::helpers::{deserialize_string_or_vec, seconds_to_utc, utc_to_seconds};
+use super::types::{LocalizedClaim, Seconds};
 use super::{
     AccessTokenHash, AdditionalClaims, AddressClaim, Audience, AudiencesClaim,
     AuthenticationContextClass, AuthenticationMethodReference, AuthorizationCodeHash,
@@ -142,32 +141,40 @@ where
     AC: AdditionalClaims,
     GC: GenderClaim,
 {
-    field_getters![
+    field_getters_setters![
         self [self.standard_claims] {
-            sub[&SubjectIdentifier],
-            name[Option<&HashMap<Option<LanguageTag>, EndUserName>>],
-            given_name[Option<&HashMap<Option<LanguageTag>, EndUserGivenName>>],
-            family_name[Option<&HashMap<Option<LanguageTag>, EndUserFamilyName>>],
-            middle_name[Option<&HashMap<Option<LanguageTag>, EndUserMiddleName>>],
-            nickname[Option<&HashMap<Option<LanguageTag>, EndUserNickname>>],
-            preferred_username[Option<&EndUserUsername>],
-            profile[Option<&HashMap<Option<LanguageTag>, EndUserProfileUrl>>],
-            picture[Option<&HashMap<Option<LanguageTag>, EndUserPictureUrl>>],
-            website[Option<&HashMap<Option<LanguageTag>, EndUserWebsiteUrl>>],
-            email[Option<&EndUserEmail>],
-            email_verified[Option<bool>],
-            gender[Option<&GC>],
-            birthday[Option<&EndUserBirthday>],
-            zoneinfo[Option<&EndUserTimezone>],
-            locale[Option<&LanguageTag>],
-            phone_number[Option<&EndUserPhoneNumber>],
-            phone_number_verified[Option<bool>],
-            address[Option<&AddressClaim>],
-            updated_at[Option<Result<DateTime<Utc>, ()>> {
-                self.standard_claims.updated_at.as_ref().map(seconds_to_utc)
-            }],
+            set_sub -> sub[SubjectIdentifier],
+            set_name -> name[Option<LocalizedClaim<EndUserName>>],
+            set_given_name -> given_name[Option<LocalizedClaim<EndUserGivenName>>],
+            set_family_name ->
+                family_name[Option<LocalizedClaim<EndUserFamilyName>>],
+            set_middle_name ->
+                middle_name[Option<LocalizedClaim<EndUserMiddleName>>],
+            set_nickname -> nickname[Option<LocalizedClaim<EndUserNickname>>],
+            set_preferred_username -> preferred_username[Option<EndUserUsername>],
+            set_profile -> profile[Option<LocalizedClaim<EndUserProfileUrl>>],
+            set_picture -> picture[Option<LocalizedClaim<EndUserPictureUrl>>],
+            set_website -> website[Option<LocalizedClaim<EndUserWebsiteUrl>>],
+            set_email -> email[Option<EndUserEmail>],
+            set_email_verified -> email_verified[Option<bool>],
+            set_gender -> gender[Option<GC>],
+            set_birthday -> birthday[Option<EndUserBirthday>],
+            set_zoneinfo -> zoneinfo[Option<EndUserTimezone>],
+            set_locale -> locale[Option<LanguageTag>],
+            set_phone_number -> phone_number[Option<EndUserPhoneNumber>],
+            set_phone_number_verified -> phone_number_verified[Option<bool>],
+            set_address -> address[Option<AddressClaim>],
         }
     ];
+
+    fn updated_at(&self) -> Option<Result<DateTime<Utc>, ()>> {
+        self.standard_claims.updated_at.as_ref().map(seconds_to_utc)
+    }
+
+    fn set_updated_at(mut self, updated_at: Option<&DateTime<Utc>>) -> Self {
+        self.standard_claims.updated_at = updated_at.map(utc_to_seconds);
+        self
+    }
 }
 impl<AC, GC> AudiencesClaim for IdTokenClaims<AC, GC>
 where

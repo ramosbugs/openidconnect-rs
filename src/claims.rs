@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fmt::{Debug, Formatter, Result as FormatterResult};
 use std::marker::PhantomData;
 use std::str;
@@ -10,7 +9,7 @@ use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
 
 use super::types::helpers::split_language_tag_key;
-use super::types::Seconds;
+use super::types::{LocalizedClaim, Seconds};
 use super::{
     AddressCountry, AddressLocality, AddressPostalCode, AddressRegion, EndUserBirthday,
     EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName, EndUserName,
@@ -46,14 +45,14 @@ pub struct AddressClaim {
     country: Option<AddressCountry>,
 }
 impl AddressClaim {
-    field_getters![
+    field_getters_setters![
         pub self [self] {
-            formatted[Option<&FormattedAddress>],
-            street_address[Option<&StreetAddress>],
-            locality[Option<&AddressLocality>],
-            region[Option<&AddressRegion>],
-            postal_code[Option<&AddressPostalCode>],
-            country[Option<&AddressCountry>],
+            set_formatted -> formatted[Option<FormattedAddress>],
+            set_street_address -> street_address[Option<StreetAddress>],
+            set_locality -> locality[Option<AddressLocality>],
+            set_region -> region[Option<AddressRegion>],
+            set_postal_code -> postal_code[Option<AddressPostalCode>],
+            set_country -> country[Option<AddressCountry>],
         }
     ];
 }
@@ -65,30 +64,32 @@ pub trait StandardClaims<GC>: Clone + Debug + DeserializeOwned + PartialEq + Ser
 where
     GC: GenderClaim,
 {
-    field_getter_decls![
-        self {
-            sub[&SubjectIdentifier],
-            name[Option<&HashMap<Option<LanguageTag>, EndUserName>>],
-            given_name[Option<&HashMap<Option<LanguageTag>, EndUserGivenName>>],
-            family_name[Option<&HashMap<Option<LanguageTag>, EndUserFamilyName>>],
-            middle_name[Option<&HashMap<Option<LanguageTag>, EndUserMiddleName>>],
-            nickname[Option<&HashMap<Option<LanguageTag>, EndUserNickname>>],
-            preferred_username[Option<&EndUserUsername>],
-            profile[Option<&HashMap<Option<LanguageTag>, EndUserProfileUrl>>],
-            picture[Option<&HashMap<Option<LanguageTag>, EndUserPictureUrl>>],
-            website[Option<&HashMap<Option<LanguageTag>, EndUserWebsiteUrl>>],
-            email[Option<&EndUserEmail>],
-            email_verified[Option<bool>],
-            gender[Option<&GC>],
-            birthday[Option<&EndUserBirthday>],
-            zoneinfo[Option<&EndUserTimezone>],
-            locale[Option<&LanguageTag>],
-            phone_number[Option<&EndUserPhoneNumber>],
-            phone_number_verified[Option<bool>],
-            address[Option<&AddressClaim>],
-            updated_at[Option<Result<DateTime<Utc>, ()>>],
-        }
+    field_getter_setter_decls![
+        set_sub -> sub[SubjectIdentifier],
+        set_name -> name[Option<LocalizedClaim<EndUserName>>],
+        set_given_name -> given_name[Option<LocalizedClaim<EndUserGivenName>>],
+        set_family_name ->
+            family_name[Option<LocalizedClaim<EndUserFamilyName>>],
+        set_middle_name ->
+            middle_name[Option<LocalizedClaim<EndUserMiddleName>>],
+        set_nickname -> nickname[Option<LocalizedClaim<EndUserNickname>>],
+        set_preferred_username -> preferred_username[Option<EndUserUsername>],
+        set_profile -> profile[Option<LocalizedClaim<EndUserProfileUrl>>],
+        set_picture -> picture[Option<LocalizedClaim<EndUserPictureUrl>>],
+        set_website -> website[Option<LocalizedClaim<EndUserWebsiteUrl>>],
+        set_email -> email[Option<EndUserEmail>],
+        set_email_verified -> email_verified[Option<bool>],
+        set_gender -> gender[Option<GC>],
+        set_birthday -> birthday[Option<EndUserBirthday>],
+        set_zoneinfo -> zoneinfo[Option<EndUserTimezone>],
+        set_locale -> locale[Option<LanguageTag>],
+        set_phone_number -> phone_number[Option<EndUserPhoneNumber>],
+        set_phone_number_verified -> phone_number_verified[Option<bool>],
+        set_address -> address[Option<AddressClaim>],
     ];
+
+    fn updated_at(&self) -> Option<Result<DateTime<Utc>, ()>>;
+    fn set_updated_at(self, updated_at: Option<&DateTime<Utc>>) -> Self;
 }
 
 // Private (fields accessed via IdTokenClaims and UserInfoClaims)
@@ -98,15 +99,15 @@ where
     GC: GenderClaim,
 {
     pub sub: SubjectIdentifier,
-    pub name: Option<HashMap<Option<LanguageTag>, EndUserName>>,
-    pub given_name: Option<HashMap<Option<LanguageTag>, EndUserGivenName>>,
-    pub family_name: Option<HashMap<Option<LanguageTag>, EndUserFamilyName>>,
-    pub middle_name: Option<HashMap<Option<LanguageTag>, EndUserMiddleName>>,
-    pub nickname: Option<HashMap<Option<LanguageTag>, EndUserNickname>>,
+    pub name: Option<LocalizedClaim<EndUserName>>,
+    pub given_name: Option<LocalizedClaim<EndUserGivenName>>,
+    pub family_name: Option<LocalizedClaim<EndUserFamilyName>>,
+    pub middle_name: Option<LocalizedClaim<EndUserMiddleName>>,
+    pub nickname: Option<LocalizedClaim<EndUserNickname>>,
     pub preferred_username: Option<EndUserUsername>,
-    pub profile: Option<HashMap<Option<LanguageTag>, EndUserProfileUrl>>,
-    pub picture: Option<HashMap<Option<LanguageTag>, EndUserPictureUrl>>,
-    pub website: Option<HashMap<Option<LanguageTag>, EndUserWebsiteUrl>>,
+    pub profile: Option<LocalizedClaim<EndUserProfileUrl>>,
+    pub picture: Option<LocalizedClaim<EndUserPictureUrl>>,
+    pub website: Option<LocalizedClaim<EndUserWebsiteUrl>>,
     pub email: Option<EndUserEmail>,
     pub email_verified: Option<bool>,
     pub gender: Option<GC>,

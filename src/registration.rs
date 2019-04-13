@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fmt::{Debug, Formatter, Result as FormatterResult};
 use std::marker::{PhantomData, Send, Sync};
 use std::time::Duration;
@@ -22,7 +21,7 @@ use super::types::helpers::split_language_tag_key;
 use super::types::{
     ApplicationType, AuthenticationContextClass, ClientAuthMethod, ClientConfigUrl, ClientName,
     ClientUrl, ContactEmail, GrantType, InitiateLoginUrl, JsonWebKeyType, JsonWebKeyUse,
-    JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag,
+    JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LocalizedClaim,
     LogoUrl, PolicyUrl, RegistrationAccessToken, RegistrationUrl, RequestUrl, ResponseType,
     ResponseTypes, SectorIdentifierUrl, SubjectIdentifierType, ToSUrl,
 };
@@ -62,16 +61,16 @@ trait_struct![
         grant_types(Option<&Vec<G>>) <- Option<Vec<G>>,
         application_type(Option<&AT>) <- Option<AT>,
         contacts(Option<&Vec<ContactEmail>>) <- Option<Vec<ContactEmail>>,
-        client_name(Option<&HashMap<Option<LanguageTag>, ClientName>>)
-            <- Option<HashMap<Option<LanguageTag>, ClientName>>,
-        logo_uri(Option<&HashMap<Option<LanguageTag>, LogoUrl>>)
-            <- Option<HashMap<Option<LanguageTag>, LogoUrl>>,
-        client_uri(Option<&HashMap<Option<LanguageTag>, ClientUrl>>)
-            <- Option<HashMap<Option<LanguageTag>, ClientUrl>>,
-        policy_uri(Option<&HashMap<Option<LanguageTag>, PolicyUrl>>)
-            <- Option<HashMap<Option<LanguageTag>, PolicyUrl>>,
-        tos_uri(Option<&HashMap<Option<LanguageTag>, ToSUrl>>)
-            <- Option<HashMap<Option<LanguageTag>, ToSUrl>>,
+        client_name(Option<&LocalizedClaim<ClientName>>)
+            <- Option<LocalizedClaim<ClientName>>,
+        logo_uri(Option<&LocalizedClaim<LogoUrl>>)
+            <- Option<LocalizedClaim<LogoUrl>>,
+        client_uri(Option<&LocalizedClaim<ClientUrl>>)
+            <- Option<LocalizedClaim<ClientUrl>>,
+        policy_uri(Option<&LocalizedClaim<PolicyUrl>>)
+            <- Option<LocalizedClaim<PolicyUrl>>,
+        tos_uri(Option<&LocalizedClaim<ToSUrl>>)
+            <- Option<LocalizedClaim<ToSUrl>>,
         jwks_uri(Option<&JsonWebKeySetUrl>) <- Option<JsonWebKeySetUrl>,
         jwks(Option<&JsonWebKeySet<JS, JT, JU, K>>) <- Option<JsonWebKeySet<JS, JT, JU, K>>,
         sector_identifier_uri(Option<&SectorIdentifierUrl>) <- Option<SectorIdentifierUrl>,
@@ -387,11 +386,11 @@ where
         set_grant_types -> grant_types[Option<Vec<G>>],
         set_application_type -> application_type[Option<AT>],
         set_contacts -> contacts[Option<Vec<ContactEmail>>],
-        set_client_name -> client_name[Option<HashMap<Option<LanguageTag>, ClientName> >],
-        set_logo_uri -> logo_uri[Option<HashMap<Option<LanguageTag>, LogoUrl> >],
-        set_client_uri -> client_uri[Option<HashMap<Option<LanguageTag>, ClientUrl> >],
-        set_policy_uri -> policy_uri[Option<HashMap<Option<LanguageTag>, PolicyUrl> >],
-        set_tos_uri -> tos_uri[Option<HashMap<Option<LanguageTag>, ToSUrl> >],
+        set_client_name -> client_name[Option<LocalizedClaim<ClientName>>],
+        set_logo_uri -> logo_uri[Option<LocalizedClaim<LogoUrl>>],
+        set_client_uri -> client_uri[Option<LocalizedClaim<ClientUrl>>],
+        set_policy_uri -> policy_uri[Option<LocalizedClaim<PolicyUrl>>],
+        set_tos_uri -> tos_uri[Option<LocalizedClaim<ToSUrl>>],
         set_jwks_uri -> jwks_uri[Option<JsonWebKeySetUrl>],
         set_jwks -> jwks[Option<JsonWebKeySet<JS, JT, JU, K>>],
         set_sector_identifier_uri -> sector_identifier_uri[Option<SectorIdentifierUrl>],
@@ -526,11 +525,11 @@ where
             set_grant_types -> grant_types[Option<Vec<G>>],
             set_application_type -> application_type[Option<AT>],
             set_contacts -> contacts[Option<Vec<ContactEmail>>],
-            set_client_name -> client_name[Option<HashMap<Option<LanguageTag>, ClientName> >],
-            set_logo_uri -> logo_uri[Option<HashMap<Option<LanguageTag>, LogoUrl> >],
-            set_client_uri -> client_uri[Option<HashMap<Option<LanguageTag>, ClientUrl> >],
-            set_policy_uri -> policy_uri[Option<HashMap<Option<LanguageTag>, PolicyUrl> >],
-            set_tos_uri -> tos_uri[Option<HashMap<Option<LanguageTag>, ToSUrl> >],
+            set_client_name -> client_name[Option<LocalizedClaim<ClientName>>],
+            set_logo_uri -> logo_uri[Option<LocalizedClaim<LogoUrl>>],
+            set_client_uri -> client_uri[Option<LocalizedClaim<ClientUrl>>],
+            set_policy_uri -> policy_uri[Option<LocalizedClaim<PolicyUrl>>],
+            set_tos_uri -> tos_uri[Option<LocalizedClaim<ToSUrl>>],
             set_jwks_uri -> jwks_uri[Option<JsonWebKeySetUrl>],
             set_jwks -> jwks[Option<JsonWebKeySet<JS, JT, JU, K>>],
             set_sector_identifier_uri -> sector_identifier_uri[Option<SectorIdentifierUrl>],
@@ -695,36 +694,36 @@ where
 {
     field_getters![
         self [self.client_metadata]() {
-            redirect_uris[&Vec<RedirectUrl>],
-            response_types[Option<&Vec<ResponseTypes<RT>>>],
-            grant_types[Option<&Vec<G>>],
-            application_type[Option<&AT>],
-            contacts[Option<&Vec<ContactEmail>>],
-            client_name[Option<&HashMap<Option<LanguageTag>, ClientName>>],
-            logo_uri[Option<&HashMap<Option<LanguageTag>, LogoUrl>>],
-            client_uri[Option<&HashMap<Option<LanguageTag>, ClientUrl>>],
-            policy_uri[Option<&HashMap<Option<LanguageTag>, PolicyUrl>>],
-            tos_uri[Option<&HashMap<Option<LanguageTag>, ToSUrl>>],
-            jwks_uri[Option<&JsonWebKeySetUrl>],
-            jwks[Option<&JsonWebKeySet<JS, JT, JU, K>>],
-            sector_identifier_uri[Option<&SectorIdentifierUrl>],
-            subject_type[Option<&S>],
-            id_token_signed_response_alg[Option<&JS>],
-            id_token_encrypted_response_alg[Option<&JK>],
-            id_token_encrypted_response_enc[Option<&JE>],
-            userinfo_signed_response_alg[Option<&JS>],
-            userinfo_encrypted_response_alg[Option<&JK>],
-            userinfo_encrypted_response_enc[Option<&JE>],
-            request_object_signing_alg[Option<&JS>],
-            request_object_encryption_alg[Option<&JK>],
-            request_object_encryption_enc[Option<&JE>],
-            token_endpoint_auth_method[Option<&CA>],
-            token_endpoint_auth_signing_alg[Option<&JS>],
-            default_max_age[Option<&Duration>],
+            redirect_uris[Vec<RedirectUrl>],
+            response_types[Option<Vec<ResponseTypes<RT>>>],
+            grant_types[Option<Vec<G>>],
+            application_type[Option<AT>],
+            contacts[Option<Vec<ContactEmail>>],
+            client_name[Option<LocalizedClaim<ClientName>>],
+            logo_uri[Option<LocalizedClaim<LogoUrl>>],
+            client_uri[Option<LocalizedClaim<ClientUrl>>],
+            policy_uri[Option<LocalizedClaim<PolicyUrl>>],
+            tos_uri[Option<LocalizedClaim<ToSUrl>>],
+            jwks_uri[Option<JsonWebKeySetUrl>],
+            jwks[Option<JsonWebKeySet<JS, JT, JU, K>>],
+            sector_identifier_uri[Option<SectorIdentifierUrl>],
+            subject_type[Option<S>],
+            id_token_signed_response_alg[Option<JS>],
+            id_token_encrypted_response_alg[Option<JK>],
+            id_token_encrypted_response_enc[Option<JE>],
+            userinfo_signed_response_alg[Option<JS>],
+            userinfo_encrypted_response_alg[Option<JK>],
+            userinfo_encrypted_response_enc[Option<JE>],
+            request_object_signing_alg[Option<JS>],
+            request_object_encryption_alg[Option<JK>],
+            request_object_encryption_enc[Option<JE>],
+            token_endpoint_auth_method[Option<CA>],
+            token_endpoint_auth_signing_alg[Option<JS>],
+            default_max_age[Option<Duration>],
             require_auth_time[Option<bool>],
-            default_acr_values[Option<&Vec<AuthenticationContextClass>>],
-            initiate_login_uri[Option<&InitiateLoginUrl>],
-            request_uris[Option<&Vec<RequestUrl>>],
+            default_acr_values[Option<Vec<AuthenticationContextClass>>],
+            initiate_login_uri[Option<InitiateLoginUrl>],
+            request_uris[Option<Vec<RequestUrl>>],
         }
     ];
 }

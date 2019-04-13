@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use std::fmt::{Debug, Display, Error as FormatterError, Formatter};
 use std::hash::Hash;
+use std::iter::FromIterator;
 use std::marker::PhantomData;
 use std::ops::Deref;
 
@@ -15,6 +17,62 @@ use url;
 use url::Url;
 
 use super::SignatureVerificationError;
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct LocalizedClaim<T>(HashMap<Option<LanguageTag>, T>);
+impl<T> LocalizedClaim<T> {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+
+    pub fn contains_key(&self, locale: &Option<LanguageTag>) -> bool {
+        self.0.contains_key(locale)
+    }
+
+    pub fn get(&self, locale: &Option<LanguageTag>) -> Option<&T> {
+        self.0.get(locale)
+    }
+
+    pub fn iter(&self) -> std::collections::hash_map::Iter<Option<LanguageTag>, T> {
+        self.0.iter()
+    }
+
+    pub fn insert(&mut self, locale: Option<LanguageTag>, value: T) -> Option<T> {
+        self.0.insert(locale, value)
+    }
+
+    pub fn remove(&mut self, locale: &Option<LanguageTag>) -> Option<T> {
+        self.0.remove(locale)
+    }
+}
+impl<T> From<HashMap<Option<LanguageTag>, T>> for LocalizedClaim<T> {
+    fn from(inner: HashMap<Option<LanguageTag>, T>) -> Self {
+        Self(inner)
+    }
+}
+impl<T> FromIterator<(Option<LanguageTag>, T)> for LocalizedClaim<T> {
+    fn from_iter<I: IntoIterator<Item = (Option<LanguageTag>, T)>>(iter: I) -> Self {
+        let inner: HashMap<Option<LanguageTag>, T> = iter.into_iter().collect();
+        Self(inner)
+    }
+}
+
+impl<'a, T> IntoIterator for &'a LocalizedClaim<T> {
+    type Item = (&'a Option<LanguageTag>, &'a T);
+    type IntoIter = std::collections::hash_map::Iter<'a, Option<LanguageTag>, T>;
+
+    fn into_iter(self) -> std::collections::hash_map::Iter<'a, Option<LanguageTag>, T> {
+        self.0.iter()
+    }
+}
+impl<T> IntoIterator for LocalizedClaim<T> {
+    type Item = (Option<LanguageTag>, T);
+    type IntoIter = std::collections::hash_map::IntoIter<Option<LanguageTag>, T>;
+
+    fn into_iter(self) -> std::collections::hash_map::IntoIter<Option<LanguageTag>, T> {
+        self.0.into_iter()
+    }
+}
 
 pub trait ApplicationType:
     Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
@@ -502,6 +560,10 @@ pub(crate) mod helpers {
             )
         };
         Utc.timestamp_opt(secs, nsecs).single().ok_or(())
+    }
+
+    pub(crate) fn utc_to_seconds(utc: &DateTime<Utc>) -> Seconds {
+        Seconds(utc.timestamp().into())
     }
 }
 
