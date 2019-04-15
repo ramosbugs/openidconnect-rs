@@ -100,7 +100,7 @@ impl<'a> HttpRequest<'a> {
             self.headers
                 .iter()
                 .map(|&(name, value)| headers.append(&format!("{}: {}", name, value)))
-                .skip_while(|res| res.is_ok())
+                .skip_while(Result::is_ok)
                 .next()
                 .unwrap_or(Ok(()))?;
             easy.http_headers(headers)?;

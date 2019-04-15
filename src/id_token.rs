@@ -3,10 +3,9 @@ use std::marker::PhantomData;
 use chrono::{DateTime, Utc};
 use oauth2::ClientId;
 
-use super::claims::StandardClaimsImpl;
-use super::jwt::JsonWebTokenJsonPayloadDeserializer;
-use super::types::helpers::{deserialize_string_or_vec, seconds_to_utc, utc_to_seconds};
-use super::types::{LocalizedClaim, Seconds};
+use super::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
+use super::types::helpers::{deserialize_string_or_vec, serde_utc_seconds, serde_utc_seconds_opt};
+use super::types::LocalizedClaim;
 use super::{
     AccessTokenHash, AdditionalClaims, AddressClaim, Audience, AudiencesClaim,
     AuthenticationContextClass, AuthenticationMethodReference, AuthorizationCodeHash,
@@ -15,7 +14,7 @@ use super::{
     EndUserProfileUrl, EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, ExtraTokenFields,
     GenderClaim, IdTokenVerifier, IssuerClaim, IssuerUrl, JsonWebKey, JsonWebKeyType,
     JsonWebKeyUse, JsonWebToken, JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag,
-    Nonce, NonceVerifier, StandardClaims, SubjectIdentifier,
+    Nonce, NonceVerifier, PrivateSigningKey, StandardClaims, SubjectIdentifier,
 };
 
 // This wrapper layer exists instead of directly verifying the JWT and returning the claims so that
@@ -30,7 +29,7 @@ pub struct IdToken<
     JT: JsonWebKeyType,
 >(
     #[serde(bound = "AC: AdditionalClaims")]
-    JsonWebToken<IdTokenClaims<AC, GC>, JE, JS, JT, JsonWebTokenJsonPayloadDeserializer>,
+    JsonWebToken<JE, JS, JT, IdTokenClaims<AC, GC>, JsonWebTokenJsonPayloadSerde>,
 );
 impl<AC, GC, JE, JS, JT> IdToken<AC, GC, JE, JS, JT>
 where
@@ -40,6 +39,19 @@ where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
+    pub fn new<JU, K, S>(
+        claims: IdTokenClaims<AC, GC>,
+        signing_key: &S,
+        alg: JS,
+    ) -> Result<Self, JsonWebTokenError>
+    where
+        JU: JsonWebKeyUse,
+        K: JsonWebKey<JS, JT, JU>,
+        S: PrivateSigningKey<JS, JT, JU, K>,
+    {
+        JsonWebToken::new(claims, signing_key, &alg).map(Self)
+    }
+
     pub fn claims<'a, 'b, JU, K, N>(
         &'a self,
         verifier: &'b IdTokenVerifier<JS, JT, JU, K>,
@@ -63,30 +75,37 @@ where
     AC: AdditionalClaims,
     GC: GenderClaim,
 {
-    iss: IssuerUrl,
+    #[serde(rename = "iss")]
+    issuer: IssuerUrl,
     // We always serialize as an array, which is valid according to the spec.
-    #[serde(deserialize_with = "deserialize_string_or_vec")]
-    aud: Vec<Audience>,
-    exp: Seconds,
-    iat: Seconds,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    auth_time: Option<Seconds>,
+    #[serde(rename = "aud", deserialize_with = "deserialize_string_or_vec")]
+    audiences: Vec<Audience>,
+    #[serde(rename = "exp", with = "serde_utc_seconds")]
+    expiration: DateTime<Utc>,
+    #[serde(rename = "iat", with = "serde_utc_seconds")]
+    issue_time: DateTime<Utc>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "serde_utc_seconds_opt"
+    )]
+    auth_time: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     nonce: Option<Nonce>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    acr: Option<AuthenticationContextClass>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    amr: Option<Vec<AuthenticationMethodReference>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    azp: Option<ClientId>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    at_hash: Option<AccessTokenHash>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    c_hash: Option<AuthorizationCodeHash>,
+    #[serde(rename = "acr", skip_serializing_if = "Option::is_none")]
+    auth_context_ref: Option<AuthenticationContextClass>,
+    #[serde(rename = "amr", skip_serializing_if = "Option::is_none")]
+    auth_method_refs: Option<Vec<AuthenticationMethodReference>>,
+    #[serde(rename = "azp", skip_serializing_if = "Option::is_none")]
+    authorized_party: Option<ClientId>,
+    #[serde(rename = "at_hash", skip_serializing_if = "Option::is_none")]
+    access_token_hash: Option<AccessTokenHash>,
+    #[serde(rename = "c_hash", skip_serializing_if = "Option::is_none")]
+    code_hash: Option<AuthorizationCodeHash>,
 
     #[serde(bound = "GC: GenderClaim")]
     #[serde(flatten)]
-    standard_claims: StandardClaimsImpl<GC>,
+    standard_claims: StandardClaims<GC>,
 
     #[serde(bound = "AC: AdditionalClaims")]
     #[serde(flatten)]
@@ -98,52 +117,56 @@ where
     AC: AdditionalClaims,
     GC: GenderClaim,
 {
-    pub fn issuer(&self) -> &IssuerUrl {
-        &self.iss
-    }
-    pub fn audiences(&self) -> &Vec<Audience> {
-        &self.aud
-    }
-    pub fn expiration(&self) -> Result<DateTime<Utc>, ()> {
-        seconds_to_utc(&self.exp)
-    }
-    pub fn issue_time(&self) -> Result<DateTime<Utc>, ()> {
-        seconds_to_utc(&self.iat)
-    }
-    pub fn auth_time(&self) -> Option<Result<DateTime<Utc>, ()>> {
-        self.auth_time.as_ref().map(seconds_to_utc)
-    }
-    pub fn nonce(&self) -> Option<&Nonce> {
-        self.nonce.as_ref()
-    }
-    pub fn auth_context_ref(&self) -> Option<&AuthenticationContextClass> {
-        self.acr.as_ref()
-    }
-    pub fn auth_methods_refs(&self) -> Option<&Vec<AuthenticationMethodReference>> {
-        self.amr.as_ref()
-    }
-    pub fn authorized_party(&self) -> Option<&ClientId> {
-        self.azp.as_ref()
-    }
-    pub fn access_token_hash(&self) -> Option<&AccessTokenHash> {
-        self.at_hash.as_ref()
-    }
-    pub fn code_hash(&self) -> Option<&AuthorizationCodeHash> {
-        self.c_hash.as_ref()
+    pub fn new(
+        issuer: IssuerUrl,
+        audiences: Vec<Audience>,
+        expiration: DateTime<Utc>,
+        issue_time: DateTime<Utc>,
+        standard_claims: StandardClaims<GC>,
+        additional_claims: AC,
+    ) -> Self {
+        Self {
+            issuer,
+            audiences,
+            expiration,
+            issue_time,
+            auth_time: None,
+            nonce: None,
+            auth_context_ref: None,
+            auth_method_refs: None,
+            authorized_party: None,
+            access_token_hash: None,
+            code_hash: None,
+            standard_claims,
+            additional_claims,
+        }
     }
 
-    pub fn additional_claims(&self) -> &AC {
-        &self.additional_claims
-    }
-}
-impl<AC, GC> StandardClaims<GC> for IdTokenClaims<AC, GC>
-where
-    AC: AdditionalClaims,
-    GC: GenderClaim,
-{
     field_getters_setters![
-        self [self.standard_claims] {
-            set_sub -> sub[SubjectIdentifier],
+        pub self [self] {
+            set_issuer -> issuer[IssuerUrl],
+            set_audiences -> audiences[Vec<Audience>],
+            set_expiration -> expiration[DateTime<Utc>],
+            set_issue_time -> issue_time[DateTime<Utc>],
+            set_auth_time -> auth_time[Option<DateTime<Utc>>],
+            set_nonce -> nonce[Option<Nonce>],
+            set_auth_context_ref -> auth_context_ref[Option<AuthenticationContextClass>],
+            set_auth_method_refs -> auth_method_refs[Option<Vec<AuthenticationMethodReference>>],
+            set_authorized_party -> authorized_party[Option<ClientId>],
+            set_access_token_hash -> access_token_hash[Option<AccessTokenHash>],
+            set_code_hash -> code_hash[Option<AuthorizationCodeHash>],
+        }
+    ];
+
+    pub fn subject(&self) -> &SubjectIdentifier {
+        &self.standard_claims.sub
+    }
+    pub fn set_subject(&mut self, subject: SubjectIdentifier) {
+        self.standard_claims.sub = subject
+    }
+
+    field_getters_setters![
+        pub self [self.standard_claims] {
             set_name -> name[Option<LocalizedClaim<EndUserName>>],
             set_given_name -> given_name[Option<LocalizedClaim<EndUserGivenName>>],
             set_family_name ->
@@ -164,16 +187,15 @@ where
             set_phone_number -> phone_number[Option<EndUserPhoneNumber>],
             set_phone_number_verified -> phone_number_verified[Option<bool>],
             set_address -> address[Option<AddressClaim>],
+            set_updated_at -> updated_at[Option<DateTime<Utc>>],
         }
     ];
 
-    fn updated_at(&self) -> Option<Result<DateTime<Utc>, ()>> {
-        self.standard_claims.updated_at.as_ref().map(seconds_to_utc)
+    pub fn additional_claims(&self) -> &AC {
+        &self.additional_claims
     }
-
-    fn set_updated_at(mut self, updated_at: Option<&DateTime<Utc>>) -> Self {
-        self.standard_claims.updated_at = updated_at.map(utc_to_seconds);
-        self
+    pub fn additional_claims_mut(&mut self) -> &mut AC {
+        &mut self.additional_claims
     }
 }
 impl<AC, GC> AudiencesClaim for IdTokenClaims<AC, GC>
@@ -259,12 +281,11 @@ where
 #[cfg(test)]
 mod tests {
     use chrono::{TimeZone, Utc};
-    use itertools::sorted;
     use oauth2::basic::BasicTokenType;
     use oauth2::prelude::{NewType, SecretNewType};
     use oauth2::{AccessToken, ClientId, TokenResponse};
-    use serde_json;
     use url::Url;
+    use {serde_json, AddressClaim};
 
     use super::super::claims::{AdditionalClaims, EmptyAdditionalClaims, StandardClaims};
     use super::super::core::{CoreGenderClaim, CoreIdToken, CoreIdTokenClaims, CoreTokenResponse};
@@ -288,7 +309,7 @@ mod tests {
         let id_token =
             serde_json::from_str::<CoreIdToken>(id_token_str).expect("failed to deserialize");
 
-        let claims = id_token.0.unverified_claims_ref();
+        let claims = id_token.0.unverified_payload_ref();
 
         assert_eq!(
             *claims.issuer().url(),
@@ -298,10 +319,10 @@ mod tests {
             *claims.audiences(),
             vec![Audience::new("s6BhdRkqt3".to_string())]
         );
-        assert_eq!(claims.expiration().unwrap(), Utc.timestamp(1311281970, 0));
-        assert_eq!(claims.issue_time().unwrap(), Utc.timestamp(1311280970, 0));
+        assert_eq!(*claims.expiration(), Utc.timestamp(1311281970, 0));
+        assert_eq!(*claims.issue_time(), Utc.timestamp(1311280970, 0));
         assert_eq!(
-            *claims.sub(),
+            *claims.subject(),
             SubjectIdentifier::new("24400320".to_string())
         );
 
@@ -330,7 +351,7 @@ mod tests {
         assert_eq!(*response.token_type(), BasicTokenType::Bearer);
 
         let id_token = response.extra_fields().id_token();
-        let claims = id_token.0.unverified_claims_ref();
+        let claims = id_token.0.unverified_payload_ref();
 
         assert_eq!(
             *claims.issuer().url(),
@@ -340,10 +361,10 @@ mod tests {
             *claims.audiences(),
             vec![Audience::new("s6BhdRkqt3".to_string())]
         );
-        assert_eq!(claims.expiration().unwrap(), Utc.timestamp(1311281970, 0));
-        assert_eq!(claims.issue_time().unwrap(), Utc.timestamp(1311280970, 0));
+        assert_eq!(*claims.expiration(), Utc.timestamp(1311281970, 0));
+        assert_eq!(*claims.issue_time(), Utc.timestamp(1311280970, 0));
         assert_eq!(
-            *claims.sub(),
+            *claims.subject(),
             SubjectIdentifier::new("24400320".to_string())
         );
 
@@ -355,38 +376,51 @@ mod tests {
 
     #[test]
     fn test_minimal_claims_serde() {
-        let claims_json = "{
+        let new_claims = CoreIdTokenClaims::new(
+            IssuerUrl::new("https://server.example.com".to_string()).unwrap(),
+            vec![Audience::new("s6BhdRkqt3".to_string())],
+            Utc.timestamp(1311281970, 0),
+            Utc.timestamp(1311280970, 0),
+            StandardClaims::new(SubjectIdentifier::new("24400320".to_string())),
+            EmptyAdditionalClaims {},
+        );
+        let expected_serialized_claims = "\
+                                          {\
+                                          \"iss\":\"https://server.example.com\",\
+                                          \"aud\":[\"s6BhdRkqt3\"],\
+                                          \"exp\":1311281970,\
+                                          \"iat\":1311280970,\
+                                          \"sub\":\"24400320\"\
+                                          }";
+
+        let new_serialized_claims =
+            serde_json::to_string(&new_claims).expect("failed to serialize");
+        assert_eq!(new_serialized_claims, expected_serialized_claims);
+
+        let claims: CoreIdTokenClaims = serde_json::from_str(
+            "{
             \"iss\": \"https://server.example.com\",
             \"sub\": \"24400320\",
             \"aud\": \"s6BhdRkqt3\",
             \"exp\": 1311281970,
             \"iat\": 1311280970
-        }";
-
-        let claims: CoreIdTokenClaims =
-            serde_json::from_str(claims_json).expect("failed to deserialize");
-        assert_eq!(
-            *claims.issuer().url(),
-            Url::parse("https://server.example.com").unwrap()
-        );
-        assert_eq!(
-            *claims.audiences(),
-            vec![Audience::new("s6BhdRkqt3".to_string())]
-        );
-        assert_eq!(claims.expiration().unwrap(), Utc.timestamp(1311281970, 0));
-        assert_eq!(claims.issue_time().unwrap(), Utc.timestamp(1311280970, 0));
+            }",
+        )
+        .expect("failed to deserialize");
+        assert_eq!(claims, new_claims);
+        assert_eq!(claims.issuer().url(), new_claims.issuer().url());
+        assert_eq!(claims.audiences(), new_claims.audiences());
+        assert_eq!(claims.expiration(), new_claims.expiration());
+        assert_eq!(claims.issue_time(), new_claims.issue_time());
         assert_eq!(claims.auth_time(), None);
         assert_eq!(claims.nonce(), None);
         assert_eq!(claims.auth_context_ref(), None);
-        assert_eq!(claims.auth_methods_refs(), None);
+        assert_eq!(claims.auth_method_refs(), None);
         assert_eq!(claims.authorized_party(), None);
         assert_eq!(claims.access_token_hash(), None);
         assert_eq!(claims.code_hash(), None);
         assert_eq!(*claims.additional_claims(), EmptyAdditionalClaims {});
-        assert_eq!(
-            *claims.sub(),
-            SubjectIdentifier::new("24400320".to_string())
-        );
+        assert_eq!(claims.subject(), new_claims.subject());
         assert_eq!(claims.name(), None);
         assert_eq!(claims.given_name(), None);
         assert_eq!(claims.family_name(), None);
@@ -408,16 +442,7 @@ mod tests {
         assert_eq!(claims.updated_at(), None);
 
         let serialized_claims = serde_json::to_string(&claims).expect("failed to serialize");
-        assert_eq!(
-            serialized_claims,
-            "{\
-             \"iss\":\"https://server.example.com\",\
-             \"aud\":[\"s6BhdRkqt3\"],\
-             \"exp\":1311281970,\
-             \"iat\":1311280970,\
-             \"sub\":\"24400320\"\
-             }"
-        );
+        assert_eq!(serialized_claims, expected_serialized_claims);
 
         let claims_round_trip: CoreIdTokenClaims =
             serde_json::from_str(&serialized_claims).expect("failed to deserialize");
@@ -426,254 +451,287 @@ mod tests {
 
     #[test]
     fn test_complete_claims_serde() {
-        let claims_json = "{
-            \"iss\": \"https://server.example.com\",
-            \"aud\": \"s6BhdRkqt3\",
-            \"exp\": 1311281970,
-            \"iat\": 1311280970,
-            \"auth_time\": 1311282970.5,
-            \"nonce\": \"Zm9vYmFy\",
-            \"acr\": \"urn:mace:incommon:iap:silver\",
-            \"amr\": [\"password\", \"totp\"],
-            \"azp\": \"dGhpc19jbGllbnQ\",
-            \"at_hash\": \"_JPLB-GtkomFJxAOWKHPHQ\",
-            \"c_hash\": \"VpTQii5T_8rgwxA-Wtb2Bw\",
-            \"sub\": \"24400320\",
-            \"name\": \"Homer Simpson\",
-            \"name#es\": \"Jomer Simpson\",
-            \"given_name\": \"Homer\",
-            \"given_name#es\": \"Jomer\",
-            \"family_name\": \"Simpson\",
-            \"family_name#es\": \"Simpson\",
-            \"middle_name\": \"Jay\",
-            \"middle_name#es\": \"Jay\",
-            \"nickname\": \"Homer\",
-            \"nickname#es\": \"Jomer\",
-            \"preferred_username\": \"homersimpson\",
-            \"profile\": \"https://example.com/profile?id=12345\",
-            \"profile#es\": \"https://example.com/profile?id=12345&lang=es\",
-            \"picture\": \"https://example.com/avatar?id=12345\",
-            \"picture#es\": \"https://example.com/avatar?id=12345&lang=es\",
-            \"website\": \"https://homersimpson.me\",
-            \"website#es\": \"https://homersimpson.me/?lang=es\",
-            \"email\": \"homer@homersimpson.me\",
-            \"email_verified\": true,
-            \"gender\": \"male\",
-            \"birthday\": \"1956-05-12\",
-            \"zoneinfo\": \"America/Los_Angeles\",
-            \"locale\": \"en-US\",
-            \"phone_number\": \"+1 (555) 555-5555\",
-            \"phone_number_verified\": false,
-            \"address\": {
-                \"formatted\": \"1234 Hollywood Blvd., Los Angeles, CA 90210\",
-                \"street_address\": \"1234 Hollywood Blvd.\",
-                \"locality\": \"Los Angeles\",
-                \"region\": \"CA\",
-                \"postal_code\": \"90210\",
-                \"country\": \"US\"
+        let claims_json = "{\
+                           \"iss\":\"https://server.example.com\",\
+                           \"aud\":[\"s6BhdRkqt3\"],\
+                           \"exp\":1311281970,\
+                           \"iat\":1311280970,\
+                           \"auth_time\":1311282970.5,\
+                           \"nonce\":\"Zm9vYmFy\",\
+                           \"acr\":\"urn:mace:incommon:iap:silver\",\
+                           \"amr\":[\"password\",\"totp\"],\
+                           \"azp\":\"dGhpc19jbGllbnQ\",\
+                           \"at_hash\":\"_JPLB-GtkomFJxAOWKHPHQ\",\
+                           \"c_hash\":\"VpTQii5T_8rgwxA-Wtb2Bw\",\
+                           \"sub\":\"24400320\",\
+                           \"name\":\"Homer Simpson\",\
+                           \"name#es\":\"Jomer Simpson\",\
+                           \"given_name\":\"Homer\",\
+                           \"given_name#es\":\"Jomer\",\
+                           \"family_name\":\"Simpson\",\
+                           \"family_name#es\":\"Simpson\",\
+                           \"middle_name\":\"Jay\",\
+                           \"middle_name#es\":\"Jay\",\
+                           \"nickname\":\"Homer\",\
+                           \"nickname#es\":\"Jomer\",\
+                           \"preferred_username\":\"homersimpson\",\
+                           \"profile\":\"https://example.com/profile?id=12345\",\
+                           \"profile#es\":\"https://example.com/profile?id=12345&lang=es\",\
+                           \"picture\":\"https://example.com/avatar?id=12345\",\
+                           \"picture#es\":\"https://example.com/avatar?id=12345&lang=es\",\
+                           \"website\":\"https://homersimpson.me\",\
+                           \"website#es\":\"https://homersimpson.me/?lang=es\",\
+                           \"email\":\"homer@homersimpson.me\",\
+                           \"email_verified\":true,\
+                           \"gender\":\"male\",\
+                           \"birthday\":\"1956-05-12\",\
+                           \"zoneinfo\":\"America/Los_Angeles\",\
+                           \"locale\":\"en-US\",\
+                           \"phone_number\":\"+1 (555) 555-5555\",\
+                           \"phone_number_verified\":false,\
+                           \"address\":{\
+                           \"formatted\":\"1234 Hollywood Blvd., Los Angeles, CA 90210\",\
+                           \"street_address\":\"1234 Hollywood Blvd.\",\
+                           \"locality\":\"Los Angeles\",\
+                           \"region\":\"CA\",\
+                           \"postal_code\":\"90210\",\
+                           \"country\":\"US\"\
+                           },\
+                           \"updated_at\":1311283970\
+                           }";
+
+        let new_claims = CoreIdTokenClaims::new(
+            IssuerUrl::new("https://server.example.com".to_string()).unwrap(),
+            vec![Audience::new("s6BhdRkqt3".to_string())],
+            Utc.timestamp(1311281970, 0),
+            Utc.timestamp(1311280970, 0),
+            StandardClaims {
+                sub: SubjectIdentifier::new("24400320".to_string()),
+                name: Some(
+                    vec![
+                        (None, EndUserName::new("Homer Simpson".to_string())),
+                        (
+                            Some(LanguageTag::new("es".to_string())),
+                            EndUserName::new("Jomer Simpson".to_string()),
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+                given_name: Some(
+                    vec![
+                        (None, EndUserGivenName::new("Homer".to_string())),
+                        (
+                            Some(LanguageTag::new("es".to_string())),
+                            EndUserGivenName::new("Jomer".to_string()),
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+                family_name: Some(
+                    vec![
+                        (None, EndUserFamilyName::new("Simpson".to_string())),
+                        (
+                            Some(LanguageTag::new("es".to_string())),
+                            EndUserFamilyName::new("Simpson".to_string()),
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+                middle_name: Some(
+                    vec![
+                        (None, EndUserMiddleName::new("Jay".to_string())),
+                        (
+                            Some(LanguageTag::new("es".to_string())),
+                            EndUserMiddleName::new("Jay".to_string()),
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+                nickname: Some(
+                    vec![
+                        (None, EndUserNickname::new("Homer".to_string())),
+                        (
+                            Some(LanguageTag::new("es".to_string())),
+                            EndUserNickname::new("Jomer".to_string()),
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+                preferred_username: Some(EndUserUsername::new("homersimpson".to_string())),
+                profile: Some(
+                    vec![
+                        (
+                            None,
+                            EndUserProfileUrl::new(
+                                "https://example.com/profile?id=12345".to_string(),
+                            )
+                            .unwrap(),
+                        ),
+                        (
+                            Some(LanguageTag::new("es".to_string())),
+                            EndUserProfileUrl::new(
+                                "https://example.com/profile?id=12345&lang=es".to_string(),
+                            )
+                            .unwrap(),
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+                picture: Some(
+                    vec![
+                        (
+                            None,
+                            EndUserPictureUrl::new(
+                                "https://example.com/avatar?id=12345".to_string(),
+                            )
+                            .unwrap(),
+                        ),
+                        (
+                            Some(LanguageTag::new("es".to_string())),
+                            EndUserPictureUrl::new(
+                                "https://example.com/avatar?id=12345&lang=es".to_string(),
+                            )
+                            .unwrap(),
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+                website: Some(
+                    vec![
+                        (
+                            None,
+                            EndUserWebsiteUrl::new("https://homersimpson.me".to_string()).unwrap(),
+                        ),
+                        (
+                            Some(LanguageTag::new("es".to_string())),
+                            EndUserWebsiteUrl::new("https://homersimpson.me/?lang=es".to_string())
+                                .unwrap(),
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+                email: Some(EndUserEmail::new("homer@homersimpson.me".to_string())),
+                email_verified: Some(true),
+                gender: Some(CoreGenderClaim::Male),
+                birthday: Some(EndUserBirthday::new("1956-05-12".to_string())),
+                zoneinfo: Some(EndUserTimezone::new("America/Los_Angeles".to_string())),
+                locale: Some(LanguageTag::new("en-US".to_string())),
+                phone_number: Some(EndUserPhoneNumber::new("+1 (555) 555-5555".to_string())),
+                phone_number_verified: Some(false),
+                address: Some(AddressClaim {
+                    formatted: Some(FormattedAddress::new(
+                        "1234 Hollywood Blvd., Los Angeles, CA 90210".to_string(),
+                    )),
+                    street_address: Some(StreetAddress::new("1234 Hollywood Blvd.".to_string())),
+                    locality: Some(AddressLocality::new("Los Angeles".to_string())),
+                    region: Some(AddressRegion::new("CA".to_string())),
+                    postal_code: Some(AddressPostalCode::new("90210".to_string())),
+                    country: Some(AddressCountry::new("US".to_string())),
+                }),
+                updated_at: Some(Utc.timestamp(1311283970, 0)),
             },
-            \"updated_at\": 1311283970,
-            \"some_other_field\": \"some_other_value\"
-        }";
+            EmptyAdditionalClaims {},
+        )
+        .set_auth_time(Some(Utc.timestamp(1311282970, 500000000)))
+        .set_nonce(Some(Nonce::new("Zm9vYmFy".to_string())))
+        .set_auth_context_ref(Some(AuthenticationContextClass::new(
+            "urn:mace:incommon:iap:silver".to_string(),
+        )))
+        .set_auth_method_refs(Some(vec![
+            AuthenticationMethodReference::new("password".to_string()),
+            AuthenticationMethodReference::new("totp".to_string()),
+        ]))
+        .set_authorized_party(Some(ClientId::new("dGhpc19jbGllbnQ".to_string())))
+        .set_access_token_hash(Some(AccessTokenHash::new(
+            "_JPLB-GtkomFJxAOWKHPHQ".to_string(),
+        )))
+        .set_code_hash(Some(AuthorizationCodeHash::new(
+            "VpTQii5T_8rgwxA-Wtb2Bw".to_string(),
+        )));
 
         let claims: CoreIdTokenClaims =
             serde_json::from_str(claims_json).expect("failed to deserialize");
-        assert_eq!(
-            *claims.issuer().url(),
-            Url::parse("https://server.example.com").unwrap(),
-        );
-        assert_eq!(
-            *claims.audiences(),
-            vec![Audience::new("s6BhdRkqt3".to_string())]
-        );
-        assert_eq!(claims.expiration().unwrap(), Utc.timestamp(1311281970, 0));
-        assert_eq!(claims.issue_time().unwrap(), Utc.timestamp(1311280970, 0));
-        assert_eq!(
-            claims.auth_time(),
-            Some(Ok(Utc.timestamp(1311282970, 500000000))),
-        );
-        assert_eq!(*claims.nonce().unwrap(), Nonce::new("Zm9vYmFy".to_string()));
-        assert_eq!(
-            *claims.auth_context_ref().unwrap(),
-            AuthenticationContextClass::new("urn:mace:incommon:iap:silver".to_string()),
-        );
-        assert_eq!(
-            *claims.auth_methods_refs().unwrap(),
-            vec![
-                AuthenticationMethodReference::new("password".to_string()),
-                AuthenticationMethodReference::new("totp".to_string()),
-            ]
-        );
-        assert_eq!(
-            *claims.authorized_party().unwrap(),
-            ClientId::new("dGhpc19jbGllbnQ".to_string()),
-        );
-        assert_eq!(
-            *claims.access_token_hash().unwrap(),
-            AccessTokenHash::new("_JPLB-GtkomFJxAOWKHPHQ".to_string()),
-        );
-        assert_eq!(
-            *claims.code_hash().unwrap(),
-            AuthorizationCodeHash::new("VpTQii5T_8rgwxA-Wtb2Bw".to_string()),
-        );
+        assert_eq!(claims, new_claims);
+        assert_eq!(claims.issuer().url(), new_claims.issuer().url());
+        assert_eq!(claims.audiences(), new_claims.audiences());
+        assert_eq!(claims.expiration(), new_claims.expiration());
+        assert_eq!(claims.issue_time(), new_claims.issue_time());
+        assert_eq!(claims.auth_time(), new_claims.auth_time());
+        assert_eq!(claims.nonce(), new_claims.nonce());
+        assert_eq!(claims.auth_context_ref(), new_claims.auth_context_ref());
+        assert_eq!(claims.auth_method_refs(), new_claims.auth_method_refs());
+        assert_eq!(claims.authorized_party(), new_claims.authorized_party());
+        assert_eq!(claims.access_token_hash(), new_claims.access_token_hash());
+        assert_eq!(claims.code_hash(), new_claims.code_hash());
         assert_eq!(*claims.additional_claims(), EmptyAdditionalClaims {});
+        assert_eq!(claims.subject(), new_claims.subject());
+        assert_eq!(claims.name(), new_claims.name());
+        assert_eq!(claims.given_name(), new_claims.given_name());
+        assert_eq!(claims.family_name(), new_claims.family_name());
+        assert_eq!(claims.middle_name(), new_claims.middle_name());
+        assert_eq!(claims.nickname(), new_claims.nickname());
+        assert_eq!(claims.preferred_username(), new_claims.preferred_username());
+        assert_eq!(claims.preferred_username(), new_claims.preferred_username());
+        assert_eq!(claims.profile(), new_claims.profile());
+        assert_eq!(claims.picture(), new_claims.picture());
+        assert_eq!(claims.website(), new_claims.website());
+        assert_eq!(claims.email(), new_claims.email());
+        assert_eq!(claims.email_verified(), new_claims.email_verified());
+        assert_eq!(claims.gender(), new_claims.gender());
+        assert_eq!(claims.birthday(), new_claims.birthday());
+        assert_eq!(claims.zoneinfo(), new_claims.zoneinfo());
+        assert_eq!(claims.locale(), new_claims.locale());
+        assert_eq!(claims.phone_number(), new_claims.phone_number(),);
         assert_eq!(
-            *claims.sub(),
-            SubjectIdentifier::new("24400320".to_string()),
+            claims.phone_number_verified(),
+            new_claims.phone_number_verified()
         );
-        assert_eq!(
-            sorted(claims.name().unwrap().clone()),
-            vec![
-                (None, EndUserName::new("Homer Simpson".to_string())),
-                (
-                    Some(LanguageTag::new("es".to_string())),
-                    EndUserName::new("Jomer Simpson".to_string()),
-                ),
-            ]
-        );
-        assert_eq!(
-            sorted(claims.given_name().unwrap().clone()),
-            vec![
-                (None, EndUserGivenName::new("Homer".to_string())),
-                (
-                    Some(LanguageTag::new("es".to_string())),
-                    EndUserGivenName::new("Jomer".to_string()),
-                ),
-            ]
-        );
-        assert_eq!(
-            sorted(claims.family_name().unwrap().clone()),
-            vec![
-                (None, EndUserFamilyName::new("Simpson".to_string())),
-                (
-                    Some(LanguageTag::new("es".to_string())),
-                    EndUserFamilyName::new("Simpson".to_string()),
-                ),
-            ]
-        );
-        assert_eq!(
-            sorted(claims.middle_name().unwrap().clone()),
-            vec![
-                (None, EndUserMiddleName::new("Jay".to_string())),
-                (
-                    Some(LanguageTag::new("es".to_string())),
-                    EndUserMiddleName::new("Jay".to_string()),
-                ),
-            ]
-        );
-        assert_eq!(
-            sorted(claims.nickname().unwrap().clone()),
-            vec![
-                (None, EndUserNickname::new("Homer".to_string())),
-                (
-                    Some(LanguageTag::new("es".to_string())),
-                    EndUserNickname::new("Jomer".to_string()),
-                ),
-            ]
-        );
-        assert_eq!(
-            claims.preferred_username(),
-            Some(&EndUserUsername::new("homersimpson".to_string()))
-        );
-        assert_eq!(
-            sorted(claims.profile().unwrap().clone()),
-            vec![
-                (
-                    None,
-                    EndUserProfileUrl::new("https://example.com/profile?id=12345".to_string())
-                        .unwrap(),
-                ),
-                (
-                    Some(LanguageTag::new("es".to_string())),
-                    EndUserProfileUrl::new(
-                        "https://example.com/profile?id=12345&lang=es".to_string()
-                    )
-                    .unwrap(),
-                ),
-            ]
-        );
-        assert_eq!(
-            sorted(claims.picture().unwrap().clone()),
-            vec![
-                (
-                    None,
-                    EndUserPictureUrl::new("https://example.com/avatar?id=12345".to_string())
-                        .unwrap(),
-                ),
-                (
-                    Some(LanguageTag::new("es".to_string())),
-                    EndUserPictureUrl::new(
-                        "https://example.com/avatar?id=12345&lang=es".to_string()
-                    )
-                    .unwrap(),
-                ),
-            ]
-        );
-        assert_eq!(
-            sorted(claims.website().unwrap().clone()),
-            vec![
-                (
-                    None,
-                    EndUserWebsiteUrl::new("https://homersimpson.me".to_string()).unwrap(),
-                ),
-                (
-                    Some(LanguageTag::new("es".to_string())),
-                    EndUserWebsiteUrl::new("https://homersimpson.me/?lang=es".to_string()).unwrap(),
-                ),
-            ]
-        );
-        assert_eq!(
-            claims.email(),
-            Some(&EndUserEmail::new("homer@homersimpson.me".to_string()))
-        );
-        assert_eq!(claims.email_verified(), Some(true));
-        assert_eq!(claims.gender(), Some(&CoreGenderClaim::Male));
-        assert_eq!(
-            claims.birthday(),
-            Some(&EndUserBirthday::new("1956-05-12".to_string()))
-        );
-        assert_eq!(
-            claims.zoneinfo(),
-            Some(&EndUserTimezone::new("America/Los_Angeles".to_string())),
-        );
-        assert_eq!(
-            claims.locale(),
-            Some(&LanguageTag::new("en-US".to_string()))
-        );
-        assert_eq!(
-            claims.phone_number(),
-            Some(&EndUserPhoneNumber::new("+1 (555) 555-5555".to_string()))
-        );
-        assert_eq!(claims.phone_number_verified(), Some(false));
-        assert_eq!(
-            claims.address().unwrap().formatted(),
-            Some(&FormattedAddress::new(
-                "1234 Hollywood Blvd., Los Angeles, CA 90210".to_string()
-            ))
-        );
-        assert_eq!(
-            claims.address().unwrap().street_address(),
-            Some(&StreetAddress::new("1234 Hollywood Blvd.".to_string()))
-        );
-        assert_eq!(
-            claims.address().unwrap().locality(),
-            Some(&AddressLocality::new("Los Angeles".to_string()))
-        );
-        assert_eq!(
-            claims.address().unwrap().region(),
-            Some(&AddressRegion::new("CA".to_string()))
-        );
-        assert_eq!(
-            claims.address().unwrap().postal_code(),
-            Some(&AddressPostalCode::new("90210".to_string()))
-        );
-        assert_eq!(
-            claims.address().unwrap().country(),
-            Some(&AddressCountry::new("US".to_string()))
-        );
-        assert_eq!(claims.updated_at(), Some(Ok(Utc.timestamp(1311283970, 0))),);
+        assert_eq!(claims.address(), new_claims.address());
+        assert_eq!(claims.updated_at(), new_claims.updated_at());
 
         let serialized_claims = serde_json::to_string(&claims).expect("failed to serialize");
+        let claims_round_trip: CoreIdTokenClaims =
+            serde_json::from_str(&serialized_claims).expect("failed to deserialize");
+        assert_eq!(claims, claims_round_trip);
+
+        let serialized_new_claims =
+            serde_json::to_string(&new_claims).expect("failed to serialize");
+        assert_eq!(serialized_new_claims, claims_json);
+    }
+
+    #[test]
+    fn test_unknown_claims_serde() {
+        let expected_serialized_claims = "{\
+                                          \"iss\":\"https://server.example.com\",\
+                                          \"aud\":[\"s6BhdRkqt3\"],\
+                                          \"exp\":1311281970,\
+                                          \"iat\":1311280970,\
+                                          \"sub\":\"24400320\"\
+                                          }";
+
+        let claims: CoreIdTokenClaims = serde_json::from_str(
+            "{
+            \"iss\": \"https://server.example.com\",
+            \"sub\": \"24400320\",
+            \"aud\": \"s6BhdRkqt3\",
+            \"exp\": 1311281970,
+            \"iat\": 1311280970,
+            \"some_other_field\":\"some_other_value\"\
+            }",
+        )
+        .expect("failed to deserialize");
+
+        let serialized_claims = serde_json::to_string(&claims).expect("failed to serialize");
+        assert_eq!(serialized_claims, expected_serialized_claims);
+
         let claims_round_trip: CoreIdTokenClaims =
             serde_json::from_str(&serialized_claims).expect("failed to deserialize");
         assert_eq!(claims, claims_round_trip);

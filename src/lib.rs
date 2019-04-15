@@ -18,6 +18,7 @@ extern crate curl;
 extern crate failure;
 #[macro_use]
 extern crate failure_derive;
+extern crate itertools;
 #[macro_use]
 extern crate log;
 extern crate oauth2;
@@ -31,7 +32,8 @@ extern crate untrusted;
 extern crate url;
 
 #[cfg(test)]
-extern crate itertools;
+#[macro_use]
+extern crate pretty_assertions;
 
 use std::marker::PhantomData;
 use std::str;
@@ -53,6 +55,7 @@ pub use claims::{
 pub use discovery::{DiscoveryError, ProviderMetadata};
 pub use id_token::IdTokenFields;
 pub use id_token::{IdToken, IdTokenClaims};
+pub use jwt::JsonWebTokenError;
 use jwt::{JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenHeader};
 use registration::ClientRegistrationResponse;
 // Flatten the module hierarchy involving types. They're only separated to improve code
@@ -67,12 +70,12 @@ pub use types::{
     EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, FormattedAddress, GrantType,
     InitiateLoginUrl, IssuerUrl, JsonWebKey, JsonWebKeyId, JsonWebKeySet, JsonWebKeyType,
     JsonWebKeyUse, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm,
-    LanguageTag, LoginHint, LogoUrl, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl,
+    LanguageTag, LoginHint, LogoUrl, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl, PrivateSigningKey,
     RegistrationAccessToken, RegistrationUrl, RequestUrl, ResponseMode, ResponseType,
-    ResponseTypes, SectorIdentifierUrl, ServiceDocUrl, StreetAddress, SubjectIdentifier,
-    SubjectIdentifierType, ToSUrl,
+    ResponseTypes, SectorIdentifierUrl, ServiceDocUrl, SigningError, StreetAddress,
+    SubjectIdentifier, SubjectIdentifierType, ToSUrl,
 };
-pub use user_info::{UserInfoClaims, UserInfoError, UserInfoUrl};
+pub use user_info::{UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoUrl};
 use verification::{AudiencesClaim, IssuerClaim};
 pub use verification::{
     ClaimsVerificationError, IdTokenVerifier, NonceVerifier, SignatureVerificationError,
@@ -692,7 +695,7 @@ where
         Some(entries) => Some(
             entries
                 .iter()
-                .map(|entries| entries.as_ref())
+                .map(AsRef::as_ref)
                 .collect::<Vec<_>>()
                 .join(" "),
         ),

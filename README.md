@@ -1,4 +1,4 @@
-# OpenID Connect Relying Party (Client) Library for Rust
+# OpenID Connect Library for Rust
 
 [![Build Status](https://travis-ci.org/ramosbugs/openidconnect-rs.svg?branch=master)](https://travis-ci.org/ramosbugs/openidconnect-rs)
 [![crates.io](https://img.shields.io/crates/v/openidconnect.svg)](https://crates.io/crates/openidconnect)

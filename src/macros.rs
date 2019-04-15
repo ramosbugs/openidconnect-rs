@@ -565,10 +565,12 @@ macro_rules! trait_struct {
 
 macro_rules! deserialize_fields {
     (@field_str Option(Seconds($field:ident))) => { stringify![$field] };
+    (@field_str Option(DateTime(Seconds($field:ident)))) => { stringify![$field] };
     (@field_str Option($field:ident)) => { stringify![$field] };
     (@field_str LanguageTag($field:ident)) => { stringify![$field] };
     (@field_str $field:ident) => { stringify![$field] };
     (@let_none Option(Seconds($field:ident))) => { let mut $field = None; };
+    (@let_none Option(DateTime(Seconds($field:ident)))) => { let mut $field = None; };
     (@let_none Option($field:ident)) => { let mut $field = None; };
     (@let_none LanguageTag($field:ident)) => { let mut $field = None; };
     (@let_none $field:ident) => { let mut $field = None; };
@@ -587,6 +589,33 @@ macro_rules! deserialize_fields {
         }
         let seconds = $map.next_value::<Option<u64>>()?;
         $field = seconds.map(Duration::from_secs);
+    };
+    (@case $map:ident $key:ident $language_tag_opt:ident
+     Option(DateTime(Seconds($field:ident)))) => {
+        if $field.is_some() {
+            return Err(serde::de::Error::duplicate_field(stringify!($field)));
+        } else if let Some(language_tag) = $language_tag_opt {
+            return Err(
+                serde::de::Error::custom(
+                    format!(
+                        concat!("unexpected language tag `{}` for key `", stringify!($field), "`"),
+                        language_tag.as_ref()
+                    )
+                )
+            );
+        }
+        let seconds = $map.next_value::<Option<Seconds>>()?;
+        $field = seconds
+            .map(|sec| seconds_to_utc(&sec).map_err(|_| serde::de::Error::custom(
+                format!(
+                    concat!(
+                        "failed to parse `{}` as UTC datetime (in seconds) for key `",
+                        stringify!($field),
+                        "`"
+                    ),
+                    *sec,
+                )
+            ))).transpose()?;
     };
     (@case $map:ident $key:ident $language_tag_opt:ident Option($field:ident)) => {
         if $field.is_some() {
@@ -635,6 +664,15 @@ macro_rules! deserialize_fields {
     };
     (@struct_recurs [$($struct_type:tt)+] {
         $($name:ident: $e:expr),* => [Option(Seconds($field_new:ident))] $([$($entry:tt)+])*
+    }) => {
+        deserialize_fields![
+            @struct_recurs [$($struct_type)+] {
+                $($name: $e,)* $field_new: $field_new => $([$($entry)+])*
+            }
+        ]
+    };
+    (@struct_recurs [$($struct_type:tt)+] {
+        $($name:ident: $e:expr),* => [Option(DateTime(Seconds($field_new:ident)))] $([$($entry:tt)+])*
     }) => {
         deserialize_fields![
             @struct_recurs [$($struct_type)+] {
@@ -713,6 +751,11 @@ macro_rules! serialize_fields {
             $map.serialize_entry(stringify!($field), &$field.as_secs())?;
         }
     };
+    (@case $self:ident $map:ident Option(DateTime(Seconds($field:ident)))) => {
+        if let Some(ref $field) = $self.$field {
+            $map.serialize_entry(stringify!($field), &utc_to_seconds(&$field))?;
+        }
+    };
     (@case $self:ident $map:ident Option($field:ident)) => {
         if let Some(ref $field) = $self.$field {
             $map.serialize_entry(stringify!($field), $field)?;
@@ -720,7 +763,9 @@ macro_rules! serialize_fields {
     };
     (@case $self:ident $map:ident LanguageTag($field:ident)) => {
         if let Some(ref field_map) = $self.$field {
-            for (language_tag_opt, $field) in field_map.iter() {
+            use itertools::sorted;
+            let sorted_field_map = sorted(field_map.clone());
+            for (language_tag_opt, $field) in sorted_field_map.iter() {
                 if let Some(ref language_tag) = *language_tag_opt {
                     $map.serialize_entry(
                         &format!(concat!(stringify!($field), "#{}"), language_tag.as_ref()),
@@ -749,6 +794,7 @@ macro_rules! serialize_fields {
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! field_getter_decls {
     (@case $field:ident Option < bool >) => {
         fn $field(&self) -> Option<bool>;
@@ -956,6 +1002,7 @@ macro_rules! field_setters {
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! field_getter_setter_decls {
     (
         $(

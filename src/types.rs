@@ -50,13 +50,17 @@ impl<T> From<HashMap<Option<LanguageTag>, T>> for LocalizedClaim<T> {
         Self(inner)
     }
 }
+impl<T> From<T> for LocalizedClaim<T> {
+    fn from(inner: T) -> Self {
+        Self(vec![(None, inner)].into_iter().collect())
+    }
+}
 impl<T> FromIterator<(Option<LanguageTag>, T)> for LocalizedClaim<T> {
     fn from_iter<I: IntoIterator<Item = (Option<LanguageTag>, T)>>(iter: I) -> Self {
         let inner: HashMap<Option<LanguageTag>, T> = iter.into_iter().collect();
         Self(inner)
     }
 }
-
 impl<'a, T> IntoIterator for &'a LocalizedClaim<T> {
     type Item = (&'a Option<LanguageTag>, &'a T);
     type IntoIter = std::collections::hash_map::Iter<'a, Option<LanguageTag>, T>;
@@ -103,6 +107,27 @@ pub trait ClientAuthMethod:
 }
 pub trait GrantType: Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static {}
 
+///
+/// Error signing a message.
+///
+#[derive(Clone, Debug, Fail, PartialEq)]
+pub enum SigningError {
+    /// Failed to sign the message using the given key and parameters.
+    #[fail(display = "Crypto error: {}", _0)]
+    CryptoError(String),
+    /// The supplied key cannot be used in this context. This may occur if the key type does not
+    /// match the signature type (e.g., an RSA key used to validate an HMAC) or the JWK usage
+    /// disallows signatures.
+    #[fail(display = "Invalid cryptographic key: {}", _0)]
+    InvalidKey(String),
+    /// Unsupported signature algorithm.
+    #[fail(display = "Unsupported signature algorithm: {}", _0)]
+    UnsupportedAlg(String),
+    /// An unexpected error occurred.
+    #[fail(display = "Other error: {}", _0)]
+    Other(String),
+}
+
 pub trait JsonWebKey<JS, JT, JU>:
     Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
 where
@@ -117,9 +142,20 @@ where
     fn verify_signature(
         &self,
         signature_alg: &JS,
-        msg: &str,
+        msg: &[u8],
         signature: &[u8],
     ) -> Result<(), SignatureVerificationError>;
+}
+
+pub trait PrivateSigningKey<JS, JT, JU, K>
+where
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+{
+    fn sign(&self, signature_alg: &JS, msg: &[u8]) -> Result<Vec<u8>, SigningError>;
+    fn to_verification_key(&self) -> K;
 }
 
 pub trait JsonWebKeyType:
@@ -496,6 +532,25 @@ pub(crate) mod helpers {
         }
     }
 
+    pub fn deserialize_string_or_vec_opt<'de, T, D>(
+        deserializer: D,
+    ) -> Result<Option<Vec<T>>, D::Error>
+    where
+        T: DeserializeOwned,
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error;
+
+        let value: Value = Deserialize::deserialize(deserializer)?;
+        match from_value::<Option<Vec<T>>>(value.clone()) {
+            Ok(val) => Ok(val),
+            Err(_) => {
+                let single_val: T = from_value(value).map_err(Error::custom)?;
+                Ok(Some(vec![single_val]))
+            }
+        }
+    }
+
     // Attempt to deserialize the value; if the value is null or an error occurs, return None.
     // This is useful when deserializing fields that may mean different things in different
     // contexts, and where we would rather ignore the result than fail to deserialize. For example,
@@ -563,7 +618,73 @@ pub(crate) mod helpers {
     }
 
     pub(crate) fn utc_to_seconds(utc: &DateTime<Utc>) -> Seconds {
-        Seconds(utc.timestamp().into())
+        let (secs, nsecs) = (utc.timestamp(), utc.timestamp_subsec_nanos());
+        if nsecs == 0 {
+            Seconds::new(secs.into())
+        } else {
+            Seconds::new(
+                serde_json::Number::from_f64(secs as f64 + (f64::from(nsecs)) / 1_000_000_000.)
+                    // This really shouldn't happen for a valid DateTime
+                    .expect("Failed to convert timestamp to f64"),
+            )
+        }
+    }
+
+    pub mod serde_utc_seconds {
+        use super::super::Seconds;
+        use chrono::{DateTime, Utc};
+        use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+        pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let seconds: Seconds = Deserialize::deserialize(deserializer)?;
+            super::seconds_to_utc(&seconds).map_err(|_| {
+                serde::de::Error::custom(format!(
+                    "failed to parse `{}` as UTC datetime (in seconds)",
+                    *seconds
+                ))
+            })
+        }
+
+        pub fn serialize<S>(v: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            super::utc_to_seconds(v).serialize(serializer)
+        }
+    }
+
+    pub mod serde_utc_seconds_opt {
+        use super::super::Seconds;
+        use chrono::{DateTime, Utc};
+        use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+        pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<DateTime<Utc>>, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let seconds: Option<Seconds> = Deserialize::deserialize(deserializer)?;
+            seconds
+                .map(|sec| {
+                    super::seconds_to_utc(&sec).map_err(|_| {
+                        serde::de::Error::custom(format!(
+                            "failed to parse `{}` as UTC datetime (in seconds)",
+                            *sec
+                        ))
+                    })
+                })
+                .transpose()
+        }
+
+        pub fn serialize<S>(v: &Option<DateTime<Utc>>, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            v.map(|sec| super::utc_to_seconds(&sec))
+                .serialize(serializer)
+        }
     }
 }
 

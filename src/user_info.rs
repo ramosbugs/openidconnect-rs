@@ -7,13 +7,12 @@ use oauth2::AccessToken;
 use serde_json;
 use url::Url;
 
-use super::claims::StandardClaimsImpl;
 use super::http::{
     auth_bearer, HttpRequest, HttpRequestMethod, ACCEPT_JSON, HTTP_STATUS_OK, MIME_TYPE_JSON,
     MIME_TYPE_JWT,
 };
-use super::jwt::JsonWebTokenJsonPayloadDeserializer;
-use super::types::helpers::{seconds_to_utc, utc_to_seconds};
+use super::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
+use super::types::helpers::deserialize_string_or_vec_opt;
 use super::types::LocalizedClaim;
 use super::verification::UserInfoVerifier;
 use super::{
@@ -22,53 +21,62 @@ use super::{
     EndUserName, EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl,
     EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, GenderClaim, IssuerClaim, IssuerUrl,
     JsonWebKey, JsonWebKeyType, JsonWebKeyUse, JsonWebToken, JweContentEncryptionAlgorithm,
-    JwsSigningAlgorithm, LanguageTag, StandardClaims, SubjectIdentifier,
+    JwsSigningAlgorithm, LanguageTag, PrivateSigningKey, StandardClaims, SubjectIdentifier,
 };
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct UserInfoClaims<AC, GC>
-where
-    AC: AdditionalClaims,
-    GC: GenderClaim,
-{
-    #[serde(skip_serializing_if = "Option::is_none")]
-    iss: Option<IssuerUrl>,
-    // FIXME: this needs to be a vector, but it may also come as a single string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    aud: Option<Vec<Audience>>,
-
-    #[serde(bound = "GC: GenderClaim")]
-    #[serde(flatten)]
-    standard_claims: StandardClaimsImpl<GC>,
-
-    #[serde(bound = "AC: AdditionalClaims")]
-    #[serde(flatten)]
-    additional_claims: AC,
-}
-// FIXME: see what other structs should have friendlier trait interfaces like this one
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct UserInfoClaims<AC: AdditionalClaims, GC: GenderClaim>(UserInfoClaimsImpl<AC, GC>);
 impl<AC, GC> UserInfoClaims<AC, GC>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
 {
-    pub fn issuer(&self) -> Option<&IssuerUrl> {
-        self.iss.as_ref()
+    pub fn new(standard_claims: StandardClaims<GC>, additional_claims: AC) -> Self {
+        Self(UserInfoClaimsImpl {
+            issuer: None,
+            audiences: None,
+            standard_claims,
+            additional_claims,
+        })
     }
-    pub fn audiences(&self) -> Option<&Vec<Audience>> {
-        self.aud.as_ref()
+
+    pub fn from_json(
+        user_info_json: &[u8],
+        subject: &SubjectIdentifier,
+    ) -> Result<Self, UserInfoError> {
+        let user_info = serde_json::from_slice::<UserInfoClaimsImpl<AC, GC>>(&user_info_json)
+            .map_err(UserInfoError::Json)?;
+
+        // This is the only verification we need to do for JSON-based user info claims, so don't
+        // bother with the complexity of a separate verifier object.
+        if user_info.standard_claims.sub == *subject {
+            Ok(Self(user_info))
+        } else {
+            Err(UserInfoError::ClaimsVerification(
+                ClaimsVerificationError::InvalidSubject(format!(
+                    "expected `{}` (found `{}`)",
+                    **subject, *user_info.standard_claims.sub,
+                )),
+            ))
+        }
     }
-    pub fn additional_claims(&self) -> &AC {
-        &self.additional_claims
-    }
-}
-impl<AC, GC> StandardClaims<GC> for UserInfoClaims<AC, GC>
-where
-    AC: AdditionalClaims,
-    GC: GenderClaim,
-{
+
     field_getters_setters![
-        self [self.standard_claims] {
-            set_sub -> sub[SubjectIdentifier],
+        pub self [self.0] {
+            set_issuer -> issuer[Option<IssuerUrl>],
+            set_audiences -> audiences[Option<Vec<Audience>>],
+        }
+    ];
+
+    pub fn subject(&self) -> &SubjectIdentifier {
+        &self.0.standard_claims.sub
+    }
+    pub fn set_subject(&mut self, subject: SubjectIdentifier) {
+        self.0.standard_claims.sub = subject
+    }
+
+    field_getters_setters![
+        pub self [self.0.standard_claims] {
             set_name -> name[Option<LocalizedClaim<EndUserName>>],
             set_given_name -> given_name[Option<LocalizedClaim<EndUserGivenName>>],
             set_family_name ->
@@ -88,54 +96,121 @@ where
             set_locale -> locale[Option<LanguageTag>],
             set_phone_number -> phone_number[Option<EndUserPhoneNumber>],
             set_phone_number_verified -> phone_number_verified[Option<bool>],
-            set_address -> address[Option<AddressClaim>],        }
+            set_address -> address[Option<AddressClaim>],
+            set_updated_at -> updated_at[Option<DateTime<Utc>>],
+        }
     ];
 
-    fn updated_at(&self) -> Option<Result<DateTime<Utc>, ()>> {
-        self.standard_claims.updated_at.as_ref().map(seconds_to_utc)
+    pub fn additional_claims(&self) -> &AC {
+        &self.0.additional_claims
     }
-
-    fn set_updated_at(mut self, updated_at: Option<&DateTime<Utc>>) -> Self {
-        self.standard_claims.updated_at = updated_at.map(utc_to_seconds);
-        self
+    pub fn additional_claims_mut(&mut self) -> &mut AC {
+        &mut self.0.additional_claims
     }
 }
 
-impl<AC, GC> AudiencesClaim for UserInfoClaims<AC, GC>
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub(crate) struct UserInfoClaimsImpl<AC, GC>
+where
+    AC: AdditionalClaims,
+    GC: GenderClaim,
+{
+    #[serde(rename = "iss", skip_serializing_if = "Option::is_none")]
+    pub issuer: Option<IssuerUrl>,
+    // We always serialize as an array, which is valid according to the spec.
+    #[serde(
+        default,
+        rename = "aud",
+        deserialize_with = "deserialize_string_or_vec_opt",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub audiences: Option<Vec<Audience>>,
+
+    #[serde(bound = "GC: GenderClaim", flatten)]
+    pub standard_claims: StandardClaims<GC>,
+
+    #[serde(bound = "AC: AdditionalClaims", flatten)]
+    pub additional_claims: AC,
+}
+impl<AC, GC> AudiencesClaim for UserInfoClaimsImpl<AC, GC>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
 {
     fn audiences(&self) -> Option<&Vec<Audience>> {
-        UserInfoClaims::audiences(&self)
+        self.audiences.as_ref()
     }
 }
-impl<'a, AC, GC> AudiencesClaim for &'a UserInfoClaims<AC, GC>
+impl<'a, AC, GC> AudiencesClaim for &'a UserInfoClaimsImpl<AC, GC>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
 {
     fn audiences(&self) -> Option<&Vec<Audience>> {
-        UserInfoClaims::audiences(&self)
+        self.audiences.as_ref()
     }
 }
 
-impl<AC, GC> IssuerClaim for UserInfoClaims<AC, GC>
+impl<AC, GC> IssuerClaim for UserInfoClaimsImpl<AC, GC>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
 {
     fn issuer(&self) -> Option<&IssuerUrl> {
-        UserInfoClaims::issuer(&self)
+        self.issuer.as_ref()
     }
 }
-impl<'a, AC, GC> IssuerClaim for &'a UserInfoClaims<AC, GC>
+impl<'a, AC, GC> IssuerClaim for &'a UserInfoClaimsImpl<AC, GC>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
 {
     fn issuer(&self) -> Option<&IssuerUrl> {
-        UserInfoClaims::issuer(&self)
+        self.issuer.as_ref()
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct UserInfoJsonWebToken<
+    AC: AdditionalClaims,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+>(
+    #[serde(bound = "AC: AdditionalClaims")]
+    JsonWebToken<JE, JS, JT, UserInfoClaimsImpl<AC, GC>, JsonWebTokenJsonPayloadSerde>,
+);
+impl<AC, GC, JE, JS, JT> UserInfoJsonWebToken<AC, GC, JE, JS, JT>
+where
+    AC: AdditionalClaims,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+{
+    pub fn new<JU, K, S>(
+        claims: UserInfoClaims<AC, GC>,
+        signing_key: &S,
+        alg: JS,
+    ) -> Result<Self, JsonWebTokenError>
+    where
+        JU: JsonWebKeyUse,
+        K: JsonWebKey<JS, JT, JU>,
+        S: PrivateSigningKey<JS, JT, JU, K>,
+    {
+        Ok(Self(JsonWebToken::new(claims.0, signing_key, &alg)?))
+    }
+
+    pub fn claims<JU, K>(
+        self,
+        verifier: &UserInfoVerifier<JE, JS, JT, JU, K>,
+    ) -> Result<UserInfoClaims<AC, GC>, ClaimsVerificationError>
+    where
+        JU: JsonWebKeyUse,
+        K: JsonWebKey<JS, JT, JU>,
+    {
+        Ok(UserInfoClaims(verifier.verified_claims(self.0)?))
     }
 }
 
@@ -145,7 +220,8 @@ new_url_type![
         pub fn get_user_info<AC, GC, JE, JS, JT, JU, K>(
             &self,
             access_token: &AccessToken,
-            verifier: &UserInfoVerifier<JE, JS, JT, JU, K>,
+            require_signed_response: bool,
+            signed_response_verifier: &UserInfoVerifier<JE, JS, JT, JU, K>,
         ) -> Result<UserInfoClaims<AC, GC>, UserInfoError>
         where AC: AdditionalClaims,
                 GC: GenderClaim,
@@ -178,14 +254,15 @@ new_url_type![
 
             match user_info_response.content_type.as_ref().map(String::as_str) {
                 None | Some(MIME_TYPE_JSON) => {
-                    verifier
-                        .verified_claims(
-                            UnverifiedUserInfoClaims::JsonClaims(
-                                serde_json::from_slice(&user_info_response.body)
-                                    .map_err(UserInfoError::Json)?
-                            )
-                        )
-                        .map_err(UserInfoError::ClaimsVerification)
+                    if require_signed_response {
+                        return Err(
+                            UserInfoError::ClaimsVerification(ClaimsVerificationError::NoSignature)
+                        );
+                    }
+                    UserInfoClaims::from_json(
+                        &user_info_response.body,
+                        signed_response_verifier.subject(),
+                    )
                 }
                 Some(MIME_TYPE_JWT) => {
                     let jwt_str =
@@ -195,17 +272,12 @@ new_url_type![
                                     "response body has invalid UTF-8 encoding".to_string()
                                 )
                             )?;
-                    verifier
-                        .verified_claims(
-                            UnverifiedUserInfoClaims::JwtClaims(
-                                // TODO: Implement a simple deserializer so that we can go straight
-                                // from a str to a JsonWebToken without first converting to/from
-                                // JSON.
-                                serde_json::from_value(serde_json::Value::String(jwt_str))
-                                    .map_err(UserInfoError::Json)?
-                            )
-                        )
-                        .map_err(UserInfoError::ClaimsVerification)
+                    serde_json::from_value::<UserInfoJsonWebToken<AC, GC, JE, JS, JT>>(
+                        serde_json::Value::String(jwt_str)
+                    )
+                    .map_err(UserInfoError::Json)?
+                    .claims(signed_response_verifier)
+                    .map_err(UserInfoError::ClaimsVerification)
                 }
                 Some(content_type) =>
                     Err(
@@ -231,20 +303,4 @@ pub enum UserInfoError {
     Json(#[cause] serde_json::Error),
     #[fail(display = "Other error: {}", _0)]
     Other(String),
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub(crate) enum UnverifiedUserInfoClaims<AC, GC, JE, JS, JT>
-where
-    AC: AdditionalClaims,
-    GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-{
-    JsonClaims(#[serde(bound = "AC: AdditionalClaims")] UserInfoClaims<AC, GC>),
-    JwtClaims(
-        #[serde(bound = "AC: AdditionalClaims")]
-        JsonWebToken<UserInfoClaims<AC, GC>, JE, JS, JT, JsonWebTokenJsonPayloadDeserializer>,
-    ),
 }

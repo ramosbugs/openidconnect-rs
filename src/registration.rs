@@ -246,6 +246,7 @@ where
     RT: ResponseType,
     S: SubjectIdentifierType,
 {
+    #[allow(clippy::cognitive_complexity)]
     fn serialize<SE>(&self, serializer: SE) -> Result<SE::Ok, SE::Error>
     where
         SE: Serializer,

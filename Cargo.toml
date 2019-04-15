@@ -2,7 +2,7 @@
 name = "openidconnect"
 version = "0.1.0"
 authors = ["David A. Ramos <ramos@cs.stanford.edu>"]
-description = "OpenID Connect library for Relying Parties"
+description = "OpenID Connect library"
 license = "MIT"
 repository = "https://github.com/ramosbugs/openidconnect-rs"
 
@@ -12,8 +12,9 @@ chrono = "0.4"
 curl = "0.4"
 failure = "0.1"
 failure_derive = "0.1"
+itertools = "0.7.8"
 log = "0.4"
-oauth2 = { git = "https://github.com/ramosbugs/oauth2-rs.git", branch = "master" }
+oauth2 = "2.0.0-beta.2"
 rand = "0.4"
 ring = "0.14"
 serde = "1.0"
@@ -25,5 +26,4 @@ url = "1.0"
 [dev-dependencies]
 env_logger = "0.5"
 hyper = "0.11"
-itertools = "0.7.8"
 pretty_assertions = "0.5"

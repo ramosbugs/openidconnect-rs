@@ -29,8 +29,8 @@ use openidconnect::{
     AccessToken, AuthType, AuthorizationCode, CsrfToken, RequestTokenError, Scope,
 };
 use openidconnect::{
-    AuthenticationFlow, ClaimsVerificationError, SignatureVerificationError, StandardClaims,
-    SubjectIdentifier, UserInfoError,
+    AuthenticationFlow, ClaimsVerificationError, SignatureVerificationError, SubjectIdentifier,
+    UserInfoError,
 };
 
 #[macro_use]
@@ -207,21 +207,23 @@ impl TestState {
     }
 
     pub fn user_info_claims(&self) -> CoreUserInfoClaims {
-        let verifier = self.user_info_verifier(self.jwks(), self.id_token_claims().sub().clone());
+        let verifier =
+            self.user_info_verifier(self.jwks(), self.id_token_claims().subject().clone());
         self.provider_metadata
             .userinfo_endpoint()
             .unwrap()
-            .get_user_info(self.access_token(), &verifier)
+            .get_user_info(self.access_token(), false, &verifier)
             .panic_if_fail("failed to get UserInfo")
     }
 
     pub fn user_info_claims_failure(&self) -> UserInfoError {
-        let verifier = self.user_info_verifier(self.jwks(), self.id_token_claims().sub().clone());
+        let verifier =
+            self.user_info_verifier(self.jwks(), self.id_token_claims().subject().clone());
         let user_info_result: Result<CoreUserInfoClaims, UserInfoError> = self
             .provider_metadata
             .userinfo_endpoint()
             .unwrap()
-            .get_user_info(self.access_token(), &verifier);
+            .get_user_info(self.access_token(), false, &verifier);
         match user_info_result {
             Err(err) => err,
             _ => panic!("claims verification succeeded but was expected to fail"),
@@ -257,7 +259,7 @@ fn rp_scope_userinfo_claims() {
     let user_info_claims = test_state.user_info_claims();
     log_debug!("UserInfo response: {:?}", user_info_claims);
 
-    assert!(id_token_claims.sub() == user_info_claims.sub());
+    assert_eq!(id_token_claims.subject(), user_info_claims.subject());
     assert!(!user_info_claims
         .email()
         .expect("no email returned by UserInfo endpoint")
@@ -265,7 +267,8 @@ fn rp_scope_userinfo_claims() {
     assert!(!user_info_claims
         .address()
         .expect("no address returned by UserInfo endpoint")
-        .street_address()
+        .street_address
+        .as_ref()
         .expect("no street address returned by UserInfo endpoint")
         .is_empty());
     assert!(!user_info_claims
@@ -553,9 +556,8 @@ fn rp_userinfo_sig() {
     let verifier = test_state
         .user_info_verifier(
             test_state.jwks(),
-            test_state.id_token_claims().sub().clone(),
+            test_state.id_token_claims().subject().clone(),
         )
-        .require_signed_response(true)
         // For some reason, the test suite omits these claims even though the Core spec says
         // that the RP SHOULD verify these.
         .require_audience_match(false)
@@ -564,7 +566,7 @@ fn rp_userinfo_sig() {
         .provider_metadata
         .userinfo_endpoint()
         .unwrap()
-        .get_user_info(test_state.access_token(), &verifier)
+        .get_user_info(test_state.access_token(), true, &verifier)
         .panic_if_fail("failed to get user info");
 
     log_debug!("UserInfo response: {:?}", user_info_claims);

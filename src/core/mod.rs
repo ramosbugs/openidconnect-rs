@@ -21,10 +21,12 @@ use super::{
     EmptyAdditionalClaims, GenderClaim, GrantType, IdToken, IdTokenClaims, IdTokenFields,
     IdTokenVerifier, JsonWebKeySet, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm,
     JwsSigningAlgorithm, ResponseMode, ResponseType, SubjectIdentifierType, UserInfoClaims,
-    UserInfoVerifier,
+    UserInfoJsonWebToken, UserInfoVerifier,
 };
 
-pub use self::jwk::{CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse};
+pub use self::jwk::{
+    CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreRsaPrivateSigningKey,
+};
 
 mod crypto;
 
@@ -145,6 +147,13 @@ pub type CoreProviderMetadata = Discovery10ProviderMetadata<
 >;
 
 pub type CoreUserInfoClaims = UserInfoClaims<EmptyAdditionalClaims, CoreGenderClaim>;
+pub type CoreUserInfoJsonWebToken = UserInfoJsonWebToken<
+    EmptyAdditionalClaims,
+    CoreGenderClaim,
+    CoreJweContentEncryptionAlgorithm,
+    CoreJwsSigningAlgorithm,
+    CoreJsonWebKeyType,
+>;
 pub type CoreUserInfoVerifier = UserInfoVerifier<
     CoreJweContentEncryptionAlgorithm,
     CoreJwsSigningAlgorithm,
