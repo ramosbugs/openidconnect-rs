@@ -21,9 +21,12 @@ addons:
       - binutils-dev
       - libiberty-dev
       - libssl-dev
+before_script:
+  - cargo install --force cargo-audit
 script:
   - cargo test -- --test-threads=1
   - cargo test --example google
+  - cargo audit
 after_success: |
   RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin &&
   cargo tarpaulin --out Xml &&
