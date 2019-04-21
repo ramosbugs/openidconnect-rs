@@ -1,16 +1,9 @@
 // FIXME: uncomment
 //#![warn(missing_docs)]
 
-// FIXME: remove
-//#![feature(trace_macros)]
-
 //!
 //! [OpenID Connect](http://openid.net/specs/openid-connect-core-1_0.html) support.
 //!
-
-// FIXME: specify the backward compatibility contract (e.g., no guarantee that non-JSON
-// serializations will continue to deserialize; fields may be reordered, so assuming a particular
-// order is undefined behavior).
 
 extern crate base64;
 extern crate chrono;

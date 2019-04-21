@@ -32,18 +32,6 @@ impl<'a, U> TraitStructExtract<'a, Option<&'a U>> for Option<U> {
     }
 }
 
-// FIXME: remove
-/*
-pub trait DeserializeMapValue<T: DeserializeOwned> {
-    fn deserialize_next_value<'de, V: MapAccess<'de>>(map: &mut V) -> Result<T, V::Error>;
-}
-impl<T> DeserializeMapValue<T> for T where T: DeserializeOwned {
-    fn deserialize_next_value<'de, V: MapAccess<'de>>(map: &mut V) -> Result<T, V::Error> {
-        map.next_value::<T>()
-    }
-}
-*/
-
 ///
 /// Copied from oauth2-rs crate (not part of that crate's stable public interface).
 ///

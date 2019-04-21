@@ -77,25 +77,27 @@ impl<'a> HttpRequest<'a> {
         easy.url(&self.url.to_string()[..])?;
         match self.method {
             HttpRequestMethod::Get => {
-                // FIXME: make this a flag that gets passed in
-                trace!("GET {:?}", self.url);
+                if cfg!(feature = "trace_requests") {
+                    trace!("GET {:?}", self.url);
+                }
             }
             HttpRequestMethod::Post => {
-                // FIXME: remove
-                trace!("POST {:?}", self.url);
                 easy.post(true)?;
                 easy.post_field_size(self.post_body.len() as u64)?;
-                // FIXME: remove
-                trace!(
-                    "Body: {}",
-                    String::from_utf8(self.post_body.to_vec()).unwrap()
-                );
+                if cfg!(feature = "trace_requests") {
+                    trace!(
+                        "POST {:?}\n{:?}",
+                        self.url,
+                        String::from_utf8(self.post_body.to_vec())
+                    );
+                }
             }
         }
 
         if !self.headers.is_empty() {
-            // FIXME: remove
-            trace!("Headers: {:?}", self.headers);
+            if cfg!(feature = "trace_requests") {
+                trace!("Sending HTTP headers: {:?}", self.headers);
+            }
             let mut headers = curl::easy::List::new();
             self.headers
                 .iter()
@@ -126,13 +128,14 @@ impl<'a> HttpRequest<'a> {
             content_type: easy.content_type()?.map(|s| s.to_lowercase().to_string()),
             body: response_body,
         };
-        // FIXME: remove
-        trace!(
-            "Response: status_code={}, content_type=`{:?}`, body=`{}`",
-            response.status_code,
-            response.content_type,
-            String::from_utf8(response.body.to_vec()).unwrap()
-        );
+        if cfg!(feature = "trace_requests") {
+            trace!(
+                "HTTP response: status_code={}, content_type=`{:?}`, body=`{:?}`",
+                response.status_code,
+                response.content_type,
+                String::from_utf8(response.body.to_vec())
+            );
+        }
         Ok(response)
     }
 }

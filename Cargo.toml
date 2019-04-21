@@ -6,6 +6,10 @@ description = "OpenID Connect library"
 license = "MIT"
 repository = "https://github.com/ramosbugs/openidconnect-rs"
 
+[features]
+# FIXME: document this optional feature
+trace_requests = []
+
 [dependencies]
 base64 = "0.9"
 chrono = "0.4"

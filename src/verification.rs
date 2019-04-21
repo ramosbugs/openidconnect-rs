@@ -777,7 +777,7 @@ mod tests {
         AudiencesClaim, ClaimsVerificationError, IssuerClaim, JsonWebTokenHeader,
         JwtClaimsVerifier, SignatureVerificationError, SubjectIdentifier,
     };
-    use {UserInfoClaims, UserInfoError};
+    use UserInfoError;
 
     type CoreJsonWebTokenHeader = JsonWebTokenHeader<
         CoreJweContentEncryptionAlgorithm,
