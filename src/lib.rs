@@ -1,6 +1,8 @@
 // FIXME: uncomment
 //#![warn(missing_docs)]
 
+#![cfg_attr(feature = "nightly", feature(type_alias_enum_variants))]
+
 //!
 //! [OpenID Connect](http://openid.net/specs/openid-connect-core-1_0.html) support.
 //!
@@ -564,46 +566,37 @@ where
         let max_age_opt = self.max_age().map(|max_age| max_age.as_secs().to_string());
         let prompts_opt = join_optional_vec(self.prompts());
         let ui_locales_opt = join_optional_vec(self.ui_locales());
+        let id_token_hint_str = id_token_hint.map(ToString::to_string);
 
         let nonce = nonce_fn();
 
+        fn param_or_none<'a, T>(param: Option<&'a T>, name: &'a str) -> Option<(&'a str, &'a str)>
+        where
+            T: AsRef<str> + 'a,
+        {
+            if let Some(p) = param {
+                Some((name, p.as_ref()))
+            } else {
+                None
+            }
+        }
+
         let (url, state) = {
-            let mut extra_params: Vec<(&str, &str)> = vec![("nonce", nonce.secret())];
-
-            if let Some(ref acr_values) = acr_values_opt {
-                extra_params.push(("acr_values", acr_values));
-            }
-
-            if let Some(ref claims_locales) = claims_locales_opt {
-                extra_params.push(("claims_locales", claims_locales));
-            }
-
-            if let Some(display) = self.display() {
-                extra_params.push(("display", display.to_str()));
-            }
-
-            // FIXME: uncomment
-            /*
-                        if let Some(id_token_hint) = id_token_hint {
-                            extra_params.push(("id_token_hint", id_token_hint));
-                        }
-            */
-
-            if let Some(login_hint) = login_hint {
-                extra_params.push(("login_hint", login_hint.secret()));
-            }
-
-            if let Some(ref max_age) = max_age_opt {
-                extra_params.push(("max_age", max_age));
-            }
-
-            if let Some(ref prompts) = prompts_opt {
-                extra_params.push(("prompt", prompts));
-            }
-
-            if let Some(ref ui_locales) = ui_locales_opt {
-                extra_params.push(("ui_locales", ui_locales));
-            }
+            let mut extra_params: Vec<(&str, &str)> = vec![
+                Some(("nonce", nonce.secret().as_str())),
+                param_or_none(acr_values_opt.as_ref(), "acr_values"),
+                param_or_none(claims_locales_opt.as_ref(), "claims_locales"),
+                param_or_none(self.display(), "display"),
+                param_or_none(id_token_hint_str.as_ref(), "id_token_hint"),
+                param_or_none(login_hint.map(SecretNewType::secret), "login_hint"),
+                param_or_none(max_age_opt.as_ref(), "max_age"),
+                param_or_none(prompts_opt.as_ref(), "prompt"),
+                param_or_none(ui_locales_opt.as_ref(), "ui_locales"),
+            ]
+            .into_iter()
+            .filter(Option::is_some)
+            .map(Option::unwrap)
+            .collect();
 
             let response_type = match *authentication_flow {
                 AuthenticationFlow::AuthorizationCode => core::CoreResponseType::Code.to_oauth2(),
@@ -703,9 +696,11 @@ mod tests {
     use oauth2::{AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl};
     use url::Url;
 
-    use super::core::{CoreAuthDisplay, CoreAuthPrompt, CoreClient, CoreResponseType};
+    #[cfg(feature = "nightly")]
+    use super::core::CoreAuthenticationFlow;
+    use super::core::{CoreAuthDisplay, CoreAuthPrompt, CoreClient, CoreIdToken, CoreResponseType};
     use super::prelude::*;
-    use super::{AuthenticationContextClass, AuthenticationFlow, LanguageTag, Nonce};
+    use super::{AuthenticationContextClass, AuthenticationFlow, LanguageTag, LoginHint, Nonce};
 
     fn new_client() -> CoreClient {
         CoreClient::new(
@@ -752,17 +747,56 @@ mod tests {
                 "urn:mace:incommon:iap:silver".to_string(),
             )]));
 
-        let (authorize_url, _, _) = client.authorize_url(
-            &AuthenticationFlow::AuthorizationCode::<CoreResponseType>,
-            || CsrfToken::new("CSRF123".to_string()),
-            || Nonce::new("NONCE456".to_string()),
-        );
+        #[cfg(feature = "nightly")]
+        let flow = CoreAuthenticationFlow::AuthorizationCode;
+        #[cfg(not(feature = "nightly"))]
+        let flow = AuthenticationFlow::AuthorizationCode::<CoreResponseType>;
 
+        fn new_csrf() -> CsrfToken {
+            CsrfToken::new("CSRF123".to_string())
+        }
+        fn new_nonce() -> Nonce {
+            Nonce::new("NONCE456".to_string())
+        }
+
+        let (authorize_url, _, _) = client.authorize_url(&flow, new_csrf, new_nonce);
         assert_eq!(
             "https://example/authorize?response_type=code&client_id=aaa&\
              redirect_uri=http%3A%2F%2Flocalhost%3A8888%2F&scope=openid+email&state=CSRF123&\
              nonce=NONCE456&acr_values=urn%3Amace%3Aincommon%3Aiap%3Asilver&display=touch&\
              max_age=1800&prompt=login+consent&ui_locales=fr-CA+fr+en",
+            authorize_url.to_string()
+        );
+
+        let serialized_jwt =
+            "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwiYXVkIjpbIm15X2NsaWVudCJdL\
+             CJleHAiOjE1NDQ5MzIxNDksImlhdCI6MTU0NDkyODU0OSwiYXV0aF90aW1lIjoxNTQ0OTI4NTQ4LCJub25jZSI\
+             6InRoZV9ub25jZSIsImFjciI6InRoZV9hY3IiLCJzdWIiOiJzdWJqZWN0In0.gb5HuuyDMu-LvYvG-jJNIJPEZ\
+             823qNwvgNjdAtW0HJpgwJWhJq0hOHUuZz6lvf8ud5xbg5GOo0Q37v3Ke08TvGu6E1USWjecZzp1aYVm9BiMvw5\
+             EBRUrwAaOCG2XFjuOKUVfglSMJnRnoNqVVIWpCAr1ETjZzRIbkU3n5GQRguC5CwN5n45I3dtjoKuNGc2Ni-IMl\
+             J2nRiCJOl2FtStdgs-doc-A9DHtO01x-5HCwytXvcE28Snur1JnqpUgmWrQ8gZMGuijKirgNnze2Dd5BsZRHZ2\
+             CLGIwBsCnauBrJy_NNlQg4hUcSlGsuTa0dmZY7mCf4BN2WCpyOh0wgtkAgQ";
+        let id_token = serde_json::from_value::<CoreIdToken>(serde_json::Value::String(
+            serialized_jwt.to_string(),
+        ))
+        .unwrap();
+
+        let (authorize_url, _, _) = client.authorize_url_with_hint(
+            &flow,
+            new_csrf,
+            new_nonce,
+            Some(&id_token),
+            Some(&LoginHint::new("foo@bar.com".to_string())),
+        );
+        assert_eq!(
+            format!(
+                "https://example/authorize?response_type=code&client_id=aaa&\
+                 redirect_uri=http%3A%2F%2Flocalhost%3A8888%2F&scope=openid+email&state=CSRF123&\
+                 nonce=NONCE456&acr_values=urn%3Amace%3Aincommon%3Aiap%3Asilver&display=touch&\
+                 id_token_hint={}&login_hint=foo%40bar.com&\
+                 max_age=1800&prompt=login+consent&ui_locales=fr-CA+fr+en",
+                serialized_jwt
+            ),
             authorize_url.to_string()
         );
     }

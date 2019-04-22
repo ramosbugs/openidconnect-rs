@@ -87,16 +87,15 @@ pub trait ApplicationType:
 /// How the Authorization Server displays the authentication and consent user interface pages to
 /// the End-User.
 ///
-pub trait AuthDisplay: Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static {
-    fn to_str(&self) -> &str;
+pub trait AuthDisplay:
+    AsRef<str> + Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
+{
 }
 
 ///
 /// Whether the Authorization Server should prompt the End-User for reauthentication and consent.
 ///
-pub trait AuthPrompt: AsRef<str> + Display + PartialEq + 'static {
-    fn to_str(&self) -> &str;
-}
+pub trait AuthPrompt: AsRef<str> + Display + PartialEq + 'static {}
 
 pub trait ClaimName: Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static {}
 pub trait ClaimType: Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static {}

@@ -65,6 +65,25 @@ where
         verifier.verified_claims(&self.0, nonce_verifier)
     }
 }
+impl<AC, GC, JE, JS, JT> ToString for IdToken<AC, GC, JE, JS, JT>
+where
+    AC: AdditionalClaims,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+{
+    fn to_string(&self) -> String {
+        serde_json::to_value(&self)
+            // This should never arise, since we're just asking serde_json to serialize the
+            // signing input concatenated with the signature, both of which are precomputed.
+            .expect("ID token serialization failed")
+            .as_str()
+            // This should also never arise, since our IdToken serializer always calls serialize_str
+            .expect("ID token serializer did not produce a str")
+            .to_owned()
+    }
+}
 
 // FIXME: document at the module level that we do not support aggregated or distributed claims,
 // which are OPTIONAL in the spec:

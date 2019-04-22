@@ -23,8 +23,11 @@ addons:
       - libssl-dev
 before_script:
   - cargo install --force cargo-audit
+  - cargo install --force cargo-when
 script:
   - cargo test -- --test-threads=1
+  # On nightly, test both the default config and special nightly features
+  - cargo when --channel=nightly test --features nightly -- --test-threads=1
   - cargo test --example google
   - cargo audit
 after_success: |

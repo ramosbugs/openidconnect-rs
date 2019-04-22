@@ -33,6 +33,12 @@ mod crypto;
 // Private purely for organizational reasons; exported publicly above.
 mod jwk;
 
+#[cfg(feature = "nightly")]
+use super::AuthenticationFlow;
+
+#[cfg(feature = "nightly")]
+pub type CoreAuthenticationFlow = AuthenticationFlow<CoreResponseType>;
+
 pub type CoreClient = Client<
     EmptyAdditionalClaims,
     CoreAuthDisplay,
@@ -221,8 +227,8 @@ pub enum CoreAuthDisplay {
     Wap,
 }
 
-impl AuthDisplay for CoreAuthDisplay {
-    fn to_str(&self) -> &str {
+impl AsRef<str> for CoreAuthDisplay {
+    fn as_ref(&self) -> &str {
         match *self {
             CoreAuthDisplay::Page => "page",
             CoreAuthDisplay::Popup => "popup",
@@ -231,10 +237,11 @@ impl AuthDisplay for CoreAuthDisplay {
         }
     }
 }
+impl AuthDisplay for CoreAuthDisplay {}
 
 impl Display for CoreAuthDisplay {
     fn fmt(&self, f: &mut Formatter) -> Result<(), FormatterError> {
-        write!(f, "{}", self.to_str())
+        write!(f, "{}", self.as_ref())
     }
 }
 
@@ -278,8 +285,8 @@ pub enum CoreAuthPrompt {
     SelectAccount,
 }
 
-impl AuthPrompt for CoreAuthPrompt {
-    fn to_str(&self) -> &str {
+impl AsRef<str> for CoreAuthPrompt {
+    fn as_ref(&self) -> &str {
         match *self {
             CoreAuthPrompt::None => "none",
             CoreAuthPrompt::Login => "login",
@@ -288,15 +295,11 @@ impl AuthPrompt for CoreAuthPrompt {
         }
     }
 }
-impl AsRef<str> for CoreAuthPrompt {
-    fn as_ref(&self) -> &str {
-        self.to_str()
-    }
-}
+impl AuthPrompt for CoreAuthPrompt {}
 
 impl Display for CoreAuthPrompt {
     fn fmt(&self, f: &mut Formatter) -> Result<(), FormatterError> {
-        write!(f, "{}", self.to_str())
+        write!(f, "{}", self.as_ref())
     }
 }
 
