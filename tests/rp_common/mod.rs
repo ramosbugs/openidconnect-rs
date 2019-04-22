@@ -1,6 +1,9 @@
 extern crate env_logger;
 extern crate failure;
 
+#[cfg(test)]
+extern crate color_backtrace;
+
 use std::cell::RefCell;
 use std::sync::{Once, ONCE_INIT};
 
@@ -67,6 +70,7 @@ macro_rules! log_container_field {
 }
 
 fn _init_log() {
+    color_backtrace::install();
     env_logger::init();
 }
 

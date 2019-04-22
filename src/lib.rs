@@ -27,6 +27,9 @@ extern crate untrusted;
 extern crate url;
 
 #[cfg(test)]
+extern crate color_backtrace;
+
+#[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
 
@@ -703,6 +706,7 @@ mod tests {
     use super::{AuthenticationContextClass, AuthenticationFlow, LanguageTag, LoginHint, Nonce};
 
     fn new_client() -> CoreClient {
+        color_backtrace::install();
         CoreClient::new(
             ClientId::new("aaa".to_string()),
             Some(ClientSecret::new("bbb".to_string())),
