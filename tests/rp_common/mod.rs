@@ -15,11 +15,9 @@ use openidconnect::core::{
     CoreApplicationType, CoreClientRegistrationRequest, CoreClientRegistrationResponse,
     CoreProviderMetadata,
 };
-use openidconnect::discovery::ProviderMetadata;
 use openidconnect::prelude::*;
 use openidconnect::registration::ClientRegistrationRequest;
-use openidconnect::RedirectUrl;
-use openidconnect::{ClientName, ContactEmail, IssuerUrl};
+use openidconnect::{ClientName, ContactEmail, IssuerUrl, RedirectUrl};
 
 pub const CERTIFICATION_BASE_URL: &str = "https://rp.certification.openid.net:8080";
 pub const RP_CONTACT_EMAIL: &str = "ramos@cs.stanford.edu";
@@ -118,7 +116,7 @@ pub fn issuer_url(test_id: &str) -> IssuerUrl {
 
 pub fn get_provider_metadata(test_id: &str) -> CoreProviderMetadata {
     let _issuer_url = issuer_url(test_id);
-    openidconnect::discovery::get_provider_metadata(&_issuer_url).expect(&format!(
+    openidconnect::get_provider_metadata(&_issuer_url).expect(&format!(
         "Failed to fetch provider metadata from {:?}",
         _issuer_url
     ))

@@ -50,7 +50,10 @@ use url::Url;
 pub use claims::{
     AdditionalClaims, AddressClaim, EmptyAdditionalClaims, GenderClaim, StandardClaims,
 };
-pub use discovery::{DiscoveryError, ProviderMetadata};
+pub use discovery::{
+    get_provider_metadata, AdditionalProviderMetadata, DiscoveryError,
+    EmptyAdditionalProviderMetadata, JsonWebKeySetUrl, ProviderMetadata,
+};
 pub use id_token::IdTokenFields;
 pub use id_token::{IdToken, IdTokenClaims};
 pub use jwt::JsonWebTokenError;
@@ -86,7 +89,7 @@ pub use verification::{
 mod macros;
 
 pub mod core;
-pub mod discovery;
+mod discovery;
 pub mod prelude {
     pub use super::{OAuth2TokenResponse, OpenIdConnect};
     pub use oauth2::prelude::*;
@@ -144,11 +147,13 @@ pub enum AuthenticationFlow<RT: ResponseType> {
     Hybrid(Vec<RT>),
 }
 
-pub trait OpenIdConnect<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TR, TT>:
+// Convenience trait to allow clients to mock out OIDC
+pub trait OpenIdConnect<AC, AD, AM, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>:
     Sized
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
+    AM: AdditionalProviderMetadata,
     CA: ClientAuthMethod,
     CN: ClaimName,
     CT: ClaimType,
@@ -159,7 +164,6 @@ where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     P: AuthPrompt,
-    PM: ProviderMetadata<AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
     RM: ResponseMode,
     RT: ResponseType,
     S: SubjectIdentifierType,
@@ -178,8 +182,9 @@ where
         client_secret: Option<ClientSecret>,
         issuer_url: &IssuerUrl,
     ) -> Result<Self, DiscoveryError>;
+    #[allow(clippy::type_complexity)]
     fn from_dynamic_registration<AT, CR, JU, K>(
-        provider_metadata: &PM,
+        provider_metadata: &ProviderMetadata<AM, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
         registration_response: &CR,
     ) -> Self
     where
@@ -227,14 +232,18 @@ where
         NF: FnOnce() -> Nonce + 'static,
         SF: FnOnce() -> CsrfToken + 'static;
     fn exchange_code(&self, code: AuthorizationCode) -> Result<TR, RequestTokenError<TE>>;
-    fn provider_metadata(&self) -> Option<&PM>;
+    #[allow(clippy::type_complexity)]
+    fn provider_metadata(
+        &self,
+    ) -> Option<&ProviderMetadata<AM, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>>;
 }
 
 #[derive(Clone, Debug)]
-pub struct Client<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TR, TT>
+pub struct Client<AC, AD, AM, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
+    AM: AdditionalProviderMetadata,
     CA: ClientAuthMethod,
     CN: ClaimName,
     CT: ClaimType,
@@ -245,7 +254,6 @@ where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     P: AuthPrompt,
-    PM: ProviderMetadata<AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
     RM: ResponseMode,
     RT: ResponseType,
     S: SubjectIdentifierType,
@@ -261,7 +269,8 @@ where
     display: Option<AD>,
     max_age: Option<Duration>,
     prompts: Option<Vec<P>>,
-    provider_metadata: Option<PM>,
+    #[allow(clippy::type_complexity)]
+    provider_metadata: Option<ProviderMetadata<AM, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>>,
     ui_locales: Option<Vec<LanguageTag>>,
     _phantom_ac: PhantomData<AC>,
     _phantom_ca: PhantomData<CA>,
@@ -280,12 +289,13 @@ where
     // additional Authorization Request parameters and parameter values defined by this
     // specification.
 }
-impl<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TR, TT>
-    OpenIdConnect<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TR, TT>
-    for Client<AC, AD, CA, CN, CT, G, GC, JE, JK, JS, JT, P, PM, RM, RT, S, TE, TR, TT>
+impl<AC, AD, AM, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
+    OpenIdConnect<AC, AD, AM, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
+    for Client<AC, AD, AM, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
+    AM: AdditionalProviderMetadata,
     CA: ClientAuthMethod,
     CN: ClaimName,
     CT: ClaimType,
@@ -296,7 +306,6 @@ where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     P: AuthPrompt,
-    PM: ProviderMetadata<AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
     RM: ResponseMode,
     RT: ResponseType,
     S: SubjectIdentifierType,
@@ -349,7 +358,22 @@ where
         client_secret: Option<ClientSecret>,
         issuer_url: &IssuerUrl,
     ) -> Result<Self, DiscoveryError> {
-        let provider_metadata: PM = discovery::get_provider_metadata(issuer_url)?;
+        #[allow(clippy::type_complexity)]
+        let provider_metadata: ProviderMetadata<
+            AM,
+            AD,
+            CA,
+            CN,
+            CT,
+            G,
+            JE,
+            JK,
+            JS,
+            JT,
+            RM,
+            RT,
+            S,
+        > = discovery::get_provider_metadata(issuer_url)?;
 
         let oauth2_client = oauth2::Client::new(
             client_id.clone(),
@@ -385,8 +409,9 @@ where
         })
     }
 
+    #[allow(clippy::type_complexity)]
     fn from_dynamic_registration<AT, CR, JU, K>(
-        provider_metadata: &PM,
+        provider_metadata: &ProviderMetadata<AM, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
         registration_response: &CR,
     ) -> Self
     where
@@ -517,10 +542,7 @@ where
             .provider_metadata
             .as_ref()
             .ok_or_else(|| DiscoveryError::Other("no provider metadata present".to_string()))?;
-        let jwks_uri = provider_metadata.jwks_uri().ok_or_else(|| {
-            DiscoveryError::Other("provider metadata contains no `jwks_uri`".to_string())
-        })?;
-        let signature_keys = jwks_uri.get_keys()?;
+        let signature_keys = provider_metadata.jwks_uri().get_keys()?;
         if let Some(ref client_secret) = self.client_secret {
             Ok(IdTokenVerifier::new_private_client(
                 self.client_id.clone(),
@@ -644,7 +666,10 @@ where
     /// The provider metadata is only available if the Client was created using the `discover`
     /// or `from_dynamic_registration` methods. Otherwise, this function returns `None`.
     ///
-    fn provider_metadata(&self) -> Option<&PM> {
+    #[allow(clippy::type_complexity)]
+    fn provider_metadata(
+        &self,
+    ) -> Option<&ProviderMetadata<AM, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>> {
         self.provider_metadata.as_ref()
     }
 }

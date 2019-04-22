@@ -19,17 +19,14 @@ use openidconnect::core::{
     CoreJsonWebKeySet, CoreJwsSigningAlgorithm, CoreProviderMetadata, CoreResponseType,
     CoreUserInfoClaims, CoreUserInfoVerifier,
 };
-use openidconnect::discovery::ProviderMetadata;
 use openidconnect::prelude::*;
 use openidconnect::registration::{
     ClientMetadata, ClientRegistrationRequest, ClientRegistrationResponse,
 };
 use openidconnect::Nonce;
 use openidconnect::{
-    AccessToken, AuthType, AuthorizationCode, CsrfToken, RequestTokenError, Scope,
-};
-use openidconnect::{
-    AuthenticationFlow, ClaimsVerificationError, SignatureVerificationError, SubjectIdentifier,
+    AccessToken, AuthType, AuthenticationFlow, AuthorizationCode, ClaimsVerificationError,
+    CsrfToken, RequestTokenError, Scope, SignatureVerificationError, SubjectIdentifier,
     UserInfoError,
 };
 
@@ -183,7 +180,6 @@ impl TestState {
     pub fn jwks(&self) -> CoreJsonWebKeySet {
         self.provider_metadata
             .jwks_uri()
-            .unwrap()
             .get_keys()
             .panic_if_fail("failed to fetch JWK set")
     }

@@ -11,7 +11,6 @@ use url;
 use url::Url;
 
 use super::http::{HttpRequest, HttpRequestMethod, ACCEPT_JSON, HTTP_STATUS_OK, MIME_TYPE_JSON};
-use super::macros::TraitStructExtract;
 use super::types::{
     AuthDisplay, AuthenticationContextClass, ClaimName, ClaimType, ClientAuthMethod, GrantType,
     IssuerUrl, JsonWebKey, JsonWebKeySet, JsonWebKeyType, JsonWebKeyUse,
@@ -21,10 +20,23 @@ use super::types::{
 };
 use super::{UserInfoUrl, CONFIG_URL_SUFFIX};
 
-pub fn get_provider_metadata<PM, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>(
+pub trait AdditionalProviderMetadata:
+    Clone + Debug + DeserializeOwned + PartialEq + Serialize
+{
+}
+
+// In order to support serde flatten, this must be an empty struct rather than an empty
+// tuple struct.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct EmptyAdditionalProviderMetadata {}
+impl AdditionalProviderMetadata for EmptyAdditionalProviderMetadata {}
+
+#[allow(clippy::type_complexity)]
+pub fn get_provider_metadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>(
     issuer_url: &IssuerUrl,
-) -> Result<PM, DiscoveryError>
+) -> Result<ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>, DiscoveryError>
 where
+    A: AdditionalProviderMetadata,
     AD: AuthDisplay,
     CA: ClientAuthMethod,
     CN: ClaimName,
@@ -37,7 +49,6 @@ where
     RM: ResponseMode,
     RT: ResponseType,
     S: SubjectIdentifierType,
-    PM: ProviderMetadata<AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
 {
     let discover_url = issuer_url
         .join(CONFIG_URL_SUFFIX)
@@ -63,149 +74,285 @@ where
         .check_content_type(MIME_TYPE_JSON)
         .map_err(|err_msg| DiscoveryError::Response(discover_response.status_code, err_msg))?;
 
-    let provider_metadata: PM =
-        serde_json::from_slice(&discover_response.body).map_err(DiscoveryError::Json)?;
+    let provider_metadata = serde_json::from_slice::<
+        ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
+    >(&discover_response.body)
+    .map_err(DiscoveryError::Json)?;
 
-    provider_metadata.validate(issuer_url)
+    if provider_metadata.issuer() != issuer_url {
+        Err(DiscoveryError::Validation(format!(
+            "unexpected issuer URI `{}` (expected `{}`)",
+            provider_metadata.issuer().url(),
+            issuer_url.url()
+        )))
+    } else {
+        Ok(provider_metadata)
+    }
 }
 
-// FIXME: switch to embedding a flattened extra_fields struct
-trait_struct![
-    trait ProviderMetadata[
-        AD: AuthDisplay,
-        CA: ClientAuthMethod,
-        CN: ClaimName,
-        CT: ClaimType,
-        G: GrantType,
-        JE: JweContentEncryptionAlgorithm,
-        JK: JweKeyManagementAlgorithm,
-        JS: JwsSigningAlgorithm<JT>,
-        JT: JsonWebKeyType,
-        RM: ResponseMode,
-        RT: ResponseType,
-        S: SubjectIdentifierType,
-    ] : [Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static] {
-        // consumes self so that, if validation fails, it doesn't get used
-        fn validate(self, issuer_uri: &IssuerUrl) -> Result<Self, DiscoveryError> {
-            if self.issuer() != issuer_uri {
-                return Err(
-                    DiscoveryError::Validation(
-                        format!(
-                            "unexpected issuer URI `{}` (expected `{}`); this may indicate an \
-                                OpenID Provider impersonation attack",
-                            self.issuer().url(),
-                            issuer_uri.url()
-                        )
-                    )
-                )
-            }
-            Ok(self)
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[allow(clippy::type_complexity)]
+pub struct ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>
+where
+    A: AdditionalProviderMetadata,
+    AD: AuthDisplay,
+    CA: ClientAuthMethod,
+    CN: ClaimName,
+    CT: ClaimType,
+    G: GrantType,
+    JE: JweContentEncryptionAlgorithm,
+    JK: JweKeyManagementAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    RM: ResponseMode,
+    RT: ResponseType,
+    S: SubjectIdentifierType,
+{
+    issuer: IssuerUrl,
+    authorization_endpoint: AuthUrl,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    token_endpoint: Option<TokenUrl>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    userinfo_endpoint: Option<UserInfoUrl>,
+    jwks_uri: JsonWebKeySetUrl,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    registration_endpoint: Option<RegistrationUrl>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    scopes_supported: Option<Vec<Scope>>,
+    #[serde(bound(deserialize = "RT: ResponseType"))]
+    response_types_supported: Vec<ResponseTypes<RT>>,
+    #[serde(
+        bound(deserialize = "RM: ResponseMode"),
+        skip_serializing_if = "Option::is_none"
+    )]
+    response_modes_supported: Option<Vec<RM>>,
+    #[serde(
+        bound(deserialize = "G: GrantType"),
+        skip_serializing_if = "Option::is_none"
+    )]
+    grant_types_supported: Option<Vec<G>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    acr_values_supported: Option<Vec<AuthenticationContextClass>>,
+    #[serde(bound(deserialize = "S: SubjectIdentifierType"))]
+    subject_types_supported: Vec<S>,
+    #[serde(bound(deserialize = "JS: JwsSigningAlgorithm<JT>"))]
+    id_token_signing_alg_values_supported: Vec<JS>,
+    #[serde(
+        bound(deserialize = "JK: JweKeyManagementAlgorithm"),
+        skip_serializing_if = "Option::is_none"
+    )]
+    id_token_encryption_alg_values_supported: Option<Vec<JK>>,
+    #[serde(
+        bound(deserialize = "JE: JweContentEncryptionAlgorithm"),
+        skip_serializing_if = "Option::is_none"
+    )]
+    id_token_encryption_enc_values_supported: Option<Vec<JE>>,
+    #[serde(
+        bound(deserialize = "JS: JwsSigningAlgorithm<JT>"),
+        skip_serializing_if = "Option::is_none"
+    )]
+    userinfo_signing_alg_values_supported: Option<Vec<JS>>,
+    #[serde(
+        bound(deserialize = "JK: JweKeyManagementAlgorithm"),
+        skip_serializing_if = "Option::is_none"
+    )]
+    userinfo_encryption_alg_values_supported: Option<Vec<JK>>,
+    #[serde(
+        bound(deserialize = "JE: JweContentEncryptionAlgorithm"),
+        skip_serializing_if = "Option::is_none"
+    )]
+    userinfo_encryption_enc_values_supported: Option<Vec<JE>>,
+    #[serde(
+        bound(deserialize = "JS: JwsSigningAlgorithm<JT>"),
+        skip_serializing_if = "Option::is_none"
+    )]
+    request_object_signing_alg_values_supported: Option<Vec<JS>>,
+    #[serde(
+        bound(deserialize = "JK: JweKeyManagementAlgorithm"),
+        skip_serializing_if = "Option::is_none"
+    )]
+    request_object_encryption_alg_values_supported: Option<Vec<JK>>,
+    #[serde(
+        bound(deserialize = "JE: JweContentEncryptionAlgorithm"),
+        skip_serializing_if = "Option::is_none"
+    )]
+    request_object_encryption_enc_values_supported: Option<Vec<JE>>,
+    #[serde(
+        bound(deserialize = "CA: ClientAuthMethod"),
+        skip_serializing_if = "Option::is_none"
+    )]
+    token_endpoint_auth_methods_supported: Option<Vec<CA>>,
+    #[serde(
+        bound(deserialize = "JS: JwsSigningAlgorithm<JT>"),
+        skip_serializing_if = "Option::is_none"
+    )]
+    token_endpoint_auth_signing_alg_values_supported: Option<Vec<JS>>,
+    #[serde(
+        bound(deserialize = "AD: AuthDisplay"),
+        skip_serializing_if = "Option::is_none"
+    )]
+    display_values_supported: Option<Vec<AD>>,
+    #[serde(
+        bound(deserialize = "CT: ClaimType"),
+        skip_serializing_if = "Option::is_none"
+    )]
+    claim_types_supported: Option<Vec<CT>>,
+    #[serde(
+        bound(deserialize = "CN: ClaimName"),
+        skip_serializing_if = "Option::is_none"
+    )]
+    claims_supported: Option<Vec<CN>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    service_documentation: Option<ServiceDocUrl>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    claims_locales_supported: Option<Vec<LanguageTag>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ui_locales_supported: Option<Vec<LanguageTag>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    claims_parameter_supported: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    request_parameter_supported: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    request_uri_parameter_supported: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    require_request_uri_registration: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    op_policy_uri: Option<OpPolicyUrl>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    op_tos_uri: Option<OpTosUrl>,
+
+    #[serde(bound(deserialize = "A: AdditionalProviderMetadata"), flatten)]
+    additional_metadata: A,
+
+    #[serde(skip)]
+    _phantom_jt: PhantomData<JT>,
+}
+impl<A, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>
+    ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>
+where
+    A: AdditionalProviderMetadata,
+    AD: AuthDisplay,
+    CA: ClientAuthMethod,
+    CN: ClaimName,
+    CT: ClaimType,
+    G: GrantType,
+    JE: JweContentEncryptionAlgorithm,
+    JK: JweKeyManagementAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    RM: ResponseMode,
+    RT: ResponseType,
+    S: SubjectIdentifierType,
+{
+    pub fn new(
+        issuer: IssuerUrl,
+        authorization_endpoint: AuthUrl,
+        jwks_uri: JsonWebKeySetUrl,
+        response_types_supported: Vec<ResponseTypes<RT>>,
+        subject_types_supported: Vec<S>,
+        id_token_signing_alg_values_supported: Vec<JS>,
+        additional_metadata: A,
+    ) -> Self {
+        Self {
+            issuer,
+            authorization_endpoint,
+            token_endpoint: None,
+            userinfo_endpoint: None,
+            jwks_uri,
+            registration_endpoint: None,
+            scopes_supported: None,
+            response_types_supported,
+            response_modes_supported: None,
+            grant_types_supported: None,
+            acr_values_supported: None,
+            subject_types_supported,
+            id_token_signing_alg_values_supported,
+            id_token_encryption_alg_values_supported: None,
+            id_token_encryption_enc_values_supported: None,
+            userinfo_signing_alg_values_supported: None,
+            userinfo_encryption_alg_values_supported: None,
+            userinfo_encryption_enc_values_supported: None,
+            request_object_signing_alg_values_supported: None,
+            request_object_encryption_alg_values_supported: None,
+            request_object_encryption_enc_values_supported: None,
+            token_endpoint_auth_methods_supported: None,
+            token_endpoint_auth_signing_alg_values_supported: None,
+            display_values_supported: None,
+            claim_types_supported: None,
+            claims_supported: None,
+            service_documentation: None,
+            claims_locales_supported: None,
+            ui_locales_supported: None,
+            claims_parameter_supported: None,
+            request_parameter_supported: None,
+            request_uri_parameter_supported: None,
+            require_request_uri_registration: None,
+            op_policy_uri: None,
+            op_tos_uri: None,
+            additional_metadata,
+            _phantom_jt: PhantomData,
         }
     }
-    #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-    struct Discovery10ProviderMetadata[
-        AD: AuthDisplay,
-        CA: ClientAuthMethod,
-        CN: ClaimName,
-        CT: ClaimType,
-        G: GrantType,
-        JE: JweContentEncryptionAlgorithm,
-        JK: JweKeyManagementAlgorithm,
-        JS: JwsSigningAlgorithm<JT>,
-        JT: JsonWebKeyType,
-        RM: ResponseMode,
-        RT: ResponseType,
-        S: SubjectIdentifierType,
-    ] {
-        issuer(&IssuerUrl) <- IssuerUrl,
-        authorization_endpoint(&AuthUrl) <- AuthUrl,
-        #[serde(skip_serializing_if="Option::is_none")]
-        token_endpoint(Option<&TokenUrl>) <- Option<TokenUrl>,
-        #[serde(skip_serializing_if="Option::is_none")]
-        userinfo_endpoint(Option<&UserInfoUrl>) <- Option<UserInfoUrl>,
-        #[serde(skip_serializing_if="Option::is_none")]
-        jwks_uri(Option<&JsonWebKeySetUrl>) <- Option<JsonWebKeySetUrl>,
-        #[serde(skip_serializing_if="Option::is_none")]
-        registration_endpoint(Option<&RegistrationUrl>) <- Option<RegistrationUrl>,
-        #[serde(skip_serializing_if="Option::is_none")]
-        scopes_supported(Option<&Vec<Scope>>) <- Option<Vec<Scope>>,
-        #[serde(bound(deserialize = "RT: ResponseType"))]
-        response_types_supported(&Vec<ResponseTypes<RT>>) <- Vec<ResponseTypes<RT>>,
-        #[serde(bound(deserialize = "RM: ResponseMode"), skip_serializing_if="Option::is_none")]
-        response_modes_supported(Option<&Vec<RM>>) <- Option<Vec<RM>>,
-        #[serde(bound(deserialize = "G: GrantType"), skip_serializing_if="Option::is_none")]
-        grant_types_supported(Option<&Vec<G>>) <- Option<Vec<G>>,
-        #[serde(skip_serializing_if="Option::is_none")]
-        acr_values_supported(Option<&Vec<AuthenticationContextClass>>)
-            <- Option<Vec<AuthenticationContextClass>>,
-        #[serde(bound(deserialize = "S: SubjectIdentifierType"))]
-        subject_types_supported(&Vec<S>) <- Vec<S>,
-        #[serde(bound(deserialize = "JS: JwsSigningAlgorithm<JT>"))]
-        id_token_signing_alg_values_supported(&Vec<JS>) <- Vec<JS>,
-        #[serde(bound(deserialize = "JK: JweKeyManagementAlgorithm"), skip_serializing_if="Option::is_none")]
-        id_token_encryption_alg_values_supported(Option<&Vec<JK>>) <- Option<Vec<JK>>,
-        #[serde(bound(deserialize = "JE: JweContentEncryptionAlgorithm"), skip_serializing_if="Option::is_none")]
-        id_token_encryption_enc_values_supported(Option<&Vec<JE>>) <- Option<Vec<JE>>,
-        #[serde(bound(deserialize = "JS: JwsSigningAlgorithm<JT>"), skip_serializing_if="Option::is_none")]
-        userinfo_signing_alg_values_supported(Option<&Vec<JS>>) <- Option<Vec<JS>>,
-        #[serde(bound(deserialize = "JK: JweKeyManagementAlgorithm"), skip_serializing_if="Option::is_none")]
-        userinfo_encryption_alg_values_supported(Option<&Vec<JK>>) <- Option<Vec<JK>>,
-        #[serde(bound(deserialize = "JE: JweContentEncryptionAlgorithm"), skip_serializing_if="Option::is_none")]
-        userinfo_encryption_enc_values_supported(Option<&Vec<JE>>) <- Option<Vec<JE>>,
-        #[serde(bound(deserialize = "JS: JwsSigningAlgorithm<JT>"), skip_serializing_if="Option::is_none")]
-        request_object_signing_alg_values_supported(Option<&Vec<JS>>) <- Option<Vec<JS>>,
-        #[serde(bound(deserialize = "JK: JweKeyManagementAlgorithm"), skip_serializing_if="Option::is_none")]
-        request_object_encryption_alg_values_supported(Option<&Vec<JK>>) <- Option<Vec<JK>>,
-        #[serde(bound(deserialize = "JE: JweContentEncryptionAlgorithm"), skip_serializing_if="Option::is_none")]
-        request_object_encryption_enc_values_supported(Option<&Vec<JE>>) <- Option<Vec<JE>>,
-        #[serde(bound(deserialize = "CA: ClientAuthMethod"), skip_serializing_if="Option::is_none")]
-        token_endpoint_auth_methods_supported(Option<&Vec<CA>>) <- Option<Vec<CA>>,
-        #[serde(bound(deserialize = "JS: JwsSigningAlgorithm<JT>"), skip_serializing_if="Option::is_none")]
-        token_endpoint_auth_signing_alg_values_supported(Option<&Vec<JS>>) <- Option<Vec<JS>>,
-        #[serde(bound(deserialize = "AD: AuthDisplay"), skip_serializing_if="Option::is_none")]
-        display_values_supported(Option<&Vec<AD>>) <- Option<Vec<AD>>,
-        #[serde(bound(deserialize = "CT: ClaimType"), skip_serializing_if="Option::is_none")]
-        claim_types_supported(Option<&Vec<CT>>) <- Option<Vec<CT>>,
-        #[serde(bound(deserialize = "CN: ClaimName"), skip_serializing_if="Option::is_none")]
-        claims_supported(Option<&Vec<CN>>) <- Option<Vec<CN>>,
-        #[serde(skip_serializing_if="Option::is_none")]
-        service_documentation(Option<&ServiceDocUrl>) <- Option<ServiceDocUrl>,
-        #[serde(skip_serializing_if="Option::is_none")]
-        claims_locales_supported(Option<&Vec<LanguageTag>>) <- Option<Vec<LanguageTag>>,
-        #[serde(skip_serializing_if="Option::is_none")]
-        ui_locales_supported(Option<&Vec<LanguageTag>>) <- Option<Vec<LanguageTag>>,
-        #[serde(skip_serializing_if="Option::is_none")]
-        claims_parameter_supported(Option<bool>) <- Option<bool>,
-        #[serde(skip_serializing_if="Option::is_none")]
-        request_parameter_supported(Option<bool>) <- Option<bool>,
-        #[serde(skip_serializing_if="Option::is_none")]
-        request_uri_parameter_supported(Option<bool>) <- Option<bool>,
-        #[serde(skip_serializing_if="Option::is_none")]
-        require_request_uri_registration(Option<bool>) <- Option<bool>,
-        #[serde(skip_serializing_if="Option::is_none")]
-        op_policy_uri(Option<&OpPolicyUrl>) <- Option<OpPolicyUrl>,
-        #[serde(skip_serializing_if="Option::is_none")]
-        op_tos_uri(Option<&OpTosUrl>) <- Option<OpTosUrl>,
-        // FIXME: remove trait method
-        #[serde(skip)]
-        _phantom_jt(PhantomData<JT>) <- PhantomData<JT>,
+
+    field_getters_setters![
+        pub self [self] {
+            set_issuer -> issuer[IssuerUrl],
+            set_authorization_endpoint -> authorization_endpoint[AuthUrl],
+            set_token_endpoint -> token_endpoint[Option<TokenUrl>],
+            set_userinfo_endpoint -> userinfo_endpoint[Option<UserInfoUrl>],
+            set_jwks_uri -> jwks_uri[JsonWebKeySetUrl],
+            set_registration_endpoint -> registration_endpoint[Option<RegistrationUrl>],
+            set_scopes_supported -> scopes_supported[Option<Vec<Scope>>],
+            set_response_types_supported -> response_types_supported[Vec<ResponseTypes<RT>>],
+            set_response_modes_supported -> response_modes_supported[Option<Vec<RM>>],
+            set_grant_types_supported -> grant_types_supported[Option<Vec<G>>],
+            set_acr_values_supported
+                -> acr_values_supported[Option<Vec<AuthenticationContextClass>>],
+            set_subject_types_supported -> subject_types_supported[Vec<S>],
+            set_id_token_signing_alg_values_supported
+                -> id_token_signing_alg_values_supported[Vec<JS>],
+            set_id_token_encryption_alg_values_supported
+                -> id_token_encryption_alg_values_supported[Option<Vec<JK>>],
+            set_id_token_encryption_enc_values_supported
+                -> id_token_encryption_enc_values_supported[Option<Vec<JE>>],
+            set_userinfo_signing_alg_values_supported
+                -> userinfo_signing_alg_values_supported[Option<Vec<JS>>],
+            set_userinfo_encryption_alg_values_supported
+                -> userinfo_encryption_alg_values_supported[Option<Vec<JK>>],
+            set_userinfo_encryption_enc_values_supported
+                -> userinfo_encryption_enc_values_supported[Option<Vec<JE>>],
+            set_request_object_signing_alg_values_supported
+                -> request_object_signing_alg_values_supported[Option<Vec<JS>>],
+            set_request_object_encryption_alg_values_supported
+                -> request_object_encryption_alg_values_supported[Option<Vec<JK>>],
+            set_request_object_encryption_enc_values_supported
+                -> request_object_encryption_enc_values_supported[Option<Vec<JE>>],
+            set_token_endpoint_auth_methods_supported
+                -> token_endpoint_auth_methods_supported[Option<Vec<CA>>],
+            set_token_endpoint_auth_signing_alg_values_supported
+                -> token_endpoint_auth_signing_alg_values_supported[Option<Vec<JS>>],
+            set_display_values_supported -> display_values_supported[Option<Vec<AD>>],
+            set_claim_types_supported -> claim_types_supported[Option<Vec<CT>>],
+            set_claims_supported -> claims_supported[Option<Vec<CN>>],
+            set_service_documentation -> service_documentation[Option<ServiceDocUrl>],
+            set_claims_locales_supported -> claims_locales_supported[Option<Vec<LanguageTag>>],
+            set_ui_locales_supported -> ui_locales_supported[Option<Vec<LanguageTag>>],
+            set_claims_parameter_supported -> claims_parameter_supported[Option<bool>],
+            set_request_parameter_supported -> request_parameter_supported[Option<bool>],
+            set_request_uri_parameter_supported -> request_uri_parameter_supported[Option<bool>],
+            set_require_request_uri_registration -> require_request_uri_registration[Option<bool>],
+            set_op_policy_uri -> op_policy_uri[Option<OpPolicyUrl>],
+            set_op_tos_uri -> op_tos_uri[Option<OpTosUrl>],
+        }
+    ];
+
+    pub fn additional_metadata(&self) -> &A {
+        &self.additional_metadata
     }
-    impl [
-        AD: AuthDisplay,
-        CA: ClientAuthMethod,
-        CN: ClaimName,
-        CT: ClaimType,
-        G: GrantType,
-        JE: JweContentEncryptionAlgorithm,
-        JK: JweKeyManagementAlgorithm,
-        JS: JwsSigningAlgorithm<JT>,
-        JT: JsonWebKeyType,
-        RM: ResponseMode,
-        RT: ResponseType,
-        S: SubjectIdentifierType,
-    ] trait[AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S] for
-    struct[AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S]
-];
+    pub fn additional_metadata_mut(&mut self) -> &mut A {
+        &mut self.additional_metadata
+    }
+}
 
 // FIXME: clean up Display/Debug/cause for this and other Fail impls
 #[derive(Debug, Fail)]
@@ -281,210 +428,404 @@ mod tests {
         AuthenticationContextClass, IssuerUrl, LanguageTag, OpPolicyUrl, OpTosUrl, RegistrationUrl,
         ResponseTypes, ServiceDocUrl, UserInfoUrl,
     };
-    use super::{JsonWebKeySetUrl, ProviderMetadata};
+    use super::{EmptyAdditionalProviderMetadata, JsonWebKeySetUrl};
 
     #[test]
     fn test_discovery_deserialization() {
         // Fetched from: https://rp.certification.openid.net:8080/openidconnect-rs/
         //     rp-response_type-code/.well-known/openid-configuration
-        let json_response = "{
-        \"request_object_signing_alg_values_supported\" : [
-           \"RS256\",
-           \"RS384\",
-           \"RS512\",
-           \"ES256\",
-           \"ES384\",
-           \"ES512\",
-           \"HS256\",
-           \"HS384\",
-           \"HS512\",
-           \"PS256\",
-           \"PS384\",
-           \"PS512\",
-           \"none\"
-        ],
-        \"subject_types_supported\" : [
-           \"public\",
-           \"pairwise\"
-        ],
-        \"end_session_endpoint\" : \"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/end_session\",
-        \"token_endpoint_auth_signing_alg_values_supported\" : [
-           \"RS256\",
-           \"RS384\",
-           \"RS512\",
-           \"ES256\",
-           \"ES384\",
-           \"ES512\",
-           \"HS256\",
-           \"HS384\",
-           \"HS512\",
-           \"PS256\",
-           \"PS384\",
-           \"PS512\"
-        ],
-        \"scopes_supported\" : [
-           \"email\",
-           \"phone\",
-           \"profile\",
-           \"openid\",
-           \"address\",
-           \"offline_access\",
-           \"openid\"
-        ],
-        \"userinfo_signing_alg_values_supported\" : [
-           \"RS256\",
-           \"RS384\",
-           \"RS512\",
-           \"ES256\",
-           \"ES384\",
-           \"ES512\",
-           \"HS256\",
-           \"HS384\",
-           \"HS512\",
-           \"PS256\",
-           \"PS384\",
-           \"PS512\",
-           \"none\"
-        ],
-        \"id_token_encryption_enc_values_supported\" : [
-           \"A128CBC-HS256\",
-           \"A192CBC-HS384\",
-           \"A256CBC-HS512\",
-           \"A128GCM\",
-           \"A192GCM\",
-           \"A256GCM\"
-        ],
-        \"grant_types_supported\" : [
-           \"authorization_code\",
-           \"implicit\",
-           \"urn:ietf:params:oauth:grant-type:jwt-bearer\",
-           \"refresh_token\"
-        ],
-        \"response_modes_supported\" : [
-           \"query\",
-           \"fragment\",
-           \"form_post\"
-        ],
-        \"require_request_uri_registration\" : true,
-        \"registration_endpoint\" : \"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/registration\",
-        \"response_types_supported\" : [
-           \"code\"
-        ],
-        \"claims_parameter_supported\" : true,
-        \"request_object_encryption_enc_values_supported\" : [
-           \"A128CBC-HS256\",
-           \"A192CBC-HS384\",
-           \"A256CBC-HS512\",
-           \"A128GCM\",
-           \"A192GCM\",
-           \"A256GCM\"
-        ],
-        \"userinfo_endpoint\" : \"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/userinfo\",
-        \"id_token_signing_alg_values_supported\" : [
-           \"RS256\",
-           \"RS384\",
-           \"RS512\",
-           \"ES256\",
-           \"ES384\",
-           \"ES512\",
-           \"HS256\",
-           \"HS384\",
-           \"HS512\",
-           \"PS256\",
-           \"PS384\",
-           \"PS512\",
-           \"none\"
-        ],
-        \"token_endpoint_auth_methods_supported\" : [
-           \"client_secret_post\",
-           \"client_secret_basic\",
-           \"client_secret_jwt\",
-           \"private_key_jwt\"
-        ],
-        \"claims_supported\" : [
-           \"name\",
-           \"given_name\",
-           \"middle_name\",
-           \"picture\",
-           \"email_verified\",
-           \"birthdate\",
-           \"sub\",
-           \"address\",
-           \"zoneinfo\",
-           \"email\",
-           \"gender\",
-           \"preferred_username\",
-           \"family_name\",
-           \"website\",
-           \"profile\",
-           \"phone_number_verified\",
-           \"nickname\",
-           \"updated_at\",
-           \"phone_number\",
-           \"locale\"
-        ],
-        \"issuer\" : \"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\",
-        \"request_object_encryption_alg_values_supported\" : [
-           \"RSA1_5\",
-           \"RSA-OAEP\",
-           \"RSA-OAEP-256\",
-           \"A128KW\",
-           \"A192KW\",
-           \"A256KW\",
-           \"ECDH-ES\",
-           \"ECDH-ES+A128KW\",
-           \"ECDH-ES+A192KW\",
-           \"ECDH-ES+A256KW\"
-        ],
-        \"jwks_uri\" : \"https://rp.certification.openid.net:8080/static/jwks_3INbZl52IrrPCp2j.json\",
-        \"claim_types_supported\" : [
-           \"normal\",
-           \"aggregated\",
-           \"distributed\"
-        ],
-        \"request_uri_parameter_supported\" : true,
-        \"request_parameter_supported\" : true,
-        \"token_endpoint\" : \"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/token\",
-        \"authorization_endpoint\" : \"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/authorization\",
-        \"version\" : \"3.0\",
-        \"id_token_encryption_alg_values_supported\" : [
-           \"RSA1_5\",
-           \"RSA-OAEP\",
-           \"RSA-OAEP-256\",
-           \"A128KW\",
-           \"A192KW\",
-           \"A256KW\",
-           \"ECDH-ES\",
-           \"ECDH-ES+A128KW\",
-           \"ECDH-ES+A192KW\",
-           \"ECDH-ES+A256KW\"
-        ],
-        \"userinfo_encryption_alg_values_supported\" : [
-           \"RSA1_5\",
-           \"RSA-OAEP\",
-           \"RSA-OAEP-256\",
-           \"A128KW\",
-           \"A192KW\",
-           \"A256KW\",
-           \"ECDH-ES\",
-           \"ECDH-ES+A128KW\",
-           \"ECDH-ES+A192KW\",
-           \"ECDH-ES+A256KW\"
-        ],
-        \"userinfo_encryption_enc_values_supported\" : [
-           \"A128CBC-HS256\",
-           \"A192CBC-HS384\",
-           \"A256CBC-HS512\",
-           \"A128GCM\",
-           \"A192GCM\",
-           \"A256GCM\"
-        ],
-        \"acr_values_supported\" : [
-           \"PASSWORD\"
-        ]
-    }";
+        let json_response_standard = "\
+            \"issuer\":\"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\",\
+            \"authorization_endpoint\":\"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/authorization\",\
+            \"token_endpoint\":\"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/token\",\
+            \"userinfo_endpoint\":\"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/userinfo\",\
+            \"jwks_uri\":\"https://rp.certification.openid.net:8080/static/jwks_3INbZl52IrrPCp2j.json\",\
+            \"registration_endpoint\":\"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/registration\",\
+            \"scopes_supported\":[\
+               \"email\",\
+               \"phone\",\
+               \"profile\",\
+               \"openid\",\
+               \"address\",\
+               \"offline_access\",\
+               \"openid\"\
+            ],\
+            \"response_types_supported\":[\
+               \"code\"\
+            ],\
+            \"response_modes_supported\":[\
+               \"query\",\
+               \"fragment\",\
+               \"form_post\"\
+            ],\
+            \"grant_types_supported\":[\
+               \"authorization_code\",\
+               \"implicit\",\
+               \"urn:ietf:params:oauth:grant-type:jwt-bearer\",\
+               \"refresh_token\"\
+            ],\
+            \"acr_values_supported\":[\
+               \"PASSWORD\"\
+            ],\
+            \"subject_types_supported\":[\
+               \"public\",\
+               \"pairwise\"\
+            ],\
+            \"id_token_signing_alg_values_supported\":[\
+               \"RS256\",\
+               \"RS384\",\
+               \"RS512\",\
+               \"ES256\",\
+               \"ES384\",\
+               \"ES512\",\
+               \"HS256\",\
+               \"HS384\",\
+               \"HS512\",\
+               \"PS256\",\
+               \"PS384\",\
+               \"PS512\",\
+               \"none\"\
+            ],\
+            \"id_token_encryption_alg_values_supported\":[\
+               \"RSA1_5\",\
+               \"RSA-OAEP\",\
+               \"RSA-OAEP-256\",\
+               \"A128KW\",\
+               \"A192KW\",\
+               \"A256KW\",\
+               \"ECDH-ES\",\
+               \"ECDH-ES+A128KW\",\
+               \"ECDH-ES+A192KW\",\
+               \"ECDH-ES+A256KW\"\
+            ],\
+            \"id_token_encryption_enc_values_supported\":[\
+               \"A128CBC-HS256\",\
+               \"A192CBC-HS384\",\
+               \"A256CBC-HS512\",\
+               \"A128GCM\",\
+               \"A192GCM\",\
+               \"A256GCM\"\
+            ],\
+            \"userinfo_signing_alg_values_supported\":[\
+               \"RS256\",\
+               \"RS384\",\
+               \"RS512\",\
+               \"ES256\",\
+               \"ES384\",\
+               \"ES512\",\
+               \"HS256\",\
+               \"HS384\",\
+               \"HS512\",\
+               \"PS256\",\
+               \"PS384\",\
+               \"PS512\",\
+               \"none\"\
+            ],\
+            \"userinfo_encryption_alg_values_supported\":[\
+               \"RSA1_5\",\
+               \"RSA-OAEP\",\
+               \"RSA-OAEP-256\",\
+               \"A128KW\",\
+               \"A192KW\",\
+               \"A256KW\",\
+               \"ECDH-ES\",\
+               \"ECDH-ES+A128KW\",\
+               \"ECDH-ES+A192KW\",\
+               \"ECDH-ES+A256KW\"\
+            ],\
+            \"userinfo_encryption_enc_values_supported\":[\
+               \"A128CBC-HS256\",\
+               \"A192CBC-HS384\",\
+               \"A256CBC-HS512\",\
+               \"A128GCM\",\
+               \"A192GCM\",\
+               \"A256GCM\"\
+            ],\
+            \"request_object_signing_alg_values_supported\":[\
+               \"RS256\",\
+               \"RS384\",\
+               \"RS512\",\
+               \"ES256\",\
+               \"ES384\",\
+               \"ES512\",\
+               \"HS256\",\
+               \"HS384\",\
+               \"HS512\",\
+               \"PS256\",\
+               \"PS384\",\
+               \"PS512\",\
+               \"none\"\
+            ],\
+            \"request_object_encryption_alg_values_supported\":[\
+               \"RSA1_5\",\
+               \"RSA-OAEP\",\
+               \"RSA-OAEP-256\",\
+               \"A128KW\",\
+               \"A192KW\",\
+               \"A256KW\",\
+               \"ECDH-ES\",\
+               \"ECDH-ES+A128KW\",\
+               \"ECDH-ES+A192KW\",\
+               \"ECDH-ES+A256KW\"\
+            ],\
+            \"request_object_encryption_enc_values_supported\":[\
+               \"A128CBC-HS256\",\
+               \"A192CBC-HS384\",\
+               \"A256CBC-HS512\",\
+               \"A128GCM\",\
+               \"A192GCM\",\
+               \"A256GCM\"\
+            ],\
+            \"token_endpoint_auth_methods_supported\":[\
+               \"client_secret_post\",\
+               \"client_secret_basic\",\
+               \"client_secret_jwt\",\
+               \"private_key_jwt\"\
+            ],\
+            \"token_endpoint_auth_signing_alg_values_supported\":[\
+               \"RS256\",\
+               \"RS384\",\
+               \"RS512\",\
+               \"ES256\",\
+               \"ES384\",\
+               \"ES512\",\
+               \"HS256\",\
+               \"HS384\",\
+               \"HS512\",\
+               \"PS256\",\
+               \"PS384\",\
+               \"PS512\"\
+            ],\
+            \"claim_types_supported\":[\
+               \"normal\",\
+               \"aggregated\",\
+               \"distributed\"\
+            ],\
+            \"claims_supported\":[\
+               \"name\",\
+               \"given_name\",\
+               \"middle_name\",\
+               \"picture\",\
+               \"email_verified\",\
+               \"birthdate\",\
+               \"sub\",\
+               \"address\",\
+               \"zoneinfo\",\
+               \"email\",\
+               \"gender\",\
+               \"preferred_username\",\
+               \"family_name\",\
+               \"website\",\
+               \"profile\",\
+               \"phone_number_verified\",\
+               \"nickname\",\
+               \"updated_at\",\
+               \"phone_number\",\
+               \"locale\"\
+            ],\
+            \"claims_parameter_supported\":true,\
+            \"request_parameter_supported\":true,\
+            \"request_uri_parameter_supported\":true,\
+            \"require_request_uri_registration\":true";
 
-        let provider_metadata: CoreProviderMetadata = serde_json::from_str(json_response).unwrap();
+        let json_response = format!(
+            "{{{},{}}}",
+            json_response_standard,
+            "\"end_session_endpoint\":\"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/end_session\",\
+            \"version\":\"3.0\""
+        );
+        dbg!(&json_response);
+
+        let all_signing_algs = vec![
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384,
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512,
+            CoreJwsSigningAlgorithm::EcdsaP256Sha256,
+            CoreJwsSigningAlgorithm::EcdsaP384Sha384,
+            CoreJwsSigningAlgorithm::EcdsaP521Sha512,
+            CoreJwsSigningAlgorithm::HmacSha256,
+            CoreJwsSigningAlgorithm::HmacSha384,
+            CoreJwsSigningAlgorithm::HmacSha512,
+            CoreJwsSigningAlgorithm::RsaSsaPssSha256,
+            CoreJwsSigningAlgorithm::RsaSsaPssSha384,
+            CoreJwsSigningAlgorithm::RsaSsaPssSha512,
+            CoreJwsSigningAlgorithm::None,
+        ];
+        let all_encryption_algs = vec![
+            CoreJweKeyManagementAlgorithm::RsaPkcs1V15,
+            CoreJweKeyManagementAlgorithm::RsaOaep,
+            CoreJweKeyManagementAlgorithm::RsaOaepSha256,
+            CoreJweKeyManagementAlgorithm::AesKeyWrap128,
+            CoreJweKeyManagementAlgorithm::AesKeyWrap192,
+            CoreJweKeyManagementAlgorithm::AesKeyWrap256,
+            CoreJweKeyManagementAlgorithm::EcdhEs,
+            CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap128,
+            CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap192,
+            CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap256,
+        ];
+        let new_provider_metadata = CoreProviderMetadata::new(
+            IssuerUrl::new(
+                "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code"
+                    .to_string(),
+            )
+            .unwrap(),
+            AuthUrl::new(
+                Url::parse(
+                    "https://rp.certification.openid.net:8080/openidconnect-rs/\
+                     rp-response_type-code/authorization",
+                )
+                .unwrap(),
+            ),
+            JsonWebKeySetUrl::new(
+                "https://rp.certification.openid.net:8080/static/jwks_3INbZl52IrrPCp2j.json"
+                    .to_string(),
+            )
+            .unwrap(),
+            vec![ResponseTypes::new(vec![CoreResponseType::Code])],
+            vec![
+                CoreSubjectIdentifierType::Public,
+                CoreSubjectIdentifierType::Pairwise,
+            ],
+            all_signing_algs.clone(),
+            EmptyAdditionalProviderMetadata {},
+        )
+        .set_request_object_signing_alg_values_supported(Some(all_signing_algs.clone()))
+        .set_token_endpoint_auth_signing_alg_values_supported(Some(vec![
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384,
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512,
+            CoreJwsSigningAlgorithm::EcdsaP256Sha256,
+            CoreJwsSigningAlgorithm::EcdsaP384Sha384,
+            CoreJwsSigningAlgorithm::EcdsaP521Sha512,
+            CoreJwsSigningAlgorithm::HmacSha256,
+            CoreJwsSigningAlgorithm::HmacSha384,
+            CoreJwsSigningAlgorithm::HmacSha512,
+            CoreJwsSigningAlgorithm::RsaSsaPssSha256,
+            CoreJwsSigningAlgorithm::RsaSsaPssSha384,
+            CoreJwsSigningAlgorithm::RsaSsaPssSha512,
+        ]))
+        .set_scopes_supported(Some(vec![
+            Scope::new("email".to_string()),
+            Scope::new("phone".to_string()),
+            Scope::new("profile".to_string()),
+            Scope::new("openid".to_string()),
+            Scope::new("address".to_string()),
+            Scope::new("offline_access".to_string()),
+            Scope::new("openid".to_string()),
+        ]))
+        .set_userinfo_signing_alg_values_supported(Some(all_signing_algs.clone()))
+        .set_id_token_encryption_enc_values_supported(Some(vec![
+            CoreJweContentEncryptionAlgorithm::Aes128CbcHmacSha256,
+            CoreJweContentEncryptionAlgorithm::Aes192CbcHmacSha384,
+            CoreJweContentEncryptionAlgorithm::Aes256CbcHmacSha512,
+            CoreJweContentEncryptionAlgorithm::Aes128Gcm,
+            CoreJweContentEncryptionAlgorithm::Aes192Gcm,
+            CoreJweContentEncryptionAlgorithm::Aes256Gcm,
+        ]))
+        .set_grant_types_supported(Some(vec![
+            CoreGrantType::AuthorizationCode,
+            CoreGrantType::Implicit,
+            CoreGrantType::Extension("urn:ietf:params:oauth:grant-type:jwt-bearer".to_string()),
+            CoreGrantType::RefreshToken,
+        ]))
+        .set_response_modes_supported(Some(vec![
+            CoreResponseMode::Query,
+            CoreResponseMode::Fragment,
+            CoreResponseMode::FormPost,
+        ]))
+        .set_require_request_uri_registration(Some(true))
+        .set_registration_endpoint(Some(
+            RegistrationUrl::new(
+                "https://rp.certification.openid.net:8080/openidconnect-rs/\
+                 rp-response_type-code/registration"
+                    .to_string(),
+            )
+            .unwrap(),
+        ))
+        .set_claims_parameter_supported(Some(true))
+        .set_request_object_encryption_enc_values_supported(Some(vec![
+            CoreJweContentEncryptionAlgorithm::Aes128CbcHmacSha256,
+            CoreJweContentEncryptionAlgorithm::Aes192CbcHmacSha384,
+            CoreJweContentEncryptionAlgorithm::Aes256CbcHmacSha512,
+            CoreJweContentEncryptionAlgorithm::Aes128Gcm,
+            CoreJweContentEncryptionAlgorithm::Aes192Gcm,
+            CoreJweContentEncryptionAlgorithm::Aes256Gcm,
+        ]))
+        .set_userinfo_endpoint(Some(
+            UserInfoUrl::new(
+                "https://rp.certification.openid.net:8080/openidconnect-rs/\
+                 rp-response_type-code/userinfo"
+                    .to_string(),
+            )
+            .unwrap(),
+        ))
+        .set_token_endpoint_auth_methods_supported(Some(vec![
+            CoreClientAuthMethod::ClientSecretPost,
+            CoreClientAuthMethod::ClientSecretBasic,
+            CoreClientAuthMethod::ClientSecretJwt,
+            CoreClientAuthMethod::PrivateKeyJwt,
+        ]))
+        .set_claims_supported(Some(
+            vec![
+                "name",
+                "given_name",
+                "middle_name",
+                "picture",
+                "email_verified",
+                "birthdate",
+                "sub",
+                "address",
+                "zoneinfo",
+                "email",
+                "gender",
+                "preferred_username",
+                "family_name",
+                "website",
+                "profile",
+                "phone_number_verified",
+                "nickname",
+                "updated_at",
+                "phone_number",
+                "locale",
+            ]
+            .iter()
+            .map(|claim| CoreClaimName::new(claim.to_string()))
+            .collect(),
+        ))
+        .set_request_object_encryption_alg_values_supported(Some(all_encryption_algs.clone()))
+        .set_claim_types_supported(Some(vec![
+            CoreClaimType::Normal,
+            CoreClaimType::Aggregated,
+            CoreClaimType::Distributed,
+        ]))
+        .set_request_uri_parameter_supported(Some(true))
+        .set_request_parameter_supported(Some(true))
+        .set_token_endpoint(Some(TokenUrl::new(
+            Url::parse(
+                "https://rp.certification.openid.net:8080/openidconnect-rs/\
+                 rp-response_type-code/token",
+            )
+            .unwrap(),
+        )))
+        .set_id_token_encryption_alg_values_supported(Some(all_encryption_algs.clone()))
+        .set_userinfo_encryption_alg_values_supported(Some(all_encryption_algs.clone()))
+        .set_userinfo_encryption_enc_values_supported(Some(vec![
+            CoreJweContentEncryptionAlgorithm::Aes128CbcHmacSha256,
+            CoreJweContentEncryptionAlgorithm::Aes192CbcHmacSha384,
+            CoreJweContentEncryptionAlgorithm::Aes256CbcHmacSha512,
+            CoreJweContentEncryptionAlgorithm::Aes128Gcm,
+            CoreJweContentEncryptionAlgorithm::Aes192Gcm,
+            CoreJweContentEncryptionAlgorithm::Aes256Gcm,
+        ]))
+        .set_acr_values_supported(Some(vec![AuthenticationContextClass::new(
+            "PASSWORD".to_string(),
+        )]));
+
+        let provider_metadata: CoreProviderMetadata = serde_json::from_str(&json_response).unwrap();
+        assert_eq!(provider_metadata, new_provider_metadata);
+
+        let serialized = serde_json::to_string(&provider_metadata).unwrap();
+        assert_eq!(serialized, format!("{{{}}}", json_response_standard));
 
         assert_eq!(
             IssuerUrl::new(
@@ -526,13 +867,11 @@ mod tests {
             provider_metadata.userinfo_endpoint()
         );
         assert_eq!(
-            Some(
-                &JsonWebKeySetUrl::new(
-                    "https://rp.certification.openid.net:8080/static/jwks_3INbZl52IrrPCp2j.json"
-                        .to_string()
-                )
-                .unwrap()
-            ),
+            &JsonWebKeySetUrl::new(
+                "https://rp.certification.openid.net:8080/static/jwks_3INbZl52IrrPCp2j.json"
+                    .to_string()
+            )
+            .unwrap(),
             provider_metadata.jwks_uri()
         );
         assert_eq!(
@@ -830,6 +1169,7 @@ mod tests {
         let json_response = "{
         \"issuer\" : \"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\",
         \"authorization_endpoint\" : \"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/authorization\",
+        \"jwks_uri\" : \"https://rp.certification.openid.net:8080/static/jwks_oMXD5waO08Q1GEnv.json\",
         \"response_types_supported\" : [
            \"code\",
            \"code token\",
@@ -893,7 +1233,14 @@ mod tests {
         );
         assert_eq!(None, provider_metadata.token_endpoint());
         assert_eq!(None, provider_metadata.userinfo_endpoint());
-        assert_eq!(None, provider_metadata.jwks_uri());
+        assert_eq!(
+            JsonWebKeySetUrl::new(
+                "https://rp.certification.openid.net:8080/static/jwks_oMXD5waO08Q1GEnv.json"
+                    .to_string()
+            )
+            .unwrap(),
+            *provider_metadata.jwks_uri()
+        );
         assert_eq!(None, provider_metadata.registration_endpoint());
         assert_eq!(None, provider_metadata.scopes_supported());
         assert_eq!(

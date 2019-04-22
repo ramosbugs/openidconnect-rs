@@ -11,17 +11,16 @@ use oauth2::{ErrorResponseType, ResponseType as OAuth2ResponseType, StandardToke
 use serde::de::{Error as DeserializeError, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::discovery::Discovery10ProviderMetadata;
 use super::registration::{
     RegisterErrorResponseType, Registration10ClientMetadata,
     Registration10ClientRegistrationRequest, Registration10ClientRegistrationResponse,
 };
 use super::{
     ApplicationType, AuthDisplay, AuthPrompt, ClaimName, ClaimType, Client, ClientAuthMethod,
-    EmptyAdditionalClaims, GenderClaim, GrantType, IdToken, IdTokenClaims, IdTokenFields,
-    IdTokenVerifier, JsonWebKeySet, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm,
-    JwsSigningAlgorithm, ResponseMode, ResponseType, SubjectIdentifierType, UserInfoClaims,
-    UserInfoJsonWebToken, UserInfoVerifier,
+    EmptyAdditionalClaims, EmptyAdditionalProviderMetadata, GenderClaim, GrantType, IdToken,
+    IdTokenClaims, IdTokenFields, IdTokenVerifier, JsonWebKeySet, JweContentEncryptionAlgorithm,
+    JweKeyManagementAlgorithm, JwsSigningAlgorithm, ProviderMetadata, ResponseMode, ResponseType,
+    SubjectIdentifierType, UserInfoClaims, UserInfoJsonWebToken, UserInfoVerifier,
 };
 
 pub use self::jwk::{
@@ -42,6 +41,7 @@ pub type CoreAuthenticationFlow = AuthenticationFlow<CoreResponseType>;
 pub type CoreClient = Client<
     EmptyAdditionalClaims,
     CoreAuthDisplay,
+    EmptyAdditionalProviderMetadata,
     CoreClientAuthMethod,
     CoreClaimName,
     CoreClaimType,
@@ -52,7 +52,6 @@ pub type CoreClient = Client<
     CoreJwsSigningAlgorithm,
     CoreJsonWebKeyType,
     CoreAuthPrompt,
-    CoreProviderMetadata,
     CoreResponseMode,
     CoreResponseType,
     CoreSubjectIdentifierType,
@@ -137,7 +136,8 @@ pub type CoreTokenResponse = StandardTokenResponse<CoreIdTokenFields, CoreTokenT
 pub type CoreJsonWebKeySet =
     JsonWebKeySet<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJsonWebKey>;
 
-pub type CoreProviderMetadata = Discovery10ProviderMetadata<
+pub type CoreProviderMetadata = ProviderMetadata<
+    EmptyAdditionalProviderMetadata,
     CoreAuthDisplay,
     CoreClientAuthMethod,
     CoreClaimName,
