@@ -39,7 +39,7 @@ pub fn sign_rsa(
     let sig_len = key.public_modulus_len();
     let mut sig = vec![0; sig_len];
     key.sign(padding_alg, rng, msg, &mut sig)
-        .map_err(|_| SigningError::CryptoError("signing failed".to_string()))?;
+        .map_err(|_| SigningError::CryptoError)?;
     Ok(sig)
 }
 

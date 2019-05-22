@@ -319,7 +319,7 @@ where
         registration_endpoint: &RegistrationUrl,
     ) -> Result<CR, ClientRegistrationError<ET>> {
         let request_json = serde_json::to_string(self.client_metadata())
-            .map_err(ClientRegistrationError::Json)?
+            .map_err(ClientRegistrationError::Serialize)?
             .into_bytes();
 
         let auth_header_opt = if let Some(initial_access_token) = self.initial_access_token() {
@@ -355,6 +355,7 @@ where
         {
             return Err(ClientRegistrationError::Response(
                 register_response.status_code,
+                register_response.body,
                 "unexpected HTTP status code".to_string(),
             ));
         }
@@ -362,7 +363,11 @@ where
         register_response
             .check_content_type(MIME_TYPE_JSON)
             .map_err(|err_msg| {
-                ClientRegistrationError::Response(register_response.status_code, err_msg)
+                ClientRegistrationError::Response(
+                    register_response.status_code,
+                    register_response.body.clone(),
+                    err_msg,
+                )
             })?;
 
         let response_body = String::from_utf8(register_response.body).map_err(|parse_error| {
@@ -374,11 +379,11 @@ where
 
         if register_response.status_code == HTTP_STATUS_BAD_REQUEST {
             let response_error: ErrorResponse<ET> =
-                serde_json::from_str(&response_body).map_err(ClientRegistrationError::Json)?;
+                serde_json::from_str(&response_body).map_err(ClientRegistrationError::Parse)?;
             return Err(ClientRegistrationError::ServerResponse(response_error));
         }
 
-        serde_json::from_str(&response_body).map_err(ClientRegistrationError::Json)
+        serde_json::from_str(&response_body).map_err(ClientRegistrationError::Parse)
     }
 
     field_setter_decls![
@@ -735,18 +740,20 @@ pub trait RegisterErrorResponseType: Clone + ErrorResponseType + Send + Sync + '
 
 #[derive(Debug, Fail)]
 pub enum ClientRegistrationError<T: RegisterErrorResponseType> {
-    #[fail(display = "Request error: {}", _0)]
-    Request(curl::Error),
-    #[fail(display = "Response error (status={}): {}", _0, _1)]
-    Response(u32, String),
-    #[fail(display = "JSON error: {}", _0)]
-    Json(serde_json::Error),
-    #[fail(display = "Server response: {}", _0)]
+    #[fail(display = "Other error: {}", _0)]
+    Other(String),
+    #[fail(display = "Failed to parse server response")]
+    Parse(#[cause] serde_json::Error),
+    #[fail(display = "Request failed")]
+    Request(#[cause] curl::Error),
+    #[fail(display = "Server returned invalid response: {}", _2)]
+    Response(u32, Vec<u8>, String),
+    #[fail(display = "Failed to serialize client metadata")]
+    Serialize(#[cause] serde_json::Error),
+    #[fail(display = "Server returned error")]
     ServerResponse(ErrorResponse<T>),
     #[fail(display = "Validation error: {}", _0)]
     Validation(String),
-    #[fail(display = "Other error: {}", _0)]
-    Other(String),
 }
 
 #[cfg(test)]

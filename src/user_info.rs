@@ -45,7 +45,7 @@ where
         subject: &SubjectIdentifier,
     ) -> Result<Self, UserInfoError> {
         let user_info = serde_json::from_slice::<UserInfoClaimsImpl<AC, GC>>(&user_info_json)
-            .map_err(UserInfoError::Json)?;
+            .map_err(UserInfoError::Parse)?;
 
         // This is the only verification we need to do for JSON-based user info claims, so don't
         // bother with the complexity of a separate verifier object.
@@ -247,6 +247,7 @@ new_url_type![
                 return Err(
                     UserInfoError::Response(
                         user_info_response.status_code,
+                        user_info_response.body.clone(),
                         "unexpected HTTP status code".to_string()
                     )
                 );
@@ -275,7 +276,7 @@ new_url_type![
                     serde_json::from_value::<UserInfoJsonWebToken<AC, GC, JE, JS, JT>>(
                         serde_json::Value::String(jwt_str)
                     )
-                    .map_err(UserInfoError::Json)?
+                    .map_err(UserInfoError::Parse)?
                     .claims(signed_response_verifier)
                     .map_err(UserInfoError::ClaimsVerification)
                 }
@@ -283,6 +284,7 @@ new_url_type![
                     Err(
                         UserInfoError::Response(
                             user_info_response.status_code,
+                            user_info_response.body,
                             format!("unexpected response Content-Type: `{}`", content_type)
                         )
                     ),
@@ -295,12 +297,12 @@ new_url_type![
 pub enum UserInfoError {
     #[fail(display = "Failed to verify claims")]
     ClaimsVerification(#[cause] ClaimsVerificationError),
+    #[fail(display = "Failed to parse server response")]
+    Parse(#[cause] serde_json::Error),
     #[fail(display = "Request failed")]
     Request(#[cause] curl::Error),
-    #[fail(display = "Response error (status={}): {}", _0, _1)]
-    Response(u32, String),
-    #[fail(display = "Failed to parse response")]
-    Json(#[cause] serde_json::Error),
+    #[fail(display = "Server returned invalid response: {}", _2)]
+    Response(u32, Vec<u8>, String),
     #[fail(display = "Other error: {}", _0)]
     Other(String),
 }

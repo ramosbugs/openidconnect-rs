@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::fmt::{Debug, Formatter, Result as FormatterResult};
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -132,7 +131,7 @@ where
     P: Debug + DeserializeOwned + Serialize,
 {
     fn deserialize<DE: serde::de::Error>(payload: &[u8]) -> Result<P, DE>;
-    fn serialize(payload: &P) -> Result<String, Box<Error + Send + Sync>>;
+    fn serialize(payload: &P) -> Result<String, serde_json::Error>;
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -146,7 +145,7 @@ where
             .map_err(|err| DE::custom(format!("Failed to parse payload JSON: {:?}", err)))
     }
 
-    fn serialize(payload: &P) -> Result<String, Box<Error + Send + Sync>> {
+    fn serialize(payload: &P) -> Result<String, serde_json::Error> {
         serde_json::to_string(payload).map_err(Into::into)
     }
 }
@@ -178,10 +177,10 @@ where
 
 #[derive(Debug, Fail)]
 pub enum JsonWebTokenError {
-    #[fail(display = "Serialization error: {}", _0)]
-    SerializationError(Box<Error + Send + Sync>),
-    #[fail(display = "Signing error: {}", _0)]
-    SigningError(SigningError),
+    #[fail(display = "Failed to serialize JWT")]
+    SerializationError(#[cause] serde_json::Error),
+    #[fail(display = "Failed to sign JWT")]
+    SigningError(#[cause] SigningError),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -222,8 +221,8 @@ where
             _phantom_jt: PhantomData,
         };
 
-        let header_json = serde_json::to_string(&header)
-            .map_err(|err| JsonWebTokenError::SerializationError(err.into()))?;
+        let header_json =
+            serde_json::to_string(&header).map_err(JsonWebTokenError::SerializationError)?;
         let header_base64 = base64::encode_config(&header_json, base64::URL_SAFE_NO_PAD);
 
         let serialized_payload =
@@ -439,7 +438,6 @@ where
 
 #[cfg(test)]
 pub mod tests {
-    use std::error::Error;
     use std::marker::PhantomData;
     use std::string::ToString;
 
@@ -601,7 +599,7 @@ pub mod tests {
         fn deserialize<DE: serde::de::Error>(payload: &[u8]) -> Result<String, DE> {
             Ok(String::from_utf8(payload.to_owned()).unwrap())
         }
-        fn serialize(payload: &String) -> Result<String, Box<Error + Send + Sync>> {
+        fn serialize(payload: &String) -> Result<String, serde_json::Error> {
             Ok(payload.to_string())
         }
     }

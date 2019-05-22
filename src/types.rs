@@ -112,13 +112,8 @@ pub trait GrantType: Clone + Debug + DeserializeOwned + PartialEq + Serialize + 
 #[derive(Clone, Debug, Fail, PartialEq)]
 pub enum SigningError {
     /// Failed to sign the message using the given key and parameters.
-    #[fail(display = "Crypto error: {}", _0)]
-    CryptoError(String),
-    /// The supplied key cannot be used in this context. This may occur if the key type does not
-    /// match the signature type (e.g., an RSA key used to validate an HMAC) or the JWK usage
-    /// disallows signatures.
-    #[fail(display = "Invalid cryptographic key: {}", _0)]
-    InvalidKey(String),
+    #[fail(display = "Crypto error")]
+    CryptoError,
     /// Unsupported signature algorithm.
     #[fail(display = "Unsupported signature algorithm: {}", _0)]
     UnsupportedAlg(String),

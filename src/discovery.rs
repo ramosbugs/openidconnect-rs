@@ -62,22 +62,28 @@ where
     .request()
     .map_err(DiscoveryError::Request)?;
 
-    // FIXME: improve error handling (i.e., is there a body response?)
     if discover_response.status_code != HTTP_STATUS_OK {
         return Err(DiscoveryError::Response(
             discover_response.status_code,
-            "unexpected HTTP status code".to_string(),
+            discover_response.body,
+            format!("HTTP status code {}", discover_response.status_code),
         ));
     }
 
     discover_response
         .check_content_type(MIME_TYPE_JSON)
-        .map_err(|err_msg| DiscoveryError::Response(discover_response.status_code, err_msg))?;
+        .map_err(|err_msg| {
+            DiscoveryError::Response(
+                discover_response.status_code,
+                discover_response.body.clone(),
+                err_msg,
+            )
+        })?;
 
     let provider_metadata = serde_json::from_slice::<
         ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
     >(&discover_response.body)
-    .map_err(DiscoveryError::Json)?;
+    .map_err(DiscoveryError::Parse)?;
 
     if provider_metadata.issuer() != issuer_url {
         Err(DiscoveryError::Validation(format!(
@@ -354,21 +360,20 @@ where
     }
 }
 
-// FIXME: clean up Display/Debug/cause for this and other Fail impls
 #[derive(Debug, Fail)]
 pub enum DiscoveryError {
-    #[fail(display = "URL parse error: {}", _0)]
-    UrlParse(url::ParseError),
-    #[fail(display = "Request error: {}", _0)]
-    Request(curl::Error),
-    #[fail(display = "Response error (status={}): {}", _0, _1)]
-    Response(u32, String),
-    #[fail(display = "JSON error: {}", _0)]
-    Json(serde_json::Error),
-    #[fail(display = "Validation error: {}", _0)]
-    Validation(String),
     #[fail(display = "Other error: {}", _0)]
     Other(String),
+    #[fail(display = "Failed to parse server response")]
+    Parse(#[cause] serde_json::Error),
+    #[fail(display = "Request failed")]
+    Request(#[cause] curl::Error),
+    #[fail(display = "Server returned invalid response: {}", _2)]
+    Response(u32, Vec<u8>, String),
+    #[fail(display = "Failed to parse URL")]
+    UrlParse(#[cause] url::ParseError),
+    #[fail(display = "Validation error: {}", _0)]
+    Validation(String),
 }
 
 new_url_type![
@@ -399,16 +404,17 @@ new_url_type![
                 return Err(
                     DiscoveryError::Response(
                         key_response.status_code,
-                        "unexpected HTTP status code".to_string()
+                        key_response.body,
+                        format!("HTTP status code {}", key_response.status_code),
                     )
                 );
             }
 
             key_response
                 .check_content_type(MIME_TYPE_JSON)
-                .map_err(|err_msg| DiscoveryError::Response(key_response.status_code, err_msg))?;
+                .map_err(|err_msg| DiscoveryError::Response(key_response.status_code, key_response.body.clone(), err_msg))?;
 
-            serde_json::from_slice(&key_response.body).map_err(DiscoveryError::Json)
+            serde_json::from_slice(&key_response.body).map_err(DiscoveryError::Parse)
         }
     }
 ];

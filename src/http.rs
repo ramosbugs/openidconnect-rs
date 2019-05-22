@@ -34,7 +34,7 @@ impl HttpResponse {
             // See https://tools.ietf.org/html/rfc7231#section-3.1.1.1.
             if !content_type.starts_with(expected_content_type) {
                 Err(format!(
-                    "Unexpected response Content-Type: `{}`, should be `{}`",
+                    "unexpected response Content-Type: `{}`, should be `{}`",
                     content_type, expected_content_type
                 ))
             } else {
