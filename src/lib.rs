@@ -639,7 +639,7 @@ where
         }
 
         let (url, state) = {
-            let mut extra_params: Vec<(&str, &str)> = vec![
+            let extra_params: Vec<(&str, &str)> = vec![
                 Some(("nonce", nonce.secret().as_str())),
                 param_or_none(acr_values_opt.as_ref(), "acr_values"),
                 param_or_none(claims_locales_opt.as_ref(), "claims_locales"),
