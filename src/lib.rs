@@ -93,7 +93,7 @@ mod macros;
 pub mod core;
 mod discovery;
 pub mod prelude {
-    pub use super::{OAuth2TokenResponse, OpenIdConnect};
+    pub use super::OAuth2TokenResponse;
     pub use oauth2::prelude::*;
 }
 pub mod registration;
@@ -149,114 +149,6 @@ pub enum AuthenticationFlow<RT: ResponseType> {
     Hybrid(Vec<RT>),
 }
 
-// Convenience trait to allow clients to mock out OIDC
-pub trait OpenIdConnect<AC, AD, AP, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>:
-    Sized
-where
-    AC: AdditionalClaims,
-    AD: AuthDisplay,
-    AP: AdditionalProviderMetadata,
-    CA: ClientAuthMethod,
-    CN: ClaimName,
-    CT: ClaimType,
-    G: GrantType,
-    GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm,
-    JK: JweKeyManagementAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    P: AuthPrompt,
-    RM: ResponseMode,
-    RT: ResponseType,
-    S: SubjectIdentifierType,
-    TE: ErrorResponseType + 'static,
-    TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
-    TT: TokenType + 'static,
-{
-    fn new(
-        client_id: ClientId,
-        client_secret: Option<ClientSecret>,
-        auth_url: AuthUrl,
-        token_url: Option<TokenUrl>,
-    ) -> Self;
-    fn discover(
-        client_id: ClientId,
-        client_secret: Option<ClientSecret>,
-        issuer_url: &IssuerUrl,
-    ) -> Result<Self, DiscoveryError>;
-    #[allow(clippy::type_complexity)]
-    fn from_dynamic_registration<A, AR, AT, JU, K>(
-        provider_metadata: &ProviderMetadata<AP, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
-        registration_response: &ClientRegistrationResponse<
-            A,
-            AR,
-            AT,
-            CA,
-            G,
-            JE,
-            JK,
-            JS,
-            JT,
-            JU,
-            K,
-            RT,
-            S,
-        >,
-    ) -> Self
-    where
-        A: AdditionalClientMetadata,
-        AR: AdditionalClientRegistrationResponse,
-        AT: ApplicationType,
-        JU: JsonWebKeyUse,
-        K: JsonWebKey<JS, JT, JU>;
-    fn add_scope(self, scope: Scope) -> Self;
-    fn set_auth_type(self, auth_type: AuthType) -> Self;
-    fn set_redirect_uri(self, redirect_uri: RedirectUrl) -> Self;
-    fn auth_context_values(&self) -> Option<&Vec<AuthenticationContextClass>>;
-    fn set_auth_context_values(self, acr_values: Option<Vec<AuthenticationContextClass>>) -> Self;
-    fn claims_locales(&self) -> Option<&Vec<LanguageTag>>;
-    fn set_claims_locales(self, claims_locales: Option<Vec<LanguageTag>>) -> Self;
-    fn display(&self) -> Option<&AD>;
-    fn set_display(self, display: Option<AD>) -> Self;
-    fn max_age(&self) -> Option<&Duration>;
-    fn set_max_age(self, max_age: Option<Duration>) -> Self;
-    fn prompts(&self) -> Option<&Vec<P>>;
-    fn set_prompts(self, prompts: Option<Vec<P>>) -> Self;
-    fn ui_locales(&self) -> Option<&Vec<LanguageTag>>;
-    fn set_ui_locales(self, ui_locales: Option<Vec<LanguageTag>>) -> Self;
-    fn id_token_verifier<JU, K>(
-        &self,
-    ) -> Result<IdTokenVerifier<JS, JT, JU, K>, JsonWebKeySetFetchError>
-    where
-        JU: JsonWebKeyUse,
-        K: JsonWebKey<JS, JT, JU>;
-    fn authorize_url<NF, SF>(
-        &self,
-        authentication_flow: &AuthenticationFlow<RT>,
-        state_fn: SF,
-        nonce_fn: NF,
-    ) -> (Url, CsrfToken, Nonce)
-    where
-        NF: FnOnce() -> Nonce + 'static,
-        SF: FnOnce() -> CsrfToken + 'static;
-    fn authorize_url_with_hint<NF, SF>(
-        &self,
-        authentication_flow: &AuthenticationFlow<RT>,
-        state_fn: SF,
-        nonce_fn: NF,
-        id_token_hint: Option<&IdToken<AC, GC, JE, JS, JT>>,
-        login_hint: Option<&LoginHint>,
-    ) -> (Url, CsrfToken, Nonce)
-    where
-        NF: FnOnce() -> Nonce + 'static,
-        SF: FnOnce() -> CsrfToken + 'static;
-    fn exchange_code(&self, code: AuthorizationCode) -> Result<TR, RequestTokenError<TE>>;
-    #[allow(clippy::type_complexity)]
-    fn provider_metadata(
-        &self,
-    ) -> Option<&ProviderMetadata<AP, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>>;
-}
-
 #[derive(Clone, Debug)]
 pub struct Client<AC, AD, AM, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
 where
@@ -291,26 +183,10 @@ where
     #[allow(clippy::type_complexity)]
     provider_metadata: Option<ProviderMetadata<AM, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>>,
     ui_locales: Option<Vec<LanguageTag>>,
-    _phantom_ac: PhantomData<AC>,
-    _phantom_ca: PhantomData<CA>,
-    _phantom_cn: PhantomData<CN>,
-    _phantom_ct: PhantomData<CT>,
-    _phantom_g: PhantomData<G>,
-    _phantom_gc: PhantomData<GC>,
-    _phantom_je: PhantomData<JE>,
-    _phantom_jk: PhantomData<JK>,
-    _phantom_js: PhantomData<JS>,
-    _phantom_jt: PhantomData<JT>,
-    _phantom_rm: PhantomData<RM>,
-    _phantom_rt: PhantomData<RT>,
-    _phantom_s: PhantomData<S>,
-    // FIXME: Other parameters MAY be sent. See Sections 3.2.2, 3.3.2, 5.2, 5.5, 6, and 7.2.1 for
-    // additional Authorization Request parameters and parameter values defined by this
-    // specification.
+    _phantom: PhantomData<(AC, CA, CN, CT, G, GC, JE, JK, JS, JT, RM, RT, S)>,
 }
 impl<AC, AD, AP, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
-    OpenIdConnect<AC, AD, AP, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
-    for Client<AC, AD, AP, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
+    Client<AC, AD, AP, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
@@ -332,7 +208,7 @@ where
     TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
     TT: TokenType,
 {
-    fn new(
+    pub fn new(
         client_id: ClientId,
         client_secret: Option<ClientSecret>,
         auth_url: AuthUrl,
@@ -356,23 +232,11 @@ where
             prompts: None,
             provider_metadata: None,
             ui_locales: None,
-            _phantom_ac: PhantomData,
-            _phantom_ca: PhantomData,
-            _phantom_cn: PhantomData,
-            _phantom_ct: PhantomData,
-            _phantom_g: PhantomData,
-            _phantom_gc: PhantomData,
-            _phantom_je: PhantomData,
-            _phantom_jk: PhantomData,
-            _phantom_js: PhantomData,
-            _phantom_jt: PhantomData,
-            _phantom_rm: PhantomData,
-            _phantom_rt: PhantomData,
-            _phantom_s: PhantomData,
+            _phantom: PhantomData,
         }
     }
 
-    fn discover(
+    pub fn discover(
         client_id: ClientId,
         client_secret: Option<ClientSecret>,
         issuer_url: &IssuerUrl,
@@ -412,24 +276,12 @@ where
             prompts: None,
             provider_metadata: Some(provider_metadata),
             ui_locales: None,
-            _phantom_ac: PhantomData,
-            _phantom_ca: PhantomData,
-            _phantom_cn: PhantomData,
-            _phantom_ct: PhantomData,
-            _phantom_g: PhantomData,
-            _phantom_gc: PhantomData,
-            _phantom_je: PhantomData,
-            _phantom_jk: PhantomData,
-            _phantom_js: PhantomData,
-            _phantom_jt: PhantomData,
-            _phantom_rm: PhantomData,
-            _phantom_rt: PhantomData,
-            _phantom_s: PhantomData,
+            _phantom: PhantomData,
         })
     }
 
     #[allow(clippy::type_complexity)]
-    fn from_dynamic_registration<A, AR, AT, JU, K>(
+    pub fn from_dynamic_registration<A, AR, AT, JU, K>(
         provider_metadata: &ProviderMetadata<AP, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
         registration_response: &ClientRegistrationResponse<
             A,
@@ -472,26 +324,14 @@ where
             prompts: None,
             provider_metadata: Some(provider_metadata.clone()),
             ui_locales: None,
-            _phantom_ac: PhantomData,
-            _phantom_ca: PhantomData,
-            _phantom_cn: PhantomData,
-            _phantom_ct: PhantomData,
-            _phantom_g: PhantomData,
-            _phantom_gc: PhantomData,
-            _phantom_je: PhantomData,
-            _phantom_jk: PhantomData,
-            _phantom_js: PhantomData,
-            _phantom_jt: PhantomData,
-            _phantom_rm: PhantomData,
-            _phantom_rt: PhantomData,
-            _phantom_s: PhantomData,
+            _phantom: PhantomData,
         }
     }
 
     ///
     /// Appends a new scope to the authorization URL.
     ///
-    fn add_scope(mut self, scope: Scope) -> Self {
+    pub fn add_scope(mut self, scope: Scope) -> Self {
         self.oauth2_client = self.oauth2_client.add_scope(scope);
         self
     }
@@ -503,7 +343,7 @@ where
     /// The default is to use HTTP Basic authentication, as recommended in
     /// [Section 2.3.1 of RFC 6749](https://tools.ietf.org/html/rfc6749#section-2.3.1).
     ///
-    fn set_auth_type(mut self, auth_type: AuthType) -> Self {
+    pub fn set_auth_type(mut self, auth_type: AuthType) -> Self {
         self.oauth2_client = self.oauth2_client.set_auth_type(auth_type);
         self
     }
@@ -511,15 +351,15 @@ where
     ///
     /// Sets the the redirect URL used by the authorization endpoint.
     ///
-    fn set_redirect_uri(mut self, redirect_uri: RedirectUrl) -> Self {
+    pub fn set_redirect_uri(mut self, redirect_uri: RedirectUrl) -> Self {
         self.oauth2_client = self.oauth2_client.set_redirect_url(redirect_uri);
         self
     }
 
-    fn auth_context_values(&self) -> Option<&Vec<AuthenticationContextClass>> {
+    pub fn auth_context_values(&self) -> Option<&Vec<AuthenticationContextClass>> {
         self.acr_values.as_ref()
     }
-    fn set_auth_context_values(
+    pub fn set_auth_context_values(
         mut self,
         acr_values: Option<Vec<AuthenticationContextClass>>,
     ) -> Self {
@@ -527,47 +367,53 @@ where
         self
     }
 
-    fn claims_locales(&self) -> Option<&Vec<LanguageTag>> {
+    pub fn claims_locales(&self) -> Option<&Vec<LanguageTag>> {
         self.claims_locales.as_ref()
     }
-    fn set_claims_locales(mut self, claims_locales: Option<Vec<LanguageTag>>) -> Self {
+    pub fn set_claims_locales(mut self, claims_locales: Option<Vec<LanguageTag>>) -> Self {
         self.claims_locales = claims_locales;
         self
     }
 
-    fn display(&self) -> Option<&AD> {
+    // FIXME: support 'claims' parameter
+    // https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter
+
+    // FIXME: Add support for 'registration' parameter:
+    // https://openid.net/specs/openid-connect-core-1_0.html#RegistrationParameter
+
+    pub fn display(&self) -> Option<&AD> {
         self.display.as_ref()
     }
-    fn set_display(mut self, display: Option<AD>) -> Self {
+    pub fn set_display(mut self, display: Option<AD>) -> Self {
         self.display = display;
         self
     }
 
-    fn max_age(&self) -> Option<&Duration> {
+    pub fn max_age(&self) -> Option<&Duration> {
         self.max_age.as_ref()
     }
-    fn set_max_age(mut self, max_age: Option<Duration>) -> Self {
+    pub fn set_max_age(mut self, max_age: Option<Duration>) -> Self {
         self.max_age = max_age;
         self
     }
 
-    fn prompts(&self) -> Option<&Vec<P>> {
+    pub fn prompts(&self) -> Option<&Vec<P>> {
         self.prompts.as_ref()
     }
-    fn set_prompts(mut self, prompts: Option<Vec<P>>) -> Self {
+    pub fn set_prompts(mut self, prompts: Option<Vec<P>>) -> Self {
         self.prompts = prompts;
         self
     }
 
-    fn ui_locales(&self) -> Option<&Vec<LanguageTag>> {
+    pub fn ui_locales(&self) -> Option<&Vec<LanguageTag>> {
         self.ui_locales.as_ref()
     }
-    fn set_ui_locales(mut self, ui_locales: Option<Vec<LanguageTag>>) -> Self {
+    pub fn set_ui_locales(mut self, ui_locales: Option<Vec<LanguageTag>>) -> Self {
         self.ui_locales = ui_locales;
         self
     }
 
-    fn id_token_verifier<JU, K>(
+    pub fn id_token_verifier<JU, K>(
         &self,
     ) -> Result<IdTokenVerifier<JS, JT, JU, K>, JsonWebKeySetFetchError>
     where
@@ -594,7 +440,7 @@ where
         }
     }
 
-    fn authorize_url<NF, SF>(
+    pub fn authorize_url<NF, SF>(
         &self,
         authentication_flow: &AuthenticationFlow<RT>,
         state_fn: SF,
@@ -604,16 +450,19 @@ where
         NF: FnOnce() -> Nonce + 'static,
         SF: FnOnce() -> CsrfToken + 'static,
     {
-        self.authorize_url_with_hint(authentication_flow, state_fn, nonce_fn, None, None)
+        self.authorize_url_extension(authentication_flow, state_fn, nonce_fn, None, None, None)
     }
 
-    fn authorize_url_with_hint<NF, SF>(
+    // FIXME: document that we don't currently support passing authorization request parameters
+    // as a JWT: https://openid.net/specs/openid-connect-core-1_0.html#JWTRequests
+    pub fn authorize_url_extension<NF, SF>(
         &self,
         authentication_flow: &AuthenticationFlow<RT>,
         state_fn: SF,
         nonce_fn: NF,
         id_token_hint: Option<&IdToken<AC, GC, JE, JS, JT>>,
         login_hint: Option<&LoginHint>,
+        extra_params: Option<&[(&str, &str)]>,
     ) -> (Url, CsrfToken, Nonce)
     where
         NF: FnOnce() -> Nonce + 'static,
@@ -642,7 +491,7 @@ where
         }
 
         let (url, state) = {
-            let extra_params: Vec<(&str, &str)> = vec![
+            let mut params: Vec<(&str, &str)> = vec![
                 Some(("nonce", nonce.secret().as_str())),
                 param_or_none(acr_values_opt.as_ref(), "acr_values"),
                 param_or_none(claims_locales_opt.as_ref(), "claims_locales"),
@@ -657,6 +506,11 @@ where
             .filter(Option::is_some)
             .map(Option::unwrap)
             .collect();
+
+            extra_params.map(|p| {
+                p.iter()
+                    .for_each(|(name, value)| params.push((name, value)))
+            });
 
             let response_type = match *authentication_flow {
                 AuthenticationFlow::AuthorizationCode => core::CoreResponseType::Code.to_oauth2(),
@@ -686,12 +540,12 @@ where
             };
 
             self.oauth2_client
-                .authorize_url_extension(&response_type, state_fn, &extra_params)
+                .authorize_url_extension(&response_type, state_fn, &params)
         };
         (url, state, nonce)
     }
 
-    fn exchange_code(&self, code: AuthorizationCode) -> Result<TR, RequestTokenError<TE>> {
+    pub fn exchange_code(&self, code: AuthorizationCode) -> Result<TR, RequestTokenError<TE>> {
         self.oauth2_client.exchange_code(code)
     }
 
@@ -702,7 +556,7 @@ where
     /// or `from_dynamic_registration` methods. Otherwise, this function returns `None`.
     ///
     #[allow(clippy::type_complexity)]
-    fn provider_metadata(
+    pub fn provider_metadata(
         &self,
     ) -> Option<&ProviderMetadata<AP, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>> {
         self.provider_metadata.as_ref()
@@ -846,12 +700,13 @@ mod tests {
         ))
         .unwrap();
 
-        let (authorize_url, _, _) = client.authorize_url_with_hint(
+        let (authorize_url, _, _) = client.authorize_url_extension(
             &flow,
             new_csrf,
             new_nonce,
             Some(&id_token),
             Some(&LoginHint::new("foo@bar.com".to_string())),
+            Some(&[("foo", "bar")]),
         );
         assert_eq!(
             format!(
@@ -859,7 +714,7 @@ mod tests {
                  redirect_uri=http%3A%2F%2Flocalhost%3A8888%2F&scope=openid+email&state=CSRF123&\
                  nonce=NONCE456&acr_values=urn%3Amace%3Aincommon%3Aiap%3Asilver&display=touch&\
                  id_token_hint={}&login_hint=foo%40bar.com&\
-                 max_age=1800&prompt=login+consent&ui_locales=fr-CA+fr+en",
+                 max_age=1800&prompt=login+consent&ui_locales=fr-CA+fr+en&foo=bar",
                 serialized_jwt
             ),
             authorize_url.to_string()
