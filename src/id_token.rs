@@ -130,7 +130,6 @@ where
     #[serde(flatten)]
     additional_claims: AC,
 }
-// FIXME: see what other structs should have friendlier trait interfaces like this one
 impl<AC, GC> IdTokenClaims<AC, GC>
 where
     AC: AdditionalClaims,
@@ -261,9 +260,10 @@ where
 /// [Section 3.1.3.3](http://openid.net/specs/openid-connect-core-1_0.html#TokenResponse).
 ///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct IdTokenFields<AC, GC, JE, JS, JT>
+pub struct IdTokenFields<AC, EF, GC, JE, JS, JT>
 where
     AC: AdditionalClaims,
+    EF: ExtraTokenFields,
     GC: GenderClaim,
     JE: JweContentEncryptionAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
@@ -271,25 +271,39 @@ where
 {
     #[serde(bound = "AC: AdditionalClaims")]
     id_token: IdToken<AC, GC, JE, JS, JT>,
+    #[serde(bound = "EF: ExtraTokenFields", flatten)]
+    extra_fields: EF,
     #[serde(skip)]
-    _phantom_jt: PhantomData<JT>,
+    _phantom: PhantomData<JT>,
 }
-impl<AC, GC, JE, JS, JT> IdTokenFields<AC, GC, JE, JS, JT>
+impl<AC, EF, GC, JE, JS, JT> IdTokenFields<AC, EF, GC, JE, JS, JT>
 where
     AC: AdditionalClaims,
+    EF: ExtraTokenFields,
     GC: GenderClaim,
     JE: JweContentEncryptionAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
+    pub fn new(id_token: IdToken<AC, GC, JE, JS, JT>, extra_fields: EF) -> Self {
+        Self {
+            id_token,
+            extra_fields,
+            _phantom: PhantomData,
+        }
+    }
+
     pub fn id_token(&self) -> &IdToken<AC, GC, JE, JS, JT> {
         &self.id_token
     }
-    // FIXME: add extra_fields here to enable further extensibility by clients
+    pub fn extra_fields(&self) -> &EF {
+        &self.extra_fields
+    }
 }
-impl<AC, GC, JE, JS, JT> ExtraTokenFields for IdTokenFields<AC, GC, JE, JS, JT>
+impl<AC, EF, GC, JE, JS, JT> ExtraTokenFields for IdTokenFields<AC, EF, GC, JE, JS, JT>
 where
     AC: AdditionalClaims,
+    EF: ExtraTokenFields,
     GC: GenderClaim,
     JE: JweContentEncryptionAlgorithm,
     JS: JwsSigningAlgorithm<JT>,

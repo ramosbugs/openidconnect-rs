@@ -7,7 +7,10 @@ pub use oauth2::basic::{
 };
 use oauth2::helpers::variant_name;
 use oauth2::prelude::*;
-use oauth2::{ErrorResponseType, ResponseType as OAuth2ResponseType, StandardTokenResponse};
+use oauth2::{
+    EmptyExtraTokenFields, ErrorResponseType, ResponseType as OAuth2ResponseType,
+    StandardTokenResponse,
+};
 use serde::de::{Error as DeserializeError, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -121,6 +124,7 @@ pub type CoreIdTokenClaims = IdTokenClaims<EmptyAdditionalClaims, CoreGenderClai
 
 pub type CoreIdTokenFields = IdTokenFields<
     EmptyAdditionalClaims,
+    EmptyExtraTokenFields,
     CoreGenderClaim,
     CoreJweContentEncryptionAlgorithm,
     CoreJwsSigningAlgorithm,

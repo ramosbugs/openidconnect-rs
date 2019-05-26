@@ -721,10 +721,11 @@ where
     fn id_token(&self) -> &IdToken<AC, GC, JE, JS, JT>;
 }
 
-impl<AC, GC, JE, JS, JT, TT> TokenResponse<AC, GC, JE, JS, JT, TT>
-    for StandardTokenResponse<IdTokenFields<AC, GC, JE, JS, JT>, TT>
+impl<AC, EF, GC, JE, JS, JT, TT> TokenResponse<AC, GC, JE, JS, JT, TT>
+    for StandardTokenResponse<IdTokenFields<AC, EF, GC, JE, JS, JT>, TT>
 where
     AC: AdditionalClaims,
+    EF: ExtraTokenFields,
     GC: GenderClaim,
     JE: JweContentEncryptionAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
