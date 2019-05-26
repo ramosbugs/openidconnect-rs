@@ -42,7 +42,7 @@ use oauth2::prelude::*;
 use oauth2::ResponseType as OAuth2ResponseType;
 pub use oauth2::{
     AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken,
-    ErrorResponseType, ExtraTokenFields, RedirectUrl, RequestTokenError, Scope,
+    ErrorResponse, ErrorResponseType, ExtraTokenFields, RedirectUrl, RequestTokenError, Scope,
     StandardTokenResponse, TokenResponse as OAuth2TokenResponse, TokenType, TokenUrl,
 };
 use url::Url;

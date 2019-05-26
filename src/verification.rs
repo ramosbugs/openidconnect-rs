@@ -97,7 +97,7 @@ pub enum SignatureVerificationError {
     /// [rotation of asymmetric signing keys](
     /// http://openid.net/specs/openid-connect-core-1_0.html#RotateSigKeys), client applications
     /// should consider refreshing the JWKS document (via
-    /// [`JsonWebKeySetUrl::get_keys`][`::discovery::JsonWebKeySetUrl::get_keys`]).
+    /// [`JsonWebKeySetUrl::get_keys`][`::JsonWebKeySetUrl::get_keys`]).
     ///
     /// This error can also occur if the identified
     /// [JSON Web Key](https://tools.ietf.org/html/rfc7517) is of the wrong type (e.g., an RSA key

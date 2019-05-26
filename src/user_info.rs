@@ -241,8 +241,6 @@ new_url_type![
                 .request()
                 .map_err(UserInfoError::Request)?;
 
-            // FIXME: improve error handling (i.e., is there a body response?)
-            // possibly consolidate this error handling with discovery::get_provider_metadata().
             if user_info_response.status_code != HTTP_STATUS_OK {
                 return Err(
                     UserInfoError::Response(

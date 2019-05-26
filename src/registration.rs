@@ -4,7 +4,6 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use curl;
-use oauth2::{AccessToken, ClientId, ClientSecret, ErrorResponse, ErrorResponseType, RedirectUrl};
 use serde;
 use serde::de::{Deserialize, DeserializeOwned, Deserializer, MapAccess, Visitor};
 use serde::ser::SerializeMap;
@@ -23,7 +22,10 @@ use super::types::{
     LocalizedClaim, LogoUrl, PolicyUrl, RegistrationAccessToken, RegistrationUrl, RequestUrl,
     ResponseType, ResponseTypes, SectorIdentifierUrl, SubjectIdentifierType, ToSUrl,
 };
-use super::{JsonWebKey, JsonWebKeySet};
+use super::{
+    AccessToken, ClientId, ClientSecret, ErrorResponse, ErrorResponseType, JsonWebKey,
+    JsonWebKeySet, RedirectUrl,
+};
 
 pub trait AdditionalClientMetadata:
     Clone + Debug + DeserializeOwned + PartialEq + Serialize
@@ -509,7 +511,6 @@ where
         &self.client_metadata
     }
 
-    // FIXME: should this be an InitialAccessToken?
     pub fn initial_access_token(&self) -> Option<&AccessToken> {
         self.initial_access_token.as_ref()
     }
@@ -763,55 +764,58 @@ mod tests {
         CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm, CoreResponseType,
         CoreSubjectIdentifierType,
     };
+    use super::super::jwt::tests::TEST_RSA_PUB_KEY;
     use super::super::{
         AuthenticationContextClass, ClientConfigUrl, ClientName, ClientUrl, ContactEmail,
-        JsonWebKeySetUrl, LanguageTag, LogoUrl, PolicyUrl, RegistrationAccessToken, RequestUrl,
-        ResponseTypes, SectorIdentifierUrl, ToSUrl,
+        JsonWebKeySet, JsonWebKeySetUrl, LanguageTag, LogoUrl, PolicyUrl, RegistrationAccessToken,
+        RequestUrl, ResponseTypes, SectorIdentifierUrl, ToSUrl,
     };
 
     #[test]
     fn test_metadata_serialization() {
-        let json_response = "{
-        \"redirect_uris\": [\"https://example.com/redirect-1\", \"https://example.com/redirect-2\"],
-        \"response_types\": [\"code\", \"code token id_token\"],
-        \"grant_types\": [\"authorization_code\", \"client_credentials\", \"implicit\", \
-            \"password\", \"refresh_token\", \"some_extension\"],
-        \"application_type\": \"web\",
-        \"contacts\": [\"user@example.com\", \"admin@openidconnect.local\"],
-        \"client_name\": \"Example\",
-        \"client_name#es\": \"Ejemplo\",
-        \"logo_uri\": \"https://example.com/logo.png\",
-        \"logo_uri#fr\": \"https://example.com/logo-fr.png\",
-        \"client_uri\": \"https://example.com/client-app\",
-        \"client_uri#de\": \"https://example.com/client-app-de\",
-        \"policy_uri\": \"https://example.com/policy\",
-        \"policy_uri#sr-Latn\": \"https://example.com/policy-sr-latin\",
-        \"tos_uri\": \"https://example.com/tos\",
-        \"tos_uri#sr-Cyrl\": \"https://example.com/tos-sr-cyrl\",
-        \"jwks_uri\": \"https://example.com/jwks\",
-        \"jwks\": null,
-        \"sector_identifier_uri\": \"https://example.com/sector\",
-        \"subject_type\": \"pairwise\",
-        \"id_token_signed_response_alg\": \"HS256\",
-        \"id_token_encrypted_response_alg\": \"RSA1_5\",
-        \"id_token_encrypted_response_enc\": \"A128CBC-HS256\",
-        \"userinfo_signed_response_alg\": \"RS384\",
-        \"userinfo_encrypted_response_alg\": \"RSA-OAEP\",
-        \"userinfo_encrypted_response_enc\": \"A256CBC-HS512\",
-        \"request_object_signing_alg\": \"ES512\",
-        \"request_object_encryption_alg\": \"ECDH-ES+A128KW\",
-        \"request_object_encryption_enc\": \"A256GCM\",
-        \"token_endpoint_auth_method\": \"client_secret_basic\",
-        \"token_endpoint_auth_signing_alg\": \"PS512\",
-        \"default_max_age\": 3600,
-        \"require_auth_time\": true,
-        \"default_acr_values\": [\"0\", \"urn:mace:incommon:iap:silver\", \
-            \"urn:mace:incommon:iap:bronze\"],
-        \"initiate_login_uri\": \"https://example.com/login\",
-        \"request_uris\": [\"https://example.com/request-1\", \"https://example.com/request-2\"]
-    }";
+        // `jwks_uri` and `jwks` aren't supposed to be used together, but this test is just for
+        // serialization/deserialization.
+        let json_response = format!("{{
+            \"redirect_uris\": [\"https://example.com/redirect-1\", \"https://example.com/redirect-2\"],
+            \"response_types\": [\"code\", \"code token id_token\"],
+            \"grant_types\": [\"authorization_code\", \"client_credentials\", \"implicit\", \
+                \"password\", \"refresh_token\", \"some_extension\"],
+            \"application_type\": \"web\",
+            \"contacts\": [\"user@example.com\", \"admin@openidconnect.local\"],
+            \"client_name\": \"Example\",
+            \"client_name#es\": \"Ejemplo\",
+            \"logo_uri\": \"https://example.com/logo.png\",
+            \"logo_uri#fr\": \"https://example.com/logo-fr.png\",
+            \"client_uri\": \"https://example.com/client-app\",
+            \"client_uri#de\": \"https://example.com/client-app-de\",
+            \"policy_uri\": \"https://example.com/policy\",
+            \"policy_uri#sr-Latn\": \"https://example.com/policy-sr-latin\",
+            \"tos_uri\": \"https://example.com/tos\",
+            \"tos_uri#sr-Cyrl\": \"https://example.com/tos-sr-cyrl\",
+            \"jwks_uri\": \"https://example.com/jwks\",
+            \"jwks\": {{\"keys\": [{}]}},
+            \"sector_identifier_uri\": \"https://example.com/sector\",
+            \"subject_type\": \"pairwise\",
+            \"id_token_signed_response_alg\": \"HS256\",
+            \"id_token_encrypted_response_alg\": \"RSA1_5\",
+            \"id_token_encrypted_response_enc\": \"A128CBC-HS256\",
+            \"userinfo_signed_response_alg\": \"RS384\",
+            \"userinfo_encrypted_response_alg\": \"RSA-OAEP\",
+            \"userinfo_encrypted_response_enc\": \"A256CBC-HS512\",
+            \"request_object_signing_alg\": \"ES512\",
+            \"request_object_encryption_alg\": \"ECDH-ES+A128KW\",
+            \"request_object_encryption_enc\": \"A256GCM\",
+            \"token_endpoint_auth_method\": \"client_secret_basic\",
+            \"token_endpoint_auth_signing_alg\": \"PS512\",
+            \"default_max_age\": 3600,
+            \"require_auth_time\": true,
+            \"default_acr_values\": [\"0\", \"urn:mace:incommon:iap:silver\", \
+                \"urn:mace:incommon:iap:bronze\"],
+            \"initiate_login_uri\": \"https://example.com/login\",
+            \"request_uris\": [\"https://example.com/request-1\", \"https://example.com/request-2\"]
+        }}", TEST_RSA_PUB_KEY);
 
-        let client_metadata: CoreClientMetadata = serde_json::from_str(json_response).unwrap();
+        let client_metadata: CoreClientMetadata = serde_json::from_str(&json_response).unwrap();
 
         assert_eq!(
             *client_metadata.redirect_uris(),
@@ -919,8 +923,13 @@ mod tests {
             *client_metadata.jwks_uri().unwrap(),
             JsonWebKeySetUrl::new("https://example.com/jwks".to_string()).unwrap()
         );
-        // FIXME: set this field to something
-        assert_eq!(client_metadata.jwks(), None);
+        assert_eq!(
+            client_metadata.jwks(),
+            Some(&JsonWebKeySet::new(vec![serde_json::from_str(
+                &TEST_RSA_PUB_KEY
+            )
+            .unwrap()],))
+        );
         assert_eq!(
             *client_metadata.sector_identifier_uri().unwrap(),
             SectorIdentifierUrl::new("https://example.com/sector".to_string()).unwrap()
@@ -1057,54 +1066,54 @@ mod tests {
 
     #[test]
     fn test_response_serialization() {
-        let json_response = "{
-        \"client_id\": \"abcdefgh\",
-        \"client_secret\": \"shhhh\",
-        \"registration_access_token\": \"use_me_to_update_registration\",
-        \"registration_client_uri\": \"https://example-provider.com/registration\",
-        \"client_id_issued_at\": 1523953306,
-        \"client_secret_expires_at\": 1526545306,
-        \"redirect_uris\": [\"https://example.com/redirect-1\", \"https://example.com/redirect-2\"],
-        \"response_types\": [\"code\", \"code token id_token\"],
-        \"grant_types\": [\"authorization_code\", \"client_credentials\", \"implicit\", \
-            \"password\", \"refresh_token\", \"some_extension\"],
-        \"application_type\": \"web\",
-        \"contacts\": [\"user@example.com\", \"admin@openidconnect.local\"],
-        \"client_name\": \"Example\",
-        \"client_name#es\": \"Ejemplo\",
-        \"logo_uri\": \"https://example.com/logo.png\",
-        \"logo_uri#fr\": \"https://example.com/logo-fr.png\",
-        \"client_uri\": \"https://example.com/client-app\",
-        \"client_uri#de\": \"https://example.com/client-app-de\",
-        \"policy_uri\": \"https://example.com/policy\",
-        \"policy_uri#sr-Latn\": \"https://example.com/policy-sr-latin\",
-        \"tos_uri\": \"https://example.com/tos\",
-        \"tos_uri#sr-Cyrl\": \"https://example.com/tos-sr-cyrl\",
-        \"jwks_uri\": \"https://example.com/jwks\",
-        \"jwks\": null,
-        \"sector_identifier_uri\": \"https://example.com/sector\",
-        \"subject_type\": \"pairwise\",
-        \"id_token_signed_response_alg\": \"HS256\",
-        \"id_token_encrypted_response_alg\": \"RSA1_5\",
-        \"id_token_encrypted_response_enc\": \"A128CBC-HS256\",
-        \"userinfo_signed_response_alg\": \"RS384\",
-        \"userinfo_encrypted_response_alg\": \"RSA-OAEP\",
-        \"userinfo_encrypted_response_enc\": \"A256CBC-HS512\",
-        \"request_object_signing_alg\": \"ES512\",
-        \"request_object_encryption_alg\": \"ECDH-ES+A128KW\",
-        \"request_object_encryption_enc\": \"A256GCM\",
-        \"token_endpoint_auth_method\": \"client_secret_basic\",
-        \"token_endpoint_auth_signing_alg\": \"PS512\",
-        \"default_max_age\": 3600,
-        \"require_auth_time\": true,
-        \"default_acr_values\": [\"0\", \"urn:mace:incommon:iap:silver\", \
-            \"urn:mace:incommon:iap:bronze\"],
-        \"initiate_login_uri\": \"https://example.com/login\",
-        \"request_uris\": [\"https://example.com/request-1\", \"https://example.com/request-2\"]
-    }";
+        let json_response = format!("{{
+            \"client_id\": \"abcdefgh\",
+            \"client_secret\": \"shhhh\",
+            \"registration_access_token\": \"use_me_to_update_registration\",
+            \"registration_client_uri\": \"https://example-provider.com/registration\",
+            \"client_id_issued_at\": 1523953306,
+            \"client_secret_expires_at\": 1526545306,
+            \"redirect_uris\": [\"https://example.com/redirect-1\", \"https://example.com/redirect-2\"],
+            \"response_types\": [\"code\", \"code token id_token\"],
+            \"grant_types\": [\"authorization_code\", \"client_credentials\", \"implicit\", \
+                \"password\", \"refresh_token\", \"some_extension\"],
+            \"application_type\": \"web\",
+            \"contacts\": [\"user@example.com\", \"admin@openidconnect.local\"],
+            \"client_name\": \"Example\",
+            \"client_name#es\": \"Ejemplo\",
+            \"logo_uri\": \"https://example.com/logo.png\",
+            \"logo_uri#fr\": \"https://example.com/logo-fr.png\",
+            \"client_uri\": \"https://example.com/client-app\",
+            \"client_uri#de\": \"https://example.com/client-app-de\",
+            \"policy_uri\": \"https://example.com/policy\",
+            \"policy_uri#sr-Latn\": \"https://example.com/policy-sr-latin\",
+            \"tos_uri\": \"https://example.com/tos\",
+            \"tos_uri#sr-Cyrl\": \"https://example.com/tos-sr-cyrl\",
+            \"jwks_uri\": \"https://example.com/jwks\",
+            \"jwks\": {{\"keys\": [{}]}},
+            \"sector_identifier_uri\": \"https://example.com/sector\",
+            \"subject_type\": \"pairwise\",
+            \"id_token_signed_response_alg\": \"HS256\",
+            \"id_token_encrypted_response_alg\": \"RSA1_5\",
+            \"id_token_encrypted_response_enc\": \"A128CBC-HS256\",
+            \"userinfo_signed_response_alg\": \"RS384\",
+            \"userinfo_encrypted_response_alg\": \"RSA-OAEP\",
+            \"userinfo_encrypted_response_enc\": \"A256CBC-HS512\",
+            \"request_object_signing_alg\": \"ES512\",
+            \"request_object_encryption_alg\": \"ECDH-ES+A128KW\",
+            \"request_object_encryption_enc\": \"A256GCM\",
+            \"token_endpoint_auth_method\": \"client_secret_basic\",
+            \"token_endpoint_auth_signing_alg\": \"PS512\",
+            \"default_max_age\": 3600,
+            \"require_auth_time\": true,
+            \"default_acr_values\": [\"0\", \"urn:mace:incommon:iap:silver\", \
+                \"urn:mace:incommon:iap:bronze\"],
+            \"initiate_login_uri\": \"https://example.com/login\",
+            \"request_uris\": [\"https://example.com/request-1\", \"https://example.com/request-2\"]
+        }}", TEST_RSA_PUB_KEY);
 
         let client_metadata: CoreClientRegistrationResponse =
-            serde_json::from_str(json_response).unwrap();
+            serde_json::from_str(&json_response).unwrap();
 
         assert_eq!(
             *client_metadata.client_id(),
@@ -1236,8 +1245,13 @@ mod tests {
             *client_metadata.jwks_uri().unwrap(),
             JsonWebKeySetUrl::new("https://example.com/jwks".to_string()).unwrap()
         );
-        // FIXME: set this field to something
-        assert_eq!(client_metadata.jwks(), None);
+        assert_eq!(
+            client_metadata.jwks(),
+            Some(&JsonWebKeySet::new(vec![serde_json::from_str(
+                &TEST_RSA_PUB_KEY
+            )
+            .unwrap()],)),
+        );
         assert_eq!(
             *client_metadata.sector_identifier_uri().unwrap(),
             SectorIdentifierUrl::new("https://example.com/sector".to_string()).unwrap()
