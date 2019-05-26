@@ -33,7 +33,7 @@ pub trait AdditionalClientMetadata:
 
 // In order to support serde flatten, this must be an empty struct rather than an empty
 // tuple struct.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct EmptyAdditionalClientMetadata {}
 impl AdditionalClientMetadata for EmptyAdditionalClientMetadata {}
 
@@ -156,6 +156,7 @@ where
         &mut self.additional_metadata
     }
 }
+
 #[derive(Clone, Debug, PartialEq)]
 struct StandardClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
 where
@@ -568,7 +569,7 @@ pub trait AdditionalClientRegistrationResponse:
 
 // In order to support serde flatten, this must be an empty struct rather than an empty
 // tuple struct.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct EmptyAdditionalClientRegistrationResponse {}
 impl AdditionalClientRegistrationResponse for EmptyAdditionalClientRegistrationResponse {}
 
@@ -612,10 +613,10 @@ where
     #[serde(bound = "AR: AdditionalClientRegistrationResponse", flatten)]
     additional_response: AR,
 }
-impl<A, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
-    ClientRegistrationResponse<A, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+impl<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+    ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
 where
-    A: AdditionalClientMetadata,
+    AC: AdditionalClientMetadata,
     AR: AdditionalClientRegistrationResponse,
     AT: ApplicationType,
     CA: ClientAuthMethod,
@@ -629,6 +630,41 @@ where
     RT: ResponseType,
     S: SubjectIdentifierType,
 {
+    pub fn new(
+        client_id: ClientId,
+        redirect_uris: Vec<RedirectUrl>,
+        additional_metadata: AC,
+        additional_response: AR,
+    ) -> Self {
+        Self {
+            client_id,
+            client_secret: None,
+            registration_access_token: None,
+            registration_client_uri: None,
+            client_id_issued_at: None,
+            client_secret_expires_at: None,
+            client_metadata: ClientMetadata::new(redirect_uris, additional_metadata),
+            additional_response,
+        }
+    }
+
+    pub fn from_client_metadata(
+        client_id: ClientId,
+        client_metadata: ClientMetadata<AC, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+        additional_response: AR,
+    ) -> Self {
+        Self {
+            client_id,
+            client_secret: None,
+            registration_access_token: None,
+            registration_client_uri: None,
+            client_id_issued_at: None,
+            client_secret_expires_at: None,
+            client_metadata,
+            additional_response,
+        }
+    }
+
     field_getters_setters![
         pub self [self] {
             set_client_id -> client_id[ClientId],
@@ -676,10 +712,10 @@ where
         }
     ];
 
-    pub fn additional_metadata(&self) -> &A {
+    pub fn additional_metadata(&self) -> &AC {
         &self.client_metadata.additional_metadata
     }
-    pub fn additional_metadata_mut(&mut self) -> &mut A {
+    pub fn additional_metadata_mut(&mut self) -> &mut AC {
         &mut self.client_metadata.additional_metadata
     }
 

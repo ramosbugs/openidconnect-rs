@@ -25,7 +25,7 @@ pub trait AdditionalClaims:
 
 // In order to support serde flatten, this must be an empty struct rather than an empty
 // tuple struct.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct EmptyAdditionalClaims {}
 impl AdditionalClaims for EmptyAdditionalClaims {}
 

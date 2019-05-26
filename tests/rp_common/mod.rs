@@ -16,7 +16,6 @@ use openidconnect::core::{
     CoreProviderMetadata,
 };
 use openidconnect::prelude::*;
-use openidconnect::registration::EmptyAdditionalClientMetadata;
 use openidconnect::{ClientName, ContactEmail, IssuerUrl, RedirectUrl};
 
 pub const CERTIFICATION_BASE_URL: &str = "https://rp.certification.openid.net:8080";
@@ -131,7 +130,7 @@ where
 {
     let registration_request_pre = CoreClientRegistrationRequest::new(
         vec![RedirectUrl::new(Url::parse(RP_REDIRECT_URI).unwrap())],
-        EmptyAdditionalClientMetadata {},
+        Default::default(),
     )
     .set_application_type(Some(CoreApplicationType::Native))
     .set_client_name(Some(

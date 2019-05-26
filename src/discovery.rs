@@ -27,7 +27,7 @@ pub trait AdditionalProviderMetadata:
 
 // In order to support serde flatten, this must be an empty struct rather than an empty
 // tuple struct.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct EmptyAdditionalProviderMetadata {}
 impl AdditionalProviderMetadata for EmptyAdditionalProviderMetadata {}
 
@@ -434,7 +434,7 @@ mod tests {
         AuthenticationContextClass, IssuerUrl, LanguageTag, OpPolicyUrl, OpTosUrl, RegistrationUrl,
         ResponseTypes, ServiceDocUrl, UserInfoUrl,
     };
-    use super::{EmptyAdditionalProviderMetadata, JsonWebKeySetUrl};
+    use super::JsonWebKeySetUrl;
 
     #[test]
     fn test_discovery_deserialization() {
@@ -693,7 +693,7 @@ mod tests {
                 CoreSubjectIdentifierType::Pairwise,
             ],
             all_signing_algs.clone(),
-            EmptyAdditionalProviderMetadata {},
+            Default::default(),
         )
         .set_request_object_signing_alg_values_supported(Some(all_signing_algs.clone()))
         .set_token_endpoint_auth_signing_alg_values_supported(Some(vec![

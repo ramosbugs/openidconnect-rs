@@ -770,8 +770,8 @@ mod tests {
     use super::super::types::helpers::seconds_to_utc;
     use super::super::types::Seconds;
     use super::super::{
-        Audience, Base64UrlEncodedBytes, EmptyAdditionalClaims, EndUserName, IssuerUrl,
-        JsonWebKeyId, Nonce, StandardClaims,
+        Audience, Base64UrlEncodedBytes, EndUserName, IssuerUrl, JsonWebKeyId, Nonce,
+        StandardClaims,
     };
     use super::{
         AudiencesClaim, ClaimsVerificationError, IssuerClaim, JsonWebTokenHeader,
@@ -1594,7 +1594,7 @@ mod tests {
                 Utc.timestamp(1544932149, 0),
                 Utc.timestamp(1544928549, 0),
                 StandardClaims::new(SubjectIdentifier::new("subject".to_string())),
-                EmptyAdditionalClaims {},
+                Default::default(),
             )
             .set_nonce(Some(nonce.clone()))
             .set_auth_context_ref(Some(AuthenticationContextClass::new("the_acr".to_string())))
@@ -1784,7 +1784,7 @@ mod tests {
                 address: None,
                 updated_at: Some(Utc.timestamp(1544928548, 0)),
             },
-            EmptyAdditionalClaims {},
+            Default::default(),
         );
 
         assert_eq!(
