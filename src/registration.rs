@@ -11,7 +11,6 @@ use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
 use serde_json;
 
-use super::discovery::JsonWebKeySetUrl;
 use super::http::{
     auth_bearer, HttpRequest, HttpRequestMethod, ACCEPT_JSON, CONTENT_TYPE_JSON,
     HTTP_STATUS_BAD_REQUEST, HTTP_STATUS_CREATED, MIME_TYPE_JSON,
@@ -19,10 +18,10 @@ use super::http::{
 use super::types::helpers::{serde_utc_seconds_opt, split_language_tag_key};
 use super::types::{
     ApplicationType, AuthenticationContextClass, ClientAuthMethod, ClientConfigUrl, ClientName,
-    ClientUrl, ContactEmail, GrantType, InitiateLoginUrl, JsonWebKeyType, JsonWebKeyUse,
-    JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LocalizedClaim,
-    LogoUrl, PolicyUrl, RegistrationAccessToken, RegistrationUrl, RequestUrl, ResponseType,
-    ResponseTypes, SectorIdentifierUrl, SubjectIdentifierType, ToSUrl,
+    ClientUrl, ContactEmail, GrantType, InitiateLoginUrl, JsonWebKeySetUrl, JsonWebKeyType,
+    JsonWebKeyUse, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm,
+    LocalizedClaim, LogoUrl, PolicyUrl, RegistrationAccessToken, RegistrationUrl, RequestUrl,
+    ResponseType, ResponseTypes, SectorIdentifierUrl, SubjectIdentifierType, ToSUrl,
 };
 use super::{JsonWebKey, JsonWebKeySet};
 
@@ -764,11 +763,10 @@ mod tests {
         CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm, CoreResponseType,
         CoreSubjectIdentifierType,
     };
-    use super::super::discovery::JsonWebKeySetUrl;
     use super::super::{
         AuthenticationContextClass, ClientConfigUrl, ClientName, ClientUrl, ContactEmail,
-        LanguageTag, LogoUrl, PolicyUrl, RegistrationAccessToken, RequestUrl, ResponseTypes,
-        SectorIdentifierUrl, ToSUrl,
+        JsonWebKeySetUrl, LanguageTag, LogoUrl, PolicyUrl, RegistrationAccessToken, RequestUrl,
+        ResponseTypes, SectorIdentifierUrl, ToSUrl,
     };
 
     #[test]

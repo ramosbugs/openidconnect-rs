@@ -52,7 +52,7 @@ pub use claims::{
 };
 pub use discovery::{
     get_provider_metadata, AdditionalProviderMetadata, DiscoveryError,
-    EmptyAdditionalProviderMetadata, JsonWebKeySetUrl, ProviderMetadata,
+    EmptyAdditionalProviderMetadata, ProviderMetadata,
 };
 pub use id_token::IdTokenFields;
 pub use id_token::{IdToken, IdTokenClaims};
@@ -71,12 +71,12 @@ pub use types::{
     EndUserBirthday, EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName,
     EndUserName, EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl,
     EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, FormattedAddress, GrantType,
-    InitiateLoginUrl, IssuerUrl, JsonWebKey, JsonWebKeyId, JsonWebKeySet, JsonWebKeyType,
-    JsonWebKeyUse, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm,
-    LanguageTag, LoginHint, LogoUrl, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl, PrivateSigningKey,
-    RegistrationAccessToken, RegistrationUrl, RequestUrl, ResponseMode, ResponseType,
-    ResponseTypes, SectorIdentifierUrl, ServiceDocUrl, SigningError, StreetAddress,
-    SubjectIdentifier, SubjectIdentifierType, ToSUrl,
+    InitiateLoginUrl, IssuerUrl, JsonWebKey, JsonWebKeyId, JsonWebKeySet, JsonWebKeySetFetchError,
+    JsonWebKeySetUrl, JsonWebKeyType, JsonWebKeyUse, JweContentEncryptionAlgorithm,
+    JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag, LoginHint, LogoUrl, Nonce,
+    OpPolicyUrl, OpTosUrl, PolicyUrl, PrivateSigningKey, RegistrationAccessToken, RegistrationUrl,
+    RequestUrl, ResponseMode, ResponseType, ResponseTypes, SectorIdentifierUrl, ServiceDocUrl,
+    SigningError, StreetAddress, SubjectIdentifier, SubjectIdentifierType, ToSUrl,
 };
 pub use user_info::{UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoUrl};
 use verification::{AudiencesClaim, IssuerClaim};
@@ -224,7 +224,9 @@ where
     fn set_prompts(self, prompts: Option<Vec<P>>) -> Self;
     fn ui_locales(&self) -> Option<&Vec<LanguageTag>>;
     fn set_ui_locales(self, ui_locales: Option<Vec<LanguageTag>>) -> Self;
-    fn id_token_verifier<JU, K>(&self) -> Result<IdTokenVerifier<JS, JT, JU, K>, DiscoveryError>
+    fn id_token_verifier<JU, K>(
+        &self,
+    ) -> Result<IdTokenVerifier<JS, JT, JU, K>, JsonWebKeySetFetchError>
     where
         JU: JsonWebKeyUse,
         K: JsonWebKey<JS, JT, JU>;
@@ -565,15 +567,16 @@ where
         self
     }
 
-    fn id_token_verifier<JU, K>(&self) -> Result<IdTokenVerifier<JS, JT, JU, K>, DiscoveryError>
+    fn id_token_verifier<JU, K>(
+        &self,
+    ) -> Result<IdTokenVerifier<JS, JT, JU, K>, JsonWebKeySetFetchError>
     where
         JU: JsonWebKeyUse,
         K: JsonWebKey<JS, JT, JU>,
     {
-        let provider_metadata = self
-            .provider_metadata
-            .as_ref()
-            .ok_or_else(|| DiscoveryError::Other("no provider metadata present".to_string()))?;
+        let provider_metadata = self.provider_metadata.as_ref().ok_or_else(|| {
+            JsonWebKeySetFetchError::Other("no provider metadata present".to_string())
+        })?;
         let signature_keys = provider_metadata.jwks_uri().get_keys()?;
         if let Some(ref client_secret) = self.client_secret {
             Ok(IdTokenVerifier::new_private_client(

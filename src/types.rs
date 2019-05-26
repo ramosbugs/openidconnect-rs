@@ -16,6 +16,7 @@ use serde_json;
 use url;
 use url::Url;
 
+use super::http::{HttpRequest, HttpRequestMethod, ACCEPT_JSON, HTTP_STATUS_OK, MIME_TYPE_JSON};
 use super::SignatureVerificationError;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -392,6 +393,57 @@ where
         &self.keys
     }
 }
+
+#[derive(Debug, Fail)]
+pub enum JsonWebKeySetFetchError {
+    #[fail(display = "Other error: {}", _0)]
+    Other(String),
+    #[fail(display = "Failed to parse server response")]
+    Parse(#[cause] serde_json::Error),
+    #[fail(display = "Request failed")]
+    Request(#[cause] curl::Error),
+    #[fail(display = "Server returned invalid response: {}", _2)]
+    Response(u32, Vec<u8>, String),
+}
+
+new_url_type![
+    JsonWebKeySetUrl
+    impl {
+        pub fn get_keys<JS, JT, JU, K>(
+            &self
+        ) -> Result<JsonWebKeySet<JS, JT, JU, K>, JsonWebKeySetFetchError>
+        where JS: JwsSigningAlgorithm<JT>,
+                JT: JsonWebKeyType,
+                JU: JsonWebKeyUse,
+                K: JsonWebKey<JS, JT, JU> {
+            let key_response =
+                HttpRequest {
+                    url: &self.0,
+                    method: HttpRequestMethod::Get,
+                    headers: &vec![ACCEPT_JSON],
+                    post_body: &vec![],
+                }
+                .request()
+            .map_err(JsonWebKeySetFetchError::Request)?;
+
+            if key_response.status_code != HTTP_STATUS_OK {
+                return Err(
+                    JsonWebKeySetFetchError::Response(
+                        key_response.status_code,
+                        key_response.body,
+                        format!("HTTP status code {}", key_response.status_code),
+                    )
+                );
+            }
+
+            key_response
+                .check_content_type(MIME_TYPE_JSON)
+                .map_err(|err_msg| JsonWebKeySetFetchError::Response(key_response.status_code, key_response.body.clone(), err_msg))?;
+
+            serde_json::from_slice(&key_response.body).map_err(JsonWebKeySetFetchError::Parse)
+        }
+    }
+];
 
 new_type![
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]

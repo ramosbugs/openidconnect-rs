@@ -1,6 +1,5 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::ops::Deref;
 
 use curl;
 use oauth2::{AuthUrl, Scope, TokenUrl};
@@ -8,15 +7,14 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json;
 use url;
-use url::Url;
 
 use super::http::{HttpRequest, HttpRequestMethod, ACCEPT_JSON, HTTP_STATUS_OK, MIME_TYPE_JSON};
 use super::types::{
     AuthDisplay, AuthenticationContextClass, ClaimName, ClaimType, ClientAuthMethod, GrantType,
-    IssuerUrl, JsonWebKey, JsonWebKeySet, JsonWebKeyType, JsonWebKeyUse,
-    JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag,
-    OpPolicyUrl, OpTosUrl, RegistrationUrl, ResponseMode, ResponseType, ResponseTypes,
-    ServiceDocUrl, SubjectIdentifierType,
+    IssuerUrl, JsonWebKeySetUrl, JsonWebKeyType, JweContentEncryptionAlgorithm,
+    JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag, OpPolicyUrl, OpTosUrl,
+    RegistrationUrl, ResponseMode, ResponseType, ResponseTypes, ServiceDocUrl,
+    SubjectIdentifierType,
 };
 use super::{UserInfoUrl, CONFIG_URL_SUFFIX};
 
@@ -376,49 +374,6 @@ pub enum DiscoveryError {
     Validation(String),
 }
 
-new_url_type![
-    JsonWebKeySetUrl
-    impl {
-        // FIXME: don't depend on super::discovery in this module (factor this out into some kind
-        // of HttpError?
-        pub fn get_keys<JS, JT, JU, K>(
-            &self
-        ) -> Result<JsonWebKeySet<JS, JT, JU, K>, DiscoveryError>
-        where JS: JwsSigningAlgorithm<JT>,
-                JT: JsonWebKeyType,
-                JU: JsonWebKeyUse,
-                K: JsonWebKey<JS, JT, JU> {
-            let key_response =
-                HttpRequest {
-                    url: &self.0,
-                    method: HttpRequestMethod::Get,
-                    headers: &vec![ACCEPT_JSON],
-                    post_body: &vec![],
-                }
-                .request()
-            .map_err(DiscoveryError::Request)?;
-
-            // FIXME: improve error handling (i.e., is there a body response?)
-            // possibly consolidate this error handling with discovery::get_provider_metadata().
-            if key_response.status_code != HTTP_STATUS_OK {
-                return Err(
-                    DiscoveryError::Response(
-                        key_response.status_code,
-                        key_response.body,
-                        format!("HTTP status code {}", key_response.status_code),
-                    )
-                );
-            }
-
-            key_response
-                .check_content_type(MIME_TYPE_JSON)
-                .map_err(|err_msg| DiscoveryError::Response(key_response.status_code, key_response.body.clone(), err_msg))?;
-
-            serde_json::from_slice(&key_response.body).map_err(DiscoveryError::Parse)
-        }
-    }
-];
-
 #[cfg(test)]
 mod tests {
     use oauth2::prelude::*;
@@ -431,10 +386,9 @@ mod tests {
         CoreProviderMetadata, CoreResponseMode, CoreResponseType, CoreSubjectIdentifierType,
     };
     use super::super::{
-        AuthenticationContextClass, IssuerUrl, LanguageTag, OpPolicyUrl, OpTosUrl, RegistrationUrl,
-        ResponseTypes, ServiceDocUrl, UserInfoUrl,
+        AuthenticationContextClass, IssuerUrl, JsonWebKeySetUrl, LanguageTag, OpPolicyUrl,
+        OpTosUrl, RegistrationUrl, ResponseTypes, ServiceDocUrl, UserInfoUrl,
     };
-    use super::JsonWebKeySetUrl;
 
     #[test]
     fn test_discovery_deserialization() {
