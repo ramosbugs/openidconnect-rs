@@ -12,8 +12,6 @@ use rp_common::{
     get_provider_metadata, init_log, issuer_url, register_client, CERTIFICATION_BASE_URL, RP_NAME,
 };
 
-use openidconnect::registration::{ClientMetadata, ClientRegistrationResponse};
-
 #[macro_use]
 mod rp_common;
 

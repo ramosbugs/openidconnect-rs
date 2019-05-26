@@ -58,7 +58,9 @@ pub use id_token::IdTokenFields;
 pub use id_token::{IdToken, IdTokenClaims};
 pub use jwt::JsonWebTokenError;
 use jwt::{JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenHeader};
-use registration::ClientRegistrationResponse;
+use registration::{
+    AdditionalClientMetadata, AdditionalClientRegistrationResponse, ClientRegistrationResponse,
+};
 // Flatten the module hierarchy involving types. They're only separated to improve code
 // organization.
 pub use types::{
@@ -148,12 +150,12 @@ pub enum AuthenticationFlow<RT: ResponseType> {
 }
 
 // Convenience trait to allow clients to mock out OIDC
-pub trait OpenIdConnect<AC, AD, AM, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>:
+pub trait OpenIdConnect<AC, AD, AP, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>:
     Sized
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
-    AM: AdditionalProviderMetadata,
+    AP: AdditionalProviderMetadata,
     CA: ClientAuthMethod,
     CN: ClaimName,
     CT: ClaimType,
@@ -183,13 +185,28 @@ where
         issuer_url: &IssuerUrl,
     ) -> Result<Self, DiscoveryError>;
     #[allow(clippy::type_complexity)]
-    fn from_dynamic_registration<AT, CR, JU, K>(
-        provider_metadata: &ProviderMetadata<AM, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
-        registration_response: &CR,
+    fn from_dynamic_registration<A, AR, AT, JU, K>(
+        provider_metadata: &ProviderMetadata<AP, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
+        registration_response: &ClientRegistrationResponse<
+            A,
+            AR,
+            AT,
+            CA,
+            G,
+            JE,
+            JK,
+            JS,
+            JT,
+            JU,
+            K,
+            RT,
+            S,
+        >,
     ) -> Self
     where
+        A: AdditionalClientMetadata,
+        AR: AdditionalClientRegistrationResponse,
         AT: ApplicationType,
-        CR: ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
         JU: JsonWebKeyUse,
         K: JsonWebKey<JS, JT, JU>;
     fn add_scope(self, scope: Scope) -> Self;
@@ -235,7 +252,7 @@ where
     #[allow(clippy::type_complexity)]
     fn provider_metadata(
         &self,
-    ) -> Option<&ProviderMetadata<AM, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>>;
+    ) -> Option<&ProviderMetadata<AP, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>>;
 }
 
 #[derive(Clone, Debug)]
@@ -289,13 +306,13 @@ where
     // additional Authorization Request parameters and parameter values defined by this
     // specification.
 }
-impl<AC, AD, AM, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
-    OpenIdConnect<AC, AD, AM, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
-    for Client<AC, AD, AM, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
+impl<AC, AD, AP, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
+    OpenIdConnect<AC, AD, AP, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
+    for Client<AC, AD, AP, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
-    AM: AdditionalProviderMetadata,
+    AP: AdditionalProviderMetadata,
     CA: ClientAuthMethod,
     CN: ClaimName,
     CT: ClaimType,
@@ -360,7 +377,7 @@ where
     ) -> Result<Self, DiscoveryError> {
         #[allow(clippy::type_complexity)]
         let provider_metadata: ProviderMetadata<
-            AM,
+            AP,
             AD,
             CA,
             CN,
@@ -410,13 +427,28 @@ where
     }
 
     #[allow(clippy::type_complexity)]
-    fn from_dynamic_registration<AT, CR, JU, K>(
-        provider_metadata: &ProviderMetadata<AM, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
-        registration_response: &CR,
+    fn from_dynamic_registration<A, AR, AT, JU, K>(
+        provider_metadata: &ProviderMetadata<AP, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
+        registration_response: &ClientRegistrationResponse<
+            A,
+            AR,
+            AT,
+            CA,
+            G,
+            JE,
+            JK,
+            JS,
+            JT,
+            JU,
+            K,
+            RT,
+            S,
+        >,
     ) -> Self
     where
+        A: AdditionalClientMetadata,
+        AR: AdditionalClientRegistrationResponse,
         AT: ApplicationType,
-        CR: ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
         JU: JsonWebKeyUse,
         K: JsonWebKey<JS, JT, JU>,
     {
@@ -669,7 +701,7 @@ where
     #[allow(clippy::type_complexity)]
     fn provider_metadata(
         &self,
-    ) -> Option<&ProviderMetadata<AM, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>> {
+    ) -> Option<&ProviderMetadata<AP, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>> {
         self.provider_metadata.as_ref()
     }
 }

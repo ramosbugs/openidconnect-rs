@@ -12,8 +12,9 @@ use serde::de::{Error as DeserializeError, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::registration::{
-    RegisterErrorResponseType, Registration10ClientMetadata,
-    Registration10ClientRegistrationRequest, Registration10ClientRegistrationResponse,
+    ClientMetadata, ClientRegistrationRequest, ClientRegistrationResponse,
+    EmptyAdditionalClientMetadata, EmptyAdditionalClientRegistrationResponse,
+    RegisterErrorResponseType,
 };
 use super::{
     ApplicationType, AuthDisplay, AuthPrompt, ClaimName, ClaimType, Client, ClientAuthMethod,
@@ -60,7 +61,8 @@ pub type CoreClient = Client<
     CoreTokenType,
 >;
 
-pub type CoreClientMetadata = Registration10ClientMetadata<
+pub type CoreClientMetadata = ClientMetadata<
+    EmptyAdditionalClientMetadata,
     CoreApplicationType,
     CoreClientAuthMethod,
     CoreGrantType,
@@ -74,10 +76,11 @@ pub type CoreClientMetadata = Registration10ClientMetadata<
     CoreSubjectIdentifierType,
 >;
 
-pub type CoreClientRegistrationRequest = Registration10ClientRegistrationRequest<
+pub type CoreClientRegistrationRequest = ClientRegistrationRequest<
+    EmptyAdditionalClientMetadata,
+    EmptyAdditionalClientRegistrationResponse,
     CoreApplicationType,
     CoreClientAuthMethod,
-    CoreClientRegistrationResponse,
     CoreRegisterErrorResponseType,
     CoreGrantType,
     CoreJweContentEncryptionAlgorithm,
@@ -90,10 +93,11 @@ pub type CoreClientRegistrationRequest = Registration10ClientRegistrationRequest
     CoreSubjectIdentifierType,
 >;
 
-pub type CoreClientRegistrationResponse = Registration10ClientRegistrationResponse<
+pub type CoreClientRegistrationResponse = ClientRegistrationResponse<
+    EmptyAdditionalClientMetadata,
+    EmptyAdditionalClientRegistrationResponse,
     CoreApplicationType,
     CoreClientAuthMethod,
-    CoreClientMetadata,
     CoreGrantType,
     CoreJweContentEncryptionAlgorithm,
     CoreJweKeyManagementAlgorithm,

@@ -1,38 +1,4 @@
 ///
-/// Helper trait to convert struct values to the types returned by the parent trait getters.
-///
-pub trait TraitStructExtract<'a, T> {
-    fn extract(&'a self) -> T;
-}
-///
-/// Specialization that clones the struct field.
-///
-impl<'a, U: Clone> TraitStructExtract<'a, U> for U {
-    #[inline(always)]
-    fn extract(&'a self) -> U {
-        self.clone()
-    }
-}
-///
-/// Specialization that borrows a reference to the struct field.
-///
-impl<'a, U> TraitStructExtract<'a, &'a U> for U {
-    #[inline(always)]
-    fn extract(&'a self) -> &'a U {
-        self
-    }
-}
-///
-/// Specialization that extracts `Option<U>` as `Option<&U>`.
-///
-impl<'a, U> TraitStructExtract<'a, Option<&'a U>> for Option<U> {
-    #[inline(always)]
-    fn extract(&'a self) -> Option<&'a U> {
-        self.as_ref()
-    }
-}
-
-///
 /// Copied from oauth2-rs crate (not part of that crate's stable public interface).
 ///
 macro_rules! new_type {
@@ -423,134 +389,6 @@ macro_rules! new_url_type {
     };
 }
 
-///
-/// Macro to generate a trait containing the specified getters, a struct to store the specified
-/// fields, and an implementation of the trait for the struct.
-///
-/// This macro reduces the redundancy of implementing an extensible struct with a default
-/// implementation adhering to the spec.
-///
-macro_rules! trait_struct {
-    // Convenience pattern omitting `impl[...] trait[...] for struct[...], with a trailing comma
-    // after the last struct field.
-    (
-        trait $trait_name:ident[$($trait_types:tt)*] : [$($trait_bounds:tt)*]
-        $(#[$struct_attr:meta])*
-        struct $struct_name:ident[$($struct_types:tt)*] {
-            $(
-                $(#[$attr:meta])*
-                $field_name:ident($trait_type:ty) <- $field_type:ty,
-            )+
-        }
-    ) => {
-        trait_struct! {
-            trait $trait_name[$($trait_types)*] : [$($trait_bounds)*]
-            $(#[$struct_attr])*
-            struct $struct_name[$($struct_types)*] {
-                $(
-                    $(#[$attr])*
-                    $field_name($trait_type) <- $field_type
-                ),+
-            }
-            impl[] trait[] for struct []
-        }
-    };
-    // Convenience pattern omitting `impl[...] trait[...] for struct[...], without a trailing comma
-    // after the last struct field.
-    (
-        trait $trait_name:ident[$($trait_types:tt)*] : [$($trait_bounds:tt)*]
-        $(#[$struct_attr:meta])*
-        struct $struct_name:ident[$($struct_types:tt)*] {
-            $(
-                $(#[$attr:meta])*
-                $field_name:ident($trait_type:ty) <- $field_type:ty
-            ),+
-        }
-    ) => {
-        trait_struct! {
-            trait $trait_name[$($trait_types)*] : [$($trait_bounds)*]
-            $(#[$struct_attr])*
-            struct $struct_name[$($struct_types)*] {
-                $(
-                    $(#[$attr])*
-                    $field_name($trait_type) <- $field_type
-                ),+
-            }
-            impl[] trait[] for struct []
-        }
-    };
-    // Convenience pattern with a trailing comma after the last struct field.
-    (
-        trait $trait_name:ident[$($trait_types:tt)*] : [$($trait_bounds:tt)*] {
-            $($func:tt)*
-        }
-        $(#[$struct_attr:meta])*
-        struct $struct_name:ident[$($struct_types:tt)*] {
-            $(
-                $(#[$attr:meta])*
-                $field_name:ident($trait_type:ty) <- $field_type:ty,
-            )+
-        }
-        impl[$($impl_generics:tt)*] trait[$($trait_generics:tt)*]
-        for struct [$($struct_generics:tt)*]
-    ) => {
-        trait_struct! {
-            trait $trait_name[$($trait_types)*] : [$($trait_bounds)*] {
-                $($func)*
-            }
-            $(#[$struct_attr])*
-            struct $struct_name[$($struct_types)*] {
-                $(
-                    $(#[$attr])*
-                    $field_name($trait_type) <- $field_type
-                ),+
-            }
-            impl[$($impl_generics)*] trait[$($trait_generics)*] for struct [$($struct_generics)*]
-        }
-    };
-    // Actual implementation.
-    (
-        trait $trait_name:ident[$($trait_types:tt)*] : [$($trait_bounds:tt)*] {
-            $($func:tt)*
-        }
-        $(#[$struct_attr:meta])*
-        struct $struct_name:ident[$($struct_types:tt)*] {
-            $(
-                $(#[$attr:meta])*
-                $field_name:ident($trait_type:ty) <- $field_type:ty
-            ),+
-        }
-        impl[$($impl_generics:tt)*] trait[$($trait_generics:tt)*]
-        for struct [$($struct_generics:tt)*]
-    ) => {
-        pub trait $trait_name<$($trait_types)*> : $($trait_bounds)* {
-            $($func)*
-            $(
-                fn $field_name(&self) -> $trait_type;
-            )+
-        }
-        $(
-            #[$struct_attr]
-        )*
-        pub struct $struct_name<$($struct_types)*> {
-            $(
-                $(
-                    #[$attr]
-                )*
-                $field_name: $field_type,
-            )+
-        }
-        impl<$($impl_generics)*> $trait_name<$($trait_generics)*>
-        for $struct_name<$($struct_generics)*> {
-            $(
-                fn $field_name(&self) -> $trait_type {
-                    TraitStructExtract::<$trait_type>::extract(&self.$field_name)
-                }
-            )+
-        }
-    };
-}
-
 macro_rules! deserialize_fields {
     (@field_str Option(Seconds($field:ident))) => { stringify![$field] };
     (@field_str Option(DateTime(Seconds($field:ident)))) => { stringify![$field] };
@@ -782,29 +620,6 @@ macro_rules! serialize_fields {
     };
 }
 
-#[allow(unused_macros)]
-macro_rules! field_getter_decls {
-    (@case $field:ident Option < bool >) => {
-        fn $field(&self) -> Option<bool>;
-    };
-    (@case $field:ident Option < $type:ty >) => {
-        fn $field(&self) -> Option<&$type>;
-    };
-    (@case $field:ident $type:ty) => {
-        fn $field(&self) -> &$type;
-    };
-    // Main entry point
-    (
-        $(
-            $field:ident[$($entry:tt)+],
-        )+
-    ) => {
-        $(
-            field_getter_decls![@case $field $($entry)+];
-        )+
-    };
-}
-
 macro_rules! field_getters {
     (@case $self:ident [$zero:expr] $field:ident Option < bool >) => {
         fn $field(&$self) -> Option<bool> {
@@ -927,25 +742,6 @@ macro_rules! field_getters {
     };
 }
 
-macro_rules! field_setter_decls {
-    (@case $setter:ident $field:ident $type:ty) => {
-        fn $setter(
-            self,
-            $field: $type
-        ) -> Self;
-    };
-    // Main entry point
-    (
-        $(
-            $setter:ident -> $field:ident[$($entry:tt)+],
-        )+
-    ) => {
-        $(
-            field_setter_decls![@case $setter $field $($entry)+];
-        )+
-    };
-}
-
 macro_rules! field_setters {
     (@case pub $self:ident [$zero:expr] $setter:ident $field:ident $type:ty) => {
         pub fn $setter(
@@ -987,18 +783,6 @@ macro_rules! field_setters {
         $(
             field_setters![@case $self [$zero] $setter $field $($entry)+];
         )+
-    };
-}
-
-#[allow(unused_macros)]
-macro_rules! field_getter_setter_decls {
-    (
-        $(
-            $setter:ident -> $field:ident[$($entry:tt)+],
-        )+
-    ) => {
-        field_getter_decls![$($field[$($entry)+],)+];
-        field_setter_decls![$($setter -> $field[$($entry)+],)+];
     };
 }
 

@@ -20,9 +20,6 @@ use openidconnect::core::{
     CoreUserInfoClaims, CoreUserInfoVerifier,
 };
 use openidconnect::prelude::*;
-use openidconnect::registration::{
-    ClientMetadata, ClientRegistrationRequest, ClientRegistrationResponse,
-};
 use openidconnect::Nonce;
 use openidconnect::{
     AccessToken, AuthType, AuthenticationFlow, AuthorizationCode, ClaimsVerificationError,

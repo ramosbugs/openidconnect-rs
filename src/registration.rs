@@ -2,7 +2,7 @@ use std::fmt::{Debug, Formatter, Result as FormatterResult};
 use std::marker::{PhantomData, Send, Sync};
 use std::time::Duration;
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use curl;
 use oauth2::{AccessToken, ClientId, ClientSecret, ErrorResponse, ErrorResponseType, RedirectUrl};
 use serde;
@@ -16,8 +16,7 @@ use super::http::{
     auth_bearer, HttpRequest, HttpRequestMethod, ACCEPT_JSON, CONTENT_TYPE_JSON,
     HTTP_STATUS_BAD_REQUEST, HTTP_STATUS_CREATED, MIME_TYPE_JSON,
 };
-use super::macros::TraitStructExtract;
-use super::types::helpers::split_language_tag_key;
+use super::types::helpers::{serde_utc_seconds_opt, split_language_tag_key};
 use super::types::{
     ApplicationType, AuthenticationContextClass, ClientAuthMethod, ClientConfigUrl, ClientName,
     ClientUrl, ContactEmail, GrantType, InitiateLoginUrl, JsonWebKeyType, JsonWebKeyUse,
@@ -27,89 +26,184 @@ use super::types::{
 };
 use super::{JsonWebKey, JsonWebKeySet};
 
-// FIXME: switch to embedding a flattened extra_fields struct
-trait_struct![
-    trait ClientMetadata[
-        AT: ApplicationType,
-        CA: ClientAuthMethod,
-        G: GrantType,
-        JE: JweContentEncryptionAlgorithm,
-        JK: JweKeyManagementAlgorithm,
-        JS: JwsSigningAlgorithm<JT>,
-        JT: JsonWebKeyType,
-        JU: JsonWebKeyUse,
-        K: JsonWebKey<JS, JT, JU>,
-        RT: ResponseType,
-        S: SubjectIdentifierType,
-    ] : [Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static] {}
-    #[derive(Clone, Debug, PartialEq)]
-    struct Registration10ClientMetadata[
-        AT: ApplicationType,
-        CA: ClientAuthMethod,
-        G: GrantType,
-        JE: JweContentEncryptionAlgorithm,
-        JK: JweKeyManagementAlgorithm,
-        JS: JwsSigningAlgorithm<JT>,
-        JT: JsonWebKeyType,
-        JU: JsonWebKeyUse,
-        K: JsonWebKey<JS, JT, JU>,
-        RT: ResponseType,
-        S: SubjectIdentifierType,
-    ] {
-        redirect_uris(&Vec<RedirectUrl>) <- Vec<RedirectUrl>,
-        response_types(Option<&Vec<ResponseTypes<RT>>>) <- Option<Vec<ResponseTypes<RT>>>,
-        grant_types(Option<&Vec<G>>) <- Option<Vec<G>>,
-        application_type(Option<&AT>) <- Option<AT>,
-        contacts(Option<&Vec<ContactEmail>>) <- Option<Vec<ContactEmail>>,
-        client_name(Option<&LocalizedClaim<ClientName>>)
-            <- Option<LocalizedClaim<ClientName>>,
-        logo_uri(Option<&LocalizedClaim<LogoUrl>>)
-            <- Option<LocalizedClaim<LogoUrl>>,
-        client_uri(Option<&LocalizedClaim<ClientUrl>>)
-            <- Option<LocalizedClaim<ClientUrl>>,
-        policy_uri(Option<&LocalizedClaim<PolicyUrl>>)
-            <- Option<LocalizedClaim<PolicyUrl>>,
-        tos_uri(Option<&LocalizedClaim<ToSUrl>>)
-            <- Option<LocalizedClaim<ToSUrl>>,
-        jwks_uri(Option<&JsonWebKeySetUrl>) <- Option<JsonWebKeySetUrl>,
-        jwks(Option<&JsonWebKeySet<JS, JT, JU, K>>) <- Option<JsonWebKeySet<JS, JT, JU, K>>,
-        sector_identifier_uri(Option<&SectorIdentifierUrl>) <- Option<SectorIdentifierUrl>,
-        subject_type(Option<&S>) <- Option<S>,
-        id_token_signed_response_alg(Option<&JS>) <- Option<JS>,
-        id_token_encrypted_response_alg(Option<&JK>) <- Option<JK>,
-        id_token_encrypted_response_enc(Option<&JE>) <- Option<JE>,
-        userinfo_signed_response_alg(Option<&JS>) <- Option<JS>,
-        userinfo_encrypted_response_alg(Option<&JK>) <- Option<JK>,
-        userinfo_encrypted_response_enc(Option<&JE>) <- Option<JE>,
-        request_object_signing_alg(Option<&JS>) <- Option<JS>,
-        request_object_encryption_alg(Option<&JK>) <- Option<JK>,
-        request_object_encryption_enc(Option<&JE>) <- Option<JE>,
-        token_endpoint_auth_method(Option<&CA>) <- Option<CA>,
-        token_endpoint_auth_signing_alg(Option<&JS>) <- Option<JS>,
-        default_max_age(Option<&Duration>) <- Option<Duration>,
-        require_auth_time(Option<bool>) <- Option<bool>,
-        default_acr_values(Option<&Vec<AuthenticationContextClass>>)
-            <- Option<Vec<AuthenticationContextClass>>,
-        initiate_login_uri(Option<&InitiateLoginUrl>) <- Option<InitiateLoginUrl>,
-        request_uris(Option<&Vec<RequestUrl>>) <- Option<Vec<RequestUrl>>,
+pub trait AdditionalClientMetadata:
+    Clone + Debug + DeserializeOwned + PartialEq + Serialize
+{
+}
+
+// In order to support serde flatten, this must be an empty struct rather than an empty
+// tuple struct.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct EmptyAdditionalClientMetadata {}
+impl AdditionalClientMetadata for EmptyAdditionalClientMetadata {}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ClientMetadata<A, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+where
+    A: AdditionalClientMetadata,
+    AT: ApplicationType,
+    CA: ClientAuthMethod,
+    G: GrantType,
+    JE: JweContentEncryptionAlgorithm,
+    JK: JweKeyManagementAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    RT: ResponseType,
+    S: SubjectIdentifierType,
+{
+    // To avoid implementing a custom deserializer that handles both language tags and flatten,
+    // we wrap the language tag handling in its own flattened struct.
+    #[serde(bound = "AT: ApplicationType", flatten)]
+    standard_metadata: StandardClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+
+    #[serde(bound = "A: AdditionalClientMetadata", flatten)]
+    additional_metadata: A,
+}
+impl<A, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+    ClientMetadata<A, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+where
+    A: AdditionalClientMetadata,
+    AT: ApplicationType,
+    CA: ClientAuthMethod,
+    G: GrantType,
+    JE: JweContentEncryptionAlgorithm,
+    JK: JweKeyManagementAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    RT: ResponseType,
+    S: SubjectIdentifierType,
+{
+    pub fn new(redirect_uris: Vec<RedirectUrl>, additional_metadata: A) -> Self {
+        Self {
+            standard_metadata: StandardClientMetadata {
+                redirect_uris,
+                response_types: None,
+                grant_types: None,
+                application_type: None,
+                contacts: None,
+                client_name: None,
+                logo_uri: None,
+                client_uri: None,
+                policy_uri: None,
+                tos_uri: None,
+                jwks_uri: None,
+                jwks: None,
+                sector_identifier_uri: None,
+                subject_type: None,
+                id_token_signed_response_alg: None,
+                id_token_encrypted_response_alg: None,
+                id_token_encrypted_response_enc: None,
+                userinfo_signed_response_alg: None,
+                userinfo_encrypted_response_alg: None,
+                userinfo_encrypted_response_enc: None,
+                request_object_signing_alg: None,
+                request_object_encryption_alg: None,
+                request_object_encryption_enc: None,
+                token_endpoint_auth_method: None,
+                token_endpoint_auth_signing_alg: None,
+                default_max_age: None,
+                require_auth_time: None,
+                default_acr_values: None,
+                initiate_login_uri: None,
+                request_uris: None,
+            },
+            additional_metadata,
+        }
     }
-    impl [
-        AT: ApplicationType,
-        CA: ClientAuthMethod,
-        G: GrantType,
-        JE: JweContentEncryptionAlgorithm,
-        JK: JweKeyManagementAlgorithm,
-        JS: JwsSigningAlgorithm<JT>,
-        JT: JsonWebKeyType,
-        JU: JsonWebKeyUse,
-        K: JsonWebKey<JS, JT, JU>,
-        RT: ResponseType,
-        S: SubjectIdentifierType,
-    ] trait[AT, CA, G, JE, JK, JS, JT, JU, K, RT, S] for
-    struct[AT, CA, G, JE, JK, JS, JT, JU, K, RT, S]
-];
+    field_getters_setters![
+        pub self [self.standard_metadata] {
+            set_redirect_uris -> redirect_uris[Vec<RedirectUrl>],
+            set_response_types -> response_types[Option<Vec<ResponseTypes<RT>>>],
+            set_grant_types -> grant_types[Option<Vec<G>>],
+            set_application_type -> application_type[Option<AT>],
+            set_contacts -> contacts[Option<Vec<ContactEmail>>],
+            set_client_name -> client_name[Option<LocalizedClaim<ClientName>>],
+            set_logo_uri -> logo_uri[Option<LocalizedClaim<LogoUrl>>],
+            set_client_uri -> client_uri[Option<LocalizedClaim<ClientUrl>>],
+            set_policy_uri -> policy_uri[Option<LocalizedClaim<PolicyUrl>>],
+            set_tos_uri -> tos_uri[Option<LocalizedClaim<ToSUrl>>],
+            set_jwks_uri -> jwks_uri[Option<JsonWebKeySetUrl>],
+            set_jwks -> jwks[Option<JsonWebKeySet<JS, JT, JU, K>>],
+            set_sector_identifier_uri -> sector_identifier_uri[Option<SectorIdentifierUrl>],
+            set_subject_type -> subject_type[Option<S>],
+            set_id_token_signed_response_alg -> id_token_signed_response_alg[Option<JS>],
+            set_id_token_encrypted_response_alg -> id_token_encrypted_response_alg[Option<JK>],
+            set_id_token_encrypted_response_enc -> id_token_encrypted_response_enc[Option<JE>],
+            set_userinfo_signed_response_alg -> userinfo_signed_response_alg[Option<JS>],
+            set_userinfo_encrypted_response_alg -> userinfo_encrypted_response_alg[Option<JK>],
+            set_userinfo_encrypted_response_enc -> userinfo_encrypted_response_enc[Option<JE>],
+            set_request_object_signing_alg -> request_object_signing_alg[Option<JS>],
+            set_request_object_encryption_alg -> request_object_encryption_alg[Option<JK>],
+            set_request_object_encryption_enc -> request_object_encryption_enc[Option<JE>],
+            set_token_endpoint_auth_method -> token_endpoint_auth_method[Option<CA>],
+            set_token_endpoint_auth_signing_alg -> token_endpoint_auth_signing_alg[Option<JS>],
+            set_default_max_age -> default_max_age[Option<Duration>],
+            set_require_auth_time -> require_auth_time[Option<bool>],
+            set_default_acr_values -> default_acr_values[Option<Vec<AuthenticationContextClass>>],
+            set_initiate_login_uri -> initiate_login_uri[Option<InitiateLoginUrl>],
+            set_request_uris -> request_uris[Option<Vec<RequestUrl>>],
+        }
+    ];
+
+    pub fn additional_metadata(&self) -> &A {
+        &self.additional_metadata
+    }
+    pub fn additional_metadata_mut(&mut self) -> &mut A {
+        &mut self.additional_metadata
+    }
+}
+#[derive(Clone, Debug, PartialEq)]
+struct StandardClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+where
+    AT: ApplicationType,
+    CA: ClientAuthMethod,
+    G: GrantType,
+    JE: JweContentEncryptionAlgorithm,
+    JK: JweKeyManagementAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    RT: ResponseType,
+    S: SubjectIdentifierType,
+{
+    redirect_uris: Vec<RedirectUrl>,
+    response_types: Option<Vec<ResponseTypes<RT>>>,
+    grant_types: Option<Vec<G>>,
+    application_type: Option<AT>,
+    contacts: Option<Vec<ContactEmail>>,
+    client_name: Option<LocalizedClaim<ClientName>>,
+    logo_uri: Option<LocalizedClaim<LogoUrl>>,
+    client_uri: Option<LocalizedClaim<ClientUrl>>,
+    policy_uri: Option<LocalizedClaim<PolicyUrl>>,
+    tos_uri: Option<LocalizedClaim<ToSUrl>>,
+    jwks_uri: Option<JsonWebKeySetUrl>,
+    jwks: Option<JsonWebKeySet<JS, JT, JU, K>>,
+    sector_identifier_uri: Option<SectorIdentifierUrl>,
+    subject_type: Option<S>,
+    id_token_signed_response_alg: Option<JS>,
+    id_token_encrypted_response_alg: Option<JK>,
+    id_token_encrypted_response_enc: Option<JE>,
+    userinfo_signed_response_alg: Option<JS>,
+    userinfo_encrypted_response_alg: Option<JK>,
+    userinfo_encrypted_response_enc: Option<JE>,
+    request_object_signing_alg: Option<JS>,
+    request_object_encryption_alg: Option<JK>,
+    request_object_encryption_enc: Option<JE>,
+    token_endpoint_auth_method: Option<CA>,
+    token_endpoint_auth_signing_alg: Option<JS>,
+    default_max_age: Option<Duration>,
+    require_auth_time: Option<bool>,
+    default_acr_values: Option<Vec<AuthenticationContextClass>>,
+    initiate_login_uri: Option<InitiateLoginUrl>,
+    request_uris: Option<Vec<RequestUrl>>,
+}
 impl<'de, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S> Deserialize<'de>
-    for Registration10ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+    for StandardClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
 where
     AT: ApplicationType,
     CA: ClientAuthMethod,
@@ -171,10 +265,10 @@ where
             RT: ResponseType,
             S: SubjectIdentifierType,
         {
-            type Value = Registration10ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>;
+            type Value = StandardClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>;
 
             fn expecting(&self, formatter: &mut Formatter) -> FormatterResult {
-                formatter.write_str("struct Registration10ClientMetadata")
+                formatter.write_str("struct StandardClientMetadata")
             }
             fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
             where
@@ -232,7 +326,7 @@ where
     }
 }
 impl<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S> Serialize
-    for Registration10ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+    for StandardClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
 where
     AT: ApplicationType,
     CA: ClientAuthMethod,
@@ -288,14 +382,13 @@ where
     }
 }
 
-// FIXME: switch to embedding a flattened extra_fields struct
-pub trait ClientRegistrationRequest<AT, CA, CM, CR, ET, G, JE, JK, JS, JT, JU, K, RT, S>:
-    Debug + PartialEq + 'static
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClientRegistrationRequest<AC, AR, AT, CA, ET, G, JE, JK, JS, JT, JU, K, RT, S>
 where
+    AC: AdditionalClientMetadata,
+    AR: AdditionalClientRegistrationResponse,
     AT: ApplicationType,
     CA: ClientAuthMethod,
-    CM: ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
-    CR: ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
     ET: RegisterErrorResponseType,
     G: GrantType,
     JE: JweContentEncryptionAlgorithm,
@@ -307,17 +400,43 @@ where
     RT: ResponseType,
     S: SubjectIdentifierType,
 {
-    fn new(redirect_uris: Vec<RedirectUrl>) -> Self;
-    fn client_metadata(&self) -> &CM;
+    client_metadata: ClientMetadata<AC, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+    initial_access_token: Option<AccessToken>,
+    _phantom: PhantomData<(AR, ET)>,
+}
+impl<AC, AR, AT, CA, ET, G, JE, JK, JS, JT, JU, K, RT, S>
+    ClientRegistrationRequest<AC, AR, AT, CA, ET, G, JE, JK, JS, JT, JU, K, RT, S>
+where
+    AC: AdditionalClientMetadata,
+    AR: AdditionalClientRegistrationResponse,
+    AT: ApplicationType,
+    CA: ClientAuthMethod,
+    ET: RegisterErrorResponseType,
+    G: GrantType,
+    JE: JweContentEncryptionAlgorithm,
+    JK: JweKeyManagementAlgorithm,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    RT: ResponseType,
+    S: SubjectIdentifierType,
+{
+    pub fn new(redirect_uris: Vec<RedirectUrl>, additional_metadata: AC) -> Self {
+        Self {
+            client_metadata: ClientMetadata::new(redirect_uris, additional_metadata),
+            initial_access_token: None,
+            _phantom: PhantomData,
+        }
+    }
 
-    // FIXME: should this be an InitialAccessToken?
-    fn initial_access_token(&self) -> Option<&AccessToken>;
-    fn set_initial_access_token(&mut self, access_token: Option<AccessToken>);
-
-    fn register(
+    pub fn register(
         &self,
         registration_endpoint: &RegistrationUrl,
-    ) -> Result<CR, ClientRegistrationError<ET>> {
+    ) -> Result<
+        ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+        ClientRegistrationError<ET>,
+    > {
         let request_json = serde_json::to_string(self.client_metadata())
             .map_err(ClientRegistrationError::Serialize)?
             .into_bytes();
@@ -386,146 +505,21 @@ where
         serde_json::from_str(&response_body).map_err(ClientRegistrationError::Parse)
     }
 
-    field_setter_decls![
-        set_redirect_uris -> redirect_uris[Vec<RedirectUrl>],
-        set_response_types -> response_types[Option<Vec<ResponseTypes<RT>>>],
-        set_grant_types -> grant_types[Option<Vec<G>>],
-        set_application_type -> application_type[Option<AT>],
-        set_contacts -> contacts[Option<Vec<ContactEmail>>],
-        set_client_name -> client_name[Option<LocalizedClaim<ClientName>>],
-        set_logo_uri -> logo_uri[Option<LocalizedClaim<LogoUrl>>],
-        set_client_uri -> client_uri[Option<LocalizedClaim<ClientUrl>>],
-        set_policy_uri -> policy_uri[Option<LocalizedClaim<PolicyUrl>>],
-        set_tos_uri -> tos_uri[Option<LocalizedClaim<ToSUrl>>],
-        set_jwks_uri -> jwks_uri[Option<JsonWebKeySetUrl>],
-        set_jwks -> jwks[Option<JsonWebKeySet<JS, JT, JU, K>>],
-        set_sector_identifier_uri -> sector_identifier_uri[Option<SectorIdentifierUrl>],
-        set_subject_type -> subject_type[Option<S>],
-        set_id_token_signed_response_alg -> id_token_signed_response_alg[Option<JS>],
-        set_id_token_encrypted_response_alg -> id_token_encrypted_response_alg[Option<JK>],
-        set_id_token_encrypted_response_enc -> id_token_encrypted_response_enc[Option<JE>],
-        set_userinfo_signed_response_alg -> userinfo_signed_response_alg[Option<JS>],
-        set_userinfo_encrypted_response_alg -> userinfo_encrypted_response_alg[Option<JK>],
-        set_userinfo_encrypted_response_enc -> userinfo_encrypted_response_enc[Option<JE>],
-        set_request_object_signing_alg -> request_object_signing_alg[Option<JS>],
-        set_request_object_encryption_alg -> request_object_encryption_alg[Option<JK>],
-        set_request_object_encryption_enc -> request_object_encryption_enc[Option<JE>],
-        set_token_endpoint_auth_method -> token_endpoint_auth_method[Option<CA>],
-        set_token_endpoint_auth_signing_alg -> token_endpoint_auth_signing_alg[Option<JS>],
-        set_default_max_age -> default_max_age[Option<Duration>],
-        set_require_auth_time -> require_auth_time[Option<bool>],
-        set_default_acr_values -> default_acr_values[Option<Vec<AuthenticationContextClass>>],
-        set_initiate_login_uri -> initiate_login_uri[Option<InitiateLoginUrl>],
-        set_request_uris -> request_uris[Option<Vec<RequestUrl>>],
-    ];
-}
-#[derive(Clone, Debug, PartialEq)]
-pub struct Registration10ClientRegistrationRequest<
-    AT: ApplicationType,
-    CA: ClientAuthMethod,
-    CR: ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
-    ET: RegisterErrorResponseType,
-    G: GrantType,
-    JE: JweContentEncryptionAlgorithm,
-    JK: JweKeyManagementAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
-    RT: ResponseType,
-    S: SubjectIdentifierType,
-> {
-    client_metadata: Registration10ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
-    initial_access_token: Option<AccessToken>,
-    _phantom_cr: PhantomData<CR>,
-    _phantom_et: PhantomData<ET>,
-}
-impl<AT, CA, CR, ET, G, JE, JK, JS, JT, JU, K, RT, S>
-    ClientRegistrationRequest<
-        AT,
-        CA,
-        Registration10ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
-        CR,
-        ET,
-        G,
-        JE,
-        JK,
-        JS,
-        JT,
-        JU,
-        K,
-        RT,
-        S,
-    > for Registration10ClientRegistrationRequest<AT, CA, CR, ET, G, JE, JK, JS, JT, JU, K, RT, S>
-where
-    AT: ApplicationType,
-    CA: ClientAuthMethod,
-    CR: ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
-    ET: RegisterErrorResponseType,
-    G: GrantType,
-    JE: JweContentEncryptionAlgorithm,
-    JK: JweKeyManagementAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
-    RT: ResponseType,
-    S: SubjectIdentifierType,
-{
-    fn new(redirect_uris: Vec<RedirectUrl>) -> Self {
-        Registration10ClientRegistrationRequest {
-            client_metadata: Registration10ClientMetadata {
-                redirect_uris,
-                response_types: None,
-                grant_types: None,
-                application_type: None,
-                contacts: None,
-                client_name: None,
-                logo_uri: None,
-                client_uri: None,
-                policy_uri: None,
-                tos_uri: None,
-                jwks_uri: None,
-                jwks: None,
-                sector_identifier_uri: None,
-                subject_type: None,
-                id_token_signed_response_alg: None,
-                id_token_encrypted_response_alg: None,
-                id_token_encrypted_response_enc: None,
-                userinfo_signed_response_alg: None,
-                userinfo_encrypted_response_alg: None,
-                userinfo_encrypted_response_enc: None,
-                request_object_signing_alg: None,
-                request_object_encryption_alg: None,
-                request_object_encryption_enc: None,
-                token_endpoint_auth_method: None,
-                token_endpoint_auth_signing_alg: None,
-                default_max_age: None,
-                require_auth_time: None,
-                default_acr_values: None,
-                initiate_login_uri: None,
-                request_uris: None,
-            },
-            initial_access_token: None,
-            _phantom_cr: PhantomData,
-            _phantom_et: PhantomData,
-        }
-    }
-    fn client_metadata(
-        &self,
-    ) -> &Registration10ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S> {
+    pub fn client_metadata(&self) -> &ClientMetadata<AC, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S> {
         &self.client_metadata
     }
 
-    fn initial_access_token(&self) -> Option<&AccessToken> {
+    // FIXME: should this be an InitialAccessToken?
+    pub fn initial_access_token(&self) -> Option<&AccessToken> {
         self.initial_access_token.as_ref()
     }
-    fn set_initial_access_token(&mut self, access_token: Option<AccessToken>) {
-        self.initial_access_token = access_token
+    pub fn set_initial_access_token(mut self, access_token: Option<AccessToken>) -> Self {
+        self.initial_access_token = access_token;
+        self
     }
 
-    field_setters![
-        self [self.client_metadata] {
+    field_getters_setters![
+        pub self [self.client_metadata.standard_metadata] {
             set_redirect_uris -> redirect_uris[Vec<RedirectUrl>],
             set_response_types -> response_types[Option<Vec<ResponseTypes<RT>>>],
             set_grant_types -> grant_types[Option<Vec<G>>],
@@ -558,42 +552,33 @@ where
             set_request_uris -> request_uris[Option<Vec<RequestUrl>>],
         }
     ];
+
+    pub fn additional_metadata(&self) -> &AC {
+        &self.client_metadata.additional_metadata
+    }
+    pub fn additional_metadata_mut(&mut self) -> &mut AC {
+        &mut self.client_metadata.additional_metadata
+    }
 }
 
-// FIXME: switch to embedding a flattened extra_fields struct
-pub trait ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>:
-    ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
-    + Debug
-    + DeserializeOwned
-    + PartialEq
-    + Serialize
-    + 'static
-where
-    AT: ApplicationType,
-    CA: ClientAuthMethod,
-    G: GrantType,
-    JE: JweContentEncryptionAlgorithm,
-    JK: JweKeyManagementAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
-    RT: ResponseType,
-    S: SubjectIdentifierType,
+pub trait AdditionalClientRegistrationResponse:
+    Clone + Debug + DeserializeOwned + PartialEq + Serialize
 {
-    fn client_id(&self) -> &ClientId;
-    fn client_secret(&self) -> Option<&ClientSecret>;
-    fn registration_access_token(&self) -> Option<&RegistrationAccessToken>;
-    fn registration_client_uri(&self) -> Option<&ClientConfigUrl>;
-    fn client_id_issued_at(&self) -> Option<Result<DateTime<Utc>, ()>>;
-    fn client_secret_expires_at(&self) -> Option<Result<DateTime<Utc>, ()>>;
 }
+
+// In order to support serde flatten, this must be an empty struct rather than an empty
+// tuple struct.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct Registration10ClientRegistrationResponse<AT, CA, CM, G, JE, JK, JS, JT, JU, K, RT, S>
+pub struct EmptyAdditionalClientRegistrationResponse {}
+impl AdditionalClientRegistrationResponse for EmptyAdditionalClientRegistrationResponse {}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
 where
+    AC: AdditionalClientMetadata,
+    AR: AdditionalClientRegistrationResponse,
     AT: ApplicationType,
     CA: ClientAuthMethod,
-    CM: ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
     G: GrantType,
     JE: JweContentEncryptionAlgorithm,
     JK: JweKeyManagementAlgorithm,
@@ -611,45 +596,29 @@ where
     registration_access_token: Option<RegistrationAccessToken>,
     #[serde(skip_serializing_if = "Option::is_none")]
     registration_client_uri: Option<ClientConfigUrl>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    client_id_issued_at: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    client_secret_expires_at: Option<u64>,
     #[serde(
-        flatten,
-        bound = "CM: ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>"
+        skip_serializing_if = "Option::is_none",
+        with = "serde_utc_seconds_opt"
     )]
-    client_metadata: CM,
-    #[serde(skip)]
-    _phantom_at: PhantomData<AT>,
-    #[serde(skip)]
-    _phantom_ca: PhantomData<CA>,
-    #[serde(skip)]
-    _phantom_g: PhantomData<G>,
-    #[serde(skip)]
-    _phantom_je: PhantomData<JE>,
-    #[serde(skip)]
-    _phantom_jk: PhantomData<JK>,
-    #[serde(skip)]
-    _phantom_js: PhantomData<JS>,
-    #[serde(skip)]
-    _phantom_jt: PhantomData<JT>,
-    #[serde(skip)]
-    _phantom_ju: PhantomData<JU>,
-    #[serde(skip)]
-    _phantom_jw: PhantomData<K>,
-    #[serde(skip)]
-    _phantom_rt: PhantomData<RT>,
-    #[serde(skip)]
-    _phantom_s: PhantomData<S>,
+    client_id_issued_at: Option<DateTime<Utc>>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        with = "serde_utc_seconds_opt"
+    )]
+    client_secret_expires_at: Option<DateTime<Utc>>,
+    #[serde(bound = "AC: AdditionalClientMetadata", flatten)]
+    client_metadata: ClientMetadata<AC, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+
+    #[serde(bound = "AR: AdditionalClientRegistrationResponse", flatten)]
+    additional_response: AR,
 }
-impl<AT, CA, CM, G, JE, JK, JS, JT, JU, K, RT, S>
-    ClientRegistrationResponse<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
-    for Registration10ClientRegistrationResponse<AT, CA, CM, G, JE, JK, JS, JT, JU, K, RT, S>
+impl<A, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+    ClientRegistrationResponse<A, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
 where
+    A: AdditionalClientMetadata,
+    AR: AdditionalClientRegistrationResponse,
     AT: ApplicationType,
     CA: ClientAuthMethod,
-    CM: ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
     G: GrantType,
     JE: JweContentEncryptionAlgorithm,
     JK: JweKeyManagementAlgorithm,
@@ -660,78 +629,66 @@ where
     RT: ResponseType,
     S: SubjectIdentifierType,
 {
-    fn client_id(&self) -> &ClientId {
-        &self.client_id
-    }
-    fn client_secret(&self) -> Option<&ClientSecret> {
-        self.client_secret.as_ref()
-    }
-    fn registration_access_token(&self) -> Option<&RegistrationAccessToken> {
-        self.registration_access_token.as_ref()
-    }
-    fn registration_client_uri(&self) -> Option<&ClientConfigUrl> {
-        self.registration_client_uri.as_ref()
-    }
-    fn client_id_issued_at(&self) -> Option<Result<DateTime<Utc>, ()>> {
-        self.client_id_issued_at
-            .map(|seconds| Utc.timestamp_opt(seconds as i64, 0).single().ok_or(()))
-    }
-    fn client_secret_expires_at(&self) -> Option<Result<DateTime<Utc>, ()>> {
-        self.client_secret_expires_at
-            .map(|seconds| Utc.timestamp_opt(seconds as i64, 0).single().ok_or(()))
-    }
-}
-impl<AT, CA, CM, G, JE, JK, JS, JT, JU, K, RT, S>
-    ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
-    for Registration10ClientRegistrationResponse<AT, CA, CM, G, JE, JK, JS, JT, JU, K, RT, S>
-where
-    AT: ApplicationType,
-    CA: ClientAuthMethod,
-    CM: ClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
-    G: GrantType,
-    JE: JweContentEncryptionAlgorithm,
-    JK: JweKeyManagementAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
-    RT: ResponseType,
-    S: SubjectIdentifierType,
-{
-    field_getters![
-        self [self.client_metadata]() {
-            redirect_uris[Vec<RedirectUrl>],
-            response_types[Option<Vec<ResponseTypes<RT>>>],
-            grant_types[Option<Vec<G>>],
-            application_type[Option<AT>],
-            contacts[Option<Vec<ContactEmail>>],
-            client_name[Option<LocalizedClaim<ClientName>>],
-            logo_uri[Option<LocalizedClaim<LogoUrl>>],
-            client_uri[Option<LocalizedClaim<ClientUrl>>],
-            policy_uri[Option<LocalizedClaim<PolicyUrl>>],
-            tos_uri[Option<LocalizedClaim<ToSUrl>>],
-            jwks_uri[Option<JsonWebKeySetUrl>],
-            jwks[Option<JsonWebKeySet<JS, JT, JU, K>>],
-            sector_identifier_uri[Option<SectorIdentifierUrl>],
-            subject_type[Option<S>],
-            id_token_signed_response_alg[Option<JS>],
-            id_token_encrypted_response_alg[Option<JK>],
-            id_token_encrypted_response_enc[Option<JE>],
-            userinfo_signed_response_alg[Option<JS>],
-            userinfo_encrypted_response_alg[Option<JK>],
-            userinfo_encrypted_response_enc[Option<JE>],
-            request_object_signing_alg[Option<JS>],
-            request_object_encryption_alg[Option<JK>],
-            request_object_encryption_enc[Option<JE>],
-            token_endpoint_auth_method[Option<CA>],
-            token_endpoint_auth_signing_alg[Option<JS>],
-            default_max_age[Option<Duration>],
-            require_auth_time[Option<bool>],
-            default_acr_values[Option<Vec<AuthenticationContextClass>>],
-            initiate_login_uri[Option<InitiateLoginUrl>],
-            request_uris[Option<Vec<RequestUrl>>],
+    field_getters_setters![
+        pub self [self] {
+            set_client_id -> client_id[ClientId],
+            set_client_secret -> client_secret[Option<ClientSecret>],
+            set_registration_access_token
+              -> registration_access_token[Option<RegistrationAccessToken>],
+            set_registration_client_uri -> registration_client_uri[Option<ClientConfigUrl>],
+            set_client_id_issued_at -> client_id_issued_at[Option<DateTime<Utc>>],
+            set_client_secret_expires_at -> client_secret_expires_at[Option<DateTime<Utc>>],
         }
     ];
+
+    field_getters_setters![
+        pub self [self.client_metadata.standard_metadata] {
+            set_redirect_uris -> redirect_uris[Vec<RedirectUrl>],
+            set_response_types -> response_types[Option<Vec<ResponseTypes<RT>>>],
+            set_grant_types -> grant_types[Option<Vec<G>>],
+            set_application_type -> application_type[Option<AT>],
+            set_contacts -> contacts[Option<Vec<ContactEmail>>],
+            set_client_name -> client_name[Option<LocalizedClaim<ClientName>>],
+            set_logo_uri -> logo_uri[Option<LocalizedClaim<LogoUrl>>],
+            set_client_uri -> client_uri[Option<LocalizedClaim<ClientUrl>>],
+            set_policy_uri -> policy_uri[Option<LocalizedClaim<PolicyUrl>>],
+            set_tos_uri -> tos_uri[Option<LocalizedClaim<ToSUrl>>],
+            set_jwks_uri -> jwks_uri[Option<JsonWebKeySetUrl>],
+            set_jwks -> jwks[Option<JsonWebKeySet<JS, JT, JU, K>>],
+            set_sector_identifier_uri -> sector_identifier_uri[Option<SectorIdentifierUrl>],
+            set_subject_type -> subject_type[Option<S>],
+            set_id_token_signed_response_alg -> id_token_signed_response_alg[Option<JS>],
+            set_id_token_encrypted_response_alg -> id_token_encrypted_response_alg[Option<JK>],
+            set_id_token_encrypted_response_enc -> id_token_encrypted_response_enc[Option<JE>],
+            set_userinfo_signed_response_alg -> userinfo_signed_response_alg[Option<JS>],
+            set_userinfo_encrypted_response_alg -> userinfo_encrypted_response_alg[Option<JK>],
+            set_userinfo_encrypted_response_enc -> userinfo_encrypted_response_enc[Option<JE>],
+            set_request_object_signing_alg -> request_object_signing_alg[Option<JS>],
+            set_request_object_encryption_alg -> request_object_encryption_alg[Option<JK>],
+            set_request_object_encryption_enc -> request_object_encryption_enc[Option<JE>],
+            set_token_endpoint_auth_method -> token_endpoint_auth_method[Option<CA>],
+            set_token_endpoint_auth_signing_alg -> token_endpoint_auth_signing_alg[Option<JS>],
+            set_default_max_age -> default_max_age[Option<Duration>],
+            set_require_auth_time -> require_auth_time[Option<bool>],
+            set_default_acr_values -> default_acr_values[Option<Vec<AuthenticationContextClass>>],
+            set_initiate_login_uri -> initiate_login_uri[Option<InitiateLoginUrl>],
+            set_request_uris -> request_uris[Option<Vec<RequestUrl>>],
+        }
+    ];
+
+    pub fn additional_metadata(&self) -> &A {
+        &self.client_metadata.additional_metadata
+    }
+    pub fn additional_metadata_mut(&mut self) -> &mut A {
+        &mut self.client_metadata.additional_metadata
+    }
+
+    pub fn additional_response(&self) -> &AR {
+        &self.additional_response
+    }
+    pub fn additional_response_mut(&mut self) -> &mut AR {
+        &mut self.additional_response
+    }
 }
 
 // FIXME: implement client configuration endpoint request (Section 4)
@@ -777,7 +734,6 @@ mod tests {
         LanguageTag, LogoUrl, PolicyUrl, RegistrationAccessToken, RequestUrl, ResponseTypes,
         SectorIdentifierUrl, ToSUrl,
     };
-    use super::{ClientMetadata, ClientRegistrationResponse};
 
     #[test]
     fn test_metadata_serialization() {
@@ -1133,11 +1089,11 @@ mod tests {
             ClientConfigUrl::new("https://example-provider.com/registration".to_string()).unwrap()
         );
         assert_eq!(
-            client_metadata.client_id_issued_at().unwrap().unwrap(),
+            *client_metadata.client_id_issued_at().unwrap(),
             Utc.timestamp(1523953306, 0)
         );
         assert_eq!(
-            client_metadata.client_secret_expires_at().unwrap().unwrap(),
+            *client_metadata.client_secret_expires_at().unwrap(),
             Utc.timestamp(1526545306, 0)
         );
         assert_eq!(
