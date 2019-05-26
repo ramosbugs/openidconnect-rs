@@ -196,10 +196,10 @@ pub trait SubjectIdentifierType:
 }
 
 // FIXME: make this a trait so that callers can add their own enums if desired
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-AuthenticationContextClass(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    AuthenticationContextClass(String)
+];
 impl AsRef<str> for AuthenticationContextClass {
     fn as_ref(&self) -> &str {
         self
@@ -207,45 +207,45 @@ impl AsRef<str> for AuthenticationContextClass {
 }
 
 // FIXME: make this a trait so that callers can add their own enums if desired
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-AuthenticationMethodReference(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    AuthenticationMethodReference(String)
+];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-AccessTokenHash(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    AccessTokenHash(String)
+];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-AddressCountry(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    AddressCountry(String)
+];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-AddressLocality(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    AddressLocality(String)
+];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-AddressPostalCode(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    AddressPostalCode(String)
+];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-AddressRegion(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    AddressRegion(String)
+];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-Audience(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    Audience(String)
+];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-AuthorizationCodeHash(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    AuthorizationCodeHash(String)
+];
 
 new_type![
     #[derive(Deserialize, Eq, Hash, Serialize)]
@@ -255,80 +255,80 @@ new_type![
     )
 ];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-ClientName(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    ClientName(String)
+];
 
 new_url_type![ClientConfigUrl];
 
 new_url_type![ClientUrl];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-ContactEmail(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    ContactEmail(String)
+];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-EndUserBirthday(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    EndUserBirthday(String)
+];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-EndUserEmail(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    EndUserEmail(String)
+];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-EndUserFamilyName(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    EndUserFamilyName(String)
+];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-EndUserGivenName(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    EndUserGivenName(String)
+];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-EndUserMiddleName(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    EndUserMiddleName(String)
+];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-EndUserName(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    EndUserName(String)
+];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-EndUserNickname(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    EndUserNickname(String)
+];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-EndUserPhoneNumber(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    EndUserPhoneNumber(String)
+];
 
 new_url_type![EndUserPictureUrl];
 
 new_url_type![EndUserProfileUrl];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-EndUserTimezone(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    EndUserTimezone(String)
+];
 
 new_url_type![EndUserWebsiteUrl];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-EndUserUsername(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    EndUserUsername(String)
+];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-FormattedAddress(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    FormattedAddress(String)
+];
 
 new_url_type![InitiateLoginUrl];
 
@@ -345,10 +345,10 @@ new_url_type![
     }
 ];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-JsonWebKeyId(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    JsonWebKeyId(String)
+];
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct JsonWebKeySet<JS, JT, JU, K>
@@ -393,20 +393,20 @@ where
     }
 }
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-LanguageTag(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    LanguageTag(String)
+];
 impl AsRef<str> for LanguageTag {
     fn as_ref(&self) -> &str {
         self
     }
 }
 
-new_secret_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-LoginHint(String)];
+new_secret_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    LoginHint(String)
+];
 
 new_url_type![LogoUrl];
 
@@ -440,10 +440,10 @@ new_url_type![OpTosUrl];
 
 new_url_type![PolicyUrl];
 
-new_secret_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-RegistrationAccessToken(String)];
+new_secret_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    RegistrationAccessToken(String)
+];
 
 new_url_type![RegistrationUrl];
 
@@ -487,15 +487,15 @@ new_url_type![SectorIdentifierUrl];
 
 new_url_type![ServiceDocUrl];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-StreetAddress(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    StreetAddress(String)
+];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-SubjectIdentifier(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    SubjectIdentifier(String)
+];
 
 new_url_type![ToSUrl];
 

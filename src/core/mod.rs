@@ -307,10 +307,10 @@ impl Display for CoreAuthPrompt {
     }
 }
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-CoreClaimName(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    CoreClaimName(String)
+];
 impl ClaimName for CoreClaimName {}
 
 ///

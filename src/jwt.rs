@@ -14,15 +14,15 @@ use super::{
     JwsSigningAlgorithm, PrivateSigningKey, SignatureVerificationError, SigningError,
 };
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-JsonWebTokenContentType(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    JsonWebTokenContentType(String)
+];
 
-new_type![#[derive(
-    Deserialize, Eq, Hash, Ord, PartialOrd, Serialize,
-)]
-JsonWebTokenType(String)];
+new_type![
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    JsonWebTokenType(String)
+];
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum JsonWebTokenAlgorithm<JE, JS, JT>
