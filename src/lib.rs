@@ -375,11 +375,8 @@ where
         self
     }
 
-    // FIXME: support 'claims' parameter
+    // TODO: support 'claims' parameter
     // https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter
-
-    // FIXME: Add support for 'registration' parameter:
-    // https://openid.net/specs/openid-connect-core-1_0.html#RegistrationParameter
 
     pub fn display(&self) -> Option<&AD> {
         self.display.as_ref()
@@ -507,7 +504,7 @@ where
             .map(Option::unwrap)
             .collect();
 
-            extra_params.map(|p| {
+            extra_params.iter().for_each(|p| {
                 p.iter()
                     .for_each(|(name, value)| params.push((name, value)))
             });

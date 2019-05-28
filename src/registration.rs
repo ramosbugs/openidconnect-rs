@@ -463,10 +463,10 @@ where
         .request()
         .map_err(ClientRegistrationError::Request)?;
 
-        // FIXME: check for WWW-Authenticate response header if bearer auth was used (see
+        // TODO: check for WWW-Authenticate response header if bearer auth was used (see
         //   https://tools.ietf.org/html/rfc6750#section-3)
-        // FIXME: improve error handling (i.e., is there a body response?)
-        // FIXME: other necessary response validation? check spec
+        // TODO: improve error handling (i.e., is there a body response?)
+        // TODO: other necessary response validation? check spec
 
         // Spec says that a successful response SHOULD use 201 Created, and a registration error
         // condition returns (no "SHOULD") 400 Bad Request. For now, only accept these two status
@@ -727,7 +727,7 @@ where
     }
 }
 
-// FIXME: implement client configuration endpoint request (Section 4)
+// TODO: implement client configuration endpoint request (Section 4)
 
 pub trait RegisterErrorResponseType: Clone + ErrorResponseType + Send + Sync + 'static {}
 

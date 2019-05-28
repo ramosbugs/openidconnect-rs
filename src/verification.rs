@@ -113,8 +113,8 @@ pub enum SignatureVerificationError {
 }
 
 // This struct is intentionally private.
-#[derive(Clone, Debug)]
-struct JwtClaimsVerifier<JS, JT, JU, K>
+#[derive(Clone)]
+struct JwtClaimsVerifier<'a, JS, JT, JU, K>
 where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
@@ -122,15 +122,16 @@ where
     K: JsonWebKey<JS, JT, JU>,
 {
     allowed_algs: Option<HashSet<JS>>,
-    aud_required: bool,
+    aud_match_required: bool,
     client_id: ClientId,
     client_secret: Option<ClientSecret>,
     iss_required: bool,
     issuer: IssuerUrl,
     is_signature_check_enabled: bool,
+    other_aud_verifier_fn: Rc<Fn(&Audience) -> bool + 'a>,
     signature_keys: JsonWebKeySet<JS, JT, JU, K>,
 }
-impl<JS, JT, JU, K> JwtClaimsVerifier<JS, JT, JU, K>
+impl<'a, JS, JT, JU, K> JwtClaimsVerifier<'a, JS, JT, JU, K>
 where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
@@ -144,18 +145,22 @@ where
     ) -> Self {
         JwtClaimsVerifier {
             allowed_algs: Some([JS::rsa_sha_256()].iter().cloned().collect()),
-            aud_required: true,
+            aud_match_required: true,
             client_id,
             client_secret: None,
             iss_required: true,
             issuer,
             is_signature_check_enabled: true,
+            // Secure default: reject all other audiences as untrusted, since any other audience
+            // can potentially impersonate the user when by sending its copy of these claims
+            // to this relying party.
+            other_aud_verifier_fn: Rc::new(|_| false),
             signature_keys,
         }
     }
 
     pub fn require_audience_match(mut self, aud_required: bool) -> Self {
-        self.aud_required = aud_required;
+        self.aud_match_required = aud_required;
         self
     }
 
@@ -183,6 +188,14 @@ where
 
     pub fn set_client_secret(mut self, client_secret: ClientSecret) -> Self {
         self.client_secret = Some(client_secret);
+        self
+    }
+
+    pub fn set_other_audience_verifier_fn<T>(mut self, other_aud_verifier_fn: T) -> Self
+    where
+        T: Fn(&Audience) -> bool + 'a,
+    {
+        self.other_aud_verifier_fn = Rc::new(other_aud_verifier_fn);
         self
     }
 
@@ -221,7 +234,6 @@ where
         // implementation doesn't understand any of them, unconditionally reject the JWT. Note that
         // the spec prohibits this field from containing any of the standard headers or being empty.
         if jose_header.crit.is_some() {
-            // FIXME: add a test case using this test vector:
             // https://tools.ietf.org/html/rfc7515#appendix-E
             return Err(ClaimsVerificationError::Unsupported(
                 "critical JWT header fields are unsupported".to_string(),
@@ -282,9 +294,8 @@ where
             //    (audience) Claim MAY contain an array with more than one element. The ID Token MUST be
             //    rejected if the ID Token does not list the Client as a valid audience, or if it
             //    contains additional audiences not trusted by the Client.
-            if self.aud_required {
+            if self.aud_match_required {
                 if let Some(audiences) = unverified_claims.audiences() {
-                    // FIXME: Reject untrusted additional audiences.
                     if !audiences
                         .iter()
                         .any(|aud| (**aud).deref() == self.client_id.deref())
@@ -298,6 +309,18 @@ where
                                 .collect::<Vec<_>>()
                                 .join(", ")
                         )));
+                    } else if audiences.len() > 1 {
+                        audiences
+                            .iter()
+                            .filter(|aud| (**aud).deref() != self.client_id.deref())
+                            .find(|aud| !(self.other_aud_verifier_fn)(aud))
+                            .map(|aud| {
+                                Err(ClaimsVerificationError::InvalidAudience(format!(
+                                    "`{}` is not a trusted audience",
+                                    **aud,
+                                )))
+                            })
+                            .unwrap_or(Ok(()))?;
                     }
                 } else {
                     return Err(ClaimsVerificationError::InvalidAudience(
@@ -483,7 +506,7 @@ where
     #[allow(clippy::type_complexity)]
     auth_time_verifier_fn: Rc<Fn(Option<&DateTime<Utc>>) -> Result<(), String> + 'a>,
     iat_verifier_fn: Rc<Fn(&DateTime<Utc>) -> Result<(), String> + 'a>,
-    jwt_verifier: JwtClaimsVerifier<JS, JT, JU, K>,
+    jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>,
     time_fn: Rc<Fn() -> DateTime<Utc> + 'a>,
 }
 impl<'a, JS, JT, JU, K> IdTokenVerifier<'a, JS, JT, JU, K>
@@ -493,7 +516,7 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
-    fn new(jwt_verifier: JwtClaimsVerifier<JS, JT, JU, K>) -> Self {
+    fn new(jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>) -> Self {
         IdTokenVerifier {
             // By default, accept authorization context reference (acr claim).
             acr_verifier_fn: Rc::new(|_| Ok(())),
@@ -576,6 +599,16 @@ where
         T: Fn(&DateTime<Utc>) -> Result<(), String> + 'a,
     {
         self.iat_verifier_fn = Rc::new(iat_verifier_fn);
+        self
+    }
+
+    pub fn set_other_audience_verifier_fn<T>(mut self, other_aud_verifier_fn: T) -> Self
+    where
+        T: Fn(&Audience) -> bool + 'a,
+    {
+        self.jwt_verifier = self
+            .jwt_verifier
+            .set_other_audience_verifier_fn(other_aud_verifier_fn);
         self
     }
 
@@ -676,7 +709,7 @@ where
 /// User info verifier.
 ///
 #[derive(Clone)]
-pub struct UserInfoVerifier<JE, JS, JT, JU, K>
+pub struct UserInfoVerifier<'a, JE, JS, JT, JU, K>
 where
     JE: JweContentEncryptionAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
@@ -684,11 +717,11 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
-    jwt_verifier: JwtClaimsVerifier<JS, JT, JU, K>,
+    jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>,
     sub: SubjectIdentifier,
     _phantom: PhantomData<JE>,
 }
-impl<JE, JS, JT, JU, K> UserInfoVerifier<JE, JS, JT, JU, K>
+impl<'a, JE, JS, JT, JU, K> UserInfoVerifier<'a, JE, JS, JT, JU, K>
 where
     JE: JweContentEncryptionAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
@@ -785,7 +818,8 @@ mod tests {
         CoreJsonWebKeyType,
     >;
 
-    type CoreJwtClaimsVerifier = JwtClaimsVerifier<
+    type CoreJwtClaimsVerifier<'a> = JwtClaimsVerifier<
+        'a,
         CoreJwsSigningAlgorithm,
         CoreJsonWebKeyType,
         CoreJsonWebKeyUse,
@@ -992,8 +1026,29 @@ mod tests {
                 )).expect("failed to deserialize"),
             ).expect("verification should succeed");
 
-        // Multiple audiences, where one is a match
-        verifier.verified_claims(
+        // Multiple audiences, where one is a match (default = reject)
+        match verifier.verified_claims(
+            serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
+                "eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOlsiYXVkMSIsIm15X2NsaWVudCIsImF1ZDIiXSwiaXNzIjoia\
+                 HR0cHM6Ly9leGFtcGxlLmNvbSIsInBheWxvYWQiOiJoZWxsbyB3b3JsZCJ9.N9ibisEe0kKLe1GDWM\
+                 ON3PmYqbL73dag-loM8pjKJNinF9SB7n4JuSu4FrNkeW4F1Cz8MIbLuWfKvDa_4v_3FstMA3GODZWH\
+                 BVIiuNFay2ovCfGFyykwe47dF_47g_OM5AkJc_teE5MN8lPh9V5zYCy3ON3zZ3acFPJMOPTdbU56xD\
+                 eFe7lil6DmV4JU9A52t5ZkJILFaIuxxXJUIDmqpPTvHkggh_QOj9C2US9bgg5b543JwT4j-HbDp51L\
+                 dDB4k3azOssT1ddtoAuuDOctnraMKUtqffJXexxfwA1uM6EIofSrK5v11xwgTciL9xDXAvav_G2buP\
+                 ol1bjGLa2t0Q"
+                    .to_string(),
+            ))
+            .expect("failed to deserialize"),
+        ) {
+            Err(ClaimsVerificationError::InvalidAudience(_)) => {}
+            other => panic!("unexpected result: {:?}", other),
+        }
+
+        // Multiple audiences, where one is a match (allowed)
+        verifier
+            .clone()
+            .set_other_audience_verifier_fn(|aud| **aud == "aud1" || **aud == "aud2")
+            .verified_claims(
             serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
                 "eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOlsiYXVkMSIsIm15X2NsaWVudCIsImF1ZDIiXSwiaXNzIjoia\
                  HR0cHM6Ly9leGFtcGxlLmNvbSIsInBheWxvYWQiOiJoZWxsbyB3b3JsZCJ9.N9ibisEe0kKLe1GDWM\

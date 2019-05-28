@@ -76,7 +76,6 @@ pub fn init_log(test_id: &'static str) {
     set_test_id(test_id);
 }
 
-// FIXME: convert this to a trait on Result<_, Fail>
 pub trait PanicIfFail<T, F>
 where
     F: Fail,

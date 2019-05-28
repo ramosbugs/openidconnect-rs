@@ -168,7 +168,8 @@ pub type CoreUserInfoJsonWebToken = UserInfoJsonWebToken<
     CoreJwsSigningAlgorithm,
     CoreJsonWebKeyType,
 >;
-pub type CoreUserInfoVerifier = UserInfoVerifier<
+pub type CoreUserInfoVerifier<'a> = UserInfoVerifier<
+    'a,
     CoreJweContentEncryptionAlgorithm,
     CoreJwsSigningAlgorithm,
     CoreJsonWebKeyType,
