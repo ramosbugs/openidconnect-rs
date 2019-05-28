@@ -174,7 +174,7 @@ where
 pub struct UserInfoJsonWebToken<
     AC: AdditionalClaims,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 >(
@@ -185,7 +185,7 @@ impl<AC, GC, JE, JS, JT> UserInfoJsonWebToken<AC, GC, JE, JS, JT>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
@@ -225,7 +225,7 @@ new_url_type![
         ) -> Result<UserInfoClaims<AC, GC>, UserInfoError>
         where AC: AdditionalClaims,
                 GC: GenderClaim,
-                JE: JweContentEncryptionAlgorithm,
+                JE: JweContentEncryptionAlgorithm<JT>,
                 JS: JwsSigningAlgorithm<JT>,
                 JT: JsonWebKeyType,
                 JU: JsonWebKeyUse,

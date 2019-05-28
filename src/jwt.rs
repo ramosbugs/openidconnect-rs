@@ -27,7 +27,7 @@ new_type![
 #[derive(Clone, Debug, PartialEq)]
 pub enum JsonWebTokenAlgorithm<JE, JS, JT>
 where
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
@@ -49,7 +49,7 @@ where
 }
 impl<'de, JE, JS, JT> Deserialize<'de> for JsonWebTokenAlgorithm<JE, JS, JT>
 where
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
@@ -80,7 +80,7 @@ where
 }
 impl<JE, JS, JT> Serialize for JsonWebTokenAlgorithm<JE, JS, JT>
 where
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
@@ -99,12 +99,12 @@ where
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct JsonWebTokenHeader<JE, JS, JT>
 where
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
     #[serde(
-        bound = "JE: JweContentEncryptionAlgorithm, JS: JwsSigningAlgorithm<JT>, JT: JsonWebKeyType"
+        bound = "JE: JweContentEncryptionAlgorithm<JT>, JS: JwsSigningAlgorithm<JT>, JT: JsonWebKeyType"
     )]
     pub alg: JsonWebTokenAlgorithm<JE, JS, JT>,
     // Additional critical header parameters that must be understood by this implementation. Since
@@ -154,7 +154,7 @@ where
 // payload when we own the JWT.
 pub trait JsonWebTokenAccess<JE, JS, JT, P>
 where
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     P: Debug + DeserializeOwned + Serialize,
@@ -186,7 +186,7 @@ pub enum JsonWebTokenError {
 #[derive(Clone, Debug, PartialEq)]
 pub struct JsonWebToken<JE, JS, JT, P, S>
 where
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     P: Debug + DeserializeOwned + Serialize,
@@ -200,7 +200,7 @@ where
 }
 impl<JE, JS, JT, P, S> JsonWebToken<JE, JS, JT, P, S>
 where
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     P: Debug + DeserializeOwned + Serialize,
@@ -248,7 +248,7 @@ where
 // Owned JWT.
 impl<JE, JS, JT, P, S> JsonWebTokenAccess<JE, JS, JT, P> for JsonWebToken<JE, JS, JT, P, S>
 where
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     P: Debug + DeserializeOwned + Serialize,
@@ -284,7 +284,7 @@ where
 // Borrowed JWT.
 impl<'a, JE, JS, JT, P, S> JsonWebTokenAccess<JE, JS, JT, P> for &'a JsonWebToken<JE, JS, JT, P, S>
 where
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     P: Debug + DeserializeOwned + Serialize,
@@ -319,7 +319,7 @@ where
 }
 impl<'de, JE, JS, JT, P, S> Deserialize<'de> for JsonWebToken<JE, JS, JT, P, S>
 where
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     P: Debug + DeserializeOwned + Serialize,
@@ -330,7 +330,7 @@ where
         D: Deserializer<'de>,
     {
         struct JsonWebTokenVisitor<
-            JE: JweContentEncryptionAlgorithm,
+            JE: JweContentEncryptionAlgorithm<JT>,
             JS: JwsSigningAlgorithm<JT>,
             JT: JsonWebKeyType,
             P: Debug + DeserializeOwned + Serialize,
@@ -344,7 +344,7 @@ where
         );
         impl<'de, JE, JS, JT, P, S> Visitor<'de> for JsonWebTokenVisitor<JE, JS, JT, P, S>
         where
-            JE: JweContentEncryptionAlgorithm,
+            JE: JweContentEncryptionAlgorithm<JT>,
             JS: JwsSigningAlgorithm<JT>,
             JT: JsonWebKeyType,
             P: Debug + DeserializeOwned + Serialize,
@@ -421,7 +421,7 @@ where
 }
 impl<JE, JS, JT, P, S> Serialize for JsonWebToken<JE, JS, JT, P, S>
 where
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     P: Debug + DeserializeOwned + Serialize,

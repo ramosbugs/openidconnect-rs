@@ -157,21 +157,26 @@ pub trait JsonWebKeyType:
     Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
 {
 }
+
 pub trait JsonWebKeyUse:
     Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
 {
     fn allows_signature(&self) -> bool;
     fn allows_encryption(&self) -> bool;
 }
-// FIXME: add a key_type() method
-pub trait JweContentEncryptionAlgorithm:
+
+pub trait JweContentEncryptionAlgorithm<JT>:
     Clone + Debug + DeserializeOwned + Eq + Hash + PartialEq + Serialize + 'static
+where
+    JT: JsonWebKeyType,
 {
+    fn key_type(&self) -> Result<JT, String>;
 }
-// FIXME: add a key_type() method?
+
 pub trait JweKeyManagementAlgorithm:
     Clone + Debug + DeserializeOwned + Eq + Hash + PartialEq + Serialize + 'static
 {
+    // TODO: add a key_type() method
 }
 
 pub trait JwsSigningAlgorithm<JT>:
@@ -179,18 +184,19 @@ pub trait JwsSigningAlgorithm<JT>:
 where
     JT: JsonWebKeyType,
 {
-    // FIXME: return a real error
     fn key_type(&self) -> Result<JT, String>;
     fn is_symmetric(&self) -> bool;
     fn rsa_sha_256() -> Self;
 }
 
 pub trait ResponseMode: Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static {}
+
 pub trait ResponseType:
     AsRef<str> + Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
 {
     fn to_oauth2(&self) -> oauth2::ResponseType;
 }
+
 pub trait SubjectIdentifierType:
     Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
 {

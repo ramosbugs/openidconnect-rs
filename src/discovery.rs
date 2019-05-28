@@ -40,7 +40,7 @@ where
     CN: ClaimName,
     CT: ClaimType,
     G: GrantType,
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JK: JweKeyManagementAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
@@ -104,7 +104,7 @@ where
     CN: ClaimName,
     CT: ClaimType,
     G: GrantType,
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JK: JweKeyManagementAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
@@ -147,7 +147,7 @@ where
     )]
     id_token_encryption_alg_values_supported: Option<Vec<JK>>,
     #[serde(
-        bound(deserialize = "JE: JweContentEncryptionAlgorithm"),
+        bound(deserialize = "JE: JweContentEncryptionAlgorithm<JT>"),
         skip_serializing_if = "Option::is_none"
     )]
     id_token_encryption_enc_values_supported: Option<Vec<JE>>,
@@ -162,7 +162,7 @@ where
     )]
     userinfo_encryption_alg_values_supported: Option<Vec<JK>>,
     #[serde(
-        bound(deserialize = "JE: JweContentEncryptionAlgorithm"),
+        bound(deserialize = "JE: JweContentEncryptionAlgorithm<JT>"),
         skip_serializing_if = "Option::is_none"
     )]
     userinfo_encryption_enc_values_supported: Option<Vec<JE>>,
@@ -177,7 +177,7 @@ where
     )]
     request_object_encryption_alg_values_supported: Option<Vec<JK>>,
     #[serde(
-        bound(deserialize = "JE: JweContentEncryptionAlgorithm"),
+        bound(deserialize = "JE: JweContentEncryptionAlgorithm<JT>"),
         skip_serializing_if = "Option::is_none"
     )]
     request_object_encryption_enc_values_supported: Option<Vec<JE>>,
@@ -240,7 +240,7 @@ where
     CN: ClaimName,
     CT: ClaimType,
     G: GrantType,
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JK: JweKeyManagementAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,

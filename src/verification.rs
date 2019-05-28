@@ -203,7 +203,7 @@ where
         jose_header: &JsonWebTokenHeader<JE, JS, JT>,
     ) -> Result<(), ClaimsVerificationError>
     where
-        JE: JweContentEncryptionAlgorithm,
+        JE: JweContentEncryptionAlgorithm<JT>,
     {
         // The 'typ' header field must either be omitted or have the canonicalized value JWT.
         if let Some(ref jwt_type) = jose_header.typ {
@@ -246,7 +246,7 @@ where
     where
         A: JsonWebTokenAccess<JE, JS, JT, C, ReturnType = T>,
         C: AudiencesClaim + Debug + DeserializeOwned + IssuerClaim + Serialize,
-        JE: JweContentEncryptionAlgorithm,
+        JE: JweContentEncryptionAlgorithm<JT>,
         T: AudiencesClaim + IssuerClaim,
     {
         {
@@ -620,7 +620,7 @@ where
     where
         AC: AdditionalClaims,
         GC: GenderClaim,
-        JE: JweContentEncryptionAlgorithm,
+        JE: JweContentEncryptionAlgorithm<JT>,
         N: NonceVerifier<'b>,
     {
         // The code below roughly follows the validation steps described in
@@ -711,7 +711,7 @@ where
 #[derive(Clone)]
 pub struct UserInfoVerifier<'a, JE, JS, JT, JU, K>
 where
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     JU: JsonWebKeyUse,
@@ -723,7 +723,7 @@ where
 }
 impl<'a, JE, JS, JT, JU, K> UserInfoVerifier<'a, JE, JS, JT, JU, K>
 where
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     JU: JsonWebKeyUse,

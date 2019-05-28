@@ -24,7 +24,7 @@ use super::{
 pub struct IdToken<
     AC: AdditionalClaims,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 >(
@@ -35,7 +35,7 @@ impl<AC, GC, JE, JS, JT> IdToken<AC, GC, JE, JS, JT>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
@@ -69,7 +69,7 @@ impl<AC, GC, JE, JS, JT> ToString for IdToken<AC, GC, JE, JS, JT>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
@@ -265,7 +265,7 @@ where
     AC: AdditionalClaims,
     EF: ExtraTokenFields,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
@@ -281,7 +281,7 @@ where
     AC: AdditionalClaims,
     EF: ExtraTokenFields,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
@@ -305,7 +305,7 @@ where
     AC: AdditionalClaims,
     EF: ExtraTokenFields,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm,
+    JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {

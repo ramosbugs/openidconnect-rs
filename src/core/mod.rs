@@ -468,7 +468,11 @@ pub enum CoreJweContentEncryptionAlgorithm {
     #[serde(rename = "A256GCM")]
     Aes256Gcm,
 }
-impl JweContentEncryptionAlgorithm for CoreJweContentEncryptionAlgorithm {}
+impl JweContentEncryptionAlgorithm<CoreJsonWebKeyType> for CoreJweContentEncryptionAlgorithm {
+    fn key_type(&self) -> Result<CoreJsonWebKeyType, String> {
+        Ok(CoreJsonWebKeyType::Symmetric)
+    }
+}
 
 ///
 /// Core JWE key management algorithms.
