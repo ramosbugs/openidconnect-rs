@@ -202,7 +202,6 @@ pub trait SubjectIdentifierType:
 {
 }
 
-// FIXME: make this a trait so that callers can add their own enums if desired
 new_type![
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     AuthenticationContextClass(String)
@@ -213,7 +212,6 @@ impl AsRef<str> for AuthenticationContextClass {
     }
 }
 
-// FIXME: make this a trait so that callers can add their own enums if desired
 new_type![
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     AuthenticationMethodReference(String)
@@ -374,11 +372,7 @@ where
     #[serde(bound = "K: JsonWebKey<JS, JT, JU>")]
     keys: Vec<K>,
     #[serde(skip)]
-    _phantom_js: PhantomData<JS>,
-    #[serde(skip)]
-    _phantom_jt: PhantomData<JT>,
-    #[serde(skip)]
-    _phantom_ju: PhantomData<JU>,
+    _phantom: PhantomData<(JS, JT, JU)>,
 }
 impl<JS, JT, JU, K> JsonWebKeySet<JS, JT, JU, K>
 where
@@ -390,9 +384,7 @@ where
     pub fn new(keys: Vec<K>) -> Self {
         Self {
             keys,
-            _phantom_js: PhantomData,
-            _phantom_jt: PhantomData,
-            _phantom_ju: PhantomData,
+            _phantom: PhantomData,
         }
     }
     pub fn keys(&self) -> &Vec<K> {
