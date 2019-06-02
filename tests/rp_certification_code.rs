@@ -1,16 +1,20 @@
-extern crate curl;
 extern crate env_logger;
 extern crate failure;
+extern crate http;
 #[macro_use]
 extern crate log;
 extern crate openidconnect;
 #[macro_use]
 extern crate pretty_assertions;
+extern crate reqwest;
 extern crate url;
 
 use std::collections::HashMap;
 
-use curl::easy::Easy;
+use http::header::LOCATION;
+use http::method::Method;
+use http::status::StatusCode;
+use reqwest::{Client, RedirectPolicy};
 use url::Url;
 
 use openidconnect::core::{
@@ -19,12 +23,11 @@ use openidconnect::core::{
     CoreJsonWebKeySet, CoreJwsSigningAlgorithm, CoreProviderMetadata, CoreResponseType,
     CoreUserInfoClaims, CoreUserInfoVerifier,
 };
-use openidconnect::prelude::*;
 use openidconnect::Nonce;
 use openidconnect::{
     AccessToken, AuthType, AuthenticationFlow, AuthorizationCode, ClaimsVerificationError,
-    CsrfToken, RequestTokenError, Scope, SignatureVerificationError, SubjectIdentifier,
-    UserInfoError,
+    CsrfToken, OAuth2TokenResponse, RequestTokenError, Scope, SignatureVerificationError,
+    SubjectIdentifier, UserInfoError,
 };
 
 #[macro_use]
@@ -73,22 +76,38 @@ impl TestState {
     }
 
     pub fn authorize(mut self, scopes: &Vec<Scope>) -> Self {
-        self.client = scopes.iter().fold(self.client, |mut client, scope| {
-            client = client.add_scope(scope.clone());
-            client
-        });
-        let (url, state, nonce) = self.client.authorize_url(
-            &AuthenticationFlow::AuthorizationCode::<CoreResponseType>,
+        let mut authorization_request = self.client.authorize_url(
+            AuthenticationFlow::AuthorizationCode::<CoreResponseType>,
             CsrfToken::new_random,
             Nonce::new_random,
         );
+        authorization_request =
+            scopes
+                .iter()
+                .fold(authorization_request, |mut authorization_request, scope| {
+                    authorization_request = authorization_request.add_scope(scope.clone());
+                    authorization_request
+                });
+        let (url, state, nonce) = authorization_request.url();
         log_debug!("Authorize URL: {:?}", url);
 
-        let mut easy = Easy::new();
-        easy.url(&url.to_string()[..]).unwrap();
-        easy.perform().unwrap();
-
-        let redirected_url = Url::parse(easy.redirect_url().unwrap().unwrap()).unwrap();
+        let http_client = Client::builder()
+            .redirect(RedirectPolicy::none())
+            .build()
+            .unwrap();
+        let redirect_response = http_client
+            .execute(http_client.request(Method::GET, url).build().unwrap())
+            .unwrap();
+        assert_eq!(redirect_response.status(), StatusCode::SEE_OTHER);
+        let redirected_url = Url::parse(
+            redirect_response
+                .headers()
+                .get(LOCATION)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+        )
+        .unwrap();
 
         log_debug!("Authorization Server redirected to: {:?}", redirected_url);
 
@@ -130,6 +149,7 @@ impl TestState {
                     .take()
                     .expect("no authorization_code"),
             )
+            .request(openidconnect::reqwest::http_client)
             .panic_if_fail("failed to exchange authorization code for token");
         log_debug!(
             "Authorization Server returned token response: {:?}",
@@ -177,7 +197,7 @@ impl TestState {
     pub fn jwks(&self) -> CoreJsonWebKeySet {
         self.provider_metadata
             .jwks_uri()
-            .get_keys()
+            .get_keys(openidconnect::reqwest::http_client)
             .panic_if_fail("failed to fetch JWK set")
     }
 
@@ -205,18 +225,28 @@ impl TestState {
         self.provider_metadata
             .userinfo_endpoint()
             .unwrap()
-            .get_user_info(self.access_token(), false, &verifier)
+            .get_user_info(
+                self.access_token(),
+                false,
+                &verifier,
+                openidconnect::reqwest::http_client,
+            )
             .panic_if_fail("failed to get UserInfo")
     }
 
-    pub fn user_info_claims_failure(&self) -> UserInfoError {
+    pub fn user_info_claims_failure(&self) -> UserInfoError<openidconnect::reqwest::Error> {
         let verifier =
             self.user_info_verifier(self.jwks(), self.id_token_claims().subject().clone());
-        let user_info_result: Result<CoreUserInfoClaims, UserInfoError> = self
+        let user_info_result: Result<CoreUserInfoClaims, _> = self
             .provider_metadata
             .userinfo_endpoint()
             .unwrap()
-            .get_user_info(self.access_token(), false, &verifier);
+            .get_user_info(
+                self.access_token(),
+                false,
+                &verifier,
+                openidconnect::reqwest::http_client,
+            );
         match user_info_result {
             Err(err) => err,
             _ => panic!("claims verification succeeded but was expected to fail"),
@@ -334,12 +364,15 @@ fn rp_id_token_kid_absent_single_jwks() {
 fn rp_id_token_iat() {
     let mut test_state = TestState::init("rp-id_token-iat", |reg| reg).authorize(&vec![]);
 
-    let token_response = test_state.client.exchange_code(
-        test_state
-            .authorization_code
-            .take()
-            .expect("no authorization_code"),
-    );
+    let token_response = test_state
+        .client
+        .exchange_code(
+            test_state
+                .authorization_code
+                .take()
+                .expect("no authorization_code"),
+        )
+        .request(openidconnect::reqwest::http_client);
 
     match token_response {
         Err(RequestTokenError::Parse(_, _)) => {
@@ -435,12 +468,15 @@ fn rp_id_token_sig_hs256() {
 fn rp_id_token_sub() {
     let mut test_state = TestState::init("rp-id_token-sub", |reg| reg).authorize(&vec![]);
 
-    let token_response = test_state.client.exchange_code(
-        test_state
-            .authorization_code
-            .take()
-            .expect("no authorization_code"),
-    );
+    let token_response = test_state
+        .client
+        .exchange_code(
+            test_state
+                .authorization_code
+                .take()
+                .expect("no authorization_code"),
+        )
+        .request(openidconnect::reqwest::http_client);
 
     match token_response {
         Err(RequestTokenError::Parse(_, _)) => {
@@ -559,7 +595,12 @@ fn rp_userinfo_sig() {
         .provider_metadata
         .userinfo_endpoint()
         .unwrap()
-        .get_user_info(test_state.access_token(), true, &verifier)
+        .get_user_info(
+            test_state.access_token(),
+            true,
+            &verifier,
+            openidconnect::reqwest::http_client,
+        )
         .panic_if_fail("failed to get user info");
 
     log_debug!("UserInfo response: {:?}", user_info_claims);

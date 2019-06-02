@@ -1,14 +1,17 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-use curl;
+use failure::Fail;
+use http_::header::{HeaderValue, ACCEPT};
+use http_::method::Method;
+use http_::status::StatusCode;
 use oauth2::{AuthUrl, Scope, TokenUrl};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json;
 use url;
 
-use super::http::{HttpRequest, HttpRequestMethod, ACCEPT_JSON, HTTP_STATUS_OK, MIME_TYPE_JSON};
+use super::http::{check_content_type, MIME_TYPE_JSON};
 use super::types::{
     AuthDisplay, AuthenticationContextClass, ClaimName, ClaimType, ClientAuthMethod, GrantType,
     IssuerUrl, JsonWebKeySetUrl, JsonWebKeyType, JweContentEncryptionAlgorithm,
@@ -16,7 +19,7 @@ use super::types::{
     RegistrationUrl, ResponseMode, ResponseType, ResponseTypes, ServiceDocUrl,
     SubjectIdentifierType,
 };
-use super::{UserInfoUrl, CONFIG_URL_SUFFIX};
+use super::{HttpRequest, HttpResponse, UserInfoUrl, CONFIG_URL_SUFFIX};
 
 pub trait AdditionalProviderMetadata:
     Clone + Debug + DeserializeOwned + PartialEq + Serialize
@@ -30,9 +33,10 @@ pub struct EmptyAdditionalProviderMetadata {}
 impl AdditionalProviderMetadata for EmptyAdditionalProviderMetadata {}
 
 #[allow(clippy::type_complexity)]
-pub fn get_provider_metadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>(
+pub fn get_provider_metadata<A, AD, CA, CN, CT, G, HC, JE, JK, JS, JT, RE, RM, RT, S>(
     issuer_url: &IssuerUrl,
-) -> Result<ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>, DiscoveryError>
+    http_client: HC,
+) -> Result<ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>, DiscoveryError<RE>>
 where
     A: AdditionalProviderMetadata,
     AD: AuthDisplay,
@@ -40,10 +44,12 @@ where
     CN: ClaimName,
     CT: ClaimType,
     G: GrantType,
+    HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
     JE: JweContentEncryptionAlgorithm<JT>,
     JK: JweKeyManagementAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
+    RE: Fail,
     RM: ResponseMode,
     RT: ResponseType,
     S: SubjectIdentifierType,
@@ -51,16 +57,18 @@ where
     let discover_url = issuer_url
         .join(CONFIG_URL_SUFFIX)
         .map_err(DiscoveryError::UrlParse)?;
-    let discover_response = HttpRequest {
-        url: &discover_url,
-        method: HttpRequestMethod::Get,
-        headers: &vec![ACCEPT_JSON],
-        post_body: &vec![],
-    }
-    .request()
+
+    let discover_response = http_client(HttpRequest {
+        url: discover_url,
+        method: Method::GET,
+        headers: vec![(ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON))]
+            .into_iter()
+            .collect(),
+        body: Vec::new(),
+    })
     .map_err(DiscoveryError::Request)?;
 
-    if discover_response.status_code != HTTP_STATUS_OK {
+    if discover_response.status_code != StatusCode::OK {
         return Err(DiscoveryError::Response(
             discover_response.status_code,
             discover_response.body,
@@ -68,15 +76,13 @@ where
         ));
     }
 
-    discover_response
-        .check_content_type(MIME_TYPE_JSON)
-        .map_err(|err_msg| {
-            DiscoveryError::Response(
-                discover_response.status_code,
-                discover_response.body.clone(),
-                err_msg,
-            )
-        })?;
+    check_content_type(&discover_response.headers, MIME_TYPE_JSON).map_err(|err_msg| {
+        DiscoveryError::Response(
+            discover_response.status_code,
+            discover_response.body.clone(),
+            err_msg,
+        )
+    })?;
 
     let provider_metadata = serde_json::from_slice::<
         ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
@@ -359,15 +365,18 @@ where
 }
 
 #[derive(Debug, Fail)]
-pub enum DiscoveryError {
+pub enum DiscoveryError<RE>
+where
+    RE: Fail,
+{
     #[fail(display = "Other error: {}", _0)]
     Other(String),
     #[fail(display = "Failed to parse server response")]
     Parse(#[cause] serde_json::Error),
     #[fail(display = "Request failed")]
-    Request(#[cause] curl::Error),
+    Request(#[cause] RE),
     #[fail(display = "Server returned invalid response: {}", _2)]
-    Response(u32, Vec<u8>, String),
+    Response(StatusCode, Vec<u8>, String),
     #[fail(display = "Failed to parse URL")]
     UrlParse(#[cause] url::ParseError),
     #[fail(display = "Validation error: {}", _0)]
@@ -376,7 +385,6 @@ pub enum DiscoveryError {
 
 #[cfg(test)]
 mod tests {
-    use oauth2::prelude::*;
     use oauth2::{AuthUrl, Scope, TokenUrl};
     use url::Url;
 

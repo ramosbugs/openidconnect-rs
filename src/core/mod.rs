@@ -6,10 +6,9 @@ pub use oauth2::basic::{
     BasicRequestTokenError as CoreRequestTokenError, BasicTokenType as CoreTokenType,
 };
 use oauth2::helpers::variant_name;
-use oauth2::prelude::*;
 use oauth2::{
     EmptyExtraTokenFields, ErrorResponseType, ResponseType as OAuth2ResponseType,
-    StandardTokenResponse,
+    StandardErrorResponse, StandardTokenResponse,
 };
 use serde::de::{Error as DeserializeError, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -59,7 +58,7 @@ pub type CoreClient = Client<
     CoreResponseMode,
     CoreResponseType,
     CoreSubjectIdentifierType,
-    CoreErrorResponseType,
+    StandardErrorResponse<CoreErrorResponseType>,
     CoreTokenResponse,
     CoreTokenType,
 >;

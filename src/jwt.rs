@@ -4,7 +4,6 @@ use std::ops::Deref;
 use std::str;
 
 use base64;
-use oauth2::prelude::NewType;
 use serde::de::{DeserializeOwned, Error as _, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json;
@@ -441,7 +440,6 @@ pub mod tests {
     use std::marker::PhantomData;
     use std::string::ToString;
 
-    use oauth2::prelude::NewType;
     use ring::rand::SystemRandom;
     use serde_json;
 

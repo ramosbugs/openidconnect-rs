@@ -6,9 +6,12 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 
 use base64;
+use failure::Fail;
+use http_::header::{HeaderValue, ACCEPT};
+use http_::method::Method;
+use http_::status::StatusCode;
 use oauth2;
 use oauth2::helpers::deserialize_space_delimited_vec;
-use oauth2::prelude::*;
 use rand::{thread_rng, Rng};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -16,8 +19,8 @@ use serde_json;
 use url;
 use url::Url;
 
-use super::http::{HttpRequest, HttpRequestMethod, ACCEPT_JSON, HTTP_STATUS_OK, MIME_TYPE_JSON};
-use super::SignatureVerificationError;
+use super::http::{check_content_type, MIME_TYPE_JSON};
+use super::{HttpRequest, HttpResponse, SignatureVerificationError};
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct LocalizedClaim<T>(HashMap<Option<LanguageTag>, T>);
@@ -393,38 +396,49 @@ where
 }
 
 #[derive(Debug, Fail)]
-pub enum JsonWebKeySetFetchError {
+pub enum JsonWebKeySetFetchError<RE>
+where
+    RE: Fail,
+{
     #[fail(display = "Other error: {}", _0)]
     Other(String),
     #[fail(display = "Failed to parse server response")]
     Parse(#[cause] serde_json::Error),
     #[fail(display = "Request failed")]
-    Request(#[cause] curl::Error),
+    Request(#[cause] RE),
     #[fail(display = "Server returned invalid response: {}", _2)]
-    Response(u32, Vec<u8>, String),
+    Response(StatusCode, Vec<u8>, String),
 }
 
 new_url_type![
     JsonWebKeySetUrl
     impl {
-        pub fn get_keys<JS, JT, JU, K>(
-            &self
-        ) -> Result<JsonWebKeySet<JS, JT, JU, K>, JsonWebKeySetFetchError>
-        where JS: JwsSigningAlgorithm<JT>,
-                JT: JsonWebKeyType,
-                JU: JsonWebKeyUse,
-                K: JsonWebKey<JS, JT, JU> {
+        pub fn get_keys<HC, JS, JT, JU, K, RE>(
+            &self,
+            http_client: HC,
+        ) -> Result<JsonWebKeySet<JS, JT, JU, K>, JsonWebKeySetFetchError<RE>>
+        where
+            HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
+            JS: JwsSigningAlgorithm<JT>,
+            JT: JsonWebKeyType,
+            JU: JsonWebKeyUse,
+            K: JsonWebKey<JS, JT, JU>,
+            RE: Fail,
+        {
             let key_response =
-                HttpRequest {
-                    url: &self.0,
-                    method: HttpRequestMethod::Get,
-                    headers: &vec![ACCEPT_JSON],
-                    post_body: &vec![],
-                }
-                .request()
-            .map_err(JsonWebKeySetFetchError::Request)?;
+                http_client(
+                    HttpRequest {
+                        url: self.0.clone(),
+                        method: Method::GET,
+                        headers: vec![(ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON))]
+                            .into_iter()
+                            .collect(),
+                        body: Vec::new(),
+                    }
+                )
+                .map_err(JsonWebKeySetFetchError::Request)?;
 
-            if key_response.status_code != HTTP_STATUS_OK {
+            if key_response.status_code != StatusCode::OK {
                 return Err(
                     JsonWebKeySetFetchError::Response(
                         key_response.status_code,
@@ -434,8 +448,7 @@ new_url_type![
                 );
             }
 
-            key_response
-                .check_content_type(MIME_TYPE_JSON)
+            check_content_type(&key_response.headers, MIME_TYPE_JSON)
                 .map_err(|err_msg| JsonWebKeySetFetchError::Response(key_response.status_code, key_response.body.clone(), err_msg))?;
 
             serde_json::from_slice(&key_response.body).map_err(JsonWebKeySetFetchError::Parse)
@@ -552,7 +565,6 @@ new_url_type![ToSUrl];
 // FIXME: Add tests
 pub(crate) mod helpers {
     use chrono::{DateTime, TimeZone, Utc};
-    use oauth2::prelude::*;
     use serde::de::DeserializeOwned;
     use serde::{Deserialize, Deserializer, Serializer};
     use serde_json::{from_value, Value};

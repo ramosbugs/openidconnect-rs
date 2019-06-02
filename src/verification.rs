@@ -6,7 +6,6 @@ use std::rc::Rc;
 
 use chrono::{DateTime, Utc};
 use oauth2::helpers::variant_name;
-use oauth2::prelude::*;
 use oauth2::{ClientId, ClientSecret};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -128,7 +127,7 @@ where
     iss_required: bool,
     issuer: IssuerUrl,
     is_signature_check_enabled: bool,
-    other_aud_verifier_fn: Rc<Fn(&Audience) -> bool + 'a>,
+    other_aud_verifier_fn: Rc<dyn Fn(&Audience) -> bool + 'a>,
     signature_keys: JsonWebKeySet<JS, JT, JU, K>,
 }
 impl<'a, JS, JT, JU, K> JwtClaimsVerifier<'a, JS, JT, JU, K>
@@ -502,12 +501,12 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
-    acr_verifier_fn: Rc<Fn(Option<&AuthenticationContextClass>) -> Result<(), String> + 'a>,
+    acr_verifier_fn: Rc<dyn Fn(Option<&AuthenticationContextClass>) -> Result<(), String> + 'a>,
     #[allow(clippy::type_complexity)]
-    auth_time_verifier_fn: Rc<Fn(Option<&DateTime<Utc>>) -> Result<(), String> + 'a>,
-    iat_verifier_fn: Rc<Fn(&DateTime<Utc>) -> Result<(), String> + 'a>,
+    auth_time_verifier_fn: Rc<dyn Fn(Option<&DateTime<Utc>>) -> Result<(), String> + 'a>,
+    iat_verifier_fn: Rc<dyn Fn(&DateTime<Utc>) -> Result<(), String> + 'a>,
     jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>,
-    time_fn: Rc<Fn() -> DateTime<Utc> + 'a>,
+    time_fn: Rc<dyn Fn() -> DateTime<Utc> + 'a>,
 }
 impl<'a, JS, JT, JU, K> IdTokenVerifier<'a, JS, JT, JU, K>
 where
@@ -787,7 +786,6 @@ mod tests {
     use std::cell::Cell;
 
     use chrono::{TimeZone, Utc};
-    use oauth2::prelude::*;
     use oauth2::{ClientId, ClientSecret};
     use ring::rand::SystemRandom;
     use {serde_json, AuthenticationContextClass};
@@ -1706,17 +1704,20 @@ mod tests {
 
         // JSON response (default args)
         assert_eq!(
-            CoreUserInfoClaims::from_json(json_claims.as_bytes(), &sub)
-                .expect("verification should succeed")
-                .name()
-                .unwrap()
-                .iter()
-                .collect::<Vec<_>>(),
+            CoreUserInfoClaims::from_json::<super::super::reqwest::Error>(
+                json_claims.as_bytes(),
+                &sub
+            )
+            .expect("verification should succeed")
+            .name()
+            .unwrap()
+            .iter()
+            .collect::<Vec<_>>(),
             vec![(&None, &EndUserName::new("Jane Doe".to_string()))],
         );
 
         // Invalid subject
-        match CoreUserInfoClaims::from_json(
+        match CoreUserInfoClaims::from_json::<super::super::reqwest::Error>(
             json_claims.as_bytes(),
             &SubjectIdentifier::new("wrong_subject".to_string()),
         ) {

@@ -2,15 +2,15 @@ use std::ops::Deref;
 use std::str;
 
 use chrono::{DateTime, Utc};
-use curl;
+use failure::Fail;
+use http_::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
+use http_::method::Method;
+use http_::status::StatusCode;
 use oauth2::AccessToken;
 use serde_json;
 use url::Url;
 
-use super::http::{
-    auth_bearer, HttpRequest, HttpRequestMethod, ACCEPT_JSON, HTTP_STATUS_OK, MIME_TYPE_JSON,
-    MIME_TYPE_JWT,
-};
+use super::http::{auth_bearer, MIME_TYPE_JSON, MIME_TYPE_JWT};
 use super::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
 use super::types::helpers::deserialize_string_or_vec_opt;
 use super::types::LocalizedClaim;
@@ -19,9 +19,10 @@ use super::{
     AdditionalClaims, AddressClaim, Audience, AudiencesClaim, ClaimsVerificationError,
     EndUserBirthday, EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName,
     EndUserName, EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl,
-    EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, GenderClaim, IssuerClaim, IssuerUrl,
-    JsonWebKey, JsonWebKeyType, JsonWebKeyUse, JsonWebToken, JweContentEncryptionAlgorithm,
-    JwsSigningAlgorithm, LanguageTag, PrivateSigningKey, StandardClaims, SubjectIdentifier,
+    EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, GenderClaim, HttpRequest, HttpResponse,
+    IssuerClaim, IssuerUrl, JsonWebKey, JsonWebKeyType, JsonWebKeyUse, JsonWebToken,
+    JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, PrivateSigningKey,
+    StandardClaims, SubjectIdentifier,
 };
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -40,10 +41,13 @@ where
         })
     }
 
-    pub fn from_json(
+    pub fn from_json<RE>(
         user_info_json: &[u8],
         subject: &SubjectIdentifier,
-    ) -> Result<Self, UserInfoError> {
+    ) -> Result<Self, UserInfoError<RE>>
+    where
+        RE: Fail,
+    {
         let user_info = serde_json::from_slice::<UserInfoClaimsImpl<AC, GC>>(&user_info_json)
             .map_err(UserInfoError::Parse)?;
 
@@ -217,31 +221,40 @@ where
 new_url_type![
     UserInfoUrl
     impl {
-        pub fn get_user_info<AC, GC, JE, JS, JT, JU, K>(
+        pub fn get_user_info<AC, GC, HC, JE, JS, JT, JU, K, RE>(
             &self,
             access_token: &AccessToken,
             require_signed_response: bool,
             signed_response_verifier: &UserInfoVerifier<JE, JS, JT, JU, K>,
-        ) -> Result<UserInfoClaims<AC, GC>, UserInfoError>
-        where AC: AdditionalClaims,
-                GC: GenderClaim,
-                JE: JweContentEncryptionAlgorithm<JT>,
-                JS: JwsSigningAlgorithm<JT>,
-                JT: JsonWebKeyType,
-                JU: JsonWebKeyUse,
-                K: JsonWebKey<JS, JT, JU>{
+            http_client: HC,
+        ) -> Result<UserInfoClaims<AC, GC>, UserInfoError<RE>>
+        where
+            AC: AdditionalClaims,
+            GC: GenderClaim,
+            HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
+            JE: JweContentEncryptionAlgorithm<JT>,
+            JS: JwsSigningAlgorithm<JT>,
+            JT: JsonWebKeyType,
+            JU: JsonWebKeyUse,
+            K: JsonWebKey<JS, JT, JU>,
+            RE: Fail,
+        {
             let (auth_header, auth_value) = auth_bearer(access_token);
             let user_info_response =
-                HttpRequest {
-                    url: &self.0,
-                    method: HttpRequestMethod::Get,
-                    headers: &vec![ACCEPT_JSON, (auth_header, auth_value.as_ref())],
-                    post_body: &vec![],
-                }
-                .request()
+                http_client(
+                    HttpRequest {
+                        url: self.0.clone(),
+                        method: Method::GET,
+                        headers: vec![
+                            (ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON)),
+                            (auth_header, auth_value),
+                        ].into_iter().collect(),
+                        body: Vec::new(),
+                    }
+                )
                 .map_err(UserInfoError::Request)?;
 
-            if user_info_response.status_code != HTTP_STATUS_OK {
+            if user_info_response.status_code != StatusCode::OK {
                 return Err(
                     UserInfoError::Response(
                         user_info_response.status_code,
@@ -251,8 +264,13 @@ new_url_type![
                 );
             }
 
-            match user_info_response.content_type.as_ref().map(String::as_str) {
-                None | Some(MIME_TYPE_JSON) => {
+            match user_info_response
+                .headers
+                .get(CONTENT_TYPE)
+                .map(ToOwned::to_owned)
+                .unwrap_or_else(|| HeaderValue::from_static(MIME_TYPE_JSON))
+            {
+               ref content_type if content_type == HeaderValue::from_static(MIME_TYPE_JSON) => {
                     if require_signed_response {
                         return Err(
                             UserInfoError::ClaimsVerification(ClaimsVerificationError::NoSignature)
@@ -263,7 +281,7 @@ new_url_type![
                         signed_response_verifier.subject(),
                     )
                 }
-                Some(MIME_TYPE_JWT) => {
+                ref content_type if content_type == HeaderValue::from_static(MIME_TYPE_JWT) => {
                     let jwt_str =
                         String::from_utf8(user_info_response.body)
                             .map_err(|_|
@@ -278,12 +296,12 @@ new_url_type![
                     .claims(signed_response_verifier)
                     .map_err(UserInfoError::ClaimsVerification)
                 }
-                Some(content_type) =>
+                ref content_type =>
                     Err(
                         UserInfoError::Response(
                             user_info_response.status_code,
                             user_info_response.body,
-                            format!("unexpected response Content-Type: `{}`", content_type)
+                            format!("unexpected response Content-Type: `{:?}`", content_type)
                         )
                     ),
             }
@@ -292,15 +310,18 @@ new_url_type![
 ];
 
 #[derive(Debug, Fail)]
-pub enum UserInfoError {
+pub enum UserInfoError<RE>
+where
+    RE: Fail,
+{
     #[fail(display = "Failed to verify claims")]
     ClaimsVerification(#[cause] ClaimsVerificationError),
     #[fail(display = "Failed to parse server response")]
     Parse(#[cause] serde_json::Error),
     #[fail(display = "Request failed")]
-    Request(#[cause] curl::Error),
+    Request(#[cause] RE),
     #[fail(display = "Server returned invalid response: {}", _2)]
-    Response(u32, Vec<u8>, String),
+    Response(StatusCode, Vec<u8>, String),
     #[fail(display = "Other error: {}", _0)]
     Other(String),
 }

@@ -128,10 +128,10 @@ macro_rules! new_type {
         );
         impl $name {
             $($item)*
-        }
-        impl NewType<$type> for $name {
+
+            #[allow(dead_code)]
             #[doc = $new_doc]
-            fn new(s: $type) -> Self {
+            pub fn new(s: $type) -> Self {
                 $name(s)
             }
         }
@@ -162,10 +162,9 @@ macro_rules! new_type {
         );
         impl $name {
             $($item)*
-        }
-        impl NewType<$type> for $name {
+
             #[doc = $new_doc]
-            fn new(s: $type) -> Self {
+            pub fn new(s: $type) -> Self {
                 $name(s)
             }
         }
@@ -231,10 +230,9 @@ macro_rules! new_secret_type {
         pub struct $name($type);
         impl $name {
             $($item)*
-        }
-        impl SecretNewType<$type> for $name {
+
             #[doc = $new_doc]
-            fn new(s: $type) -> Self {
+            pub fn new(s: $type) -> Self {
                 $name(s)
             }
             ///
@@ -244,7 +242,7 @@ macro_rules! new_secret_type {
             ///
             /// Leaking this value may compromise the security of the OAuth2 flow.
             ///
-            fn secret(&self) -> &$type { &self.0 }
+            pub fn secret(&self) -> &$type { &self.0 }
         }
         impl Debug for $name {
             fn fmt(&self, f: &mut Formatter) -> Result<(), FormatterError> {

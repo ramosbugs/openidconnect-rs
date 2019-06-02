@@ -15,7 +15,6 @@ use openidconnect::core::{
     CoreApplicationType, CoreClientRegistrationRequest, CoreClientRegistrationResponse,
     CoreProviderMetadata,
 };
-use openidconnect::prelude::*;
 use openidconnect::{ClientName, ContactEmail, IssuerUrl, RedirectUrl};
 
 pub const CERTIFICATION_BASE_URL: &str = "https://rp.certification.openid.net:8080";
@@ -92,7 +91,7 @@ where
             Err(fail) => {
                 let mut err_msg = format!("Panic: {}", msg);
 
-                let mut cur_fail: Option<&Fail> = Some(&fail);
+                let mut cur_fail: Option<&dyn Fail> = Some(&fail);
                 while let Some(cause) = cur_fail {
                     err_msg += &format!("\n    caused by: {}", cause);
                     cur_fail = cause.cause();
@@ -114,10 +113,9 @@ pub fn issuer_url(test_id: &str) -> IssuerUrl {
 
 pub fn get_provider_metadata(test_id: &str) -> CoreProviderMetadata {
     let _issuer_url = issuer_url(test_id);
-    openidconnect::get_provider_metadata(&_issuer_url).expect(&format!(
-        "Failed to fetch provider metadata from {:?}",
-        _issuer_url
-    ))
+    openidconnect::get_provider_metadata(&_issuer_url, openidconnect::reqwest::http_client).expect(
+        &format!("Failed to fetch provider metadata from {:?}", _issuer_url),
+    )
 }
 
 pub fn register_client<F>(
@@ -145,7 +143,7 @@ where
         .registration_endpoint()
         .expect("provider does not support dynamic registration");
     registration_request_post
-        .register(&registration_endpoint)
+        .register(&registration_endpoint, openidconnect::reqwest::http_client)
         .expect(&format!(
             "Failed to register client at {:?}",
             registration_endpoint

@@ -32,8 +32,8 @@ pub fn verify_hmac(
 
 pub fn sign_rsa(
     key: &ring_signature::RsaKeyPair,
-    padding_alg: &'static ring_signature::RsaEncoding,
-    rng: &SecureRandom,
+    padding_alg: &'static dyn ring_signature::RsaEncoding,
+    rng: &dyn SecureRandom,
     msg: &[u8],
 ) -> Result<Vec<u8>, SigningError> {
     let sig_len = key.public_modulus_len();

@@ -315,7 +315,6 @@ where
 mod tests {
     use chrono::{TimeZone, Utc};
     use oauth2::basic::BasicTokenType;
-    use oauth2::prelude::{NewType, SecretNewType};
     use oauth2::{AccessToken, ClientId, TokenResponse};
     use url::Url;
     use {serde_json, AddressClaim};

@@ -3,17 +3,17 @@ use std::marker::{PhantomData, Send, Sync};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use curl;
+use failure::Fail;
+use http_::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
+use http_::method::Method;
+use http_::status::StatusCode;
 use serde;
 use serde::de::{Deserialize, DeserializeOwned, Deserializer, MapAccess, Visitor};
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
 use serde_json;
 
-use super::http::{
-    auth_bearer, HttpRequest, HttpRequestMethod, ACCEPT_JSON, CONTENT_TYPE_JSON,
-    HTTP_STATUS_BAD_REQUEST, HTTP_STATUS_CREATED, MIME_TYPE_JSON,
-};
+use super::http::{auth_bearer, check_content_type, MIME_TYPE_JSON};
 use super::types::helpers::{serde_utc_seconds_opt, split_language_tag_key};
 use super::types::{
     ApplicationType, AuthenticationContextClass, ClientAuthMethod, ClientConfigUrl, ClientName,
@@ -23,8 +23,8 @@ use super::types::{
     ResponseType, ResponseTypes, SectorIdentifierUrl, SubjectIdentifierType, ToSUrl,
 };
 use super::{
-    AccessToken, ClientId, ClientSecret, ErrorResponse, ErrorResponseType, JsonWebKey,
-    JsonWebKeySet, RedirectUrl,
+    AccessToken, ClientId, ClientSecret, ErrorResponseType, HttpRequest, HttpResponse, JsonWebKey,
+    JsonWebKeySet, RedirectUrl, StandardErrorResponse,
 };
 
 pub trait AdditionalClientMetadata:
@@ -432,13 +432,18 @@ where
         }
     }
 
-    pub fn register(
+    pub fn register<HC, RE>(
         &self,
         registration_endpoint: &RegistrationUrl,
+        http_client: HC,
     ) -> Result<
         ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
-        ClientRegistrationError<ET>,
-    > {
+        ClientRegistrationError<ET, RE>,
+    >
+    where
+        HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
+        RE: Fail,
+    {
         let request_json = serde_json::to_string(self.client_metadata())
             .map_err(ClientRegistrationError::Serialize)?
             .into_bytes();
@@ -449,18 +454,19 @@ where
             None
         };
 
-        let mut headers = vec![ACCEPT_JSON, CONTENT_TYPE_JSON];
-        if let Some((header, ref value)) = auth_header_opt {
-            headers.push((header, value.as_ref()));
+        let mut headers = HeaderMap::new();
+        headers.append(ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON));
+        headers.append(CONTENT_TYPE, HeaderValue::from_static(MIME_TYPE_JSON));
+        if let Some((header, value)) = auth_header_opt {
+            headers.append(header, value);
         }
 
-        let register_response = HttpRequest {
-            url: registration_endpoint.url(),
-            method: HttpRequestMethod::Post,
-            headers: &headers,
-            post_body: &request_json,
-        }
-        .request()
+        let register_response = http_client(HttpRequest {
+            url: registration_endpoint.url().clone(),
+            method: Method::POST,
+            headers,
+            body: request_json,
+        })
         .map_err(ClientRegistrationError::Request)?;
 
         // TODO: check for WWW-Authenticate response header if bearer auth was used (see
@@ -471,8 +477,8 @@ where
         // Spec says that a successful response SHOULD use 201 Created, and a registration error
         // condition returns (no "SHOULD") 400 Bad Request. For now, only accept these two status
         // codes. We may need to relax the success status to improve interoperability.
-        if register_response.status_code != HTTP_STATUS_CREATED
-            && register_response.status_code != HTTP_STATUS_BAD_REQUEST
+        if register_response.status_code != StatusCode::CREATED
+            && register_response.status_code != StatusCode::BAD_REQUEST
         {
             return Err(ClientRegistrationError::Response(
                 register_response.status_code,
@@ -481,15 +487,13 @@ where
             ));
         }
 
-        register_response
-            .check_content_type(MIME_TYPE_JSON)
-            .map_err(|err_msg| {
-                ClientRegistrationError::Response(
-                    register_response.status_code,
-                    register_response.body.clone(),
-                    err_msg,
-                )
-            })?;
+        check_content_type(&register_response.headers, MIME_TYPE_JSON).map_err(|err_msg| {
+            ClientRegistrationError::Response(
+                register_response.status_code,
+                register_response.body.clone(),
+                err_msg,
+            )
+        })?;
 
         let response_body = String::from_utf8(register_response.body).map_err(|parse_error| {
             ClientRegistrationError::Other(format!(
@@ -498,8 +502,8 @@ where
             ))
         })?;
 
-        if register_response.status_code == HTTP_STATUS_BAD_REQUEST {
-            let response_error: ErrorResponse<ET> =
+        if register_response.status_code == StatusCode::BAD_REQUEST {
+            let response_error: StandardErrorResponse<ET> =
                 serde_json::from_str(&response_body).map_err(ClientRegistrationError::Parse)?;
             return Err(ClientRegistrationError::ServerResponse(response_error));
         }
@@ -732,19 +736,22 @@ where
 pub trait RegisterErrorResponseType: Clone + ErrorResponseType + Send + Sync + 'static {}
 
 #[derive(Debug, Fail)]
-pub enum ClientRegistrationError<T: RegisterErrorResponseType> {
+pub enum ClientRegistrationError<T: RegisterErrorResponseType, RE>
+where
+    RE: Fail,
+{
     #[fail(display = "Other error: {}", _0)]
     Other(String),
     #[fail(display = "Failed to parse server response")]
     Parse(#[cause] serde_json::Error),
     #[fail(display = "Request failed")]
-    Request(#[cause] curl::Error),
+    Request(#[cause] RE),
     #[fail(display = "Server returned invalid response: {}", _2)]
-    Response(u32, Vec<u8>, String),
+    Response(StatusCode, Vec<u8>, String),
     #[fail(display = "Failed to serialize client metadata")]
     Serialize(#[cause] serde_json::Error),
     #[fail(display = "Server returned error")]
-    ServerResponse(ErrorResponse<T>),
+    ServerResponse(StandardErrorResponse<T>),
     #[fail(display = "Validation error: {}", _0)]
     Validation(String),
 }
@@ -753,7 +760,6 @@ pub enum ClientRegistrationError<T: RegisterErrorResponseType> {
 mod tests {
     use chrono::{TimeZone, Utc};
     use itertools::sorted;
-    use oauth2::prelude::*;
     use oauth2::{ClientId, ClientSecret, RedirectUrl};
     use std::time::Duration;
     use url::Url;

@@ -9,13 +9,11 @@
 
 extern crate base64;
 extern crate chrono;
-extern crate curl;
 extern crate failure;
 #[macro_use]
 extern crate failure_derive;
+extern crate http as http_;
 extern crate itertools;
-#[macro_use]
-extern crate log;
 extern crate oauth2;
 extern crate rand;
 extern crate ring;
@@ -33,16 +31,19 @@ extern crate color_backtrace;
 #[macro_use]
 extern crate pretty_assertions;
 
+use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::str;
 use std::time::Duration;
 
+use failure::Fail;
 use oauth2::helpers::variant_name;
-use oauth2::prelude::*;
 use oauth2::ResponseType as OAuth2ResponseType;
 pub use oauth2::{
-    AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken,
-    ErrorResponse, ErrorResponseType, ExtraTokenFields, RedirectUrl, RequestTokenError, Scope,
+    curl, reqwest, AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret,
+    CodeTokenRequest, CsrfToken, ErrorResponse, ErrorResponseType, ExtraTokenFields, HttpRequest,
+    HttpResponse, PkceCodeChallenge, PkceCodeChallengeMethod, PkceCodeVerifier, RedirectUrl,
+    RefreshToken, RefreshTokenRequest, RequestTokenError, Scope, StandardErrorResponse,
     StandardTokenResponse, TokenResponse as OAuth2TokenResponse, TokenType, TokenUrl,
 };
 use url::Url;
@@ -91,16 +92,12 @@ pub use verification::{
 mod macros;
 
 pub mod core;
-mod discovery;
-pub mod prelude {
-    pub use super::OAuth2TokenResponse;
-    pub use oauth2::prelude::*;
-}
 pub mod registration;
 
 // Private modules since we may move types between different modules; these are exported publicly
 // via the pub use above.
 mod claims;
+mod discovery;
 mod id_token;
 mod types;
 mod user_info;
@@ -168,22 +165,16 @@ where
     RM: ResponseMode,
     RT: ResponseType,
     S: SubjectIdentifierType,
-    TE: ErrorResponseType + 'static,
+    TE: ErrorResponse,
     TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
     TT: TokenType + 'static,
 {
     oauth2_client: oauth2::Client<TE, TR, TT>,
-    acr_values: Option<Vec<AuthenticationContextClass>>,
-    claims_locales: Option<Vec<LanguageTag>>,
     client_id: ClientId,
     client_secret: Option<ClientSecret>,
-    display: Option<AD>,
-    max_age: Option<Duration>,
-    prompts: Option<Vec<P>>,
     #[allow(clippy::type_complexity)]
     provider_metadata: Option<ProviderMetadata<AM, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>>,
-    ui_locales: Option<Vec<LanguageTag>>,
-    _phantom: PhantomData<(AC, CA, CN, CT, G, GC, JE, JK, JS, JT, RM, RT, S)>,
+    _phantom: PhantomData<(AC, CA, CN, CT, G, GC, JE, JK, JS, JT, RM, RT, P, S)>,
 }
 impl<AC, AD, AP, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
     Client<AC, AD, AP, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
@@ -204,7 +195,7 @@ where
     RM: ResponseMode,
     RT: ResponseType,
     S: SubjectIdentifierType,
-    TE: ErrorResponseType,
+    TE: ErrorResponse,
     TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
     TT: TokenType,
 {
@@ -219,28 +210,26 @@ where
             client_secret.clone(),
             auth_url,
             token_url,
-        )
-        .add_scope(Scope::new(OPENID_SCOPE.to_string()));
+        );
         Client {
             oauth2_client,
-            acr_values: None,
-            claims_locales: None,
             client_id,
             client_secret,
-            display: None,
-            max_age: None,
-            prompts: None,
             provider_metadata: None,
-            ui_locales: None,
             _phantom: PhantomData,
         }
     }
 
-    pub fn discover(
+    pub fn discover<HC, RE>(
         client_id: ClientId,
         client_secret: Option<ClientSecret>,
         issuer_url: &IssuerUrl,
-    ) -> Result<Self, DiscoveryError> {
+        http_client: HC,
+    ) -> Result<Self, DiscoveryError<RE>>
+    where
+        HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
+        RE: Fail,
+    {
         #[allow(clippy::type_complexity)]
         let provider_metadata: ProviderMetadata<
             AP,
@@ -256,26 +245,19 @@ where
             RM,
             RT,
             S,
-        > = discovery::get_provider_metadata(issuer_url)?;
+        > = discovery::get_provider_metadata(issuer_url, http_client)?;
 
         let oauth2_client = oauth2::Client::new(
             client_id.clone(),
             client_secret.clone(),
             provider_metadata.authorization_endpoint().clone(),
             provider_metadata.token_endpoint().cloned(),
-        )
-        .add_scope(Scope::new(OPENID_SCOPE.to_string()));
+        );
         Ok(Client {
             oauth2_client,
-            acr_values: None,
-            claims_locales: None,
             client_id,
             client_secret,
-            display: None,
-            max_age: None,
-            prompts: None,
             provider_metadata: Some(provider_metadata),
-            ui_locales: None,
             _phantom: PhantomData,
         })
     }
@@ -311,29 +293,14 @@ where
             registration_response.client_secret().cloned(),
             provider_metadata.authorization_endpoint().clone(),
             provider_metadata.token_endpoint().cloned(),
-        )
-        .add_scope(Scope::new(OPENID_SCOPE.to_string()));
+        );
         Client {
             oauth2_client,
-            acr_values: None,
-            claims_locales: None,
             client_id: registration_response.client_id().clone(),
             client_secret: registration_response.client_secret().cloned(),
-            display: None,
-            max_age: None,
-            prompts: None,
             provider_metadata: Some(provider_metadata.clone()),
-            ui_locales: None,
             _phantom: PhantomData,
         }
-    }
-
-    ///
-    /// Appends a new scope to the authorization URL.
-    ///
-    pub fn add_scope(mut self, scope: Scope) -> Self {
-        self.oauth2_client = self.oauth2_client.add_scope(scope);
-        self
     }
 
     ///
@@ -356,71 +323,20 @@ where
         self
     }
 
-    pub fn auth_context_values(&self) -> Option<&Vec<AuthenticationContextClass>> {
-        self.acr_values.as_ref()
-    }
-    pub fn set_auth_context_values(
-        mut self,
-        acr_values: Option<Vec<AuthenticationContextClass>>,
-    ) -> Self {
-        self.acr_values = acr_values;
-        self
-    }
-
-    pub fn claims_locales(&self) -> Option<&Vec<LanguageTag>> {
-        self.claims_locales.as_ref()
-    }
-    pub fn set_claims_locales(mut self, claims_locales: Option<Vec<LanguageTag>>) -> Self {
-        self.claims_locales = claims_locales;
-        self
-    }
-
-    // TODO: support 'claims' parameter
-    // https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter
-
-    pub fn display(&self) -> Option<&AD> {
-        self.display.as_ref()
-    }
-    pub fn set_display(mut self, display: Option<AD>) -> Self {
-        self.display = display;
-        self
-    }
-
-    pub fn max_age(&self) -> Option<&Duration> {
-        self.max_age.as_ref()
-    }
-    pub fn set_max_age(mut self, max_age: Option<Duration>) -> Self {
-        self.max_age = max_age;
-        self
-    }
-
-    pub fn prompts(&self) -> Option<&Vec<P>> {
-        self.prompts.as_ref()
-    }
-    pub fn set_prompts(mut self, prompts: Option<Vec<P>>) -> Self {
-        self.prompts = prompts;
-        self
-    }
-
-    pub fn ui_locales(&self) -> Option<&Vec<LanguageTag>> {
-        self.ui_locales.as_ref()
-    }
-    pub fn set_ui_locales(mut self, ui_locales: Option<Vec<LanguageTag>>) -> Self {
-        self.ui_locales = ui_locales;
-        self
-    }
-
-    pub fn id_token_verifier<JU, K>(
+    pub fn id_token_verifier<HC, JU, K, RE>(
         &self,
-    ) -> Result<IdTokenVerifier<JS, JT, JU, K>, JsonWebKeySetFetchError>
+        http_client: HC,
+    ) -> Result<IdTokenVerifier<JS, JT, JU, K>, JsonWebKeySetFetchError<RE>>
     where
+        HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
         JU: JsonWebKeyUse,
         K: JsonWebKey<JS, JT, JU>,
+        RE: Fail,
     {
         let provider_metadata = self.provider_metadata.as_ref().ok_or_else(|| {
             JsonWebKeySetFetchError::Other("no provider metadata present".to_string())
         })?;
-        let signature_keys = provider_metadata.jwks_uri().get_keys()?;
+        let signature_keys = provider_metadata.jwks_uri().get_keys(http_client)?;
         if let Some(ref client_secret) = self.client_secret {
             Ok(IdTokenVerifier::new_private_client(
                 self.client_id.clone(),
@@ -437,113 +353,59 @@ where
         }
     }
 
-    pub fn authorize_url<NF, SF>(
-        &self,
-        authentication_flow: &AuthenticationFlow<RT>,
-        state_fn: SF,
-        nonce_fn: NF,
-    ) -> (Url, CsrfToken, Nonce)
-    where
-        NF: FnOnce() -> Nonce + 'static,
-        SF: FnOnce() -> CsrfToken + 'static,
-    {
-        self.authorize_url_extension(authentication_flow, state_fn, nonce_fn, None, None, None)
-    }
-
     // FIXME: document that we don't currently support passing authorization request parameters
     // as a JWT: https://openid.net/specs/openid-connect-core-1_0.html#JWTRequests
-    pub fn authorize_url_extension<NF, SF>(
+    pub fn authorize_url<NF, SF>(
         &self,
-        authentication_flow: &AuthenticationFlow<RT>,
+        authentication_flow: AuthenticationFlow<RT>,
         state_fn: SF,
         nonce_fn: NF,
-        id_token_hint: Option<&IdToken<AC, GC, JE, JS, JT>>,
-        login_hint: Option<&LoginHint>,
-        extra_params: Option<&[(&str, &str)]>,
-    ) -> (Url, CsrfToken, Nonce)
+    ) -> AuthorizationRequest<AD, P, RT>
     where
         NF: FnOnce() -> Nonce + 'static,
         SF: FnOnce() -> CsrfToken + 'static,
     {
-        // Create string versions of any options that need to be converted. This must be done
-        // before creating extra_params so that the lifetimes extend beyond extra_params's lifetime.
-        let acr_values_opt = join_optional_vec(self.auth_context_values());
-        let claims_locales_opt = join_optional_vec(self.claims_locales());
-        let max_age_opt = self.max_age().map(|max_age| max_age.as_secs().to_string());
-        let prompts_opt = join_optional_vec(self.prompts());
-        let ui_locales_opt = join_optional_vec(self.ui_locales());
-        let id_token_hint_str = id_token_hint.map(ToString::to_string);
-
-        let nonce = nonce_fn();
-
-        fn param_or_none<'a, T>(param: Option<&'a T>, name: &'a str) -> Option<(&'a str, &'a str)>
-        where
-            T: AsRef<str> + 'a,
-        {
-            if let Some(p) = param {
-                Some((name, p.as_ref()))
-            } else {
-                None
-            }
+        AuthorizationRequest {
+            inner: self.oauth2_client.authorize_url(state_fn),
+            acr_values: Vec::new(),
+            authentication_flow,
+            claims_locales: Vec::new(),
+            display: None,
+            id_token_hint: None,
+            login_hint: None,
+            max_age: None,
+            nonce: nonce_fn(),
+            prompts: Vec::new(),
+            ui_locales: Vec::new(),
         }
-
-        let (url, state) = {
-            let mut params: Vec<(&str, &str)> = vec![
-                Some(("nonce", nonce.secret().as_str())),
-                param_or_none(acr_values_opt.as_ref(), "acr_values"),
-                param_or_none(claims_locales_opt.as_ref(), "claims_locales"),
-                param_or_none(self.display(), "display"),
-                param_or_none(id_token_hint_str.as_ref(), "id_token_hint"),
-                param_or_none(login_hint.map(SecretNewType::secret), "login_hint"),
-                param_or_none(max_age_opt.as_ref(), "max_age"),
-                param_or_none(prompts_opt.as_ref(), "prompt"),
-                param_or_none(ui_locales_opt.as_ref(), "ui_locales"),
-            ]
-            .into_iter()
-            .filter(Option::is_some)
-            .map(Option::unwrap)
-            .collect();
-
-            extra_params.iter().for_each(|p| {
-                p.iter()
-                    .for_each(|(name, value)| params.push((name, value)))
-            });
-
-            let response_type = match *authentication_flow {
-                AuthenticationFlow::AuthorizationCode => core::CoreResponseType::Code.to_oauth2(),
-                AuthenticationFlow::Implicit(include_token) => {
-                    if include_token {
-                        OAuth2ResponseType::new(
-                            vec![
-                                core::CoreResponseType::IdToken,
-                                core::CoreResponseType::Token,
-                            ]
-                            .iter()
-                            .map(variant_name)
-                            .collect::<Vec<_>>()
-                            .join(" "),
-                        )
-                    } else {
-                        core::CoreResponseType::IdToken.to_oauth2()
-                    }
-                }
-                AuthenticationFlow::Hybrid(ref response_types) => OAuth2ResponseType::new(
-                    response_types
-                        .iter()
-                        .map(variant_name)
-                        .collect::<Vec<_>>()
-                        .join(" "),
-                ),
-            };
-
-            self.oauth2_client
-                .authorize_url_extension(&response_type, state_fn, &params)
-        };
-        (url, state, nonce)
+        .add_scope(Scope::new(OPENID_SCOPE.to_string()))
     }
 
-    pub fn exchange_code(&self, code: AuthorizationCode) -> Result<TR, RequestTokenError<TE>> {
+    ///
+    /// Exchanges a code produced by a successful authorization process with an access token.
+    ///
+    /// Acquires ownership of the `code` because authorization codes may only be used once to
+    /// retrieve an access token from the authorization server.
+    ///
+    /// See https://tools.ietf.org/html/rfc6749#section-4.1.3
+    ///
+    pub fn exchange_code(&self, code: AuthorizationCode) -> CodeTokenRequest<TE, TR, TT> {
         self.oauth2_client.exchange_code(code)
+    }
+
+    ///
+    /// Exchanges a refresh token for an access token.
+    ///
+    /// See https://tools.ietf.org/html/rfc6749#section-6
+    ///
+    pub fn exchange_refresh_token<'a, 'b>(
+        &'a self,
+        refresh_token: &'b RefreshToken,
+    ) -> RefreshTokenRequest<'b, TE, TR, TT>
+    where
+        'a: 'b,
+    {
+        self.oauth2_client.exchange_refresh_token(refresh_token)
     }
 
     ///
@@ -557,6 +419,198 @@ where
         &self,
     ) -> Option<&ProviderMetadata<AP, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>> {
         self.provider_metadata.as_ref()
+    }
+}
+
+///
+/// A request to the authorization endpoint
+///
+pub struct AuthorizationRequest<'a, AD, P, RT>
+where
+    AD: AuthDisplay,
+    P: AuthPrompt,
+    RT: ResponseType,
+{
+    inner: oauth2::AuthorizationRequest<'a>,
+    acr_values: Vec<AuthenticationContextClass>,
+    authentication_flow: AuthenticationFlow<RT>,
+    claims_locales: Vec<LanguageTag>,
+    display: Option<AD>,
+    id_token_hint: Option<String>,
+    login_hint: Option<LoginHint>,
+    max_age: Option<Duration>,
+    nonce: Nonce,
+    prompts: Vec<P>,
+    ui_locales: Vec<LanguageTag>,
+}
+impl<'a, AD, P, RT> AuthorizationRequest<'a, AD, P, RT>
+where
+    AD: AuthDisplay,
+    P: AuthPrompt,
+    RT: ResponseType,
+{
+    ///
+    /// Appends a new scope to the authorization URL.
+    ///
+    pub fn add_scope(mut self, scope: Scope) -> Self {
+        self.inner = self.inner.add_scope(scope);
+        self
+    }
+
+    ///
+    /// Appends an extra param to the authorization URL.
+    ///
+    /// This method allows extensions to be used without direct support from
+    /// this crate. If `name` conflicts with a parameter managed by this crate, the
+    /// behavior is undefined. In particular, do not set parameters defined by
+    /// [RFC 6749](https://tools.ietf.org/html/rfc6749) or
+    /// [RFC 7636](https://tools.ietf.org/html/rfc7636).
+    ///
+    /// # Security Warning
+    ///
+    /// Callers should follow the security recommendations for any OAuth2 extensions used with
+    /// this function, which are beyond the scope of
+    /// [RFC 6749](https://tools.ietf.org/html/rfc6749).
+    ///
+    pub fn add_extra_param<N, V>(mut self, name: N, value: V) -> Self
+    where
+        N: Into<Cow<'a, str>>,
+        V: Into<Cow<'a, str>>,
+    {
+        self.inner = self.inner.add_extra_param(name, value);
+        self
+    }
+
+    ///
+    /// Enables the use of [Proof Key for Code Exchange](https://tools.ietf.org/html/rfc7636)
+    /// (PKCE).
+    ///
+    /// PKCE is *highly recommended* for all public clients (i.e., those for which there
+    /// is no client secret or for which the client secret is distributed with the client,
+    /// such as in a native, mobile app, or browser app).
+    ///
+    pub fn set_pkce_challenge(mut self, pkce_code_challenge: PkceCodeChallenge) -> Self {
+        self.inner = self.inner.set_pkce_challenge(pkce_code_challenge);
+        self
+    }
+
+    pub fn add_auth_context_value(mut self, acr_value: AuthenticationContextClass) -> Self {
+        self.acr_values.push(acr_value);
+        self
+    }
+
+    pub fn add_claims_locale(mut self, claims_locale: LanguageTag) -> Self {
+        self.claims_locales.push(claims_locale);
+        self
+    }
+
+    // TODO: support 'claims' parameter
+    // https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter
+
+    pub fn set_display(mut self, display: AD) -> Self {
+        self.display = Some(display);
+        self
+    }
+
+    pub fn set_id_token_hint<AC, GC, JE, JS, JT>(
+        mut self,
+        id_token_hint: &'a IdToken<AC, GC, JE, JS, JT>,
+    ) -> Self
+    where
+        AC: AdditionalClaims,
+        GC: GenderClaim,
+        JE: JweContentEncryptionAlgorithm<JT>,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType,
+    {
+        self.id_token_hint = Some(id_token_hint.to_string());
+        self
+    }
+
+    pub fn set_login_hint(mut self, login_hint: LoginHint) -> Self {
+        self.login_hint = Some(login_hint);
+        self
+    }
+
+    pub fn set_max_age(mut self, max_age: Duration) -> Self {
+        self.max_age = Some(max_age);
+        self
+    }
+
+    pub fn add_prompt(mut self, prompt: P) -> Self {
+        self.prompts.push(prompt);
+        self
+    }
+
+    pub fn add_ui_locale(mut self, ui_locale: LanguageTag) -> Self {
+        self.ui_locales.push(ui_locale);
+        self
+    }
+
+    ///
+    /// Returns the full authorization URL and CSRF state for this authorization
+    /// request.
+    ///
+    pub fn url(self) -> (Url, CsrfToken, Nonce) {
+        let response_type = match self.authentication_flow {
+            AuthenticationFlow::AuthorizationCode => core::CoreResponseType::Code.to_oauth2(),
+            AuthenticationFlow::Implicit(include_token) => {
+                if include_token {
+                    OAuth2ResponseType::new(
+                        vec![
+                            core::CoreResponseType::IdToken,
+                            core::CoreResponseType::Token,
+                        ]
+                        .iter()
+                        .map(variant_name)
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                    )
+                } else {
+                    core::CoreResponseType::IdToken.to_oauth2()
+                }
+            }
+            AuthenticationFlow::Hybrid(ref response_types) => OAuth2ResponseType::new(
+                response_types
+                    .iter()
+                    .map(variant_name)
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            ),
+        };
+        let (mut inner, nonce) = (
+            self.inner
+                .set_response_type(&response_type)
+                .add_extra_param("nonce", self.nonce.secret().clone()),
+            self.nonce,
+        );
+        if !self.acr_values.is_empty() {
+            inner = inner.add_extra_param("acr_values", join_vec(&self.acr_values));
+        }
+        if !self.claims_locales.is_empty() {
+            inner = inner.add_extra_param("claims_locales", join_vec(&self.claims_locales));
+        }
+        if let Some(ref display) = self.display {
+            inner = inner.add_extra_param("display", display.as_ref());
+        }
+        if let Some(ref id_token_hint) = self.id_token_hint {
+            inner = inner.add_extra_param("id_token_hint", id_token_hint);
+        }
+        if let Some(ref login_hint) = self.login_hint {
+            inner = inner.add_extra_param("login_hint", login_hint.secret());
+        }
+        if let Some(max_age) = self.max_age {
+            inner = inner.add_extra_param("max_age", max_age.as_secs().to_string());
+        }
+        if !self.prompts.is_empty() {
+            inner = inner.add_extra_param("prompt", join_vec(&self.prompts));
+        }
+        if !self.ui_locales.is_empty() {
+            inner = inner.add_extra_param("ui_locales", join_vec(&self.ui_locales));
+        }
+
+        let (url, state) = inner.url();
+        (url, state, nonce)
     }
 }
 
@@ -588,20 +642,15 @@ where
     }
 }
 
-fn join_optional_vec<T>(vec_opt: Option<&Vec<T>>) -> Option<String>
+fn join_vec<T>(entries: &[T]) -> String
 where
     T: AsRef<str>,
 {
-    match vec_opt {
-        Some(entries) => Some(
-            entries
-                .iter()
-                .map(AsRef::as_ref)
-                .collect::<Vec<_>>()
-                .join(" "),
-        ),
-        None => None,
-    }
+    entries
+        .iter()
+        .map(AsRef::as_ref)
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 #[cfg(test)]
@@ -614,7 +663,6 @@ mod tests {
     #[cfg(feature = "nightly")]
     use super::core::CoreAuthenticationFlow;
     use super::core::{CoreAuthDisplay, CoreAuthPrompt, CoreClient, CoreIdToken, CoreResponseType};
-    use super::prelude::*;
     use super::{AuthenticationContextClass, AuthenticationFlow, LanguageTag, LoginHint, Nonce};
 
     fn new_client() -> CoreClient {
@@ -631,37 +679,26 @@ mod tests {
     fn test_authorize_url_minimal() {
         let client = new_client();
 
-        let (authorize_url, _, _) = client.authorize_url(
-            &AuthenticationFlow::AuthorizationCode::<CoreResponseType>,
-            || CsrfToken::new("CSRF123".to_string()),
-            || Nonce::new("NONCE456".to_string()),
-        );
+        let (authorize_url, _, _) = client
+            .authorize_url(
+                AuthenticationFlow::AuthorizationCode::<CoreResponseType>,
+                || CsrfToken::new("CSRF123".to_string()),
+                || Nonce::new("NONCE456".to_string()),
+            )
+            .url();
 
         assert_eq!(
-            "https://example/authorize?response_type=code&client_id=aaa&scope=openid&\
-             state=CSRF123&nonce=NONCE456",
+            "https://example/authorize?response_type=code&client_id=aaa&\
+             state=CSRF123&scope=openid&nonce=NONCE456",
             authorize_url.to_string()
         );
     }
 
     #[test]
     fn test_authorize_url_full() {
-        let client = new_client()
-            .add_scope(Scope::new("email".to_string()))
-            .set_redirect_uri(RedirectUrl::new(
-                Url::parse("http://localhost:8888/").unwrap(),
-            ))
-            .set_display(Some(CoreAuthDisplay::Touch))
-            .set_prompts(Some(vec![CoreAuthPrompt::Login, CoreAuthPrompt::Consent]))
-            .set_max_age(Some(Duration::from_secs(1800)))
-            .set_ui_locales(Some(vec![
-                LanguageTag::new("fr-CA".to_string()),
-                LanguageTag::new("fr".to_string()),
-                LanguageTag::new("en".to_string()),
-            ]))
-            .set_auth_context_values(Some(vec![AuthenticationContextClass::new(
-                "urn:mace:incommon:iap:silver".to_string(),
-            )]));
+        let client = new_client().set_redirect_uri(RedirectUrl::new(
+            Url::parse("http://localhost:8888/").unwrap(),
+        ));
 
         #[cfg(feature = "nightly")]
         let flow = CoreAuthenticationFlow::AuthorizationCode;
@@ -675,10 +712,23 @@ mod tests {
             Nonce::new("NONCE456".to_string())
         }
 
-        let (authorize_url, _, _) = client.authorize_url(&flow, new_csrf, new_nonce);
+        let (authorize_url, _, _) = client
+            .authorize_url(flow.clone(), new_csrf, new_nonce)
+            .add_scope(Scope::new("email".to_string()))
+            .set_display(CoreAuthDisplay::Touch)
+            .add_prompt(CoreAuthPrompt::Login)
+            .add_prompt(CoreAuthPrompt::Consent)
+            .set_max_age(Duration::from_secs(1800))
+            .add_ui_locale(LanguageTag::new("fr-CA".to_string()))
+            .add_ui_locale(LanguageTag::new("fr".to_string()))
+            .add_ui_locale(LanguageTag::new("en".to_string()))
+            .add_auth_context_value(AuthenticationContextClass::new(
+                "urn:mace:incommon:iap:silver".to_string(),
+            ))
+            .url();
         assert_eq!(
             "https://example/authorize?response_type=code&client_id=aaa&\
-             redirect_uri=http%3A%2F%2Flocalhost%3A8888%2F&scope=openid+email&state=CSRF123&\
+             state=CSRF123&redirect_uri=http%3A%2F%2Flocalhost%3A8888%2F&scope=openid+email&\
              nonce=NONCE456&acr_values=urn%3Amace%3Aincommon%3Aiap%3Asilver&display=touch&\
              max_age=1800&prompt=login+consent&ui_locales=fr-CA+fr+en",
             authorize_url.to_string()
@@ -697,21 +747,30 @@ mod tests {
         ))
         .unwrap();
 
-        let (authorize_url, _, _) = client.authorize_url_extension(
-            &flow,
-            new_csrf,
-            new_nonce,
-            Some(&id_token),
-            Some(&LoginHint::new("foo@bar.com".to_string())),
-            Some(&[("foo", "bar")]),
-        );
+        let (authorize_url, _, _) = client
+            .authorize_url(flow, new_csrf, new_nonce)
+            .add_scope(Scope::new("email".to_string()))
+            .set_display(CoreAuthDisplay::Touch)
+            .set_id_token_hint(&id_token)
+            .set_login_hint(LoginHint::new("foo@bar.com".to_string()))
+            .add_prompt(CoreAuthPrompt::Login)
+            .add_prompt(CoreAuthPrompt::Consent)
+            .set_max_age(Duration::from_secs(1800))
+            .add_ui_locale(LanguageTag::new("fr-CA".to_string()))
+            .add_ui_locale(LanguageTag::new("fr".to_string()))
+            .add_ui_locale(LanguageTag::new("en".to_string()))
+            .add_auth_context_value(AuthenticationContextClass::new(
+                "urn:mace:incommon:iap:silver".to_string(),
+            ))
+            .add_extra_param("foo", "bar")
+            .url();
         assert_eq!(
             format!(
-                "https://example/authorize?response_type=code&client_id=aaa&\
-                 redirect_uri=http%3A%2F%2Flocalhost%3A8888%2F&scope=openid+email&state=CSRF123&\
+                "https://example/authorize?response_type=code&client_id=aaa&state=CSRF123&\
+                 redirect_uri=http%3A%2F%2Flocalhost%3A8888%2F&scope=openid+email&foo=bar&\
                  nonce=NONCE456&acr_values=urn%3Amace%3Aincommon%3Aiap%3Asilver&display=touch&\
                  id_token_hint={}&login_hint=foo%40bar.com&\
-                 max_age=1800&prompt=login+consent&ui_locales=fr-CA+fr+en&foo=bar",
+                 max_age=1800&prompt=login+consent&ui_locales=fr-CA+fr+en",
                 serialized_jwt
             ),
             authorize_url.to_string()

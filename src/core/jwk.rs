@@ -1,6 +1,5 @@
 use base64;
 use oauth2::helpers::variant_name;
-use oauth2::prelude::*;
 use ring::digest;
 use ring::rand;
 use ring::signature as ring_signature;
@@ -249,7 +248,7 @@ where
         signature_alg: &CoreJwsSigningAlgorithm,
         msg: &[u8],
     ) -> Result<Vec<u8>, SigningError> {
-        let padding_alg: &ring_signature::RsaEncoding = match *signature_alg {
+        let padding_alg: &dyn ring_signature::RsaEncoding = match *signature_alg {
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256 => &ring_signature::RSA_PKCS1_SHA256,
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384 => &ring_signature::RSA_PKCS1_SHA384,
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512 => &ring_signature::RSA_PKCS1_SHA512,
@@ -328,7 +327,6 @@ impl JsonWebKeyUse for CoreJsonWebKeyUse {
 
 #[cfg(test)]
 mod tests {
-    use oauth2::prelude::*;
     use ring::rand::SystemRandom;
     use ring::test::rand::FixedByteRandom;
     use serde_json;
