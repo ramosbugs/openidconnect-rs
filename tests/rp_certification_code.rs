@@ -76,64 +76,68 @@ impl TestState {
     }
 
     pub fn authorize(mut self, scopes: &Vec<Scope>) -> Self {
-        let mut authorization_request = self.client.authorize_url(
-            AuthenticationFlow::AuthorizationCode::<CoreResponseType>,
-            CsrfToken::new_random,
-            Nonce::new_random,
-        );
-        authorization_request =
-            scopes
-                .iter()
-                .fold(authorization_request, |mut authorization_request, scope| {
-                    authorization_request = authorization_request.add_scope(scope.clone());
-                    authorization_request
-                });
-        let (url, state, nonce) = authorization_request.url();
-        log_debug!("Authorize URL: {:?}", url);
+        let (authorization_code, nonce) = {
+            let mut authorization_request = self.client.authorize_url(
+                AuthenticationFlow::AuthorizationCode::<CoreResponseType>,
+                CsrfToken::new_random,
+                Nonce::new_random,
+            );
+            authorization_request =
+                scopes
+                    .iter()
+                    .fold(authorization_request, |mut authorization_request, scope| {
+                        authorization_request = authorization_request.add_scope(scope.clone());
+                        authorization_request
+                    });
+            let (url, state, nonce) = authorization_request.url();
+            log_debug!("Authorize URL: {:?}", url);
 
-        let http_client = Client::builder()
-            .redirect(RedirectPolicy::none())
-            .build()
+            let http_client = Client::builder()
+                .redirect(RedirectPolicy::none())
+                .build()
+                .unwrap();
+            let redirect_response = http_client
+                .execute(http_client.request(Method::GET, url).build().unwrap())
+                .unwrap();
+            assert_eq!(redirect_response.status(), StatusCode::SEE_OTHER);
+            let redirected_url = Url::parse(
+                redirect_response
+                    .headers()
+                    .get(LOCATION)
+                    .unwrap()
+                    .to_str()
+                    .unwrap(),
+            )
             .unwrap();
-        let redirect_response = http_client
-            .execute(http_client.request(Method::GET, url).build().unwrap())
-            .unwrap();
-        assert_eq!(redirect_response.status(), StatusCode::SEE_OTHER);
-        let redirected_url = Url::parse(
-            redirect_response
-                .headers()
-                .get(LOCATION)
-                .unwrap()
-                .to_str()
-                .unwrap(),
-        )
-        .unwrap();
 
-        log_debug!("Authorization Server redirected to: {:?}", redirected_url);
+            log_debug!("Authorization Server redirected to: {:?}", redirected_url);
 
-        let mut query_params = HashMap::new();
-        redirected_url.query_pairs().for_each(|(key, value)| {
-            query_params.insert(key, value);
-        });
-        log_debug!(
-            "Authorization Server returned query params: {:?}",
-            query_params
-        );
+            let mut query_params = HashMap::new();
+            redirected_url.query_pairs().for_each(|(key, value)| {
+                query_params.insert(key, value);
+            });
+            log_debug!(
+                "Authorization Server returned query params: {:?}",
+                query_params
+            );
 
-        assert_eq!(
-            self.provider_metadata.issuer().as_str(),
-            query_params.get("iss").unwrap()
-        );
-        assert_eq!(state.secret(), query_params.get("state").unwrap());
+            assert_eq!(
+                self.provider_metadata.issuer().as_str(),
+                query_params.get("iss").unwrap()
+            );
+            assert_eq!(state.secret(), query_params.get("state").unwrap());
 
-        log_info!("Successfully received authentication response from Authorization Server");
+            log_info!("Successfully received authentication response from Authorization Server");
 
-        let authorization_code =
-            AuthorizationCode::new(query_params.get("code").unwrap().to_string());
-        log_debug!(
-            "Authorization Server returned authorization code: {}",
-            authorization_code.secret()
-        );
+            let authorization_code =
+                AuthorizationCode::new(query_params.get("code").unwrap().to_string());
+            log_debug!(
+                "Authorization Server returned authorization code: {}",
+                authorization_code.secret()
+            );
+
+            (authorization_code, nonce)
+        };
 
         self.authorization_code = Some(authorization_code);
         self.nonce = Some(nonce);
