@@ -7,6 +7,7 @@ use std::rc::Rc;
 use chrono::{DateTime, Utc};
 use oauth2::helpers::variant_name;
 use oauth2::{ClientId, ClientSecret};
+use ring::constant_time::verify_slices_are_equal;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -471,7 +472,9 @@ pub trait NonceVerifier<'a> {
 impl<'a> NonceVerifier<'a> for &Nonce {
     fn verify(self, nonce: Option<&'a Nonce>) -> Result<(), String> {
         if let Some(claims_nonce) = nonce {
-            if claims_nonce != self {
+            if verify_slices_are_equal(claims_nonce.secret().as_bytes(), self.secret().as_bytes())
+                .is_err()
+            {
                 return Err("nonce mismatch".to_string());
             }
         } else {
@@ -1454,13 +1457,16 @@ mod tests {
             }
 
             // Missing nonce w/ closure
-            match public_client_verifier.verified_claims(&test_jwt_without_nonce, |nonce| {
-                if nonce == Some(&valid_nonce) {
-                    Ok(())
-                } else {
-                    Err("invalid nonce".to_string())
-                }
-            }) {
+            match public_client_verifier.verified_claims(
+                &test_jwt_without_nonce,
+                |nonce: Option<&Nonce>| {
+                    if nonce.iter().any(|n| n.secret() == valid_nonce.secret()) {
+                        Ok(())
+                    } else {
+                        Err("invalid nonce".to_string())
+                    }
+                },
+            ) {
                 Err(ClaimsVerificationError::InvalidNonce(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
             }
@@ -1560,8 +1566,8 @@ mod tests {
 
             // Successful verification with nonce, acr, and auth_time specified (w/ closure)
             public_client_verifier
-                .verified_claims(&test_jwt_with_nonce, |nonce| {
-                    if nonce == Some(&valid_nonce) {
+                .verified_claims(&test_jwt_with_nonce, |nonce: Option<&Nonce>| {
+                    if nonce.iter().any(|n| n.secret() == valid_nonce.secret()) {
                         Ok(())
                     } else {
                         Err("invalid nonce".to_string())

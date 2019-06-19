@@ -1,5 +1,5 @@
 use std::fmt::{Debug, Formatter, Result as FormatterResult};
-use std::marker::{PhantomData, Send, Sync};
+use std::marker::PhantomData;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
@@ -27,10 +27,7 @@ use super::{
     JsonWebKeySet, RedirectUrl, StandardErrorResponse,
 };
 
-pub trait AdditionalClientMetadata:
-    Clone + Debug + DeserializeOwned + PartialEq + Serialize
-{
-}
+pub trait AdditionalClientMetadata: Debug + DeserializeOwned + Serialize {}
 
 // In order to support serde flatten, this must be an empty struct rather than an empty
 // tuple struct.
@@ -384,7 +381,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct ClientRegistrationRequest<AC, AR, AT, CA, ET, G, JE, JK, JS, JT, JU, K, RT, S>
 where
     AC: AdditionalClientMetadata,
@@ -566,10 +563,7 @@ where
     }
 }
 
-pub trait AdditionalClientRegistrationResponse:
-    Clone + Debug + DeserializeOwned + PartialEq + Serialize
-{
-}
+pub trait AdditionalClientRegistrationResponse: Debug + DeserializeOwned + Serialize {}
 
 // In order to support serde flatten, this must be an empty struct rather than an empty
 // tuple struct.
@@ -577,7 +571,7 @@ pub trait AdditionalClientRegistrationResponse:
 pub struct EmptyAdditionalClientRegistrationResponse {}
 impl AdditionalClientRegistrationResponse for EmptyAdditionalClientRegistrationResponse {}
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
 where
     AC: AdditionalClientMetadata,
@@ -733,12 +727,13 @@ where
 
 // TODO: implement client configuration endpoint request (Section 4)
 
-pub trait RegisterErrorResponseType: Clone + ErrorResponseType + Send + Sync + 'static {}
+pub trait RegisterErrorResponseType: ErrorResponseType + 'static {}
 
 #[derive(Debug, Fail)]
-pub enum ClientRegistrationError<T: RegisterErrorResponseType, RE>
+pub enum ClientRegistrationError<T, RE>
 where
     RE: Fail,
+    T: RegisterErrorResponseType,
 {
     #[fail(display = "Other error: {}", _0)]
     Other(String),
@@ -760,7 +755,7 @@ where
 mod tests {
     use chrono::{TimeZone, Utc};
     use itertools::sorted;
-    use oauth2::{ClientId, ClientSecret, RedirectUrl};
+    use oauth2::{ClientId, RedirectUrl};
     use std::time::Duration;
     use url::Url;
 
@@ -773,8 +768,8 @@ mod tests {
     use super::super::jwt::tests::TEST_RSA_PUB_KEY;
     use super::super::{
         AuthenticationContextClass, ClientConfigUrl, ClientName, ClientUrl, ContactEmail,
-        JsonWebKeySet, JsonWebKeySetUrl, LanguageTag, LogoUrl, PolicyUrl, RegistrationAccessToken,
-        RequestUrl, ResponseTypes, SectorIdentifierUrl, ToSUrl,
+        JsonWebKeySet, JsonWebKeySetUrl, LanguageTag, LogoUrl, PolicyUrl, RequestUrl,
+        ResponseTypes, SectorIdentifierUrl, ToSUrl,
     };
 
     #[test]
@@ -1118,42 +1113,45 @@ mod tests {
             \"request_uris\": [\"https://example.com/request-1\", \"https://example.com/request-2\"]
         }}", TEST_RSA_PUB_KEY);
 
-        let client_metadata: CoreClientRegistrationResponse =
+        let registration_response: CoreClientRegistrationResponse =
             serde_json::from_str(&json_response).unwrap();
 
         assert_eq!(
-            *client_metadata.client_id(),
+            *registration_response.client_id(),
             ClientId::new("abcdefgh".to_string())
         );
         assert_eq!(
-            *client_metadata.client_secret().unwrap(),
-            ClientSecret::new("shhhh".to_string())
+            *registration_response.client_secret().unwrap().secret(),
+            "shhhh"
         );
         assert_eq!(
-            *client_metadata.registration_access_token().unwrap(),
-            RegistrationAccessToken::new("use_me_to_update_registration".to_string())
+            *registration_response
+                .registration_access_token()
+                .unwrap()
+                .secret(),
+            "use_me_to_update_registration",
         );
         assert_eq!(
-            *client_metadata.registration_client_uri().unwrap(),
+            *registration_response.registration_client_uri().unwrap(),
             ClientConfigUrl::new("https://example-provider.com/registration".to_string()).unwrap()
         );
         assert_eq!(
-            *client_metadata.client_id_issued_at().unwrap(),
+            *registration_response.client_id_issued_at().unwrap(),
             Utc.timestamp(1523953306, 0)
         );
         assert_eq!(
-            *client_metadata.client_secret_expires_at().unwrap(),
+            *registration_response.client_secret_expires_at().unwrap(),
             Utc.timestamp(1526545306, 0)
         );
         assert_eq!(
-            *client_metadata.redirect_uris(),
+            *registration_response.redirect_uris(),
             vec![
                 RedirectUrl::new(Url::parse("https://example.com/redirect-1").unwrap()),
                 RedirectUrl::new(Url::parse("https://example.com/redirect-2").unwrap()),
             ]
         );
         assert_eq!(
-            *client_metadata.response_types().unwrap(),
+            *registration_response.response_types().unwrap(),
             vec![
                 ResponseTypes::new(vec![CoreResponseType::Code]),
                 ResponseTypes::new(vec![
@@ -1164,7 +1162,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            client_metadata.grant_types().unwrap(),
+            registration_response.grant_types().unwrap(),
             &vec![
                 CoreGrantType::AuthorizationCode,
                 CoreGrantType::ClientCredentials,
@@ -1175,18 +1173,18 @@ mod tests {
             ]
         );
         assert_eq!(
-            *client_metadata.application_type().unwrap(),
+            *registration_response.application_type().unwrap(),
             CoreApplicationType::Web
         );
         assert_eq!(
-            *client_metadata.contacts().unwrap(),
+            *registration_response.contacts().unwrap(),
             vec![
                 ContactEmail::new("user@example.com".to_string()),
                 ContactEmail::new("admin@openidconnect.local".to_string()),
             ]
         );
         assert_eq!(
-            sorted(client_metadata.client_name().unwrap().clone()),
+            sorted(registration_response.client_name().unwrap().clone()),
             vec![
                 (None, ClientName::new("Example".to_string())),
                 (
@@ -1196,7 +1194,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            sorted(client_metadata.logo_uri().unwrap().clone()),
+            sorted(registration_response.logo_uri().unwrap().clone()),
             vec![
                 (
                     None,
@@ -1209,7 +1207,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            sorted(client_metadata.client_uri().unwrap().clone()),
+            sorted(registration_response.client_uri().unwrap().clone()),
             vec![
                 (
                     None,
@@ -1222,7 +1220,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            sorted(client_metadata.policy_uri().unwrap().clone()),
+            sorted(registration_response.policy_uri().unwrap().clone()),
             vec![
                 (
                     None,
@@ -1235,7 +1233,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            sorted(client_metadata.tos_uri().unwrap().clone()),
+            sorted(registration_response.tos_uri().unwrap().clone()),
             vec![
                 (
                     None,
@@ -1248,75 +1246,93 @@ mod tests {
             ]
         );
         assert_eq!(
-            *client_metadata.jwks_uri().unwrap(),
+            *registration_response.jwks_uri().unwrap(),
             JsonWebKeySetUrl::new("https://example.com/jwks".to_string()).unwrap()
         );
         assert_eq!(
-            client_metadata.jwks(),
+            registration_response.jwks(),
             Some(&JsonWebKeySet::new(vec![serde_json::from_str(
                 &TEST_RSA_PUB_KEY
             )
             .unwrap()],)),
         );
         assert_eq!(
-            *client_metadata.sector_identifier_uri().unwrap(),
+            *registration_response.sector_identifier_uri().unwrap(),
             SectorIdentifierUrl::new("https://example.com/sector".to_string()).unwrap()
         );
         assert_eq!(
-            *client_metadata.subject_type().unwrap(),
+            *registration_response.subject_type().unwrap(),
             CoreSubjectIdentifierType::Pairwise
         );
         assert_eq!(
-            *client_metadata.id_token_signed_response_alg().unwrap(),
+            *registration_response
+                .id_token_signed_response_alg()
+                .unwrap(),
             CoreJwsSigningAlgorithm::HmacSha256
         );
         assert_eq!(
-            *client_metadata.id_token_encrypted_response_alg().unwrap(),
+            *registration_response
+                .id_token_encrypted_response_alg()
+                .unwrap(),
             CoreJweKeyManagementAlgorithm::RsaPkcs1V15
         );
         assert_eq!(
-            *client_metadata.id_token_encrypted_response_enc().unwrap(),
+            *registration_response
+                .id_token_encrypted_response_enc()
+                .unwrap(),
             CoreJweContentEncryptionAlgorithm::Aes128CbcHmacSha256
         );
         assert_eq!(
-            *client_metadata.userinfo_signed_response_alg().unwrap(),
+            *registration_response
+                .userinfo_signed_response_alg()
+                .unwrap(),
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384
         );
         assert_eq!(
-            *client_metadata.userinfo_encrypted_response_alg().unwrap(),
+            *registration_response
+                .userinfo_encrypted_response_alg()
+                .unwrap(),
             CoreJweKeyManagementAlgorithm::RsaOaep
         );
         assert_eq!(
-            *client_metadata.userinfo_encrypted_response_enc().unwrap(),
+            *registration_response
+                .userinfo_encrypted_response_enc()
+                .unwrap(),
             CoreJweContentEncryptionAlgorithm::Aes256CbcHmacSha512
         );
         assert_eq!(
-            *client_metadata.request_object_signing_alg().unwrap(),
+            *registration_response.request_object_signing_alg().unwrap(),
             CoreJwsSigningAlgorithm::EcdsaP521Sha512
         );
         assert_eq!(
-            *client_metadata.request_object_encryption_alg().unwrap(),
+            *registration_response
+                .request_object_encryption_alg()
+                .unwrap(),
             CoreJweKeyManagementAlgorithm::EcdhEsAesKeyWrap128
         );
         assert_eq!(
-            *client_metadata.request_object_encryption_enc().unwrap(),
+            *registration_response
+                .request_object_encryption_enc()
+                .unwrap(),
             CoreJweContentEncryptionAlgorithm::Aes256Gcm
         );
         assert_eq!(
-            *client_metadata.token_endpoint_auth_method().unwrap(),
+            *registration_response.token_endpoint_auth_method().unwrap(),
             CoreClientAuthMethod::ClientSecretBasic
         );
         assert_eq!(
-            *client_metadata.token_endpoint_auth_signing_alg().unwrap(),
+            *registration_response
+                .token_endpoint_auth_signing_alg()
+                .unwrap(),
             CoreJwsSigningAlgorithm::RsaSsaPssSha512
         );
         assert_eq!(
-            *client_metadata.default_max_age().unwrap(),
+            *registration_response.default_max_age().unwrap(),
             Duration::from_secs(3600)
         );
-        assert_eq!(client_metadata.require_auth_time().unwrap(), true);
+        assert_eq!(registration_response.require_auth_time().unwrap(), true);
         assert_eq!(
-            *client_metadata.default_acr_values().unwrap(),
+            *registration_response.default_acr_values().unwrap(),
             vec![
                 AuthenticationContextClass::new("0".to_string()),
                 AuthenticationContextClass::new("urn:mace:incommon:iap:silver".to_string()),
@@ -1324,21 +1340,51 @@ mod tests {
             ]
         );
         assert_eq!(
-            *client_metadata.sector_identifier_uri().unwrap(),
+            *registration_response.sector_identifier_uri().unwrap(),
             SectorIdentifierUrl::new("https://example.com/sector".to_string()).unwrap()
         );
         assert_eq!(
-            *client_metadata.request_uris().unwrap(),
+            *registration_response.request_uris().unwrap(),
             vec![
                 RequestUrl::new("https://example.com/request-1".to_string()).unwrap(),
                 RequestUrl::new("https://example.com/request-2".to_string()).unwrap(),
             ]
         );
-        let serialized_json = serde_json::to_string(&client_metadata).unwrap();
+        let serialized_json = serde_json::to_string(&registration_response).unwrap();
 
+        let deserialized: CoreClientRegistrationResponse =
+            serde_json::from_str(&serialized_json).unwrap();
+        assert_eq!(registration_response.client_id, deserialized.client_id);
         assert_eq!(
-            client_metadata,
-            serde_json::from_str(&serialized_json).unwrap()
+            registration_response.client_secret.unwrap().secret(),
+            deserialized.client_secret.unwrap().secret(),
+        );
+        assert_eq!(
+            registration_response
+                .registration_access_token
+                .unwrap()
+                .secret(),
+            deserialized.registration_access_token.unwrap().secret(),
+        );
+        assert_eq!(
+            registration_response.registration_client_uri,
+            deserialized.registration_client_uri,
+        );
+        assert_eq!(
+            registration_response.client_id_issued_at,
+            deserialized.client_id_issued_at,
+        );
+        assert_eq!(
+            registration_response.client_secret_expires_at,
+            deserialized.client_secret_expires_at,
+        );
+        assert_eq!(
+            registration_response.client_metadata,
+            deserialized.client_metadata,
+        );
+        assert_eq!(
+            registration_response.additional_response,
+            deserialized.additional_response,
         );
     }
 }

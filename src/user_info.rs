@@ -25,7 +25,7 @@ use super::{
     StandardClaims, SubjectIdentifier,
 };
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct UserInfoClaims<AC: AdditionalClaims, GC: GenderClaim>(UserInfoClaimsImpl<AC, GC>);
 impl<AC, GC> UserInfoClaims<AC, GC>
 where
@@ -113,7 +113,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct UserInfoClaimsImpl<AC, GC>
 where
     AC: AdditionalClaims,
@@ -174,7 +174,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct UserInfoJsonWebToken<
     AC: AdditionalClaims,
     GC: GenderClaim,

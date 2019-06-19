@@ -56,9 +56,11 @@ impl TestState {
         let registration_response = register_client(&provider_metadata, reg_request_fn);
 
         let redirect_uri = registration_response.redirect_uris()[0].clone();
-        let client: CoreClient =
-            CoreClient::from_dynamic_registration(&provider_metadata, &registration_response)
-                .set_redirect_uri(redirect_uri);
+        let client: CoreClient = CoreClient::from_dynamic_registration(
+            provider_metadata.clone(),
+            &registration_response,
+        )
+        .set_redirect_uri(redirect_uri);
 
         TestState {
             access_token: None,

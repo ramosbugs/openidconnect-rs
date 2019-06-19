@@ -125,7 +125,7 @@ where
     _phantom_jt: PhantomData<JT>,
 }
 
-pub trait JsonWebTokenPayloadSerde<P>: Clone + Debug + PartialEq
+pub trait JsonWebTokenPayloadSerde<P>: Debug
 where
     P: Debug + DeserializeOwned + Serialize,
 {
@@ -243,7 +243,6 @@ where
         })
     }
 }
-
 // Owned JWT.
 impl<JE, JS, JT, P, S> JsonWebTokenAccess<JE, JS, JT, P> for JsonWebToken<JE, JS, JT, P, S>
 where
@@ -591,7 +590,7 @@ pub mod tests {
         );
     }
 
-    #[derive(Clone, Debug, PartialEq)]
+    #[derive(Clone, Debug)]
     pub struct JsonWebTokenStringPayloadSerde;
     impl JsonWebTokenPayloadSerde<String> for JsonWebTokenStringPayloadSerde {
         fn deserialize<DE: serde::de::Error>(payload: &[u8]) -> Result<String, DE> {

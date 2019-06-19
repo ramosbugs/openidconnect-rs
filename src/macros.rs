@@ -226,7 +226,6 @@ macro_rules! new_secret_type {
         $(
             #[$attr]
         )*
-        #[derive(Clone, PartialEq)]
         pub struct $name($type);
         impl $name {
             $($item)*

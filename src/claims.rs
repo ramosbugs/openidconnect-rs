@@ -18,10 +18,7 @@ use super::{
     SubjectIdentifier,
 };
 
-pub trait AdditionalClaims:
-    Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
-{
-}
+pub trait AdditionalClaims: Debug + DeserializeOwned + Serialize + 'static {}
 
 // In order to support serde flatten, this must be an empty struct rather than an empty
 // tuple struct.
@@ -45,9 +42,8 @@ pub struct AddressClaim {
     pub country: Option<AddressCountry>,
 }
 
-pub trait GenderClaim: Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static {}
+pub trait GenderClaim: Clone + Debug + DeserializeOwned + Serialize + 'static {}
 
-// Private (fields accessed via IdTokenClaims and UserInfoClaims)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StandardClaims<GC>
 where

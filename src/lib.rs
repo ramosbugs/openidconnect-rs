@@ -264,7 +264,7 @@ where
 
     #[allow(clippy::type_complexity)]
     pub fn from_dynamic_registration<A, AR, AT, JU, K>(
-        provider_metadata: &ProviderMetadata<AP, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
+        provider_metadata: ProviderMetadata<AP, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
         registration_response: &ClientRegistrationResponse<
             A,
             AR,
@@ -298,7 +298,7 @@ where
             oauth2_client,
             client_id: registration_response.client_id().clone(),
             client_secret: registration_response.client_secret().cloned(),
-            provider_metadata: Some(provider_metadata.clone()),
+            provider_metadata: Some(provider_metadata),
             _phantom: PhantomData,
         }
     }

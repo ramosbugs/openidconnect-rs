@@ -315,7 +315,7 @@ where
 mod tests {
     use chrono::{TimeZone, Utc};
     use oauth2::basic::BasicTokenType;
-    use oauth2::{AccessToken, ClientId, TokenResponse};
+    use oauth2::{ClientId, TokenResponse};
     use url::Url;
     use {serde_json, AddressClaim};
 
@@ -376,10 +376,7 @@ mod tests {
         let response =
             serde_json::from_str::<CoreTokenResponse>(response_str).expect("failed to deserialize");
 
-        assert_eq!(
-            *response.access_token(),
-            AccessToken::new("foobar".to_string())
-        );
+        assert_eq!(*response.access_token().secret(), "foobar");
         assert_eq!(*response.token_type(), BasicTokenType::Bearer);
 
         let id_token = response.extra_fields().id_token();
@@ -445,7 +442,7 @@ mod tests {
         assert_eq!(claims.expiration(), new_claims.expiration());
         assert_eq!(claims.issue_time(), new_claims.issue_time());
         assert_eq!(claims.auth_time(), None);
-        assert_eq!(claims.nonce(), None);
+        assert!(claims.nonce().is_none());
         assert_eq!(claims.auth_context_ref(), None);
         assert_eq!(claims.auth_method_refs(), None);
         assert_eq!(claims.authorized_party(), None);
@@ -697,7 +694,10 @@ mod tests {
         assert_eq!(claims.expiration(), new_claims.expiration());
         assert_eq!(claims.issue_time(), new_claims.issue_time());
         assert_eq!(claims.auth_time(), new_claims.auth_time());
-        assert_eq!(claims.nonce(), new_claims.nonce());
+        assert_eq!(
+            claims.nonce().unwrap().secret(),
+            new_claims.nonce().unwrap().secret()
+        );
         assert_eq!(claims.auth_context_ref(), new_claims.auth_context_ref());
         assert_eq!(claims.auth_method_refs(), new_claims.auth_method_refs());
         assert_eq!(claims.authorized_party(), new_claims.authorized_party());

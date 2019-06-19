@@ -21,10 +21,7 @@ use super::types::{
 };
 use super::{HttpRequest, HttpResponse, UserInfoUrl, CONFIG_URL_SUFFIX};
 
-pub trait AdditionalProviderMetadata:
-    Clone + Debug + DeserializeOwned + PartialEq + Serialize
-{
-}
+pub trait AdditionalProviderMetadata: Clone + Debug + DeserializeOwned + Serialize {}
 
 // In order to support serde flatten, this must be an empty struct rather than an empty
 // tuple struct.

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fmt::{Debug, Display, Error as FormatterError, Formatter};
+use std::fmt::{Debug, Error as FormatterError, Formatter};
 use std::hash::Hash;
 use std::iter::FromIterator;
 use std::marker::PhantomData;
@@ -13,6 +13,7 @@ use http_::status::StatusCode;
 use oauth2;
 use oauth2::helpers::deserialize_space_delimited_vec;
 use rand::{thread_rng, Rng};
+use ring::constant_time;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json;
@@ -22,11 +23,11 @@ use url::Url;
 use super::http::{check_content_type, MIME_TYPE_JSON};
 use super::{HttpRequest, HttpResponse, SignatureVerificationError};
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct LocalizedClaim<T>(HashMap<Option<LanguageTag>, T>);
 impl<T> LocalizedClaim<T> {
     pub fn new() -> Self {
-        Self(HashMap::new())
+        Self::default()
     }
 
     pub fn contains_key(&self, locale: &Option<LanguageTag>) -> bool {
@@ -47,6 +48,11 @@ impl<T> LocalizedClaim<T> {
 
     pub fn remove(&mut self, locale: &Option<LanguageTag>) -> Option<T> {
         self.0.remove(locale)
+    }
+}
+impl<T> Default for LocalizedClaim<T> {
+    fn default() -> Self {
+        Self(HashMap::new())
     }
 }
 impl<T> From<HashMap<Option<LanguageTag>, T>> for LocalizedClaim<T> {
@@ -82,33 +88,24 @@ impl<T> IntoIterator for LocalizedClaim<T> {
     }
 }
 
-pub trait ApplicationType:
-    Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
-{
-}
+pub trait ApplicationType: Debug + DeserializeOwned + Serialize + 'static {}
 
 ///
 /// How the Authorization Server displays the authentication and consent user interface pages to
 /// the End-User.
 ///
-pub trait AuthDisplay:
-    AsRef<str> + Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
-{
-}
+pub trait AuthDisplay: AsRef<str> + Debug + DeserializeOwned + Serialize + 'static {}
 
 ///
 /// Whether the Authorization Server should prompt the End-User for reauthentication and consent.
 ///
-pub trait AuthPrompt: AsRef<str> + Display + PartialEq + 'static {}
+pub trait AuthPrompt: AsRef<str> + 'static {}
 
-pub trait ClaimName: Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static {}
-pub trait ClaimType: Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static {}
+pub trait ClaimName: Debug + DeserializeOwned + Serialize + 'static {}
+pub trait ClaimType: Debug + DeserializeOwned + Serialize + 'static {}
 
-pub trait ClientAuthMethod:
-    Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
-{
-}
-pub trait GrantType: Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static {}
+pub trait ClientAuthMethod: Debug + DeserializeOwned + Serialize + 'static {}
+pub trait GrantType: Debug + DeserializeOwned + Serialize + 'static {}
 
 ///
 /// Error signing a message.
@@ -126,8 +123,7 @@ pub enum SigningError {
     Other(String),
 }
 
-pub trait JsonWebKey<JS, JT, JU>:
-    Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
+pub trait JsonWebKey<JS, JT, JU>: Debug + DeserializeOwned + Serialize + 'static
 where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
@@ -161,24 +157,20 @@ pub trait JsonWebKeyType:
 {
 }
 
-pub trait JsonWebKeyUse:
-    Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
-{
+pub trait JsonWebKeyUse: Debug + DeserializeOwned + Serialize + 'static {
     fn allows_signature(&self) -> bool;
     fn allows_encryption(&self) -> bool;
 }
 
 pub trait JweContentEncryptionAlgorithm<JT>:
-    Clone + Debug + DeserializeOwned + Eq + Hash + PartialEq + Serialize + 'static
+    Clone + Debug + DeserializeOwned + Serialize + 'static
 where
     JT: JsonWebKeyType,
 {
     fn key_type(&self) -> Result<JT, String>;
 }
 
-pub trait JweKeyManagementAlgorithm:
-    Clone + Debug + DeserializeOwned + Eq + Hash + PartialEq + Serialize + 'static
-{
+pub trait JweKeyManagementAlgorithm: Debug + DeserializeOwned + Serialize + 'static {
     // TODO: add a key_type() method
 }
 
@@ -192,18 +184,13 @@ where
     fn rsa_sha_256() -> Self;
 }
 
-pub trait ResponseMode: Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static {}
+pub trait ResponseMode: Debug + DeserializeOwned + Serialize + 'static {}
 
-pub trait ResponseType:
-    AsRef<str> + Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
-{
+pub trait ResponseType: AsRef<str> + Debug + DeserializeOwned + Serialize + 'static {
     fn to_oauth2(&self) -> oauth2::ResponseType;
 }
 
-pub trait SubjectIdentifierType:
-    Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
-{
-}
+pub trait SubjectIdentifierType: Debug + DeserializeOwned + Serialize + 'static {}
 
 new_type![
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
@@ -394,7 +381,6 @@ where
         &self.keys
     }
 }
-
 #[derive(Debug, Fail)]
 pub enum JsonWebKeySetFetchError<RE>
 where
@@ -467,14 +453,14 @@ impl AsRef<str> for LanguageTag {
 }
 
 new_secret_type![
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Clone, Deserialize, Serialize)]
     LoginHint(String)
 ];
 
 new_url_type![LogoUrl];
 
 new_secret_type![
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Clone, Deserialize, Serialize)]
     Nonce(String)
     impl {
         ///
@@ -496,6 +482,12 @@ new_secret_type![
         }
     }
 ];
+impl PartialEq for Nonce {
+    fn eq(&self, other: &Self) -> bool {
+        constant_time::verify_slices_are_equal(self.secret().as_bytes(), other.secret().as_bytes())
+            .is_ok()
+    }
+}
 
 new_url_type![OpPolicyUrl];
 
@@ -504,7 +496,7 @@ new_url_type![OpTosUrl];
 new_url_type![PolicyUrl];
 
 new_secret_type![
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Clone, Deserialize, Serialize)]
     RegistrationAccessToken(String)
 ];
 
