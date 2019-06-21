@@ -7,6 +7,7 @@ use std::ops::Deref;
 
 use base64;
 use failure::Fail;
+use futures::Future;
 use http_::header::{HeaderValue, ACCEPT};
 use http_::method::Method;
 use http_::status::StatusCode;
@@ -377,6 +378,68 @@ where
             _phantom: PhantomData,
         }
     }
+
+    pub fn fetch<HC, RE>(
+        url: &JsonWebKeySetUrl,
+        http_client: HC,
+    ) -> Result<Self, JsonWebKeySetFetchError<RE>>
+    where
+        HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
+        RE: Fail,
+    {
+        http_client(Self::fetch_request(url))
+            .map_err(JsonWebKeySetFetchError::Request)
+            .and_then(Self::fetch_response)
+    }
+
+    pub fn fetch_async<F, HC, RE>(
+        url: &JsonWebKeySetUrl,
+        http_client: HC,
+    ) -> impl Future<Item = Self, Error = JsonWebKeySetFetchError<RE>>
+    where
+        F: Future<Item = HttpResponse, Error = RE>,
+        HC: FnOnce(HttpRequest) -> F,
+        RE: Fail,
+    {
+        http_client(Self::fetch_request(url))
+            .map_err(JsonWebKeySetFetchError::Request)
+            .and_then(Self::fetch_response)
+    }
+
+    fn fetch_request(url: &JsonWebKeySetUrl) -> HttpRequest {
+        HttpRequest {
+            url: url.url().clone(),
+            method: Method::GET,
+            headers: vec![(ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON))]
+                .into_iter()
+                .collect(),
+            body: Vec::new(),
+        }
+    }
+
+    fn fetch_response<RE>(http_response: HttpResponse) -> Result<Self, JsonWebKeySetFetchError<RE>>
+    where
+        RE: Fail,
+    {
+        if http_response.status_code != StatusCode::OK {
+            return Err(JsonWebKeySetFetchError::Response(
+                http_response.status_code,
+                http_response.body,
+                format!("HTTP status code {}", http_response.status_code),
+            ));
+        }
+
+        check_content_type(&http_response.headers, MIME_TYPE_JSON).map_err(|err_msg| {
+            JsonWebKeySetFetchError::Response(
+                http_response.status_code,
+                http_response.body.clone(),
+                err_msg,
+            )
+        })?;
+
+        serde_json::from_slice(&http_response.body).map_err(JsonWebKeySetFetchError::Parse)
+    }
+
     pub fn keys(&self) -> &Vec<K> {
         &self.keys
     }
@@ -396,51 +459,7 @@ where
     Response(StatusCode, Vec<u8>, String),
 }
 
-new_url_type![
-    JsonWebKeySetUrl
-    impl {
-        pub fn get_keys<HC, JS, JT, JU, K, RE>(
-            &self,
-            http_client: HC,
-        ) -> Result<JsonWebKeySet<JS, JT, JU, K>, JsonWebKeySetFetchError<RE>>
-        where
-            HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
-            JS: JwsSigningAlgorithm<JT>,
-            JT: JsonWebKeyType,
-            JU: JsonWebKeyUse,
-            K: JsonWebKey<JS, JT, JU>,
-            RE: Fail,
-        {
-            let key_response =
-                http_client(
-                    HttpRequest {
-                        url: self.0.clone(),
-                        method: Method::GET,
-                        headers: vec![(ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON))]
-                            .into_iter()
-                            .collect(),
-                        body: Vec::new(),
-                    }
-                )
-                .map_err(JsonWebKeySetFetchError::Request)?;
-
-            if key_response.status_code != StatusCode::OK {
-                return Err(
-                    JsonWebKeySetFetchError::Response(
-                        key_response.status_code,
-                        key_response.body,
-                        format!("HTTP status code {}", key_response.status_code),
-                    )
-                );
-            }
-
-            check_content_type(&key_response.headers, MIME_TYPE_JSON)
-                .map_err(|err_msg| JsonWebKeySetFetchError::Response(key_response.status_code, key_response.body.clone(), err_msg))?;
-
-            serde_json::from_slice(&key_response.body).map_err(JsonWebKeySetFetchError::Parse)
-        }
-    }
-];
+new_url_type![JsonWebKeySetUrl];
 
 new_type![
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]

@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use failure::Fail;
+use futures::{Future, IntoFuture};
 use http_::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
 use http_::method::Method;
 use http_::status::StatusCode;
@@ -441,6 +442,41 @@ where
         HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
         RE: Fail,
     {
+        self.prepare_registration(registration_endpoint)
+            .and_then(|http_request| {
+                http_client(http_request).map_err(ClientRegistrationError::Request)
+            })
+            .and_then(Self::register_response)
+    }
+
+    pub fn register_async<F, HC, RE>(
+        &self,
+        registration_endpoint: &RegistrationUrl,
+        http_client: HC,
+    ) -> impl Future<
+        Item = ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+        Error = ClientRegistrationError<ET, RE>,
+    >
+    where
+        F: Future<Item = HttpResponse, Error = RE>,
+        HC: FnOnce(HttpRequest) -> F,
+        RE: Fail,
+    {
+        self.prepare_registration(registration_endpoint)
+            .into_future()
+            .and_then(|http_request| {
+                http_client(http_request).map_err(ClientRegistrationError::Request)
+            })
+            .and_then(|http_response| Self::register_response(http_response).into_future())
+    }
+
+    fn prepare_registration<RE>(
+        &self,
+        registration_endpoint: &RegistrationUrl,
+    ) -> Result<HttpRequest, ClientRegistrationError<ET, RE>>
+    where
+        RE: Fail,
+    {
         let request_json = serde_json::to_string(self.client_metadata())
             .map_err(ClientRegistrationError::Serialize)?
             .into_bytes();
@@ -458,48 +494,56 @@ where
             headers.append(header, value);
         }
 
-        let register_response = http_client(HttpRequest {
+        Ok(HttpRequest {
             url: registration_endpoint.url().clone(),
             method: Method::POST,
             headers,
             body: request_json,
         })
-        .map_err(ClientRegistrationError::Request)?;
+    }
 
+    fn register_response<RE>(
+        http_response: HttpResponse,
+    ) -> Result<
+        ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+        ClientRegistrationError<ET, RE>,
+    >
+    where
+        RE: Fail,
+    {
         // TODO: check for WWW-Authenticate response header if bearer auth was used (see
         //   https://tools.ietf.org/html/rfc6750#section-3)
-        // TODO: improve error handling (i.e., is there a body response?)
         // TODO: other necessary response validation? check spec
 
         // Spec says that a successful response SHOULD use 201 Created, and a registration error
         // condition returns (no "SHOULD") 400 Bad Request. For now, only accept these two status
         // codes. We may need to relax the success status to improve interoperability.
-        if register_response.status_code != StatusCode::CREATED
-            && register_response.status_code != StatusCode::BAD_REQUEST
+        if http_response.status_code != StatusCode::CREATED
+            && http_response.status_code != StatusCode::BAD_REQUEST
         {
             return Err(ClientRegistrationError::Response(
-                register_response.status_code,
-                register_response.body,
+                http_response.status_code,
+                http_response.body,
                 "unexpected HTTP status code".to_string(),
             ));
         }
 
-        check_content_type(&register_response.headers, MIME_TYPE_JSON).map_err(|err_msg| {
+        check_content_type(&http_response.headers, MIME_TYPE_JSON).map_err(|err_msg| {
             ClientRegistrationError::Response(
-                register_response.status_code,
-                register_response.body.clone(),
+                http_response.status_code,
+                http_response.body.clone(),
                 err_msg,
             )
         })?;
 
-        let response_body = String::from_utf8(register_response.body).map_err(|parse_error| {
+        let response_body = String::from_utf8(http_response.body).map_err(|parse_error| {
             ClientRegistrationError::Other(format!(
                 "couldn't parse response as UTF-8: {}",
                 parse_error
             ))
         })?;
 
-        if register_response.status_code == StatusCode::BAD_REQUEST {
+        if http_response.status_code == StatusCode::BAD_REQUEST {
             let response_error: StandardErrorResponse<ET> =
                 serde_json::from_str(&response_body).map_err(ClientRegistrationError::Parse)?;
             return Err(ClientRegistrationError::ServerResponse(response_error));

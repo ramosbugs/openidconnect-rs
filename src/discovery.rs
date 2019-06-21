@@ -2,6 +2,7 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use failure::Fail;
+use futures::{Future, IntoFuture};
 use http_::header::{HeaderValue, ACCEPT};
 use http_::method::Method;
 use http_::status::StatusCode;
@@ -28,74 +29,6 @@ pub trait AdditionalProviderMetadata: Clone + Debug + DeserializeOwned + Seriali
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct EmptyAdditionalProviderMetadata {}
 impl AdditionalProviderMetadata for EmptyAdditionalProviderMetadata {}
-
-#[allow(clippy::type_complexity)]
-pub fn get_provider_metadata<A, AD, CA, CN, CT, G, HC, JE, JK, JS, JT, RE, RM, RT, S>(
-    issuer_url: &IssuerUrl,
-    http_client: HC,
-) -> Result<ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>, DiscoveryError<RE>>
-where
-    A: AdditionalProviderMetadata,
-    AD: AuthDisplay,
-    CA: ClientAuthMethod,
-    CN: ClaimName,
-    CT: ClaimType,
-    G: GrantType,
-    HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JK: JweKeyManagementAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    RE: Fail,
-    RM: ResponseMode,
-    RT: ResponseType,
-    S: SubjectIdentifierType,
-{
-    let discover_url = issuer_url
-        .join(CONFIG_URL_SUFFIX)
-        .map_err(DiscoveryError::UrlParse)?;
-
-    let discover_response = http_client(HttpRequest {
-        url: discover_url,
-        method: Method::GET,
-        headers: vec![(ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON))]
-            .into_iter()
-            .collect(),
-        body: Vec::new(),
-    })
-    .map_err(DiscoveryError::Request)?;
-
-    if discover_response.status_code != StatusCode::OK {
-        return Err(DiscoveryError::Response(
-            discover_response.status_code,
-            discover_response.body,
-            format!("HTTP status code {}", discover_response.status_code),
-        ));
-    }
-
-    check_content_type(&discover_response.headers, MIME_TYPE_JSON).map_err(|err_msg| {
-        DiscoveryError::Response(
-            discover_response.status_code,
-            discover_response.body.clone(),
-            err_msg,
-        )
-    })?;
-
-    let provider_metadata = serde_json::from_slice::<
-        ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
-    >(&discover_response.body)
-    .map_err(DiscoveryError::Parse)?;
-
-    if provider_metadata.issuer() != issuer_url {
-        Err(DiscoveryError::Validation(format!(
-            "unexpected issuer URI `{}` (expected `{}`)",
-            provider_metadata.issuer().url(),
-            issuer_url.url()
-        )))
-    } else {
-        Ok(provider_metadata)
-    }
-}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[allow(clippy::type_complexity)]
@@ -352,6 +285,94 @@ where
             set_op_tos_uri -> op_tos_uri[Option<OpTosUrl>],
         }
     ];
+
+    pub fn discover<HC, RE>(
+        issuer_url: &IssuerUrl,
+        http_client: HC,
+    ) -> Result<Self, DiscoveryError<RE>>
+    where
+        HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
+        RE: Fail,
+    {
+        let discovery_url = issuer_url
+            .join(CONFIG_URL_SUFFIX)
+            .map_err(DiscoveryError::UrlParse)?;
+
+        http_client(Self::discovery_request(discovery_url))
+            .map_err(DiscoveryError::Request)
+            .and_then(|http_response| Self::discovery_response(issuer_url, http_response))
+    }
+
+    pub fn discover_async<F, HC, RE>(
+        issuer_url: IssuerUrl,
+        http_client: HC,
+    ) -> impl Future<Item = Self, Error = DiscoveryError<RE>>
+    where
+        F: Future<Item = HttpResponse, Error = RE>,
+        HC: FnOnce(HttpRequest) -> F,
+        RE: Fail,
+    {
+        issuer_url
+            .join(CONFIG_URL_SUFFIX)
+            .map_err(DiscoveryError::UrlParse)
+            .into_future()
+            .and_then(|discovery_url| {
+                http_client(Self::discovery_request(discovery_url)).map_err(DiscoveryError::Request)
+            })
+            .and_then(move |http_response| {
+                Self::discovery_response(&issuer_url, http_response).into_future()
+            })
+    }
+
+    fn discovery_request(discovery_url: url::Url) -> HttpRequest {
+        HttpRequest {
+            url: discovery_url,
+            method: Method::GET,
+            headers: vec![(ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON))]
+                .into_iter()
+                .collect(),
+            body: Vec::new(),
+        }
+    }
+
+    fn discovery_response<RE>(
+        issuer_url: &IssuerUrl,
+        discovery_response: HttpResponse,
+    ) -> Result<Self, DiscoveryError<RE>>
+    where
+        RE: Fail,
+    {
+        if discovery_response.status_code != StatusCode::OK {
+            return Err(DiscoveryError::Response(
+                discovery_response.status_code,
+                discovery_response.body,
+                format!("HTTP status code {}", discovery_response.status_code),
+            ));
+        }
+
+        check_content_type(&discovery_response.headers, MIME_TYPE_JSON).map_err(|err_msg| {
+            DiscoveryError::Response(
+                discovery_response.status_code,
+                discovery_response.body.clone(),
+                err_msg,
+            )
+        })?;
+
+        let provider_metadata = serde_json::from_slice::<
+            ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
+        >(&discovery_response.body)
+        .map_err(DiscoveryError::Parse)?;
+
+        if provider_metadata.issuer() != issuer_url {
+            Err(DiscoveryError::Validation(format!(
+                "unexpected issuer URI `{}` (expected `{}`)",
+                provider_metadata.issuer().url(),
+                issuer_url.url()
+            )))
+        } else {
+            Ok(provider_metadata)
+        }
+    }
 
     pub fn additional_metadata(&self) -> &A {
         &self.additional_metadata

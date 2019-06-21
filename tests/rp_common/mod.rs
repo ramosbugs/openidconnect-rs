@@ -113,7 +113,7 @@ pub fn issuer_url(test_id: &str) -> IssuerUrl {
 
 pub fn get_provider_metadata(test_id: &str) -> CoreProviderMetadata {
     let _issuer_url = issuer_url(test_id);
-    openidconnect::get_provider_metadata(&_issuer_url, openidconnect::reqwest::http_client).expect(
+    CoreProviderMetadata::discover(&_issuer_url, openidconnect::reqwest::http_client).expect(
         &format!("Failed to fetch provider metadata from {:?}", _issuer_url),
     )
 }

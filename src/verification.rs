@@ -720,7 +720,7 @@ where
     K: JsonWebKey<JS, JT, JU>,
 {
     jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>,
-    sub: SubjectIdentifier,
+    expected_subject: Option<SubjectIdentifier>,
     _phantom: PhantomData<JE>,
 }
 impl<'a, JE, JS, JT, JU, K> UserInfoVerifier<'a, JE, JS, JT, JU, K>
@@ -735,17 +735,17 @@ where
         client_id: ClientId,
         issuer: IssuerUrl,
         signature_keys: JsonWebKeySet<JS, JT, JU, K>,
-        subject: SubjectIdentifier,
+        expected_subject: Option<SubjectIdentifier>,
     ) -> Self {
         UserInfoVerifier {
             jwt_verifier: JwtClaimsVerifier::new(client_id, issuer, signature_keys),
-            sub: subject,
+            expected_subject,
             _phantom: PhantomData,
         }
     }
 
-    pub fn subject(&self) -> &SubjectIdentifier {
-        &self.sub
+    pub fn expected_subject(&self) -> Option<&SubjectIdentifier> {
+        self.expected_subject.as_ref()
     }
 
     pub fn require_issuer_match(mut self, iss_required: bool) -> Self {
@@ -773,14 +773,20 @@ where
         GC: GenderClaim,
     {
         let user_info = self.jwt_verifier.verified_claims(user_info_jwt)?;
-        if user_info.standard_claims.sub != self.sub {
-            return Err(ClaimsVerificationError::InvalidSubject(format!(
+        if self
+            .expected_subject
+            .iter()
+            .all(|expected_subject| user_info.standard_claims.sub == *expected_subject)
+        {
+            Ok(user_info)
+        } else {
+            Err(ClaimsVerificationError::InvalidSubject(format!(
                 "expected `{}` (found `{}`)",
-                *self.sub, *user_info.standard_claims.sub
-            )));
+                // This can only happen when self.expected_subject is not None.
+                self.expected_subject.as_ref().unwrap().as_str(),
+                user_info.standard_claims.sub.as_str()
+            )))
         }
-
-        Ok(user_info)
     }
 }
 
@@ -1700,7 +1706,7 @@ mod tests {
             client_id.clone(),
             issuer.clone(),
             CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
-            sub.clone(),
+            Some(sub.clone()),
         );
 
         let json_claims = "{\
@@ -1712,7 +1718,7 @@ mod tests {
         assert_eq!(
             CoreUserInfoClaims::from_json::<super::super::reqwest::Error>(
                 json_claims.as_bytes(),
-                &sub
+                Some(&sub)
             )
             .expect("verification should succeed")
             .name()
@@ -1725,7 +1731,7 @@ mod tests {
         // Invalid subject
         match CoreUserInfoClaims::from_json::<super::super::reqwest::Error>(
             json_claims.as_bytes(),
-            &SubjectIdentifier::new("wrong_subject".to_string()),
+            Some(&SubjectIdentifier::new("wrong_subject".to_string())),
         ) {
             Err(UserInfoError::ClaimsVerification(ClaimsVerificationError::InvalidSubject(_))) => {}
             other => panic!("unexpected result: {:?}", other),
@@ -1775,7 +1781,7 @@ mod tests {
             client_id.clone(),
             IssuerUrl::new("https://attacker.com".to_string()).unwrap(),
             CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
-            sub.clone(),
+            Some(sub.clone()),
         )) {
             Err(ClaimsVerificationError::InvalidIssuer(_)) => {}
             other => panic!("unexpected result: {:?}", other),
@@ -1789,7 +1795,7 @@ mod tests {
                     client_id.clone(),
                     IssuerUrl::new("https://attacker.com".to_string()).unwrap(),
                     CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
-                    sub.clone(),
+                    Some(sub.clone()),
                 )
                 .require_issuer_match(false),
             )
@@ -1800,7 +1806,7 @@ mod tests {
             ClientId::new("wrong_client".to_string()),
             issuer.clone(),
             CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
-            sub.clone(),
+            Some(sub.clone()),
         )) {
             Err(ClaimsVerificationError::InvalidAudience(_)) => {}
             other => panic!("unexpected result: {:?}", other),
@@ -1814,7 +1820,7 @@ mod tests {
                     ClientId::new("wrong_client".to_string()),
                     issuer.clone(),
                     CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
-                    sub.clone(),
+                    Some(sub.clone()),
                 )
                 .require_audience_match(false),
             )

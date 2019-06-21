@@ -27,7 +27,7 @@ use openidconnect::Nonce;
 use openidconnect::{
     AccessToken, AuthType, AuthenticationFlow, AuthorizationCode, ClaimsVerificationError,
     CsrfToken, OAuth2TokenResponse, RequestTokenError, Scope, SignatureVerificationError,
-    SubjectIdentifier, UserInfoError,
+    UserInfoError,
 };
 
 #[macro_use]
@@ -201,10 +201,11 @@ impl TestState {
     }
 
     pub fn jwks(&self) -> CoreJsonWebKeySet {
-        self.provider_metadata
-            .jwks_uri()
-            .get_keys(openidconnect::reqwest::http_client)
-            .panic_if_fail("failed to fetch JWK set")
+        CoreJsonWebKeySet::fetch(
+            self.provider_metadata.jwks_uri(),
+            openidconnect::reqwest::http_client,
+        )
+        .panic_if_fail("failed to fetch JWK set")
     }
 
     pub fn set_auth_type(mut self, auth_type: AuthType) -> Self {
@@ -212,47 +213,36 @@ impl TestState {
         self
     }
 
-    pub fn user_info_verifier(
-        &self,
-        jwks: CoreJsonWebKeySet,
-        sub: SubjectIdentifier,
-    ) -> CoreUserInfoVerifier {
-        CoreUserInfoVerifier::new(
-            self.registration_response.client_id().clone(),
-            self.provider_metadata.issuer().clone(),
-            jwks,
-            sub,
-        )
-    }
-
     pub fn user_info_claims(&self) -> CoreUserInfoClaims {
-        let verifier =
-            self.user_info_verifier(self.jwks(), self.id_token_claims().subject().clone());
-        self.provider_metadata
-            .userinfo_endpoint()
-            .unwrap()
-            .get_user_info(
-                self.access_token(),
-                false,
-                &verifier,
+        let verifier: CoreUserInfoVerifier = self
+            .client
+            .user_info_verifier(
+                Some(self.id_token_claims().subject().clone()),
                 openidconnect::reqwest::http_client,
             )
+            .panic_if_fail("failed to get UserInfo");
+        self.client
+            .user_info(self.access_token().to_owned(), verifier)
+            .unwrap()
+            .require_signed_response(false)
+            .request(openidconnect::reqwest::http_client)
             .panic_if_fail("failed to get UserInfo")
     }
 
     pub fn user_info_claims_failure(&self) -> UserInfoError<openidconnect::reqwest::Error> {
-        let verifier =
-            self.user_info_verifier(self.jwks(), self.id_token_claims().subject().clone());
-        let user_info_result: Result<CoreUserInfoClaims, _> = self
-            .provider_metadata
-            .userinfo_endpoint()
-            .unwrap()
-            .get_user_info(
-                self.access_token(),
-                false,
-                &verifier,
+        let verifier: CoreUserInfoVerifier = self
+            .client
+            .user_info_verifier(
+                Some(self.id_token_claims().subject().clone()),
                 openidconnect::reqwest::http_client,
-            );
+            )
+            .panic_if_fail("failed to get UserInfo");
+        let user_info_result: Result<CoreUserInfoClaims, _> = self
+            .client
+            .user_info(self.access_token().to_owned(), verifier)
+            .unwrap()
+            .require_signed_response(false)
+            .request(openidconnect::reqwest::http_client);
         match user_info_result {
             Err(err) => err,
             _ => panic!("claims verification succeeded but was expected to fail"),
@@ -588,26 +578,23 @@ fn rp_userinfo_sig() {
     let id_token_claims = test_state.id_token_claims();
     log_debug!("ID token: {:?}", id_token_claims);
 
-    let verifier = test_state
+    let verifier: CoreUserInfoVerifier = test_state
+        .client
         .user_info_verifier(
-            test_state.jwks(),
-            test_state.id_token_claims().subject().clone(),
+            Some(id_token_claims.subject().clone()),
+            openidconnect::reqwest::http_client,
         )
+        .panic_if_fail("failed to get UserInfo")
         // For some reason, the test suite omits these claims even though the Core spec says
         // that the RP SHOULD verify these.
         .require_audience_match(false)
         .require_issuer_match(false);
     let user_info_claims: CoreUserInfoClaims = test_state
-        .provider_metadata
-        .userinfo_endpoint()
+        .client
+        .user_info(test_state.access_token().to_owned(), verifier)
         .unwrap()
-        .get_user_info(
-            test_state.access_token(),
-            true,
-            &verifier,
-            openidconnect::reqwest::http_client,
-        )
-        .panic_if_fail("failed to get user info");
+        .request(openidconnect::reqwest::http_client)
+        .panic_if_fail("failed to get UserInfo");
 
     log_debug!("UserInfo response: {:?}", user_info_claims);
     log_info!("SUCCESS");

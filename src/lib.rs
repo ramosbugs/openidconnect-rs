@@ -10,6 +10,7 @@
 extern crate base64;
 extern crate chrono;
 extern crate failure;
+extern crate futures;
 #[macro_use]
 extern crate failure_derive;
 extern crate http as http_;
@@ -52,8 +53,7 @@ pub use claims::{
     AdditionalClaims, AddressClaim, EmptyAdditionalClaims, GenderClaim, StandardClaims,
 };
 pub use discovery::{
-    get_provider_metadata, AdditionalProviderMetadata, DiscoveryError,
-    EmptyAdditionalProviderMetadata, ProviderMetadata,
+    AdditionalProviderMetadata, DiscoveryError, EmptyAdditionalProviderMetadata, ProviderMetadata,
 };
 pub use id_token::IdTokenFields;
 pub use id_token::{IdToken, IdTokenClaims};
@@ -79,7 +79,9 @@ pub use types::{
     RequestUrl, ResponseMode, ResponseType, ResponseTypes, SectorIdentifierUrl, ServiceDocUrl,
     SigningError, StreetAddress, SubjectIdentifier, SubjectIdentifierType, ToSUrl,
 };
-pub use user_info::{UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoUrl};
+pub use user_info::{
+    UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoRequest, UserInfoUrl,
+};
 use verification::{AudiencesClaim, IssuerClaim};
 pub use verification::{
     ClaimsVerificationError, IdTokenVerifier, NonceVerifier, SignatureVerificationError,
@@ -91,7 +93,10 @@ pub use verification::{
 #[macro_use]
 mod macros;
 
+/// Baseline OpenID Connect implementation and types.
 pub mod core;
+
+/// OpenID Connect Dynamic Client Registration.
 pub mod registration;
 
 // Private modules since we may move types between different modules; these are exported publicly
@@ -146,6 +151,7 @@ pub enum AuthenticationFlow<RT: ResponseType> {
     Hybrid(Vec<RT>),
 }
 
+/// OpenID Connect client.
 #[derive(Clone, Debug)]
 pub struct Client<AC, AD, AM, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
 where
@@ -172,6 +178,7 @@ where
     oauth2_client: oauth2::Client<TE, TR, TT>,
     client_id: ClientId,
     client_secret: Option<ClientSecret>,
+    issuer: IssuerUrl,
     #[allow(clippy::type_complexity)]
     provider_metadata: Option<ProviderMetadata<AM, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>>,
     _phantom: PhantomData<(AC, CA, CN, CT, G, GC, JE, JK, JS, JT, RM, RT, P, S)>,
@@ -199,9 +206,11 @@ where
     TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
     TT: TokenType,
 {
+    /// Initializes an OpenID Connect client.
     pub fn new(
         client_id: ClientId,
         client_secret: Option<ClientSecret>,
+        issuer: IssuerUrl,
         auth_url: AuthUrl,
         token_url: Option<TokenUrl>,
     ) -> Self {
@@ -215,6 +224,7 @@ where
             oauth2_client,
             client_id,
             client_secret,
+            issuer,
             provider_metadata: None,
             _phantom: PhantomData,
         }
@@ -245,7 +255,7 @@ where
             RM,
             RT,
             S,
-        > = discovery::get_provider_metadata(issuer_url, http_client)?;
+        > = ProviderMetadata::discover(issuer_url, http_client)?;
 
         let oauth2_client = oauth2::Client::new(
             client_id.clone(),
@@ -257,6 +267,7 @@ where
             oauth2_client,
             client_id,
             client_secret,
+            issuer: provider_metadata.issuer().to_owned(),
             provider_metadata: Some(provider_metadata),
             _phantom: PhantomData,
         })
@@ -298,6 +309,7 @@ where
             oauth2_client,
             client_id: registration_response.client_id().clone(),
             client_secret: registration_response.client_secret().cloned(),
+            issuer: provider_metadata.issuer().to_owned(),
             provider_metadata: Some(provider_metadata),
             _phantom: PhantomData,
         }
@@ -336,7 +348,7 @@ where
         let provider_metadata = self.provider_metadata.as_ref().ok_or_else(|| {
             JsonWebKeySetFetchError::Other("no provider metadata present".to_string())
         })?;
-        let signature_keys = provider_metadata.jwks_uri().get_keys(http_client)?;
+        let signature_keys = JsonWebKeySet::fetch(provider_metadata.jwks_uri(), http_client)?;
         if let Some(ref client_secret) = self.client_secret {
             Ok(IdTokenVerifier::new_private_client(
                 self.client_id.clone(),
@@ -406,6 +418,54 @@ where
         'a: 'b,
     {
         self.oauth2_client.exchange_refresh_token(refresh_token)
+    }
+
+    pub fn user_info_verifier<'a, HC, JU, K, RE>(
+        &self,
+        expected_subject: Option<SubjectIdentifier>,
+        http_client: HC,
+    ) -> Result<UserInfoVerifier<'a, JE, JS, JT, JU, K>, JsonWebKeySetFetchError<RE>>
+    where
+        HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
+        JU: JsonWebKeyUse,
+        K: JsonWebKey<JS, JT, JU>,
+        RE: Fail,
+    {
+        let provider_metadata = self.provider_metadata.as_ref().ok_or_else(|| {
+            JsonWebKeySetFetchError::Other("no provider metadata present".to_string())
+        })?;
+        let signature_keys = JsonWebKeySet::fetch(provider_metadata.jwks_uri(), http_client)?;
+        Ok(UserInfoVerifier::new(
+            self.client_id.clone(),
+            self.issuer.clone(),
+            signature_keys,
+            expected_subject,
+        ))
+    }
+
+    pub fn user_info<JU, K>(
+        &self,
+        access_token: AccessToken,
+        signed_response_verifier: UserInfoVerifier<'static, JE, JS, JT, JU, K>,
+        // FIXME: Remove error response once we remove provider_metadata from Client.
+    ) -> Result<UserInfoRequest<JE, JS, JT, JU, K>, String>
+    where
+        JU: JsonWebKeyUse,
+        K: JsonWebKey<JS, JT, JU>,
+    {
+        let provider_metadata = self
+            .provider_metadata
+            .as_ref()
+            .ok_or_else(|| "no provider metadata present".to_string())?;
+        Ok(UserInfoRequest {
+            url: provider_metadata
+                .userinfo_endpoint()
+                .ok_or_else(|| "no userinfo endpoint configured".to_string())?
+                .to_owned(),
+            access_token,
+            require_signed_response: true,
+            signed_response_verifier,
+        })
     }
 
     ///
@@ -664,12 +724,14 @@ mod tests {
     use super::core::CoreAuthenticationFlow;
     use super::core::{CoreAuthDisplay, CoreAuthPrompt, CoreClient, CoreIdToken, CoreResponseType};
     use super::{AuthenticationContextClass, AuthenticationFlow, LanguageTag, LoginHint, Nonce};
+    use IssuerUrl;
 
     fn new_client() -> CoreClient {
         color_backtrace::install();
         CoreClient::new(
             ClientId::new("aaa".to_string()),
             Some(ClientSecret::new("bbb".to_string())),
+            IssuerUrl::new("https://example".to_string()).unwrap(),
             AuthUrl::new(Url::parse("https://example/authorize").unwrap()),
             Some(TokenUrl::new(Url::parse("https://example/token").unwrap())),
         )

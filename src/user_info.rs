@@ -3,6 +3,7 @@ use std::str;
 
 use chrono::{DateTime, Utc};
 use failure::Fail;
+use futures::{Future, IntoFuture};
 use http_::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
 use http_::method::Method;
 use http_::status::StatusCode;
@@ -25,6 +26,133 @@ use super::{
     StandardClaims, SubjectIdentifier,
 };
 
+pub struct UserInfoRequest<JE, JS, JT, JU, K>
+where
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+{
+    pub(super) url: UserInfoUrl,
+    pub(super) access_token: AccessToken,
+    pub(super) require_signed_response: bool,
+    pub(super) signed_response_verifier: UserInfoVerifier<'static, JE, JS, JT, JU, K>,
+}
+impl<JE, JS, JT, JU, K> UserInfoRequest<JE, JS, JT, JU, K>
+where
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+{
+    pub fn request<AC, GC, HC, RE>(
+        self,
+        http_client: HC,
+    ) -> Result<UserInfoClaims<AC, GC>, UserInfoError<RE>>
+    where
+        AC: AdditionalClaims,
+        GC: GenderClaim,
+        HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
+        RE: Fail,
+    {
+        http_client(self.prepare_request())
+            .map_err(UserInfoError::Request)
+            .and_then(|http_response| self.user_info_response(http_response))
+    }
+
+    pub fn request_async<AC, C, F, GC, HC, RE>(
+        self,
+        http_client: C,
+    ) -> impl Future<Item = UserInfoClaims<AC, GC>, Error = UserInfoError<RE>>
+    where
+        AC: AdditionalClaims,
+        C: FnOnce(HttpRequest) -> F,
+        F: Future<Item = HttpResponse, Error = RE>,
+        GC: GenderClaim,
+        HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
+        RE: Fail,
+    {
+        http_client(self.prepare_request())
+            .map_err(UserInfoError::Request)
+            .and_then(|http_response| self.user_info_response(http_response).into_future())
+    }
+
+    fn prepare_request(&self) -> HttpRequest {
+        let (auth_header, auth_value) = auth_bearer(&self.access_token);
+        HttpRequest {
+            url: self.url.url().clone(),
+            method: Method::GET,
+            headers: vec![
+                (ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON)),
+                (auth_header, auth_value),
+            ]
+            .into_iter()
+            .collect(),
+            body: Vec::new(),
+        }
+    }
+
+    fn user_info_response<AC, GC, RE>(
+        self,
+        http_response: HttpResponse,
+    ) -> Result<UserInfoClaims<AC, GC>, UserInfoError<RE>>
+    where
+        AC: AdditionalClaims,
+        GC: GenderClaim,
+        RE: Fail,
+    {
+        if http_response.status_code != StatusCode::OK {
+            return Err(UserInfoError::Response(
+                http_response.status_code,
+                http_response.body.clone(),
+                "unexpected HTTP status code".to_string(),
+            ));
+        }
+
+        match http_response
+            .headers
+            .get(CONTENT_TYPE)
+            .map(ToOwned::to_owned)
+            .unwrap_or_else(|| HeaderValue::from_static(MIME_TYPE_JSON))
+        {
+            ref content_type if content_type == HeaderValue::from_static(MIME_TYPE_JSON) => {
+                if self.require_signed_response {
+                    return Err(UserInfoError::ClaimsVerification(
+                        ClaimsVerificationError::NoSignature,
+                    ));
+                }
+                UserInfoClaims::from_json(
+                    &http_response.body,
+                    self.signed_response_verifier.expected_subject(),
+                )
+            }
+            ref content_type if content_type == HeaderValue::from_static(MIME_TYPE_JWT) => {
+                let jwt_str = String::from_utf8(http_response.body).map_err(|_| {
+                    UserInfoError::Other("response body has invalid UTF-8 encoding".to_string())
+                })?;
+                serde_json::from_value::<UserInfoJsonWebToken<AC, GC, JE, JS, JT>>(
+                    serde_json::Value::String(jwt_str),
+                )
+                .map_err(UserInfoError::Parse)?
+                .claims(&self.signed_response_verifier)
+                .map_err(UserInfoError::ClaimsVerification)
+            }
+            ref content_type => Err(UserInfoError::Response(
+                http_response.status_code,
+                http_response.body,
+                format!("unexpected response Content-Type: `{:?}`", content_type),
+            )),
+        }
+    }
+
+    pub fn require_signed_response(mut self, require_signed_response: bool) -> Self {
+        self.require_signed_response = require_signed_response;
+        self
+    }
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub struct UserInfoClaims<AC: AdditionalClaims, GC: GenderClaim>(UserInfoClaimsImpl<AC, GC>);
 impl<AC, GC> UserInfoClaims<AC, GC>
@@ -43,7 +171,7 @@ where
 
     pub fn from_json<RE>(
         user_info_json: &[u8],
-        subject: &SubjectIdentifier,
+        expected_subject: Option<&SubjectIdentifier>,
     ) -> Result<Self, UserInfoError<RE>>
     where
         RE: Fail,
@@ -53,13 +181,18 @@ where
 
         // This is the only verification we need to do for JSON-based user info claims, so don't
         // bother with the complexity of a separate verifier object.
-        if user_info.standard_claims.sub == *subject {
+        if expected_subject
+            .iter()
+            .all(|expected_subject| user_info.standard_claims.sub == **expected_subject)
+        {
             Ok(Self(user_info))
         } else {
             Err(UserInfoError::ClaimsVerification(
                 ClaimsVerificationError::InvalidSubject(format!(
                     "expected `{}` (found `{}`)",
-                    **subject, *user_info.standard_claims.sub,
+                    // This can only happen when expected_subject is not None.
+                    expected_subject.unwrap().as_str(),
+                    user_info.standard_claims.sub.as_str(),
                 )),
             ))
         }
@@ -218,96 +351,7 @@ where
     }
 }
 
-new_url_type![
-    UserInfoUrl
-    impl {
-        pub fn get_user_info<AC, GC, HC, JE, JS, JT, JU, K, RE>(
-            &self,
-            access_token: &AccessToken,
-            require_signed_response: bool,
-            signed_response_verifier: &UserInfoVerifier<JE, JS, JT, JU, K>,
-            http_client: HC,
-        ) -> Result<UserInfoClaims<AC, GC>, UserInfoError<RE>>
-        where
-            AC: AdditionalClaims,
-            GC: GenderClaim,
-            HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
-            JE: JweContentEncryptionAlgorithm<JT>,
-            JS: JwsSigningAlgorithm<JT>,
-            JT: JsonWebKeyType,
-            JU: JsonWebKeyUse,
-            K: JsonWebKey<JS, JT, JU>,
-            RE: Fail,
-        {
-            let (auth_header, auth_value) = auth_bearer(access_token);
-            let user_info_response =
-                http_client(
-                    HttpRequest {
-                        url: self.0.clone(),
-                        method: Method::GET,
-                        headers: vec![
-                            (ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON)),
-                            (auth_header, auth_value),
-                        ].into_iter().collect(),
-                        body: Vec::new(),
-                    }
-                )
-                .map_err(UserInfoError::Request)?;
-
-            if user_info_response.status_code != StatusCode::OK {
-                return Err(
-                    UserInfoError::Response(
-                        user_info_response.status_code,
-                        user_info_response.body.clone(),
-                        "unexpected HTTP status code".to_string()
-                    )
-                );
-            }
-
-            match user_info_response
-                .headers
-                .get(CONTENT_TYPE)
-                .map(ToOwned::to_owned)
-                .unwrap_or_else(|| HeaderValue::from_static(MIME_TYPE_JSON))
-            {
-               ref content_type if content_type == HeaderValue::from_static(MIME_TYPE_JSON) => {
-                    if require_signed_response {
-                        return Err(
-                            UserInfoError::ClaimsVerification(ClaimsVerificationError::NoSignature)
-                        );
-                    }
-                    UserInfoClaims::from_json(
-                        &user_info_response.body,
-                        signed_response_verifier.subject(),
-                    )
-                }
-                ref content_type if content_type == HeaderValue::from_static(MIME_TYPE_JWT) => {
-                    let jwt_str =
-                        String::from_utf8(user_info_response.body)
-                            .map_err(|_|
-                                UserInfoError::Other(
-                                    "response body has invalid UTF-8 encoding".to_string()
-                                )
-                            )?;
-                    serde_json::from_value::<UserInfoJsonWebToken<AC, GC, JE, JS, JT>>(
-                        serde_json::Value::String(jwt_str)
-                    )
-                    .map_err(UserInfoError::Parse)?
-                    .claims(signed_response_verifier)
-                    .map_err(UserInfoError::ClaimsVerification)
-                }
-                ref content_type =>
-                    Err(
-                        UserInfoError::Response(
-                            user_info_response.status_code,
-                            user_info_response.body,
-                            format!("unexpected response Content-Type: `{:?}`", content_type)
-                        )
-                    ),
-            }
-        }
-    }
-];
+new_url_type![UserInfoUrl];
 
 #[derive(Debug, Fail)]
 pub enum UserInfoError<RE>
