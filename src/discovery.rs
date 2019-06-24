@@ -15,10 +15,10 @@ use url;
 use super::http::{check_content_type, MIME_TYPE_JSON};
 use super::types::{
     AuthDisplay, AuthenticationContextClass, ClaimName, ClaimType, ClientAuthMethod, GrantType,
-    IssuerUrl, JsonWebKeySetUrl, JsonWebKeyType, JweContentEncryptionAlgorithm,
-    JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag, OpPolicyUrl, OpTosUrl,
-    RegistrationUrl, ResponseMode, ResponseType, ResponseTypes, ServiceDocUrl,
-    SubjectIdentifierType,
+    IssuerUrl, JsonWebKey, JsonWebKeySet, JsonWebKeySetUrl, JsonWebKeyType, JsonWebKeyUse,
+    JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag,
+    OpPolicyUrl, OpTosUrl, RegistrationUrl, ResponseMode, ResponseType, ResponseTypes,
+    ServiceDocUrl, SubjectIdentifierType,
 };
 use super::{HttpRequest, HttpResponse, UserInfoUrl, CONFIG_URL_SUFFIX};
 
@@ -32,7 +32,7 @@ impl AdditionalProviderMetadata for EmptyAdditionalProviderMetadata {}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[allow(clippy::type_complexity)]
-pub struct ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>
+pub struct ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RT, S>
 where
     A: AdditionalProviderMetadata,
     AD: AuthDisplay,
@@ -44,6 +44,8 @@ where
     JK: JweKeyManagementAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
     RM: ResponseMode,
     RT: ResponseType,
     S: SubjectIdentifierType,
@@ -55,6 +57,8 @@ where
     #[serde(skip_serializing_if = "Option::is_none")]
     userinfo_endpoint: Option<UserInfoUrl>,
     jwks_uri: JsonWebKeySetUrl,
+    #[serde(default = "JsonWebKeySet::default", skip)]
+    jwks: JsonWebKeySet<JS, JT, JU, K>,
     #[serde(skip_serializing_if = "Option::is_none")]
     registration_endpoint: Option<RegistrationUrl>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -167,8 +171,8 @@ where
     #[serde(skip)]
     _phantom_jt: PhantomData<JT>,
 }
-impl<A, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>
-    ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>
+impl<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RT, S>
+    ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RT, S>
 where
     A: AdditionalProviderMetadata,
     AD: AuthDisplay,
@@ -180,6 +184,8 @@ where
     JK: JweKeyManagementAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
     RM: ResponseMode,
     RT: ResponseType,
     S: SubjectIdentifierType,
@@ -199,6 +205,7 @@ where
             token_endpoint: None,
             userinfo_endpoint: None,
             jwks_uri,
+            jwks: JsonWebKeySet::new(Vec::new()),
             registration_endpoint: None,
             scopes_supported: None,
             response_types_supported,
@@ -241,6 +248,7 @@ where
             set_token_endpoint -> token_endpoint[Option<TokenUrl>],
             set_userinfo_endpoint -> userinfo_endpoint[Option<UserInfoUrl>],
             set_jwks_uri -> jwks_uri[JsonWebKeySetUrl],
+            set_jwks -> jwks[JsonWebKeySet<JS, JT, JU, K>],
             set_registration_endpoint -> registration_endpoint[Option<RegistrationUrl>],
             set_scopes_supported -> scopes_supported[Option<Vec<Scope>>],
             set_response_types_supported -> response_types_supported[Vec<ResponseTypes<RT>>],
@@ -291,7 +299,7 @@ where
         http_client: HC,
     ) -> Result<Self, DiscoveryError<RE>>
     where
-        HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
+        HC: Fn(HttpRequest) -> Result<HttpResponse, RE>,
         RE: Fail,
     {
         let discovery_url = issuer_url
@@ -301,6 +309,12 @@ where
         http_client(Self::discovery_request(discovery_url))
             .map_err(DiscoveryError::Request)
             .and_then(|http_response| Self::discovery_response(issuer_url, http_response))
+            .and_then(|provider_metadata| {
+                JsonWebKeySet::fetch(provider_metadata.jwks_uri(), http_client).map(|jwks| Self {
+                    jwks,
+                    ..provider_metadata
+                })
+            })
     }
 
     pub fn discover_async<F, HC, RE>(
@@ -309,18 +323,30 @@ where
     ) -> impl Future<Item = Self, Error = DiscoveryError<RE>>
     where
         F: Future<Item = HttpResponse, Error = RE>,
-        HC: FnOnce(HttpRequest) -> F,
+        HC: Fn(HttpRequest) -> F + 'static,
         RE: Fail,
     {
         issuer_url
             .join(CONFIG_URL_SUFFIX)
             .map_err(DiscoveryError::UrlParse)
             .into_future()
-            .and_then(|discovery_url| {
-                http_client(Self::discovery_request(discovery_url)).map_err(DiscoveryError::Request)
+            .and_then(move |discovery_url| {
+                http_client(Self::discovery_request(discovery_url))
+                    .map_err(DiscoveryError::Request)
+                    .map(|http_response| (http_response, http_client))
             })
-            .and_then(move |http_response| {
-                Self::discovery_response(&issuer_url, http_response).into_future()
+            .and_then(move |(http_response, http_client)| {
+                Self::discovery_response(&issuer_url, http_response)
+                    .into_future()
+                    .map(|provider_metadata| (provider_metadata, http_client))
+            })
+            .and_then(|(provider_metadata, http_client)| {
+                JsonWebKeySet::fetch_async(provider_metadata.jwks_uri(), http_client).map(|jwks| {
+                    Self {
+                        jwks,
+                        ..provider_metadata
+                    }
+                })
             })
     }
 
@@ -358,10 +384,8 @@ where
             )
         })?;
 
-        let provider_metadata = serde_json::from_slice::<
-            ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
-        >(&discovery_response.body)
-        .map_err(DiscoveryError::Parse)?;
+        let provider_metadata = serde_json::from_slice::<Self>(&discovery_response.body)
+            .map_err(DiscoveryError::Parse)?;
 
         if provider_metadata.issuer() != issuer_url {
             Err(DiscoveryError::Validation(format!(

@@ -29,7 +29,9 @@ use std::process::exit;
 use failure::Fail;
 use url::Url;
 
-use openidconnect::core::{CoreClient, CoreIdTokenClaims, CoreIdTokenVerifier};
+use openidconnect::core::{
+    CoreClient, CoreIdTokenClaims, CoreIdTokenVerifier, CoreProviderMetadata, CoreResponseType,
+};
 use openidconnect::reqwest::http_client;
 use openidconnect::{
     AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce,
@@ -60,17 +62,19 @@ fn main() {
     let issuer_url =
         IssuerUrl::new("https://accounts.google.com".to_string()).expect("Invalid issuer URL");
 
+    // Fetch Google's OpenID Connect discovery document.
+    let provider_metadata = CoreProviderMetadata::discover(&issuer_url, http_client)
+        .unwrap_or_else(|err| {
+            handle_error(&err, "Failed to discover OpenID Provider");
+            unreachable!();
+        });
+
     // Set up the config for the Google OAuth2 process.
-    let client = CoreClient::discover(
+    let client = CoreClient::from_provider_metadata(
+        provider_metadata,
         google_client_id,
         Some(google_client_secret),
-        &issuer_url,
-        http_client,
     )
-    .unwrap_or_else(|err| {
-        handle_error(&err, "Failed to discover OpenID Provider");
-        unreachable!();
-    })
     // This example will be running its own server at localhost:8080.
     // See below for the server implementation.
     .set_redirect_uri(RedirectUrl::new(
@@ -80,7 +84,7 @@ fn main() {
     // Generate the authorization URL to which we'll redirect the user.
     let (authorize_url, csrf_state, nonce) = client
         .authorize_url(
-            AuthenticationFlow::AuthorizationCode,
+            AuthenticationFlow::<CoreResponseType>::AuthorizationCode,
             CsrfToken::new_random,
             Nonce::new_random,
         )
@@ -162,11 +166,7 @@ fn main() {
             );
             println!("Google returned scopes: {:?}", token_response.scopes());
 
-            let id_token_verifier: CoreIdTokenVerifier =
-                client.id_token_verifier(http_client).unwrap_or_else(|err| {
-                    handle_error(&err, "Failed to create ID token verifier");
-                    unreachable!();
-                });
+            let id_token_verifier: CoreIdTokenVerifier = client.id_token_verifier();
             let id_token_claims: &CoreIdTokenClaims = token_response
                 .extra_fields()
                 .id_token()

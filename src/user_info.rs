@@ -151,6 +151,20 @@ where
         self.require_signed_response = require_signed_response;
         self
     }
+
+    pub fn require_issuer_match(mut self, iss_required: bool) -> Self {
+        self.signed_response_verifier = self
+            .signed_response_verifier
+            .require_issuer_match(iss_required);
+        self
+    }
+
+    pub fn require_audience_match(mut self, aud_required: bool) -> Self {
+        self.signed_response_verifier = self
+            .signed_response_verifier
+            .require_audience_match(aud_required);
+        self
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -369,3 +383,7 @@ where
     #[fail(display = "Other error: {}", _0)]
     Other(String),
 }
+
+#[derive(Debug, Fail)]
+#[fail(display = "No user info endpoint specified")]
+pub struct NoUserInfoEndpoint;

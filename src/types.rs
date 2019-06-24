@@ -22,7 +22,7 @@ use url;
 use url::Url;
 
 use super::http::{check_content_type, MIME_TYPE_JSON};
-use super::{HttpRequest, HttpResponse, SignatureVerificationError};
+use super::{DiscoveryError, HttpRequest, HttpResponse, SignatureVerificationError};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct LocalizedClaim<T>(HashMap<Option<LanguageTag>, T>);
@@ -124,7 +124,7 @@ pub enum SigningError {
     Other(String),
 }
 
-pub trait JsonWebKey<JS, JT, JU>: Debug + DeserializeOwned + Serialize + 'static
+pub trait JsonWebKey<JS, JT, JU>: Clone + Debug + DeserializeOwned + Serialize + 'static
 where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
@@ -346,7 +346,7 @@ new_type![
     JsonWebKeyId(String)
 ];
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
 pub struct JsonWebKeySet<JS, JT, JU, K>
 where
     JS: JwsSigningAlgorithm<JT>,
@@ -382,27 +382,27 @@ where
     pub fn fetch<HC, RE>(
         url: &JsonWebKeySetUrl,
         http_client: HC,
-    ) -> Result<Self, JsonWebKeySetFetchError<RE>>
+    ) -> Result<Self, DiscoveryError<RE>>
     where
         HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
         RE: Fail,
     {
         http_client(Self::fetch_request(url))
-            .map_err(JsonWebKeySetFetchError::Request)
+            .map_err(DiscoveryError::Request)
             .and_then(Self::fetch_response)
     }
 
     pub fn fetch_async<F, HC, RE>(
         url: &JsonWebKeySetUrl,
         http_client: HC,
-    ) -> impl Future<Item = Self, Error = JsonWebKeySetFetchError<RE>>
+    ) -> impl Future<Item = Self, Error = DiscoveryError<RE>>
     where
         F: Future<Item = HttpResponse, Error = RE>,
         HC: FnOnce(HttpRequest) -> F,
         RE: Fail,
     {
         http_client(Self::fetch_request(url))
-            .map_err(JsonWebKeySetFetchError::Request)
+            .map_err(DiscoveryError::Request)
             .and_then(Self::fetch_response)
     }
 
@@ -417,12 +417,12 @@ where
         }
     }
 
-    fn fetch_response<RE>(http_response: HttpResponse) -> Result<Self, JsonWebKeySetFetchError<RE>>
+    fn fetch_response<RE>(http_response: HttpResponse) -> Result<Self, DiscoveryError<RE>>
     where
         RE: Fail,
     {
         if http_response.status_code != StatusCode::OK {
-            return Err(JsonWebKeySetFetchError::Response(
+            return Err(DiscoveryError::Response(
                 http_response.status_code,
                 http_response.body,
                 format!("HTTP status code {}", http_response.status_code),
@@ -430,33 +430,41 @@ where
         }
 
         check_content_type(&http_response.headers, MIME_TYPE_JSON).map_err(|err_msg| {
-            JsonWebKeySetFetchError::Response(
+            DiscoveryError::Response(
                 http_response.status_code,
                 http_response.body.clone(),
                 err_msg,
             )
         })?;
 
-        serde_json::from_slice(&http_response.body).map_err(JsonWebKeySetFetchError::Parse)
+        serde_json::from_slice(&http_response.body).map_err(DiscoveryError::Parse)
     }
 
     pub fn keys(&self) -> &Vec<K> {
         &self.keys
     }
 }
-#[derive(Debug, Fail)]
-pub enum JsonWebKeySetFetchError<RE>
+impl<JS, JT, JU, K> Clone for JsonWebKeySet<JS, JT, JU, K>
 where
-    RE: Fail,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
 {
-    #[fail(display = "Other error: {}", _0)]
-    Other(String),
-    #[fail(display = "Failed to parse server response")]
-    Parse(#[cause] serde_json::Error),
-    #[fail(display = "Request failed")]
-    Request(#[cause] RE),
-    #[fail(display = "Server returned invalid response: {}", _2)]
-    Response(StatusCode, Vec<u8>, String),
+    fn clone(&self) -> Self {
+        Self::new(self.keys.clone())
+    }
+}
+impl<JS, JT, JU, K> Default for JsonWebKeySet<JS, JT, JU, K>
+where
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+{
+    fn default() -> Self {
+        Self::new(Vec::new())
+    }
 }
 
 new_url_type![JsonWebKeySetUrl];

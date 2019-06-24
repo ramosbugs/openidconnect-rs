@@ -21,7 +21,7 @@ use openidconnect::core::{
     CoreClient, CoreClientAuthMethod, CoreClientRegistrationRequest,
     CoreClientRegistrationResponse, CoreIdToken, CoreIdTokenClaims, CoreIdTokenVerifier,
     CoreJsonWebKeySet, CoreJwsSigningAlgorithm, CoreProviderMetadata, CoreResponseType,
-    CoreUserInfoClaims, CoreUserInfoVerifier,
+    CoreUserInfoClaims,
 };
 use openidconnect::Nonce;
 use openidconnect::{
@@ -56,9 +56,10 @@ impl TestState {
         let registration_response = register_client(&provider_metadata, reg_request_fn);
 
         let redirect_uri = registration_response.redirect_uris()[0].clone();
-        let client: CoreClient = CoreClient::from_dynamic_registration(
+        let client: CoreClient = CoreClient::from_provider_metadata(
             provider_metadata.clone(),
-            &registration_response,
+            registration_response.client_id().to_owned(),
+            registration_response.client_secret().cloned(),
         )
         .set_redirect_uri(redirect_uri);
 
@@ -214,15 +215,11 @@ impl TestState {
     }
 
     pub fn user_info_claims(&self) -> CoreUserInfoClaims {
-        let verifier: CoreUserInfoVerifier = self
-            .client
-            .user_info_verifier(
-                Some(self.id_token_claims().subject().clone()),
-                openidconnect::reqwest::http_client,
-            )
-            .panic_if_fail("failed to get UserInfo");
         self.client
-            .user_info(self.access_token().to_owned(), verifier)
+            .user_info(
+                self.access_token().to_owned(),
+                Some(self.id_token_claims().subject().clone()),
+            )
             .unwrap()
             .require_signed_response(false)
             .request(openidconnect::reqwest::http_client)
@@ -230,16 +227,12 @@ impl TestState {
     }
 
     pub fn user_info_claims_failure(&self) -> UserInfoError<openidconnect::reqwest::Error> {
-        let verifier: CoreUserInfoVerifier = self
-            .client
-            .user_info_verifier(
-                Some(self.id_token_claims().subject().clone()),
-                openidconnect::reqwest::http_client,
-            )
-            .panic_if_fail("failed to get UserInfo");
         let user_info_result: Result<CoreUserInfoClaims, _> = self
             .client
-            .user_info(self.access_token().to_owned(), verifier)
+            .user_info(
+                self.access_token().to_owned(),
+                Some(self.id_token_claims().subject().clone()),
+            )
             .unwrap()
             .require_signed_response(false)
             .request(openidconnect::reqwest::http_client);
@@ -578,21 +571,17 @@ fn rp_userinfo_sig() {
     let id_token_claims = test_state.id_token_claims();
     log_debug!("ID token: {:?}", id_token_claims);
 
-    let verifier: CoreUserInfoVerifier = test_state
+    let user_info_claims: CoreUserInfoClaims = test_state
         .client
-        .user_info_verifier(
+        .user_info(
+            test_state.access_token().to_owned(),
             Some(id_token_claims.subject().clone()),
-            openidconnect::reqwest::http_client,
         )
-        .panic_if_fail("failed to get UserInfo")
+        .unwrap()
         // For some reason, the test suite omits these claims even though the Core spec says
         // that the RP SHOULD verify these.
         .require_audience_match(false)
-        .require_issuer_match(false);
-    let user_info_claims: CoreUserInfoClaims = test_state
-        .client
-        .user_info(test_state.access_token().to_owned(), verifier)
-        .unwrap()
+        .require_issuer_match(false)
         .request(openidconnect::reqwest::http_client)
         .panic_if_fail("failed to get UserInfo");
 

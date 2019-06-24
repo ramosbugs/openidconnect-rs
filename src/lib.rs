@@ -37,7 +37,6 @@ use std::marker::PhantomData;
 use std::str;
 use std::time::Duration;
 
-use failure::Fail;
 use oauth2::helpers::variant_name;
 use oauth2::ResponseType as OAuth2ResponseType;
 pub use oauth2::{
@@ -59,9 +58,6 @@ pub use id_token::IdTokenFields;
 pub use id_token::{IdToken, IdTokenClaims};
 pub use jwt::JsonWebTokenError;
 use jwt::{JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenHeader};
-use registration::{
-    AdditionalClientMetadata, AdditionalClientRegistrationResponse, ClientRegistrationResponse,
-};
 // Flatten the module hierarchy involving types. They're only separated to improve code
 // organization.
 pub use types::{
@@ -72,15 +68,16 @@ pub use types::{
     EndUserBirthday, EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName,
     EndUserName, EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl,
     EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, FormattedAddress, GrantType,
-    InitiateLoginUrl, IssuerUrl, JsonWebKey, JsonWebKeyId, JsonWebKeySet, JsonWebKeySetFetchError,
-    JsonWebKeySetUrl, JsonWebKeyType, JsonWebKeyUse, JweContentEncryptionAlgorithm,
-    JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag, LoginHint, LogoUrl, Nonce,
-    OpPolicyUrl, OpTosUrl, PolicyUrl, PrivateSigningKey, RegistrationAccessToken, RegistrationUrl,
-    RequestUrl, ResponseMode, ResponseType, ResponseTypes, SectorIdentifierUrl, ServiceDocUrl,
-    SigningError, StreetAddress, SubjectIdentifier, SubjectIdentifierType, ToSUrl,
+    InitiateLoginUrl, IssuerUrl, JsonWebKey, JsonWebKeyId, JsonWebKeySet, JsonWebKeySetUrl,
+    JsonWebKeyType, JsonWebKeyUse, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm,
+    JwsSigningAlgorithm, LanguageTag, LoginHint, LogoUrl, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl,
+    PrivateSigningKey, RegistrationAccessToken, RegistrationUrl, RequestUrl, ResponseMode,
+    ResponseType, ResponseTypes, SectorIdentifierUrl, ServiceDocUrl, SigningError, StreetAddress,
+    SubjectIdentifier, SubjectIdentifierType, ToSUrl,
 };
 pub use user_info::{
-    UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoRequest, UserInfoUrl,
+    NoUserInfoEndpoint, UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoRequest,
+    UserInfoUrl,
 };
 use verification::{AudiencesClaim, IssuerClaim};
 pub use verification::{
@@ -153,24 +150,17 @@ pub enum AuthenticationFlow<RT: ResponseType> {
 
 /// OpenID Connect client.
 #[derive(Clone, Debug)]
-pub struct Client<AC, AD, AM, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
+pub struct Client<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT>
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
-    AM: AdditionalProviderMetadata,
-    CA: ClientAuthMethod,
-    CN: ClaimName,
-    CT: ClaimType,
-    G: GrantType,
     GC: GenderClaim,
     JE: JweContentEncryptionAlgorithm<JT>,
-    JK: JweKeyManagementAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
     P: AuthPrompt,
-    RM: ResponseMode,
-    RT: ResponseType,
-    S: SubjectIdentifierType,
     TE: ErrorResponse,
     TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
     TT: TokenType + 'static,
@@ -179,32 +169,25 @@ where
     client_id: ClientId,
     client_secret: Option<ClientSecret>,
     issuer: IssuerUrl,
-    #[allow(clippy::type_complexity)]
-    provider_metadata: Option<ProviderMetadata<AM, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>>,
-    _phantom: PhantomData<(AC, CA, CN, CT, G, GC, JE, JK, JS, JT, RM, RT, P, S)>,
+    userinfo_endpoint: Option<UserInfoUrl>,
+    jwks: JsonWebKeySet<JS, JT, JU, K>,
+    _phantom: PhantomData<(AC, AD, GC, JE, P)>,
 }
-impl<AC, AD, AP, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
-    Client<AC, AD, AP, CA, CN, CT, G, GC, JE, JK, JS, JT, P, RM, RT, S, TE, TR, TT>
+impl<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT>
+    Client<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT>
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
-    AP: AdditionalProviderMetadata,
-    CA: ClientAuthMethod,
-    CN: ClaimName,
-    CT: ClaimType,
-    G: GrantType,
     GC: GenderClaim,
     JE: JweContentEncryptionAlgorithm<JT>,
-    JK: JweKeyManagementAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
     P: AuthPrompt,
-    RM: ResponseMode,
-    RT: ResponseType,
-    S: SubjectIdentifierType,
     TE: ErrorResponse,
     TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
-    TT: TokenType,
+    TT: TokenType + 'static,
 {
     /// Initializes an OpenID Connect client.
     pub fn new(
@@ -213,6 +196,8 @@ where
         issuer: IssuerUrl,
         auth_url: AuthUrl,
         token_url: Option<TokenUrl>,
+        userinfo_endpoint: Option<UserInfoUrl>,
+        jwks: JsonWebKeySet<JS, JT, JU, K>,
     ) -> Self {
         let oauth2_client = oauth2::Client::new(
             client_id.clone(),
@@ -225,94 +210,37 @@ where
             client_id,
             client_secret,
             issuer,
-            provider_metadata: None,
+            userinfo_endpoint,
+            jwks,
             _phantom: PhantomData,
         }
     }
 
-    pub fn discover<HC, RE>(
+    pub fn from_provider_metadata<A, CA, CN, CT, G, JK, RM, RT, S>(
+        provider_metadata: ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RT, S>,
         client_id: ClientId,
         client_secret: Option<ClientSecret>,
-        issuer_url: &IssuerUrl,
-        http_client: HC,
-    ) -> Result<Self, DiscoveryError<RE>>
-    where
-        HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
-        RE: Fail,
-    {
-        #[allow(clippy::type_complexity)]
-        let provider_metadata: ProviderMetadata<
-            AP,
-            AD,
-            CA,
-            CN,
-            CT,
-            G,
-            JE,
-            JK,
-            JS,
-            JT,
-            RM,
-            RT,
-            S,
-        > = ProviderMetadata::discover(issuer_url, http_client)?;
-
-        let oauth2_client = oauth2::Client::new(
-            client_id.clone(),
-            client_secret.clone(),
-            provider_metadata.authorization_endpoint().clone(),
-            provider_metadata.token_endpoint().cloned(),
-        );
-        Ok(Client {
-            oauth2_client,
-            client_id,
-            client_secret,
-            issuer: provider_metadata.issuer().to_owned(),
-            provider_metadata: Some(provider_metadata),
-            _phantom: PhantomData,
-        })
-    }
-
-    #[allow(clippy::type_complexity)]
-    pub fn from_dynamic_registration<A, AR, AT, JU, K>(
-        provider_metadata: ProviderMetadata<AP, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>,
-        registration_response: &ClientRegistrationResponse<
-            A,
-            AR,
-            AT,
-            CA,
-            G,
-            JE,
-            JK,
-            JS,
-            JT,
-            JU,
-            K,
-            RT,
-            S,
-        >,
     ) -> Self
     where
-        A: AdditionalClientMetadata,
-        AR: AdditionalClientRegistrationResponse,
-        AT: ApplicationType,
-        JU: JsonWebKeyUse,
-        K: JsonWebKey<JS, JT, JU>,
+        A: AdditionalProviderMetadata,
+        CA: ClientAuthMethod,
+        CN: ClaimName,
+        CT: ClaimType,
+        G: GrantType,
+        JK: JweKeyManagementAlgorithm,
+        RM: ResponseMode,
+        RT: ResponseType,
+        S: SubjectIdentifierType,
     {
-        let oauth2_client = oauth2::Client::new(
-            registration_response.client_id().clone(),
-            registration_response.client_secret().cloned(),
+        Self::new(
+            client_id,
+            client_secret,
+            provider_metadata.issuer().clone(),
             provider_metadata.authorization_endpoint().clone(),
             provider_metadata.token_endpoint().cloned(),
-        );
-        Client {
-            oauth2_client,
-            client_id: registration_response.client_id().clone(),
-            client_secret: registration_response.client_secret().cloned(),
-            issuer: provider_metadata.issuer().to_owned(),
-            provider_metadata: Some(provider_metadata),
-            _phantom: PhantomData,
-        }
+            provider_metadata.userinfo_endpoint().cloned(),
+            provider_metadata.jwks().to_owned(),
+        )
     }
 
     ///
@@ -335,39 +263,26 @@ where
         self
     }
 
-    pub fn id_token_verifier<HC, JU, K, RE>(
-        &self,
-        http_client: HC,
-    ) -> Result<IdTokenVerifier<JS, JT, JU, K>, JsonWebKeySetFetchError<RE>>
-    where
-        HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
-        JU: JsonWebKeyUse,
-        K: JsonWebKey<JS, JT, JU>,
-        RE: Fail,
-    {
-        let provider_metadata = self.provider_metadata.as_ref().ok_or_else(|| {
-            JsonWebKeySetFetchError::Other("no provider metadata present".to_string())
-        })?;
-        let signature_keys = JsonWebKeySet::fetch(provider_metadata.jwks_uri(), http_client)?;
+    pub fn id_token_verifier(&self) -> IdTokenVerifier<JS, JT, JU, K> {
         if let Some(ref client_secret) = self.client_secret {
-            Ok(IdTokenVerifier::new_private_client(
+            IdTokenVerifier::new_private_client(
                 self.client_id.clone(),
                 client_secret.clone(),
-                provider_metadata.issuer().clone(),
-                signature_keys,
-            ))
+                self.issuer.clone(),
+                self.jwks.clone(),
+            )
         } else {
-            Ok(IdTokenVerifier::new_public_client(
+            IdTokenVerifier::new_public_client(
                 self.client_id.clone(),
-                provider_metadata.issuer().clone(),
-                signature_keys,
-            ))
+                self.issuer.clone(),
+                self.jwks.clone(),
+            )
         }
     }
 
     // FIXME: document that we don't currently support passing authorization request parameters
     // as a JWT: https://openid.net/specs/openid-connect-core-1_0.html#JWTRequests
-    pub fn authorize_url<NF, SF>(
+    pub fn authorize_url<NF, RT, SF>(
         &self,
         authentication_flow: AuthenticationFlow<RT>,
         state_fn: SF,
@@ -375,6 +290,7 @@ where
     ) -> AuthorizationRequest<AD, P, RT>
     where
         NF: FnOnce() -> Nonce + 'static,
+        RT: ResponseType,
         SF: FnOnce() -> CsrfToken + 'static,
     {
         AuthorizationRequest {
@@ -420,65 +336,26 @@ where
         self.oauth2_client.exchange_refresh_token(refresh_token)
     }
 
-    pub fn user_info_verifier<'a, HC, JU, K, RE>(
-        &self,
-        expected_subject: Option<SubjectIdentifier>,
-        http_client: HC,
-    ) -> Result<UserInfoVerifier<'a, JE, JS, JT, JU, K>, JsonWebKeySetFetchError<RE>>
-    where
-        HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
-        JU: JsonWebKeyUse,
-        K: JsonWebKey<JS, JT, JU>,
-        RE: Fail,
-    {
-        let provider_metadata = self.provider_metadata.as_ref().ok_or_else(|| {
-            JsonWebKeySetFetchError::Other("no provider metadata present".to_string())
-        })?;
-        let signature_keys = JsonWebKeySet::fetch(provider_metadata.jwks_uri(), http_client)?;
-        Ok(UserInfoVerifier::new(
-            self.client_id.clone(),
-            self.issuer.clone(),
-            signature_keys,
-            expected_subject,
-        ))
-    }
-
-    pub fn user_info<JU, K>(
+    pub fn user_info(
         &self,
         access_token: AccessToken,
-        signed_response_verifier: UserInfoVerifier<'static, JE, JS, JT, JU, K>,
-        // FIXME: Remove error response once we remove provider_metadata from Client.
-    ) -> Result<UserInfoRequest<JE, JS, JT, JU, K>, String>
-    where
-        JU: JsonWebKeyUse,
-        K: JsonWebKey<JS, JT, JU>,
-    {
-        let provider_metadata = self
-            .provider_metadata
-            .as_ref()
-            .ok_or_else(|| "no provider metadata present".to_string())?;
+        expected_subject: Option<SubjectIdentifier>,
+    ) -> Result<UserInfoRequest<JE, JS, JT, JU, K>, NoUserInfoEndpoint> {
         Ok(UserInfoRequest {
-            url: provider_metadata
-                .userinfo_endpoint()
-                .ok_or_else(|| "no userinfo endpoint configured".to_string())?
+            url: self
+                .userinfo_endpoint
+                .as_ref()
+                .ok_or(NoUserInfoEndpoint)?
                 .to_owned(),
             access_token,
             require_signed_response: true,
-            signed_response_verifier,
+            signed_response_verifier: UserInfoVerifier::new(
+                self.client_id.clone(),
+                self.issuer.clone(),
+                self.jwks.clone(),
+                expected_subject,
+            ),
         })
-    }
-
-    ///
-    /// Returns the associated provider metadata (if present).
-    ///
-    /// The provider metadata is only available if the Client was created using the `discover`
-    /// or `from_dynamic_registration` methods. Otherwise, this function returns `None`.
-    ///
-    #[allow(clippy::type_complexity)]
-    pub fn provider_metadata(
-        &self,
-    ) -> Option<&ProviderMetadata<AP, AD, CA, CN, CT, G, JE, JK, JS, JT, RM, RT, S>> {
-        self.provider_metadata.as_ref()
     }
 }
 
@@ -723,7 +600,10 @@ mod tests {
     #[cfg(feature = "nightly")]
     use super::core::CoreAuthenticationFlow;
     use super::core::{CoreAuthDisplay, CoreAuthPrompt, CoreClient, CoreIdToken, CoreResponseType};
-    use super::{AuthenticationContextClass, AuthenticationFlow, LanguageTag, LoginHint, Nonce};
+    use super::{
+        AuthenticationContextClass, AuthenticationFlow, JsonWebKeySet, LanguageTag, LoginHint,
+        Nonce,
+    };
     use IssuerUrl;
 
     fn new_client() -> CoreClient {
@@ -734,6 +614,8 @@ mod tests {
             IssuerUrl::new("https://example".to_string()).unwrap(),
             AuthUrl::new(Url::parse("https://example/authorize").unwrap()),
             Some(TokenUrl::new(Url::parse("https://example/token").unwrap())),
+            None,
+            JsonWebKeySet::default(),
         )
     }
 
