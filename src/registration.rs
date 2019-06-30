@@ -824,7 +824,7 @@ mod tests {
             \"redirect_uris\": [\"https://example.com/redirect-1\", \"https://example.com/redirect-2\"],
             \"response_types\": [\"code\", \"code token id_token\"],
             \"grant_types\": [\"authorization_code\", \"client_credentials\", \"implicit\", \
-                \"password\", \"refresh_token\", \"some_extension\"],
+                \"password\", \"refresh_token\"],
             \"application_type\": \"web\",
             \"contacts\": [\"user@example.com\", \"admin@openidconnect.local\"],
             \"client_name\": \"Example\",
@@ -1120,7 +1120,7 @@ mod tests {
             \"redirect_uris\": [\"https://example.com/redirect-1\", \"https://example.com/redirect-2\"],
             \"response_types\": [\"code\", \"code token id_token\"],
             \"grant_types\": [\"authorization_code\", \"client_credentials\", \"implicit\", \
-                \"password\", \"refresh_token\", \"some_extension\"],
+                \"password\", \"refresh_token\"],
             \"application_type\": \"web\",
             \"contacts\": [\"user@example.com\", \"admin@openidconnect.local\"],
             \"client_name\": \"Example\",

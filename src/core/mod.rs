@@ -1,4 +1,4 @@
-use std::fmt::{Display, Error as FormatterError, Formatter, Result as FormatterResult};
+use std::fmt::{Display, Error as FormatterError, Formatter};
 use std::ops::Deref;
 
 pub use oauth2::basic::{
@@ -10,8 +10,7 @@ use oauth2::{
     EmptyExtraTokenFields, ErrorResponseType, ResponseType as OAuth2ResponseType,
     StandardErrorResponse, StandardTokenResponse,
 };
-use serde::de::{Error as DeserializeError, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
 use super::registration::{
     ClientMetadata, ClientRegistrationRequest, ClientRegistrationResponse,
@@ -465,7 +464,8 @@ impl GenderClaim for CoreGenderClaim {}
 ///
 // These are defined in various specs, including the Client Registration spec:
 //   http://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum CoreGrantType {
     ///
     /// Authorization code grant.
@@ -480,6 +480,11 @@ pub enum CoreGrantType {
     ///
     Implicit,
     ///
+    /// JWT-based authentication as described in [RFC 7523](https://tools.ietf.org/html/rfc7523).
+    ///
+    #[serde(rename = "urn:ietf:params:oauth:grant-type:jwt-bearer")]
+    JwtBearer,
+    ///
     /// End user password grant.
     ///
     Password,
@@ -489,53 +494,6 @@ pub enum CoreGrantType {
     RefreshToken,
 }
 impl GrantType for CoreGrantType {}
-impl<'de> Deserialize<'de> for CoreGrantType {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct CoreGrantTypeVisitor;
-        impl<'de> Visitor<'de> for CoreGrantTypeVisitor {
-            type Value = CoreGrantType;
-
-            fn expecting(&self, formatter: &mut Formatter) -> FormatterResult {
-                formatter.write_str("CoreGrantType")
-            }
-
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: DeserializeError,
-            {
-                Ok(match v {
-                    "authorization_code" => CoreGrantType::AuthorizationCode,
-                    "client_credentials" => CoreGrantType::ClientCredentials,
-                    "implicit" => CoreGrantType::Implicit,
-                    "password" => CoreGrantType::Password,
-                    "refresh_token" => CoreGrantType::RefreshToken,
-                    other => {
-                        return Err(E::custom(format!("unknown grant type `{}`", other)));
-                    }
-                })
-            }
-        }
-        deserializer.deserialize_str(CoreGrantTypeVisitor {})
-    }
-}
-impl Serialize for CoreGrantType {
-    fn serialize<SE>(&self, serializer: SE) -> Result<SE::Ok, SE::Error>
-    where
-        SE: Serializer,
-    {
-        let grant_type_str = match *self {
-            CoreGrantType::AuthorizationCode => "authorization_code",
-            CoreGrantType::ClientCredentials => "client_credentials",
-            CoreGrantType::Implicit => "implicit",
-            CoreGrantType::Password => "password",
-            CoreGrantType::RefreshToken => "refresh_token",
-        };
-        serializer.serialize_str(grant_type_str)
-    }
-}
 
 ///
 /// OpenID Connect Core JWE encryption algorithms.

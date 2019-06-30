@@ -1,5 +1,5 @@
 // FIXME: uncomment
-#![warn(missing_docs)]
+//#![warn(missing_docs)]
 #![cfg_attr(feature = "nightly", feature(type_alias_enum_variants))]
 //!
 //! [OpenID Connect](https://openid.net/specs/openid-connect-core-1_0.html) library.
