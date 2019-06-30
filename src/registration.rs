@@ -888,7 +888,6 @@ mod tests {
                 CoreGrantType::Implicit,
                 CoreGrantType::Password,
                 CoreGrantType::RefreshToken,
-                CoreGrantType::Extension("some_extension".to_string()),
             ]
         );
         assert_eq!(
@@ -1213,7 +1212,6 @@ mod tests {
                 CoreGrantType::Implicit,
                 CoreGrantType::Password,
                 CoreGrantType::RefreshToken,
-                CoreGrantType::Extension("some_extension".to_string()),
             ]
         );
         assert_eq!(

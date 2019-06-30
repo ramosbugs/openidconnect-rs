@@ -22,9 +22,9 @@ use super::{
     ApplicationType, AuthDisplay, AuthPrompt, ClaimName, ClaimType, Client, ClientAuthMethod,
     EmptyAdditionalClaims, EmptyAdditionalProviderMetadata, GenderClaim, GrantType, IdToken,
     IdTokenClaims, IdTokenFields, IdTokenVerifier, JsonWebKeySet, JweContentEncryptionAlgorithm,
-    JweKeyManagementAlgorithm, JwsSigningAlgorithm, ProviderMetadata, ResponseMode, ResponseType,
-    SubjectIdentifierType, UserInfoClaims, UserInfoJsonWebToken, UserInfoVerifier,
-    RefreshIdTokenFields,
+    JweKeyManagementAlgorithm, JwsSigningAlgorithm, ProviderMetadata, RefreshIdTokenFields,
+    ResponseMode, ResponseType, SubjectIdentifierType, UserInfoClaims, UserInfoJsonWebToken,
+    UserInfoVerifier,
 };
 
 pub use self::jwk::{
@@ -39,9 +39,17 @@ mod jwk;
 #[cfg(feature = "nightly")]
 use super::AuthenticationFlow;
 
+///
+/// OpenID Connect Core authentication flows.
+///
+/// Requires the `nightly` feature flag to be enabled.
+///
 #[cfg(feature = "nightly")]
 pub type CoreAuthenticationFlow = AuthenticationFlow<CoreResponseType>;
 
+///
+/// OpenID Connect Core client.
+///
 pub type CoreClient = Client<
     EmptyAdditionalClaims,
     CoreAuthDisplay,
@@ -58,6 +66,9 @@ pub type CoreClient = Client<
     CoreTokenType,
 >;
 
+///
+/// OpenID Connect Core client metadata.
+///
 pub type CoreClientMetadata = ClientMetadata<
     EmptyAdditionalClientMetadata,
     CoreApplicationType,
@@ -73,6 +84,9 @@ pub type CoreClientMetadata = ClientMetadata<
     CoreSubjectIdentifierType,
 >;
 
+///
+/// OpenID Connect Core client registration request.
+///
 pub type CoreClientRegistrationRequest = ClientRegistrationRequest<
     EmptyAdditionalClientMetadata,
     EmptyAdditionalClientRegistrationResponse,
@@ -90,6 +104,9 @@ pub type CoreClientRegistrationRequest = ClientRegistrationRequest<
     CoreSubjectIdentifierType,
 >;
 
+///
+/// OpenID Connect Core client registration response.
+///
 pub type CoreClientRegistrationResponse = ClientRegistrationResponse<
     EmptyAdditionalClientMetadata,
     EmptyAdditionalClientRegistrationResponse,
@@ -106,6 +123,9 @@ pub type CoreClientRegistrationResponse = ClientRegistrationResponse<
     CoreSubjectIdentifierType,
 >;
 
+///
+/// OpenID Connect Core ID token.
+///
 pub type CoreIdToken = IdToken<
     EmptyAdditionalClaims,
     CoreGenderClaim,
@@ -114,8 +134,14 @@ pub type CoreIdToken = IdToken<
     CoreJsonWebKeyType,
 >;
 
+///
+/// OpenID Connect Core ID token claims.
+///
 pub type CoreIdTokenClaims = IdTokenClaims<EmptyAdditionalClaims, CoreGenderClaim>;
 
+///
+/// OpenID Connect Core ID token fields.
+///
 pub type CoreIdTokenFields = IdTokenFields<
     EmptyAdditionalClaims,
     EmptyExtraTokenFields,
@@ -124,6 +150,10 @@ pub type CoreIdTokenFields = IdTokenFields<
     CoreJwsSigningAlgorithm,
     CoreJsonWebKeyType,
 >;
+
+///
+/// OpenID Connect Core ID token refresh token exchange fields.
+///
 pub type CoreRefreshIdTokenFields = RefreshIdTokenFields<
     EmptyAdditionalClaims,
     EmptyExtraTokenFields,
@@ -133,6 +163,9 @@ pub type CoreRefreshIdTokenFields = RefreshIdTokenFields<
     CoreJsonWebKeyType,
 >;
 
+///
+/// OpenID Connect Core ID token verifier.
+///
 pub type CoreIdTokenVerifier<'a> = IdTokenVerifier<
     'a,
     CoreJwsSigningAlgorithm,
@@ -141,12 +174,25 @@ pub type CoreIdTokenVerifier<'a> = IdTokenVerifier<
     CoreJsonWebKey,
 >;
 
+///
+/// OpenID Connect Core token response.
+///
 pub type CoreTokenResponse = StandardTokenResponse<CoreIdTokenFields, CoreTokenType>;
+
+///
+/// OpenID Connect Core refresh token response.
+///
 pub type CoreRefreshTokenResponse = StandardTokenResponse<CoreRefreshIdTokenFields, CoreTokenType>;
 
+///
+/// OpenID Connect Core JSON Web Key Set.
+///
 pub type CoreJsonWebKeySet =
     JsonWebKeySet<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJsonWebKey>;
 
+///
+/// OpenID Connect Core provider metadata.
+///
 pub type CoreProviderMetadata = ProviderMetadata<
     EmptyAdditionalProviderMetadata,
     CoreAuthDisplay,
@@ -165,7 +211,14 @@ pub type CoreProviderMetadata = ProviderMetadata<
     CoreSubjectIdentifierType,
 >;
 
+///
+/// OpenID Connect Core user info claims.
+///
 pub type CoreUserInfoClaims = UserInfoClaims<EmptyAdditionalClaims, CoreGenderClaim>;
+
+///
+/// OpenID Connect Core user info JSON Web Token.
+///
 pub type CoreUserInfoJsonWebToken = UserInfoJsonWebToken<
     EmptyAdditionalClaims,
     CoreGenderClaim,
@@ -173,6 +226,10 @@ pub type CoreUserInfoJsonWebToken = UserInfoJsonWebToken<
     CoreJwsSigningAlgorithm,
     CoreJsonWebKeyType,
 >;
+
+///
+/// OpenID Connect Core user info verifier.
+///
 pub type CoreUserInfoVerifier<'a> = UserInfoVerifier<
     'a,
     CoreJweContentEncryptionAlgorithm,
@@ -183,7 +240,7 @@ pub type CoreUserInfoVerifier<'a> = UserInfoVerifier<
 >;
 
 ///
-/// Kind of client application.
+/// OpenID Connect Core client application type.
 ///
 /// These values are defined in
 /// [Section 2 of OpenID Connect Dynamic Client Registration 1.0](
@@ -318,6 +375,9 @@ impl Display for CoreAuthPrompt {
 }
 
 new_type![
+    ///
+    /// OpenID Connect Core claim name.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     CoreClaimName(String)
 ];
@@ -356,34 +416,77 @@ pub enum CoreClaimType {
 }
 impl ClaimType for CoreClaimType {}
 
+///
+/// OpenID Connect Core client authentication method.
+///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoreClientAuthMethod {
-    ClientSecretPost,
+    ///
+    /// Client secret passed via the HTTP Basic authentication scheme.
+    ///
     ClientSecretBasic,
+    ///
+    /// Client authentication using a JSON Web Token signed with the client secret used as an HMAC
+    /// key.
+    ///
     ClientSecretJwt,
+    ///
+    /// Client secret passed via the POST request body.
+    ///
+    ClientSecretPost,
+    ///
+    /// JSON Web Token signed with a private key whose public key has been previously registered
+    /// with the OpenID Connect provider.
+    ///
     PrivateKeyJwt,
 }
 impl ClientAuthMethod for CoreClientAuthMethod {}
 
+///
+/// OpenID Connect Core gender claim.
+///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoreGenderClaim {
+    ///
+    /// Female
+    ///
     Female,
+    ///
+    /// Male
+    ///
     Male,
 }
 impl GenderClaim for CoreGenderClaim {}
 
+///
+/// OpenID Connect Core grant type.
+///
 // These are defined in various specs, including the Client Registration spec:
 //   http://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CoreGrantType {
+    ///
+    /// Authorization code grant.
+    ///
     AuthorizationCode,
+    ///
+    /// Client credentials grant.
+    ///
     ClientCredentials,
+    ///
+    /// Implicit grant.
+    ///
     Implicit,
+    ///
+    /// End user password grant.
+    ///
     Password,
+    ///
+    /// Refresh token grant.
+    ///
     RefreshToken,
-    Extension(String),
 }
 impl GrantType for CoreGrantType {}
 impl<'de> Deserialize<'de> for CoreGrantType {
@@ -409,7 +512,9 @@ impl<'de> Deserialize<'de> for CoreGrantType {
                     "implicit" => CoreGrantType::Implicit,
                     "password" => CoreGrantType::Password,
                     "refresh_token" => CoreGrantType::RefreshToken,
-                    other => CoreGrantType::Extension(other.to_string()),
+                    other => {
+                        return Err(E::custom(format!("unknown grant type `{}`", other)));
+                    }
                 })
             }
         }
@@ -427,14 +532,13 @@ impl Serialize for CoreGrantType {
             CoreGrantType::Implicit => "implicit",
             CoreGrantType::Password => "password",
             CoreGrantType::RefreshToken => "refresh_token",
-            CoreGrantType::Extension(ref extension) => extension,
         };
         serializer.serialize_str(grant_type_str)
     }
 }
 
 ///
-/// Core JWE encryption algorithms.
+/// OpenID Connect Core JWE encryption algorithms.
 ///
 /// These algorithms represent the `enc` header parameter values for JSON Web Encryption.
 /// The values are described in
@@ -480,7 +584,7 @@ impl JweContentEncryptionAlgorithm<CoreJsonWebKeyType> for CoreJweContentEncrypt
 }
 
 ///
-/// Core JWE key management algorithms.
+/// OpenID Connect Core JWE key management algorithms.
 ///
 /// These algorithms represent the `alg` header parameter values for JSON Web Encryption.
 /// They are used to encrypt the Content Encryption Key (CEK) to produce the JWE Encrypted Key, or
@@ -578,7 +682,7 @@ pub enum CoreJweKeyManagementAlgorithm {
 impl JweKeyManagementAlgorithm for CoreJweKeyManagementAlgorithm {}
 
 ///
-/// Core JWS signing algorithms.
+/// OpenID Connect Core JWS signing algorithms.
 ///
 /// These algorithms represent the `alg` header parameter values for JSON Web Signature.
 /// They are used to digitally sign or create a MAC of the contents of the JWS Protected Header and
@@ -695,6 +799,9 @@ impl JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
     }
 }
 
+///
+/// OpenID Connect Core registration error response type.
+///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoreRegisterErrorResponseType {
@@ -717,6 +824,8 @@ impl Display for CoreRegisterErrorResponseType {
     }
 }
 
+///
+/// OpenID Connect Core response mode.
 ///
 /// Informs the Authorization Server of the mechanism to be used for returning Authorization
 /// Response parameters from the Authorization Endpoint.
@@ -765,6 +874,8 @@ pub enum CoreResponseMode {
 }
 impl ResponseMode for CoreResponseMode {}
 
+///
+/// OpenID Connect Core response type.
 ///
 /// Informs the Authorization Server of the desired authorization processing flow, including what
 /// parameters are returned from the endpoints used.  
@@ -815,6 +926,8 @@ impl AsRef<str> for CoreResponseType {
     }
 }
 
+///
+/// OpenID Connect Core Subject Identifier type.
 ///
 /// A Subject Identifier is a locally unique and never reassigned identifier within the Issuer for
 /// the End-User, which is intended to be consumed by the Client.

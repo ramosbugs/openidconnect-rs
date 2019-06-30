@@ -743,7 +743,6 @@ mod tests {
         .set_grant_types_supported(Some(vec![
             CoreGrantType::AuthorizationCode,
             CoreGrantType::Implicit,
-            CoreGrantType::Extension("urn:ietf:params:oauth:grant-type:jwt-bearer".to_string()),
             CoreGrantType::RefreshToken,
         ]))
         .set_response_modes_supported(Some(vec![
@@ -938,9 +937,6 @@ mod tests {
                 &vec![
                     CoreGrantType::AuthorizationCode,
                     CoreGrantType::Implicit,
-                    CoreGrantType::Extension(
-                        "urn:ietf:params:oauth:grant-type:jwt-bearer".to_string()
-                    ),
                     CoreGrantType::RefreshToken,
                 ]
                 .into_iter()

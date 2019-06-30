@@ -1,5 +1,5 @@
 // FIXME: uncomment
-//#![warn(missing_docs)]
+#![warn(missing_docs)]
 #![cfg_attr(feature = "nightly", feature(type_alias_enum_variants))]
 //!
 //! [OpenID Connect](https://openid.net/specs/openid-connect-core-1_0.html) library.
@@ -404,8 +404,8 @@ pub use claims::{
 pub use discovery::{
     AdditionalProviderMetadata, DiscoveryError, EmptyAdditionalProviderMetadata, ProviderMetadata,
 };
-pub use id_token::{IdTokenFields, RefreshIdTokenFields};
 pub use id_token::{IdToken, IdTokenClaims};
+pub use id_token::{IdTokenFields, RefreshIdTokenFields};
 pub use jwt::JsonWebTokenError;
 use jwt::{JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenHeader};
 // Flatten the module hierarchy involving types. They're only separated to improve code
@@ -735,7 +735,8 @@ where
     where
         'a: 'b,
     {
-        self.refresh_oauth2_client.exchange_refresh_token(refresh_token)
+        self.refresh_oauth2_client
+            .exchange_refresh_token(refresh_token)
     }
 
     ///
@@ -1053,13 +1054,13 @@ where
 /// token request.
 ///
 pub trait RefreshTokenResponse<AC, GC, JE, JS, JT, TT>: OAuth2TokenResponse<TT>
-    where
-        AC: AdditionalClaims,
-        GC: GenderClaim,
-        JE: JweContentEncryptionAlgorithm<JT>,
-        JS: JwsSigningAlgorithm<JT>,
-        JT: JsonWebKeyType,
-        TT: TokenType,
+where
+    AC: AdditionalClaims,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    TT: TokenType,
 {
     ///
     /// Returns the optional ID token provided by the refresh token response.
@@ -1068,15 +1069,15 @@ pub trait RefreshTokenResponse<AC, GC, JE, JS, JT, TT>: OAuth2TokenResponse<TT>
 }
 
 impl<AC, EF, GC, JE, JS, JT, TT> RefreshTokenResponse<AC, GC, JE, JS, JT, TT>
-for StandardTokenResponse<RefreshIdTokenFields<AC, EF, GC, JE, JS, JT>, TT>
-    where
-        AC: AdditionalClaims,
-        EF: ExtraTokenFields,
-        GC: GenderClaim,
-        JE: JweContentEncryptionAlgorithm<JT>,
-        JS: JwsSigningAlgorithm<JT>,
-        JT: JsonWebKeyType,
-        TT: TokenType,
+    for StandardTokenResponse<RefreshIdTokenFields<AC, EF, GC, JE, JS, JT>, TT>
+where
+    AC: AdditionalClaims,
+    EF: ExtraTokenFields,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    TT: TokenType,
 {
     fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS, JT>> {
         self.extra_fields().id_token()

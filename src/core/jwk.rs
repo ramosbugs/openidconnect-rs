@@ -20,7 +20,9 @@ use ring::signature::KeyPair;
 // support such key types, we'll need to define a new impl for JsonWebKey. Deserializing the new
 // impl would probably need to involve first deserializing the raw values to access the 'kty'
 // parameter, and then deserializing the fields and types appropriate for that key type.
+///
 /// Public or symmetric key expressed as a JSON Web Key.
+///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct CoreJsonWebKey {
     pub(crate) kty: CoreJsonWebKeyType,
@@ -57,8 +59,10 @@ pub struct CoreJsonWebKey {
 }
 impl CoreJsonWebKey {
     /// Instantiate a new RSA public key from the raw modulus (`n`) and public exponent (`e`),
-    /// along with an optional (but recommended) key ID. The key ID is used for matching signed
-    /// JSON Web Tokens with the keys used for verifying their signatures.
+    /// along with an optional (but recommended) key ID.
+    ///
+    /// The key ID is used for matching signed JSON Web Tokens with the keys used for verifying
+    /// their signatures.
     pub fn new_rsa(n: Vec<u8>, e: Vec<u8>, kid: Option<JsonWebKeyId>) -> Self {
         Self {
             kty: CoreJsonWebKeyType::RSA,
@@ -168,11 +172,20 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
     }
 }
 
+///
+/// HMAC secret key.
+///
+/// This key can be used for signing messages, or converted to a `CoreJsonWebKey` for verifying
+/// them.
+///
 #[derive(Clone)]
 pub struct CoreHmacKey {
     secret: Vec<u8>,
 }
 impl CoreHmacKey {
+    ///
+    /// Instantiate a new key from the specified secret bytes.
+    ///
     pub fn new<T>(secret: T) -> Self
     where
         T: Into<Vec<u8>>,
@@ -218,6 +231,12 @@ impl
 const RSA_HEADER: &str = "-----BEGIN RSA PRIVATE KEY-----";
 const RSA_FOOTER: &str = "-----END RSA PRIVATE KEY-----";
 
+///
+/// RSA private key.
+///
+/// This key can be used for signing messages, or converted to a `CoreJsonWebKey` for verifying
+/// them.
+///
 pub struct CoreRsaPrivateSigningKey {
     key_pair: ring_signature::RsaKeyPair,
     rng: Box<dyn rand::SecureRandom>,
@@ -306,21 +325,44 @@ impl
     }
 }
 
+///
+/// Type of JSON Web Key.
+///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum CoreJsonWebKeyType {
+    ///
+    /// Elliptic Curve Cryptography (ECC) key.
+    ///
+    /// ECC algorithms such as ECDSA are currently unsupported.
+    ///
     #[serde(rename = "EC")]
     EllipticCurve,
+    ///
+    /// RSA key.
+    ///
     #[serde(rename = "RSA")]
     RSA,
+    ///
+    /// Symmetric key.
+    ///
     #[serde(rename = "oct")]
     Symmetric,
 }
 impl JsonWebKeyType for CoreJsonWebKeyType {}
 
+///
+/// Usage restriction for a JSON Web key.
+///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum CoreJsonWebKeyUse {
+    ///
+    /// Key may be used for digital signatures.
+    ///
     #[serde(rename = "sig")]
     Signature,
+    ///
+    /// Key may be used for encryption.
+    ///
     #[serde(rename = "enc")]
     Encryption,
 }

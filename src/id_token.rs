@@ -317,13 +317,13 @@ where
 ///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct RefreshIdTokenFields<AC, EF, GC, JE, JS, JT>
-    where
-        AC: AdditionalClaims,
-        EF: ExtraTokenFields,
-        GC: GenderClaim,
-        JE: JweContentEncryptionAlgorithm<JT>,
-        JS: JwsSigningAlgorithm<JT>,
-        JT: JsonWebKeyType,
+where
+    AC: AdditionalClaims,
+    EF: ExtraTokenFields,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
 {
     #[serde(bound = "AC: AdditionalClaims")]
     id_token: Option<IdToken<AC, GC, JE, JS, JT>>,
@@ -333,13 +333,13 @@ pub struct RefreshIdTokenFields<AC, EF, GC, JE, JS, JT>
     _phantom: PhantomData<JT>,
 }
 impl<AC, EF, GC, JE, JS, JT> RefreshIdTokenFields<AC, EF, GC, JE, JS, JT>
-    where
-        AC: AdditionalClaims,
-        EF: ExtraTokenFields,
-        GC: GenderClaim,
-        JE: JweContentEncryptionAlgorithm<JT>,
-        JS: JwsSigningAlgorithm<JT>,
-        JT: JsonWebKeyType,
+where
+    AC: AdditionalClaims,
+    EF: ExtraTokenFields,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
 {
     pub fn new(id_token: Option<IdToken<AC, GC, JE, JS, JT>>, extra_fields: EF) -> Self {
         Self {
@@ -357,13 +357,13 @@ impl<AC, EF, GC, JE, JS, JT> RefreshIdTokenFields<AC, EF, GC, JE, JS, JT>
     }
 }
 impl<AC, EF, GC, JE, JS, JT> ExtraTokenFields for RefreshIdTokenFields<AC, EF, GC, JE, JS, JT>
-    where
-        AC: AdditionalClaims,
-        EF: ExtraTokenFields,
-        GC: GenderClaim,
-        JE: JweContentEncryptionAlgorithm<JT>,
-        JS: JwsSigningAlgorithm<JT>,
-        JT: JsonWebKeyType,
+where
+    AC: AdditionalClaims,
+    EF: ExtraTokenFields,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
 {
 }
 
