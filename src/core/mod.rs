@@ -24,6 +24,7 @@ use super::{
     IdTokenClaims, IdTokenFields, IdTokenVerifier, JsonWebKeySet, JweContentEncryptionAlgorithm,
     JweKeyManagementAlgorithm, JwsSigningAlgorithm, ProviderMetadata, ResponseMode, ResponseType,
     SubjectIdentifierType, UserInfoClaims, UserInfoJsonWebToken, UserInfoVerifier,
+    RefreshIdTokenFields,
 };
 
 pub use self::jwk::{
@@ -51,6 +52,7 @@ pub type CoreClient = Client<
     CoreJsonWebKeyUse,
     CoreJsonWebKey,
     CoreAuthPrompt,
+    CoreRefreshTokenResponse,
     StandardErrorResponse<CoreErrorResponseType>,
     CoreTokenResponse,
     CoreTokenType,
@@ -122,6 +124,14 @@ pub type CoreIdTokenFields = IdTokenFields<
     CoreJwsSigningAlgorithm,
     CoreJsonWebKeyType,
 >;
+pub type CoreRefreshIdTokenFields = RefreshIdTokenFields<
+    EmptyAdditionalClaims,
+    EmptyExtraTokenFields,
+    CoreGenderClaim,
+    CoreJweContentEncryptionAlgorithm,
+    CoreJwsSigningAlgorithm,
+    CoreJsonWebKeyType,
+>;
 
 pub type CoreIdTokenVerifier<'a> = IdTokenVerifier<
     'a,
@@ -132,6 +142,7 @@ pub type CoreIdTokenVerifier<'a> = IdTokenVerifier<
 >;
 
 pub type CoreTokenResponse = StandardTokenResponse<CoreIdTokenFields, CoreTokenType>;
+pub type CoreRefreshTokenResponse = StandardTokenResponse<CoreRefreshIdTokenFields, CoreTokenType>;
 
 pub type CoreJsonWebKeySet =
     JsonWebKeySet<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJsonWebKey>;

@@ -255,10 +255,7 @@ where
 }
 
 ///
-/// OpenID Connect authorization token.
-///
-/// The fields in this struct are defined in
-/// [Section 3.1.3.3](http://openid.net/specs/openid-connect-core-1_0.html#TokenResponse).
+/// Extends the base OAuth2 token response with an ID token.
 ///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct IdTokenFields<AC, EF, GC, JE, JS, JT>
@@ -309,6 +306,64 @@ where
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
+{
+}
+
+///
+/// Extends the base OAuth2 token response with an optional ID token.
+///
+/// Unlike an initial token request, the ID token is an optional part of the response to a refresh
+/// token request.
+///
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct RefreshIdTokenFields<AC, EF, GC, JE, JS, JT>
+    where
+        AC: AdditionalClaims,
+        EF: ExtraTokenFields,
+        GC: GenderClaim,
+        JE: JweContentEncryptionAlgorithm<JT>,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType,
+{
+    #[serde(bound = "AC: AdditionalClaims")]
+    id_token: Option<IdToken<AC, GC, JE, JS, JT>>,
+    #[serde(bound = "EF: ExtraTokenFields", flatten)]
+    extra_fields: EF,
+    #[serde(skip)]
+    _phantom: PhantomData<JT>,
+}
+impl<AC, EF, GC, JE, JS, JT> RefreshIdTokenFields<AC, EF, GC, JE, JS, JT>
+    where
+        AC: AdditionalClaims,
+        EF: ExtraTokenFields,
+        GC: GenderClaim,
+        JE: JweContentEncryptionAlgorithm<JT>,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType,
+{
+    pub fn new(id_token: Option<IdToken<AC, GC, JE, JS, JT>>, extra_fields: EF) -> Self {
+        Self {
+            id_token,
+            extra_fields,
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS, JT>> {
+        self.id_token.as_ref()
+    }
+    pub fn extra_fields(&self) -> &EF {
+        &self.extra_fields
+    }
+}
+impl<AC, EF, GC, JE, JS, JT> ExtraTokenFields for RefreshIdTokenFields<AC, EF, GC, JE, JS, JT>
+    where
+        AC: AdditionalClaims,
+        EF: ExtraTokenFields,
+        GC: GenderClaim,
+        JE: JweContentEncryptionAlgorithm<JT>,
+        JS: JwsSigningAlgorithm<JT>,
+        JT: JsonWebKeyType,
 {
 }
 
