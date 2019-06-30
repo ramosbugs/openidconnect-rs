@@ -20,6 +20,7 @@ use ring::signature::KeyPair;
 // support such key types, we'll need to define a new impl for JsonWebKey. Deserializing the new
 // impl would probably need to involve first deserializing the raw values to access the 'kty'
 // parameter, and then deserializing the fields and types appropriate for that key type.
+/// Public or symmetric key expressed as a JSON Web Key.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct CoreJsonWebKey {
     pub(crate) kty: CoreJsonWebKeyType,
@@ -53,6 +54,21 @@ pub struct CoreJsonWebKey {
         skip_serializing_if = "Option::is_none"
     )]
     pub(crate) k: Option<Base64UrlEncodedBytes>,
+}
+impl CoreJsonWebKey {
+    /// Instantiate a new RSA public key from the raw modulus (`n`) and public exponent (`e`),
+    /// along with an optional (but recommended) key ID. The key ID is used for matching signed
+    /// JSON Web Tokens with the keys used for verifying their signatures.
+    pub fn new_rsa(n: Vec<u8>, e: Vec<u8>, kid: Option<JsonWebKeyId>) -> Self {
+        Self {
+            kty: CoreJsonWebKeyType::RSA,
+            use_: Some(CoreJsonWebKeyUse::Signature),
+            kid,
+            n: Some(Base64UrlEncodedBytes::new(n)),
+            e: Some(Base64UrlEncodedBytes::new(e)),
+            k: None,
+        }
+    }
 }
 impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> for CoreJsonWebKey {
     fn key_id(&self) -> Option<&JsonWebKeyId> {
@@ -202,22 +218,24 @@ impl
 const RSA_HEADER: &str = "-----BEGIN RSA PRIVATE KEY-----";
 const RSA_FOOTER: &str = "-----END RSA PRIVATE KEY-----";
 
-pub struct CoreRsaPrivateSigningKey<'a, R>
-where
-    R: rand::SecureRandom,
-{
+pub struct CoreRsaPrivateSigningKey {
     key_pair: ring_signature::RsaKeyPair,
-    rng: &'a R,
+    rng: Box<dyn rand::SecureRandom>,
     kid: Option<JsonWebKeyId>,
 }
-impl<'a, R> CoreRsaPrivateSigningKey<'a, R>
-where
-    R: rand::SecureRandom,
-{
+impl CoreRsaPrivateSigningKey {
     ///
     /// Converts an RSA private key (in PEM format) to a JWK representing its public key.
     ///
-    pub fn from_pem(pem: &str, rng: &'a R, kid: Option<JsonWebKeyId>) -> Result<Self, String> {
+    pub fn from_pem(pem: &str, kid: Option<JsonWebKeyId>) -> Result<Self, String> {
+        Self::from_pem_internal(pem, Box::new(rand::SystemRandom), kid)
+    }
+
+    pub(crate) fn from_pem_internal(
+        pem: &str,
+        rng: Box<dyn rand::SecureRandom>,
+        kid: Option<JsonWebKeyId>,
+    ) -> Result<Self, String> {
         let trimmed_pem = pem.trim();
         if !trimmed_pem.starts_with(RSA_HEADER) {
             return Err(format!("RSA private key must begin with {}", RSA_HEADER));
@@ -233,15 +251,13 @@ where
         Ok(Self { key_pair, rng, kid })
     }
 }
-impl<'a, R>
+impl
     PrivateSigningKey<
         CoreJwsSigningAlgorithm,
         CoreJsonWebKeyType,
         CoreJsonWebKeyUse,
         CoreJsonWebKey,
-    > for CoreRsaPrivateSigningKey<'a, R>
-where
-    R: rand::SecureRandom,
+    > for CoreRsaPrivateSigningKey
 {
     fn sign(
         &self,
@@ -262,7 +278,7 @@ where
             }
         };
 
-        crypto::sign_rsa(&self.key_pair, padding_alg, self.rng, msg)
+        crypto::sign_rsa(&self.key_pair, padding_alg, self.rng.as_ref(), msg)
     }
 
     fn to_verification_key(&self) -> CoreJsonWebKey {
@@ -327,7 +343,6 @@ impl JsonWebKeyUse for CoreJsonWebKeyUse {
 
 #[cfg(test)]
 mod tests {
-    use ring::rand::SystemRandom;
     use ring::test::rand::FixedByteRandom;
     use serde_json;
     use {base64, SigningError};
@@ -790,14 +805,12 @@ mod tests {
                                 -----END RSA PRIVATE KEY-----\
                                 ";
 
-    fn expect_rsa_sig<R>(
-        private_key: &CoreRsaPrivateSigningKey<R>,
+    fn expect_rsa_sig(
+        private_key: &CoreRsaPrivateSigningKey,
         message: &[u8],
         alg: &CoreJwsSigningAlgorithm,
         expected_sig_base64: &str,
-    ) where
-        R: ring::rand::SecureRandom,
-    {
+    ) {
         let sig = private_key.sign(alg, message).unwrap();
         assert_eq!(expected_sig_base64, base64::encode(&sig));
 
@@ -807,11 +820,10 @@ mod tests {
 
     #[test]
     fn test_rsa_signing() {
-        // Constant salt used for PSS test vectors below.
-        let rng = FixedByteRandom { byte: 127 };
-        let private_key = CoreRsaPrivateSigningKey::from_pem(
+        let private_key = CoreRsaPrivateSigningKey::from_pem_internal(
             TEST_RSA_KEY,
-            &rng,
+            // Constant salt used for PSS test vectors below.
+            Box::new(FixedByteRandom { byte: 127 }),
             Some(JsonWebKeyId::new("test_key".to_string())),
         )
         .unwrap();
@@ -926,8 +938,7 @@ mod tests {
 
     #[test]
     fn test_rsa_pss_signing() {
-        let private_key =
-            CoreRsaPrivateSigningKey::from_pem(TEST_RSA_KEY, &SystemRandom, None).unwrap();
+        let private_key = CoreRsaPrivateSigningKey::from_pem(TEST_RSA_KEY, None).unwrap();
 
         const MESSAGE: &str = "This is a probabilistic signature scheme";
         let sig1 = private_key

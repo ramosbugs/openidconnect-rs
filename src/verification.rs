@@ -796,7 +796,6 @@ mod tests {
 
     use chrono::{TimeZone, Utc};
     use oauth2::{ClientId, ClientSecret};
-    use ring::rand::SystemRandom;
     use {serde_json, AuthenticationContextClass};
 
     use super::super::core::{
@@ -1649,8 +1648,7 @@ mod tests {
         let client_id = ClientId::new("my_client".to_string());
         let issuer = IssuerUrl::new("https://example.com".to_string()).unwrap();
         let nonce = Nonce::new("the_nonce".to_string());
-        let rsa_priv_key =
-            CoreRsaPrivateSigningKey::from_pem(TEST_RSA_PRIV_KEY, &SystemRandom, None).unwrap();
+        let rsa_priv_key = CoreRsaPrivateSigningKey::from_pem(TEST_RSA_PRIV_KEY, None).unwrap();
 
         let id_token = CoreIdToken::new(
             CoreIdTokenClaims::new(
@@ -1860,8 +1858,7 @@ mod tests {
             serde_json::to_string(&claims).unwrap()
         );
 
-        let rsa_priv_key =
-            CoreRsaPrivateSigningKey::from_pem(TEST_RSA_PRIV_KEY, &SystemRandom, None).unwrap();
+        let rsa_priv_key = CoreRsaPrivateSigningKey::from_pem(TEST_RSA_PRIV_KEY, None).unwrap();
         let claims_jwt = CoreUserInfoJsonWebToken::new(
             claims,
             &rsa_priv_key,

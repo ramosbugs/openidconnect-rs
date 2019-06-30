@@ -439,7 +439,6 @@ pub mod tests {
     use std::marker::PhantomData;
     use std::string::ToString;
 
-    use ring::rand::SystemRandom;
     use serde_json;
 
     use super::super::core::{
@@ -670,7 +669,6 @@ pub mod tests {
     fn test_new_jwt() {
         let signing_key = CoreRsaPrivateSigningKey::from_pem(
             TEST_RSA_PRIV_KEY,
-            &SystemRandom,
             Some(JsonWebKeyId::new(
                 "bilbo.baggins@hobbiton.example".to_string(),
             )),

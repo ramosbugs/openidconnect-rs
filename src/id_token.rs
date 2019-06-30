@@ -179,8 +179,9 @@ where
     pub fn subject(&self) -> &SubjectIdentifier {
         &self.standard_claims.sub
     }
-    pub fn set_subject(&mut self, subject: SubjectIdentifier) {
-        self.standard_claims.sub = subject
+    pub fn set_subject(mut self, subject: SubjectIdentifier) -> Self {
+        self.standard_claims.sub = subject;
+        self
     }
 
     field_getters_setters![

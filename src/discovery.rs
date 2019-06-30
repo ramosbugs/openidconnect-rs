@@ -294,6 +294,10 @@ where
         }
     ];
 
+    ///
+    /// Fetches the OpenID Connect Discovery document and associated JSON Web Key Set from the
+    /// OpenID Connect Provider.
+    ///
     pub fn discover<HC, RE>(
         issuer_url: &IssuerUrl,
         http_client: HC,
@@ -317,6 +321,10 @@ where
             })
     }
 
+    ///
+    /// Asynchronously fetches the OpenID Connect Discovery document and associated JSON Web Key Set
+    /// from the OpenID Connect Provider.
+    ///
     pub fn discover_async<F, HC, RE>(
         issuer_url: IssuerUrl,
         http_client: HC,

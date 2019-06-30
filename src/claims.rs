@@ -49,34 +49,34 @@ pub struct StandardClaims<GC>
 where
     GC: GenderClaim,
 {
-    pub sub: SubjectIdentifier,
-    pub name: Option<LocalizedClaim<EndUserName>>,
-    pub given_name: Option<LocalizedClaim<EndUserGivenName>>,
-    pub family_name: Option<LocalizedClaim<EndUserFamilyName>>,
-    pub middle_name: Option<LocalizedClaim<EndUserMiddleName>>,
-    pub nickname: Option<LocalizedClaim<EndUserNickname>>,
-    pub preferred_username: Option<EndUserUsername>,
-    pub profile: Option<LocalizedClaim<EndUserProfileUrl>>,
-    pub picture: Option<LocalizedClaim<EndUserPictureUrl>>,
-    pub website: Option<LocalizedClaim<EndUserWebsiteUrl>>,
-    pub email: Option<EndUserEmail>,
-    pub email_verified: Option<bool>,
-    pub gender: Option<GC>,
-    pub birthday: Option<EndUserBirthday>,
-    pub zoneinfo: Option<EndUserTimezone>,
-    pub locale: Option<LanguageTag>,
-    pub phone_number: Option<EndUserPhoneNumber>,
-    pub phone_number_verified: Option<bool>,
-    pub address: Option<AddressClaim>,
-    pub updated_at: Option<DateTime<Utc>>,
+    pub(crate) sub: SubjectIdentifier,
+    pub(crate) name: Option<LocalizedClaim<EndUserName>>,
+    pub(crate) given_name: Option<LocalizedClaim<EndUserGivenName>>,
+    pub(crate) family_name: Option<LocalizedClaim<EndUserFamilyName>>,
+    pub(crate) middle_name: Option<LocalizedClaim<EndUserMiddleName>>,
+    pub(crate) nickname: Option<LocalizedClaim<EndUserNickname>>,
+    pub(crate) preferred_username: Option<EndUserUsername>,
+    pub(crate) profile: Option<LocalizedClaim<EndUserProfileUrl>>,
+    pub(crate) picture: Option<LocalizedClaim<EndUserPictureUrl>>,
+    pub(crate) website: Option<LocalizedClaim<EndUserWebsiteUrl>>,
+    pub(crate) email: Option<EndUserEmail>,
+    pub(crate) email_verified: Option<bool>,
+    pub(crate) gender: Option<GC>,
+    pub(crate) birthday: Option<EndUserBirthday>,
+    pub(crate) zoneinfo: Option<EndUserTimezone>,
+    pub(crate) locale: Option<LanguageTag>,
+    pub(crate) phone_number: Option<EndUserPhoneNumber>,
+    pub(crate) phone_number_verified: Option<bool>,
+    pub(crate) address: Option<AddressClaim>,
+    pub(crate) updated_at: Option<DateTime<Utc>>,
 }
 impl<GC> StandardClaims<GC>
 where
     GC: GenderClaim,
 {
-    pub fn new(sub: SubjectIdentifier) -> Self {
+    pub fn new(subject: SubjectIdentifier) -> Self {
         Self {
-            sub,
+            sub: subject,
             name: None,
             given_name: None,
             family_name: None,
@@ -98,6 +98,40 @@ where
             updated_at: None,
         }
     }
+
+    pub fn subject(&self) -> &SubjectIdentifier {
+        &self.sub
+    }
+    pub fn set_subject(mut self, subject: SubjectIdentifier) -> Self {
+        self.sub = subject;
+        self
+    }
+
+    field_getters_setters![
+        pub self [self] {
+            set_name -> name[Option<LocalizedClaim<EndUserName>>],
+            set_given_name -> given_name[Option<LocalizedClaim<EndUserGivenName>>],
+            set_family_name ->
+                family_name[Option<LocalizedClaim<EndUserFamilyName>>],
+            set_middle_name ->
+                middle_name[Option<LocalizedClaim<EndUserMiddleName>>],
+            set_nickname -> nickname[Option<LocalizedClaim<EndUserNickname>>],
+            set_preferred_username -> preferred_username[Option<EndUserUsername>],
+            set_profile -> profile[Option<LocalizedClaim<EndUserProfileUrl>>],
+            set_picture -> picture[Option<LocalizedClaim<EndUserPictureUrl>>],
+            set_website -> website[Option<LocalizedClaim<EndUserWebsiteUrl>>],
+            set_email -> email[Option<EndUserEmail>],
+            set_email_verified -> email_verified[Option<bool>],
+            set_gender -> gender[Option<GC>],
+            set_birthday -> birthday[Option<EndUserBirthday>],
+            set_zoneinfo -> zoneinfo[Option<EndUserTimezone>],
+            set_locale -> locale[Option<LanguageTag>],
+            set_phone_number -> phone_number[Option<EndUserPhoneNumber>],
+            set_phone_number_verified -> phone_number_verified[Option<bool>],
+            set_address -> address[Option<AddressClaim>],
+            set_updated_at -> updated_at[Option<DateTime<Utc>>],
+        }
+    ];
 }
 impl<'de, GC> Deserialize<'de> for StandardClaims<GC>
 where
