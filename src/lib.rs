@@ -15,6 +15,10 @@
 //! The [`Client`] struct provides the OpenID Connect Relying Party interface. The most common
 //! usage is provided by the [`core::CoreClient`] type alias.
 //!
+//! ## Examples
+//!
+//! * [Google](https://github.com/ramosbugs/openidconnect-rs/tree/master/examples/google.rs)
+//!
 //! ## Getting started: Authorization Code Grant w/ PKCE
 //!
 //! This is the most common OIDC/OAuth2 flow. PKCE is recommended whenever the client has no

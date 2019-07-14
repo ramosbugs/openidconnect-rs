@@ -634,9 +634,6 @@ where
         // 4. If the ID Token contains multiple audiences, the Client SHOULD verify that an azp
         //    Claim is present.
 
-        // FIXME(docs): add a reference in the module documentation describing this intentional
-        // deviation from the spec.
-
         // There is significant confusion and contradiction in the OpenID Connect Core spec around
         // the azp claim. See https://bitbucket.org/openid/connect/issues/973/ for a detailed
         // discussion. Given the lack of clarity around how this claim should be used, we defer

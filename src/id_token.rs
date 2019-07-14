@@ -85,9 +85,6 @@ where
     }
 }
 
-// FIXME: document at the module level that we do not support aggregated or distributed claims,
-// which are OPTIONAL in the spec:
-// http://openid.net/specs/openid-connect-core-1_0.html#AggregatedDistributedClaims
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct IdTokenClaims<AC, GC>
 where
