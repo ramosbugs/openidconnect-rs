@@ -213,9 +213,9 @@ where
     }
 
     field_getters_setters![
-        pub self [self.0] {
+        pub self [self.0] ["claim"] {
             set_issuer -> issuer[Option<IssuerUrl>],
-            set_audiences -> audiences[Option<Vec<Audience>>],
+            set_audiences -> audiences[Option<Vec<Audience>>] ["aud"],
         }
     ];
 
@@ -227,7 +227,7 @@ where
     }
 
     field_getters_setters![
-        pub self [self.0.standard_claims] {
+        pub self [self.0.standard_claims] ["claim"] {
             set_name -> name[Option<LocalizedClaim<EndUserName>>],
             set_given_name -> given_name[Option<LocalizedClaim<EndUserGivenName>>],
             set_family_name ->

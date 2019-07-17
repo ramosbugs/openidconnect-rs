@@ -7,15 +7,18 @@ use super::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
 use super::types::helpers::{deserialize_string_or_vec, serde_utc_seconds, serde_utc_seconds_opt};
 use super::types::LocalizedClaim;
 use super::{
-    AccessTokenHash, AdditionalClaims, AddressClaim, Audience, AudiencesClaim,
-    AuthenticationContextClass, AuthenticationMethodReference, AuthorizationCodeHash,
-    ClaimsVerificationError, EndUserBirthday, EndUserEmail, EndUserFamilyName, EndUserGivenName,
-    EndUserMiddleName, EndUserName, EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl,
-    EndUserProfileUrl, EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, ExtraTokenFields,
-    GenderClaim, IdTokenVerifier, IssuerClaim, IssuerUrl, JsonWebKey, JsonWebKeyType,
-    JsonWebKeyUse, JsonWebToken, JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag,
-    Nonce, NonceVerifier, PrivateSigningKey, StandardClaims, SubjectIdentifier,
+    AccessToken, AccessTokenHash, AdditionalClaims, AddressClaim, Audience, AudiencesClaim,
+    AuthenticationContextClass, AuthenticationMethodReference, AuthorizationCode,
+    AuthorizationCodeHash, ClaimsVerificationError, EndUserBirthday, EndUserEmail,
+    EndUserFamilyName, EndUserGivenName, EndUserMiddleName, EndUserName, EndUserNickname,
+    EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone, EndUserUsername,
+    EndUserWebsiteUrl, ExtraTokenFields, GenderClaim, IdTokenVerifier, IssuerClaim, IssuerUrl,
+    JsonWebKey, JsonWebKeyType, JsonWebKeyUse, JsonWebToken, JsonWebTokenAlgorithm,
+    JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, Nonce, NonceVerifier,
+    PrivateSigningKey, SigningError, StandardClaims, SubjectIdentifier,
 };
+use jwt::JsonWebTokenAccess;
+use oauth2::helpers::variant_name;
 
 // This wrapper layer exists instead of directly verifying the JWT and returning the claims so that
 // we can pass it around and easily access a serialized JWT representation of it (e.g., for passing
@@ -39,17 +42,49 @@ where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
+    ///
+    /// Initializes an ID token with the specified claims, signed using the given signing key and
+    /// algorithm.
+    ///
+    /// If an `access_token` and/or `code` are provided, this method sets the `at_hash` and/or
+    /// `c_hash` claims using the given signing algorithm, respectively. Otherwise, those claims are
+    /// unchanged from the values specified in `claims`.
+    ///
     pub fn new<JU, K, S>(
         claims: IdTokenClaims<AC, GC>,
         signing_key: &S,
         alg: JS,
+        access_token: Option<&AccessToken>,
+        code: Option<&AuthorizationCode>,
     ) -> Result<Self, JsonWebTokenError>
     where
         JU: JsonWebKeyUse,
         K: JsonWebKey<JS, JT, JU>,
         S: PrivateSigningKey<JS, JT, JU, K>,
     {
-        JsonWebToken::new(claims, signing_key, &alg).map(Self)
+        let at_hash = access_token
+            .map(|at| {
+                AccessTokenHash::from_token(at, &alg).map_err(JsonWebTokenError::SigningError)
+            })
+            .transpose()?
+            .or_else(|| claims.access_token_hash.clone());
+        let c_hash = code
+            .map(|c| {
+                AuthorizationCodeHash::from_code(c, &alg).map_err(JsonWebTokenError::SigningError)
+            })
+            .transpose()?
+            .or_else(|| claims.code_hash.clone());
+
+        JsonWebToken::new(
+            IdTokenClaims {
+                access_token_hash: at_hash,
+                code_hash: c_hash,
+                ..claims
+            },
+            signing_key,
+            &alg,
+        )
+        .map(Self)
     }
 
     pub fn claims<'a, 'b, JU, K, N>(
@@ -63,6 +98,16 @@ where
         N: NonceVerifier<'a>,
     {
         verifier.verified_claims(&self.0, nonce_verifier)
+    }
+
+    pub fn signing_alg(&self) -> Result<JS, SigningError> {
+        match self.0.unverified_header().alg {
+            JsonWebTokenAlgorithm::Signature(ref signing_alg, _) => Ok(signing_alg.clone()),
+            JsonWebTokenAlgorithm::Encryption(ref other) => Err(SigningError::UnsupportedAlg(
+                variant_name(other).to_string(),
+            )),
+            JsonWebTokenAlgorithm::None => Err(SigningError::UnsupportedAlg("none".to_string())),
+        }
     }
 }
 impl<AC, GC, JE, JS, JT> ToString for IdToken<AC, GC, JE, JS, JT>
@@ -158,18 +203,18 @@ where
     }
 
     field_getters_setters![
-        pub self [self] {
-            set_issuer -> issuer[IssuerUrl],
-            set_audiences -> audiences[Vec<Audience>],
-            set_expiration -> expiration[DateTime<Utc>],
-            set_issue_time -> issue_time[DateTime<Utc>],
+        pub self [self] ["claim"] {
+            set_issuer -> issuer[IssuerUrl] ["iss"],
+            set_audiences -> audiences[Vec<Audience>] ["aud"],
+            set_expiration -> expiration[DateTime<Utc>] ["exp"],
+            set_issue_time -> issue_time[DateTime<Utc>] ["iat"],
             set_auth_time -> auth_time[Option<DateTime<Utc>>],
             set_nonce -> nonce[Option<Nonce>],
-            set_auth_context_ref -> auth_context_ref[Option<AuthenticationContextClass>],
-            set_auth_method_refs -> auth_method_refs[Option<Vec<AuthenticationMethodReference>>],
-            set_authorized_party -> authorized_party[Option<ClientId>],
-            set_access_token_hash -> access_token_hash[Option<AccessTokenHash>],
-            set_code_hash -> code_hash[Option<AuthorizationCodeHash>],
+            set_auth_context_ref -> auth_context_ref[Option<AuthenticationContextClass>] ["acr"],
+            set_auth_method_refs -> auth_method_refs[Option<Vec<AuthenticationMethodReference>>] ["amr"],
+            set_authorized_party -> authorized_party[Option<ClientId>] ["azp"],
+            set_access_token_hash -> access_token_hash[Option<AccessTokenHash>] ["at_hash"],
+            set_code_hash -> code_hash[Option<AuthorizationCodeHash>] ["c_hash"],
         }
     ];
 
@@ -182,7 +227,7 @@ where
     }
 
     field_getters_setters![
-        pub self [self.standard_claims] {
+        pub self [self.standard_claims] ["claim"] {
             set_name -> name[Option<LocalizedClaim<EndUserName>>],
             set_given_name -> given_name[Option<LocalizedClaim<EndUserGivenName>>],
             set_family_name ->

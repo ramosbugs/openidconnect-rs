@@ -7,9 +7,7 @@ license = "MIT"
 repository = "https://github.com/ramosbugs/openidconnect-rs"
 
 [features]
-# FIXME: document these optional features
 nightly = []
-trace_requests = []
 
 [dependencies]
 base64 = "0.9"

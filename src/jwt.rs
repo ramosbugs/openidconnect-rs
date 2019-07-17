@@ -215,7 +215,7 @@ where
             alg: JsonWebTokenAlgorithm::Signature(alg.clone(), PhantomData),
             crit: None,
             cty: None,
-            kid: signing_key.to_verification_key().key_id().cloned(),
+            kid: signing_key.as_verification_key().key_id().cloned(),
             typ: None,
             _phantom_jt: PhantomData,
         };

@@ -18,14 +18,23 @@ use super::{
     SubjectIdentifier,
 };
 
+///
+/// Additional claims beyond the set of Standard Claims defined by OpenID Connect Core.
+///
 pub trait AdditionalClaims: Debug + DeserializeOwned + Serialize + 'static {}
 
+///
+/// No additional claims.
+///
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 // In order to support serde flatten, this must be an empty struct rather than an empty
 // tuple struct.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct EmptyAdditionalClaims {}
 impl AdditionalClaims for EmptyAdditionalClaims {}
 
+///
+/// Address claims.
+///
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct AddressClaim {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -42,8 +51,14 @@ pub struct AddressClaim {
     pub country: Option<AddressCountry>,
 }
 
+///
+/// Gender claim.
+///
 pub trait GenderClaim: Clone + Debug + DeserializeOwned + Serialize + 'static {}
 
+///
+/// Standard Claims defined by OpenID Connect Core.
+///
 #[derive(Clone, Debug, PartialEq)]
 pub struct StandardClaims<GC>
 where
@@ -74,6 +89,11 @@ impl<GC> StandardClaims<GC>
 where
     GC: GenderClaim,
 {
+    ///
+    /// Initializes a set of Standard Claims.
+    ///
+    /// The Subject (`sub`) claim is the only required Standard Claim.
+    ///
     pub fn new(subject: SubjectIdentifier) -> Self {
         Self {
             sub: subject,
@@ -99,16 +119,23 @@ where
         }
     }
 
+    ///
+    /// Returns the Subject (`sub`) claim.
+    ///
     pub fn subject(&self) -> &SubjectIdentifier {
         &self.sub
     }
+
+    ///
+    /// Sets the Subject (`sub`) claim.
+    ///
     pub fn set_subject(mut self, subject: SubjectIdentifier) -> Self {
         self.sub = subject;
         self
     }
 
     field_getters_setters![
-        pub self [self] {
+        pub self [self] ["claim"] {
             set_name -> name[Option<LocalizedClaim<EndUserName>>],
             set_given_name -> given_name[Option<LocalizedClaim<EndUserGivenName>>],
             set_family_name ->

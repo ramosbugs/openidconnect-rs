@@ -242,7 +242,7 @@ where
     }
 
     field_getters_setters![
-        pub self [self] {
+        pub self [self] ["provider metadata value"] {
             set_issuer -> issuer[IssuerUrl],
             set_authorization_endpoint -> authorization_endpoint[AuthUrl],
             set_token_endpoint -> token_endpoint[Option<TokenUrl>],

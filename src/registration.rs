@@ -114,7 +114,7 @@ where
         }
     }
     field_getters_setters![
-        pub self [self.standard_metadata] {
+        pub self [self.standard_metadata] ["client metadata value"] {
             set_redirect_uris -> redirect_uris[Vec<RedirectUrl>],
             set_response_types -> response_types[Option<Vec<ResponseTypes<RT>>>],
             set_grant_types -> grant_types[Option<Vec<G>>],
@@ -565,7 +565,7 @@ where
     }
 
     field_getters_setters![
-        pub self [self.client_metadata.standard_metadata] {
+        pub self [self.client_metadata.standard_metadata] ["client metadata value"] {
             set_redirect_uris -> redirect_uris[Vec<RedirectUrl>],
             set_response_types -> response_types[Option<Vec<ResponseTypes<RT>>>],
             set_grant_types -> grant_types[Option<Vec<G>>],
@@ -708,7 +708,7 @@ where
     }
 
     field_getters_setters![
-        pub self [self] {
+        pub self [self] ["response field"] {
             set_client_id -> client_id[ClientId],
             set_client_secret -> client_secret[Option<ClientSecret>],
             set_registration_access_token
@@ -720,7 +720,7 @@ where
     ];
 
     field_getters_setters![
-        pub self [self.client_metadata.standard_metadata] {
+        pub self [self.client_metadata.standard_metadata] ["client metadata value"] {
             set_redirect_uris -> redirect_uris[Vec<RedirectUrl>],
             set_response_types -> response_types[Option<Vec<ResponseTypes<RT>>>],
             set_grant_types -> grant_types[Option<Vec<G>>],

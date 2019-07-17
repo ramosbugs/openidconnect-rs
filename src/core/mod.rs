@@ -726,30 +726,53 @@ pub enum CoreJwsSigningAlgorithm {
 impl JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
     fn key_type(&self) -> Result<CoreJsonWebKeyType, String> {
         Ok(match *self {
-            CoreJwsSigningAlgorithm::HmacSha256 => CoreJsonWebKeyType::Symmetric,
-            CoreJwsSigningAlgorithm::HmacSha384 => CoreJsonWebKeyType::Symmetric,
-            CoreJwsSigningAlgorithm::HmacSha512 => CoreJsonWebKeyType::Symmetric,
-            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256 => CoreJsonWebKeyType::RSA,
-            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384 => CoreJsonWebKeyType::RSA,
-            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512 => CoreJsonWebKeyType::RSA,
-            CoreJwsSigningAlgorithm::EcdsaP256Sha256 => CoreJsonWebKeyType::EllipticCurve,
-            CoreJwsSigningAlgorithm::EcdsaP384Sha384 => CoreJsonWebKeyType::EllipticCurve,
-            CoreJwsSigningAlgorithm::EcdsaP521Sha512 => CoreJsonWebKeyType::EllipticCurve,
-            CoreJwsSigningAlgorithm::RsaSsaPssSha256 => CoreJsonWebKeyType::RSA,
-            CoreJwsSigningAlgorithm::RsaSsaPssSha384 => CoreJsonWebKeyType::RSA,
-            CoreJwsSigningAlgorithm::RsaSsaPssSha512 => CoreJsonWebKeyType::RSA,
+            CoreJwsSigningAlgorithm::HmacSha256
+            | CoreJwsSigningAlgorithm::HmacSha384
+            | CoreJwsSigningAlgorithm::HmacSha512 => CoreJsonWebKeyType::Symmetric,
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256
+            | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384
+            | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512
+            | CoreJwsSigningAlgorithm::RsaSsaPssSha256
+            | CoreJwsSigningAlgorithm::RsaSsaPssSha384
+            | CoreJwsSigningAlgorithm::RsaSsaPssSha512 => CoreJsonWebKeyType::RSA,
+            CoreJwsSigningAlgorithm::EcdsaP256Sha256
+            | CoreJwsSigningAlgorithm::EcdsaP384Sha384
+            | CoreJwsSigningAlgorithm::EcdsaP521Sha512 => CoreJsonWebKeyType::EllipticCurve,
             CoreJwsSigningAlgorithm::None => {
                 return Err("signature algorithm `none` has no corresponding key type".to_string());
             }
         })
     }
 
-    fn is_symmetric(&self) -> bool {
+    fn uses_shared_secret(&self) -> bool {
         if let Ok(kty) = self.key_type() {
             kty == CoreJsonWebKeyType::Symmetric
         } else {
             false
         }
+    }
+
+    fn hash_bytes(&self, bytes: &[u8]) -> Result<Vec<u8>, String> {
+        use ring::digest::{digest, SHA256, SHA384, SHA512};
+        Ok(match *self {
+            CoreJwsSigningAlgorithm::HmacSha256
+            | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256
+            | CoreJwsSigningAlgorithm::RsaSsaPssSha256
+            | CoreJwsSigningAlgorithm::EcdsaP256Sha256 => digest(&SHA256, bytes).as_ref().to_vec(),
+            CoreJwsSigningAlgorithm::HmacSha384
+            | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384
+            | CoreJwsSigningAlgorithm::RsaSsaPssSha384
+            | CoreJwsSigningAlgorithm::EcdsaP384Sha384 => digest(&SHA384, bytes).as_ref().to_vec(),
+            CoreJwsSigningAlgorithm::HmacSha512
+            | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512
+            | CoreJwsSigningAlgorithm::RsaSsaPssSha512
+            | CoreJwsSigningAlgorithm::EcdsaP521Sha512 => digest(&SHA512, bytes).as_ref().to_vec(),
+            CoreJwsSigningAlgorithm::None => {
+                return Err(
+                    "signature algorithm `none` has no corresponding hash algorithm".to_string(),
+                );
+            }
+        })
     }
 
     fn rsa_sha_256() -> Self {

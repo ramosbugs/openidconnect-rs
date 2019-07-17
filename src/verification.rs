@@ -380,7 +380,7 @@ where
         // JOSE header, as an attacker could manipulate these while forging the JWT. The code
         // below must be secure regardless of how these fields are manipulated.
 
-        if signature_alg.is_symmetric() {
+        if signature_alg.uses_shared_secret() {
             // 8. If the JWT alg Header Parameter uses a MAC based algorithm such as HS256,
             //    HS384, or HS512, the octets of the UTF-8 representation of the client_secret
             //    corresponding to the client_id contained in the aud (audience) Claim are used
@@ -806,14 +806,13 @@ mod tests {
     use super::super::types::helpers::seconds_to_utc;
     use super::super::types::Seconds;
     use super::super::{
-        Audience, Base64UrlEncodedBytes, EndUserName, IssuerUrl, JsonWebKeyId, Nonce,
-        StandardClaims,
+        AccessToken, Audience, AuthorizationCode, Base64UrlEncodedBytes, EndUserName, IssuerUrl,
+        JsonWebKeyId, Nonce, StandardClaims, UserInfoError,
     };
     use super::{
         AudiencesClaim, ClaimsVerificationError, IssuerClaim, JsonWebTokenHeader,
         JwtClaimsVerifier, SignatureVerificationError, SubjectIdentifier,
     };
-    use UserInfoError;
 
     type CoreJsonWebTokenHeader = JsonWebTokenHeader<
         CoreJweContentEncryptionAlgorithm,
@@ -1661,6 +1660,10 @@ mod tests {
             .set_auth_time(Some(Utc.timestamp(1544928548, 0))),
             &rsa_priv_key,
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
+            Some(&AccessToken::new("the_access_token".to_string())),
+            Some(&AuthorizationCode::new(
+                "the_authorization_code".to_string(),
+            )),
         )
         .unwrap();
 
@@ -1668,11 +1671,12 @@ mod tests {
         let expected_serialized_jwt =
             "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwiYXVkIjpbIm15X2NsaWVudCJdL\
              CJleHAiOjE1NDQ5MzIxNDksImlhdCI6MTU0NDkyODU0OSwiYXV0aF90aW1lIjoxNTQ0OTI4NTQ4LCJub25jZSI\
-             6InRoZV9ub25jZSIsImFjciI6InRoZV9hY3IiLCJzdWIiOiJzdWJqZWN0In0.gb5HuuyDMu-LvYvG-jJNIJPEZ\
-             823qNwvgNjdAtW0HJpgwJWhJq0hOHUuZz6lvf8ud5xbg5GOo0Q37v3Ke08TvGu6E1USWjecZzp1aYVm9BiMvw5\
-             EBRUrwAaOCG2XFjuOKUVfglSMJnRnoNqVVIWpCAr1ETjZzRIbkU3n5GQRguC5CwN5n45I3dtjoKuNGc2Ni-IMl\
-             J2nRiCJOl2FtStdgs-doc-A9DHtO01x-5HCwytXvcE28Snur1JnqpUgmWrQ8gZMGuijKirgNnze2Dd5BsZRHZ2\
-             CLGIwBsCnauBrJy_NNlQg4hUcSlGsuTa0dmZY7mCf4BN2WCpyOh0wgtkAgQ";
+             6InRoZV9ub25jZSIsImFjciI6InRoZV9hY3IiLCJhdF9oYXNoIjoiWjNJQUNVR00tbXhIV3lZUXZpSzhFUSIsI\
+             mNfaGFzaCI6Imo2OW1CZmFIbmRMM1Y1RmNoak9LVXciLCJzdWIiOiJzdWJqZWN0In0.CHCWFcIqbCZhZwZH4oY\
+             _mlcRy5aUQQtlNI0VHNYxiILn9ppRHLL4Bn_LMn9VP8tGXkfZWxCgP25ZTyBXXKfk0fQvnukVdyM0bCOpQbiBg\
+             5gB9c46l_f-ZznDoHWonpnKky2Gmzk3ocb3TCUQ9GSeRXAzRdRNWTT0ElWNBsLWU4j2IIdnghM78gkXwOC76Rk\
+             pshgB73ubtuHGdIf5L9Ec3hifHlVjzKuvedAM4SIOjdBOelgtBlF3463ufX_Ut91CjP5TzLMsuK3Lh_vyo8ttn\
+             S41rBDuetR2ENvR0yj5RjkX_SPY3V0yCW8_NPPu1CHu_1oL0Nma0ohCbF3vnUJcwg";
         assert_eq!(expected_serialized_jwt, serialized_jwt.as_str().unwrap());
 
         let rsa_pub_key = serde_json::from_str::<CoreJsonWebKey>(TEST_RSA_PUB_KEY)

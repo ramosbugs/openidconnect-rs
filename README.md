@@ -20,12 +20,13 @@ API documentation and examples are available on [docs.rs](https://docs.rs/openid
     * Relying Party flows: code, implicit, hybrid
     * Standard claims
     * UserInfo endpoint
-    * RSA, HMAC-based JWT verification
+    * RSA, HMAC-based ID token verification
   * Unsupported features:
     * Aggregated and distributed claims
     * Passing request parameters as JWTs
     * Verification of the `azp` claim (see [discussion](https://bitbucket.org/openid/connect/issues/973/))
-    * ECDSA-based JWT verification
+    * ECDSA-based ID token verification
+    * JSON Web Encryption (JWE)
 * [OpenID Connect Discovery](https://openid.net/specs/openid-connect-discovery-1_0.html)
   * Supported features:
     * Provider Metadata

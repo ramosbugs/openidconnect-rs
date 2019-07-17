@@ -33,6 +33,7 @@
 //! extern crate url;
 //!
 //! use openidconnect::{
+//!     AccessTokenHash,
 //!     AuthenticationFlow,
 //!     AuthorizationCode,
 //!     ClientId,
@@ -51,7 +52,7 @@
 //! # extern crate failure;
 //! # fn err_wrapper() -> Result<(), failure::Error> {
 //! // Use OpenID Connect Discovery to fetch the provider metadata.
-//! use openidconnect::TokenResponse;
+//! use openidconnect::{OAuth2TokenResponse, TokenResponse};
 //! let provider_metadata = CoreProviderMetadata::discover(
 //!     &IssuerUrl::new("https://accounts.example.com".to_string())?,
 //!     http_client,
@@ -105,6 +106,18 @@
 //!
 //! // Extract the ID token claims after verifying its authenticity and nonce.
 //! let id_token = token_response.id_token().claims(&client.id_token_verifier(), &nonce)?;
+//!
+//! // Verify the access token hash to ensure that the access token hasn't been substituted for
+//! // another user's.
+//! if let Some(expected_access_token_hash) = id_token.access_token_hash() {
+//!     let actual_access_token_hash = AccessTokenHash::from_token(
+//!         token_response.access_token(),
+//!         &token_response.id_token().signing_alg()?
+//!     )?;
+//!     if actual_access_token_hash != *expected_access_token_hash {
+//!         return Err(failure::Error::from_boxed_compat("Invalid access token".into()));
+//!     }
+//! }
 //!
 //! // The authenticated user's identity is now available. See the IdTokenClaims struct for a
 //! // complete listing of the available claims.
@@ -252,7 +265,7 @@
 //!             Some(JsonWebKeyId::new("key1".to_string()))
 //!         )
 //!         .expect("Invalid RSA private key")
-//!         .to_verification_key()
+//!         .as_verification_key()
 //!     ]
 //! );
 //!
@@ -307,6 +320,7 @@
 //! # extern crate failure;
 //! # fn err_wrapper() -> Result<CoreTokenResponse, failure::Error> {
 //! # let rsa_pem = "";
+//! # let access_token = AccessToken::new("".to_string());
 //! let id_token = CoreIdToken::new(
 //!     CoreIdTokenClaims::new(
 //!         // Specify the issuer URL for the OpenID Connect Provider.
@@ -349,6 +363,14 @@
 //!     // Uses the RS256 signature algorithm. This crate supports any RS*, PS*, or HS*
 //!     // signature algorithm.
 //!     CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
+//!     // When returning the ID token alongside an access token (e.g., in the Authorization Code
+//!     // flow), it is recommended to pass the access token here to set the `at_hash` claim
+//!     // automatically.
+//!     Some(&access_token),
+//!     // When returning the ID token alongside an authorization code (e.g., in the implicit
+//!     // flow), it is recommended to pass the authorization code here to set the `c_hash` claim
+//!     // automatically.
+//!     None,
 //! )?;
 //!
 //! Ok(CoreTokenResponse::new(

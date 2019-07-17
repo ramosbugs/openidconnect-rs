@@ -618,139 +618,122 @@ macro_rules! serialize_fields {
 }
 
 macro_rules! field_getters {
-    (@case $self:ident [$zero:expr] $field:ident Option < bool >) => {
-        fn $field(&$self) -> Option<bool> {
+    (@case [$doc:expr] $vis:vis $self:ident [$zero:expr] $field:ident Option < bool >) => {
+        #[doc = $doc]
+        $vis fn $field(&$self) -> Option<bool> {
             $zero.$field
         }
     };
-    (@case $self:ident [$zero:expr] $field:ident Option < bool > { $($body:tt)+ }) => {
-        fn $field(&$self) -> Option<bool> {
+    (@case [$doc:expr] $vis:vis $self:ident [$zero:expr] $field:ident Option < bool > { $($body:tt)+ }) => {
+        #[doc = $doc]
+        $vis fn $field(&$self) -> Option<bool> {
             $($body)+
         }
     };
-    (@case $self:ident [$zero:expr] $field:ident Option <$type:ty >) => {
-        fn $field(&$self) -> Option<&$type> {
+    (@case [$doc:expr] $vis:vis $self:ident [$zero:expr] $field:ident Option <$type:ty >) => {
+        #[doc = $doc]
+        $vis fn $field(&$self) -> Option<&$type> {
             $zero.$field.as_ref()
         }
     };
-    (@case $self:ident [$zero:expr] $field:ident $type:ty) => {
-        fn $field(&$self) -> &$type {
+    (@case [$doc:expr] $vis:vis $self:ident [$zero:expr] $field:ident Option < $type:ty > { $($body:tt)+ }) => {
+        #[doc = $doc]
+        $vis fn $field(&$self) -> Option<$type> {
+            $($body)+
+        }
+    };
+    (@case [$doc:expr] $vis:vis $self:ident [$zero:expr] $field:ident $type:ty) => {
+        #[doc = $doc]
+        $vis fn $field(&$self) -> &$type {
             &$zero.$field
         }
     };
-    (@case $self:ident [$zero:expr] $field:ident $type:ty { $($body:tt)+ }) => {
-        fn $field(&$self) -> $type {
+    (@case [$doc:expr] $vis:vis $self:ident [$zero:expr] $field:ident $type:ty { $($body:tt)+ }) => {
+        #[doc = $doc]
+        $vis fn $field(&$self) -> $type {
             $($body)+
         }
     };
-    (@case pub $self:ident [$zero:expr] $field:ident Option < bool >) => {
-        pub fn $field(&$self) -> Option<bool> {
-            $zero.$field
-        }
-    };
-    (@case pub $self:ident [$zero:expr] $field:ident Option < bool > { $($body:tt)+ }) => {
-        pub fn $field(&$self) -> Option<bool> {
-            $($body)+
-        }
-    };
-    (@case pub $self:ident [$zero:expr] $field:ident Option <$type:ty >) => {
-       pub  fn $field(&$self) -> Option<&$type> {
-            $zero.$field.as_ref()
-        }
-    };
-    (@case pub $self:ident [$zero:expr] $field:ident Option < $type:ty > { $($body:tt)+ }) => {
-       pub  fn $field(&$self) -> Option<$type> {
-            $($body)+
-        }
-    };
-    (@case pub $self:ident [$zero:expr] $field:ident $type:ty) => {
-        pub fn $field(&$self) -> &$type {
-            &$zero.$field
-        }
-    };
-    (@case pub $self:ident [$zero:expr] $field:ident $type:ty { $($body:tt)+ }) => {
-        pub fn $field(&$self) -> $type {
-            $($body)+
-        }
-    };
-    (@case $self:ident [$zero:expr] $field:ident() Option < bool >) => {
+    (@case [$doc:expr] $self:ident [$zero:expr] $field:ident() Option < bool >) => {
+        #[doc = $doc]
         fn $field(&$self) -> Option<bool> {
             $zero.$field()
         }
     };
-    (@case $self:ident [$zero:expr] $field:ident() Option < bool > { $($body:tt)+ }) => {
+    (@case [$doc:expr] $self:ident [$zero:expr] $field:ident() Option < bool > { $($body:tt)+ }) => {
+        #[doc = $doc]
         fn $field(&$self) -> Option<bool> {
             $($body)+
         }
     };
-    (@case $self:ident [$zero:expr] $field:ident() Option < $type:ty >) => {
+    (@case [$doc:expr] $self:ident [$zero:expr] $field:ident() Option < $type:ty >) => {
+        #[doc = $doc]
         fn $field(&$self) -> Option<&$type> {
             $zero.$field()
         }
     };
-    (@case $self:ident [$zero:expr] $field:ident() Option < $type:ty > { $($body:tt)+ }) => {
+    (@case [$doc:expr] $self:ident [$zero:expr] $field:ident() Option < $type:ty > { $($body:tt)+ }) => {
+        #[doc = $doc]
         fn $field(&$self) -> Option<$type> {
             $($body)+
         }
     };
-    (@case $self:ident [$zero:expr] $field:ident() $type:ty) => {
+    (@case [$doc:expr] $self:ident [$zero:expr] $field:ident() $type:ty) => {
+        #[doc = $doc]
         fn $field(&$self) -> &$type {
             &$zero.$field()
         }
     };
-    (@case $self:ident [$zero:expr] $field:ident() $type:ty { $($body:tt)+ }) => {
+    (@case [$doc:expr] $self:ident [$zero:expr] $field:ident() $type:ty { $($body:tt)+ }) => {
+        #[doc = $doc]
         fn $field(&$self) -> $type {
             $($body)+
         }
     };
     // Main entry points
     (
-        $self:ident [$zero:expr] {
+        $vis:vis $self:ident [$zero:expr] [$doc:expr] {
             $(
-                $field:ident[$($entry:tt)+],
+                $field:ident[$($entry:tt)+] [$doc_field:expr],
             )+
         }
     ) => {
         $(
-            field_getters![@case $self [$zero] $field $($entry)+];
+            field_getters![
+                @case
+                [concat!("Returns the `", $doc_field, "` ", $doc, ".")]
+                $vis $self [$zero] $field $($entry)+
+            ];
         )+
     };
     (
-        pub $self:ident [$zero:expr] {
+        $vis:vis $self:ident [$zero:expr]() [$doc:expr] {
             $(
-                $field:ident[$($entry:tt)+],
+                $field:ident[$($entry:tt)+] [$doc_field:expr],
             )+
         }
     ) => {
         $(
-            field_getters![@case pub $self [$zero] $field $($entry)+];
-        )+
-    };
-    (
-        $self:ident [$zero:expr]() {
-            $(
-                $field:ident[$($entry:tt)+],
-            )+
-        }
-    ) => {
-        $(
-            field_getters![@case $self [$zero] $field() $($entry)+];
+            field_getters![
+                @case
+                [concat!("Returns the `", $doc_field, "` ", $doc, ".")]
+                $vis $self [$zero] $field() $($entry)+
+            ];
         )+
     };
 }
 
 macro_rules! field_setters {
-    (@case pub $self:ident [$zero:expr] $setter:ident $field:ident $type:ty) => {
-        pub fn $setter(
-            mut $self,
-            $field: $type
-        ) -> Self {
-            $zero.$field = $field;
-            $self
-        }
+    (@case [$doc:expr] $vis:vis $self:ident [$zero:expr] $setter:ident $field:ident $type:ty [$doc_field:expr]) => {
+        field_setters![
+            @case2
+            [concat!("Sets the `", $doc_field, "` ", $doc, ".")]
+            $vis $self [$zero] $setter $field $type
+        ];
     };
-    (@case $self:ident [$zero:expr] $setter:ident $field:ident $type:ty) => {
-        fn $setter(
+    (@case2 [$doc:expr] $vis:vis $self:ident [$zero:expr] $setter:ident $field:ident $type:ty) => {
+        #[doc = $doc]
+        $vis fn $setter(
             mut $self,
             $field: $type
         ) -> Self {
@@ -760,59 +743,78 @@ macro_rules! field_setters {
     };
     // Main entry point
     (
-        pub $self:ident [$zero:expr] {
-            $(
-                $setter:ident -> $field:ident[$($entry:tt)+],
-            )+
+        $vis:vis $self:ident [$zero:expr] [$doc:expr] {
+            $setter:ident -> $field:ident[$($entry:tt)+] [$doc_field:expr]
         }
     ) => {
-        $(
-            field_setters![@case pub $self [$zero] $setter $field $($entry)+];
-        )+
-    };
-    (
-        $self:ident [$zero:expr] {
-            $(
-                $setter:ident -> $field:ident[$($entry:tt)+],
-            )+
-        }
-    ) => {
-        $(
-            field_setters![@case $self [$zero] $setter $field $($entry)+];
-        )+
+        field_setters![
+            @case [$doc] $vis $self [$zero] $setter $field $($entry)+ [$doc_field]
+        ];
     };
 }
 
 macro_rules! field_getters_setters {
     (
-        $self:ident [$zero:expr] {
-            $(
-                $setter:ident -> $field:ident[$($entry:tt)+],
-            )+
-        }
+        @single $vis:vis $self:ident [$zero:expr] [$doc:expr]
+        [$setter:ident -> $field:ident[$($entry:tt)+] [$field_doc:expr], $($rest:tt)*]
     ) => {
-        field_getters![$self [$zero] { $($field[$($entry)+],)+ }];
-        field_setters![$self [$zero] { $($setter -> $field[$($entry)+],)+ }];
+        field_getters![$vis $self [$zero] [$doc] { $field[$($entry)+] [$field_doc], }];
+        field_setters![
+            $vis $self [$zero] [$doc] { $setter -> $field[$($entry)+] [$field_doc] }
+        ];
+        field_getters_setters![@single $vis $self [$zero] [$doc] [$($rest)*]];
     };
     (
-        pub $self:ident [$zero:expr] {
-            $(
-                $setter:ident -> $field:ident[$($entry:tt)+],
-            )+
-        }
+        @single $vis:vis $self:ident [$zero:expr]() [$doc:expr]
+        [$setter:ident -> $field:ident[$($entry:tt)+] [$field_doc:expr], $($rest:tt)*]
     ) => {
-        field_getters![pub $self [$zero] { $($field[$($entry)+],)+ }];
-        field_setters![pub $self [$zero] { $($setter -> $field[$($entry)+],)+ }];
+        field_getters![$vis $self [$zero]() [$doc] { $field[$($entry)+] [$field_doc], }];
+        field_setters![
+            $vis $self [$zero] [$doc] { $setter -> $field[$($entry)+] [$field_doc] }
+        ];
+        field_getters_setters![@single $vis $self [$zero]() [$doc] [$($rest)*]];
     };
     (
-        $self:ident [$zero:expr]() {
-            $(
-                $setter:ident -> $field:ident[$($entry:tt)+],
-            )+
+        @single $vis:vis $self:ident [$zero:expr] [$doc:expr]
+        [$setter:ident -> $field:ident[$($entry:tt)+], $($rest:tt)*]
+    ) => {
+        field_getters![$vis $self [$zero] [$doc] { $field[$($entry)+] [stringify!($field)], }];
+        field_setters![
+            $vis $self [$zero] [$doc] { $setter -> $field[$($entry)+] [stringify!($field)] }
+        ];
+        field_getters_setters![@single $vis $self [$zero] [$doc] [$($rest)*]];
+    };
+    (
+        @single $vis:vis $self:ident [$zero:expr]() [$doc:expr]
+        [$setter:ident -> $field:ident[$($entry:tt)+], $($rest:tt)*]
+    ) => {
+        field_getters![$vis $self [$zero]() [$doc] { $field[$($entry)+] [stringify!($field)], }];
+        field_setters![
+            $vis $self [$zero] [$doc] { $setter -> $field[$($entry)+] [stringify!($field)] }
+        ];
+        field_getters_setters![@single $vis $self [$zero]() [$doc] [$($rest)*]];
+    };
+    // Base case.
+    (@single $vis:vis $self:ident [$zero:expr] [$doc:expr] []) => {};
+    // Main entry points.
+    (
+        $vis:vis $self:ident [$zero:expr] [$doc:expr] {
+            $setter:ident -> $field:ident[$($entry:tt)+] $($rest:tt)*
         }
     ) => {
-        field_getters![$self [$zero]() { $($field[$($entry)+],)+ }];
-        field_setters![$self [$zero] { $($setter -> $field[$($entry)+],)+ }];
+        field_getters_setters![
+            @single
+            $vis $self [$zero] [$doc] [$setter -> $field[$($entry)+] $($rest)*]
+        ];
     };
-
+    (
+        $vis:vis $self:ident [$zero:expr]() [$doc:expr] {
+            $setter:ident -> $field:ident[$($entry:tt)+] $($rest:tt)*
+        }
+    ) => {
+        field_getters_setters![
+            @single
+            $vis $self [$zero]() [$doc] [$setter -> $field[$($entry)+] $($rest)*]
+        ];
+    };
 }

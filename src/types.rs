@@ -22,31 +22,65 @@ use url;
 use url::Url;
 
 use super::http::{check_content_type, MIME_TYPE_JSON};
-use super::{DiscoveryError, HttpRequest, HttpResponse, SignatureVerificationError};
+use super::{
+    AccessToken, AuthorizationCode, DiscoveryError, HttpRequest, HttpResponse,
+    SignatureVerificationError,
+};
 
+///
+/// A [locale-aware](https://openid.net/specs/openid-connect-core-1_0.html#IndividualClaimsLanguages)
+/// claim.
+///
+/// This structure associates one more `Option<LanguageTag>` locales with the corresponding
+/// claims values.
+///
 #[derive(Clone, Debug, PartialEq)]
 pub struct LocalizedClaim<T>(HashMap<Option<LanguageTag>, T>);
 impl<T> LocalizedClaim<T> {
+    ///
+    /// Initialize an empty claim.
+    ///
     pub fn new() -> Self {
         Self::default()
     }
 
+    ///
+    /// Returns true if the claim contains a value for the specified locale.
+    ///
     pub fn contains_key(&self, locale: &Option<LanguageTag>) -> bool {
         self.0.contains_key(locale)
     }
 
+    ///
+    /// Returns the entry for the specified locale or `None` if there is no such entry.
+    ///
     pub fn get(&self, locale: &Option<LanguageTag>) -> Option<&T> {
         self.0.get(locale)
     }
 
+    ///
+    /// Returns an iterator over the locales and claim value entries.
+    ///
     pub fn iter(&self) -> std::collections::hash_map::Iter<Option<LanguageTag>, T> {
         self.0.iter()
     }
 
+    ///
+    /// Inserts or updates an entry for the specified locale.
+    ///
+    /// Returns the current value associated with the given locale, or `None` if there is no
+    /// such entry.
+    ///
     pub fn insert(&mut self, locale: Option<LanguageTag>, value: T) -> Option<T> {
         self.0.insert(locale, value)
     }
 
+    ///
+    /// Removes an entry for the specified locale.
+    ///
+    /// Returns the current value associated with the given locale, or `None` if there is no
+    /// such entry.
+    ///
     pub fn remove(&mut self, locale: &Option<LanguageTag>) -> Option<T> {
         self.0.remove(locale)
     }
@@ -89,6 +123,9 @@ impl<T> IntoIterator for LocalizedClaim<T> {
     }
 }
 
+///
+/// Client application type.
+///
 pub trait ApplicationType: Debug + DeserializeOwned + Serialize + 'static {}
 
 ///
@@ -102,10 +139,24 @@ pub trait AuthDisplay: AsRef<str> + Debug + DeserializeOwned + Serialize + 'stat
 ///
 pub trait AuthPrompt: AsRef<str> + 'static {}
 
+///
+/// Claim name.
+///
 pub trait ClaimName: Debug + DeserializeOwned + Serialize + 'static {}
+
+///
+/// Claim type (e.g., normal, aggregated, or distributed).
+///
 pub trait ClaimType: Debug + DeserializeOwned + Serialize + 'static {}
 
+///
+/// Client authentication method.
+///
 pub trait ClientAuthMethod: Debug + DeserializeOwned + Serialize + 'static {}
+
+///
+/// Grant type.
+///
 pub trait GrantType: Debug + DeserializeOwned + Serialize + 'static {}
 
 ///
@@ -124,24 +175,53 @@ pub enum SigningError {
     Other(String),
 }
 
+///
+/// JSON Web Key.
+///
 pub trait JsonWebKey<JS, JT, JU>: Clone + Debug + DeserializeOwned + Serialize + 'static
 where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     JU: JsonWebKeyUse,
 {
+    ///
+    /// Returns the key ID, or `None` if no key ID is specified.
+    ///
     fn key_id(&self) -> Option<&JsonWebKeyId>;
+
+    ///
+    /// Returns the key type (e.g., RSA).
+    ///
     fn key_type(&self) -> &JT;
+
+    ///
+    /// Returns the allowed key usage (e.g., signing or encryption), or `None` if no usage is
+    /// specified.
+    ///
     fn key_use(&self) -> Option<&JU>;
+
+    ///
+    /// Initializes a new symmetric key or shared signing secret from the specified raw bytes.
+    ///
     fn new_symmetric(key: Vec<u8>) -> Self;
+
+    ///
+    /// Verifies the given `signature` using the given signature algorithm (`signature_alg`) over
+    /// the given `message`.
+    ///
+    /// Returns `Ok` if the signature is valid, or an `Err` otherwise.
+    ///
     fn verify_signature(
         &self,
         signature_alg: &JS,
-        msg: &[u8],
+        message: &[u8],
         signature: &[u8],
     ) -> Result<(), SignatureVerificationError>;
 }
 
+///
+/// Private or symmetric key for signing.
+///
 pub trait PrivateSigningKey<JS, JT, JU, K>
 where
     JS: JwsSigningAlgorithm<JT>,
@@ -149,51 +229,118 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
-    fn sign(&self, signature_alg: &JS, msg: &[u8]) -> Result<Vec<u8>, SigningError>;
-    fn to_verification_key(&self) -> K;
+    ///
+    /// Signs the given `message` using the given signature algorithm.
+    ///
+    fn sign(&self, signature_alg: &JS, message: &[u8]) -> Result<Vec<u8>, SigningError>;
+
+    ///
+    /// Converts this key to a JSON Web Key that can be used for verifying signatures.
+    ///
+    fn as_verification_key(&self) -> K;
 }
 
+///
+/// Key type (e.g., RSA).
+///
 pub trait JsonWebKeyType:
     Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
 {
 }
 
+///
+/// Allowed key usage.
+///
 pub trait JsonWebKeyUse: Debug + DeserializeOwned + Serialize + 'static {
+    ///
+    /// Returns true if the associated key may be used for digital signatures, or false otherwise.
+    ///
     fn allows_signature(&self) -> bool;
+
+    ///
+    /// Returns true if the associated key may be used for encryption, or false otherwise.
+    ///
     fn allows_encryption(&self) -> bool;
 }
 
+///
+/// JSON Web Encryption (JWE) content encryption algorithm.
+///
 pub trait JweContentEncryptionAlgorithm<JT>:
     Clone + Debug + DeserializeOwned + Serialize + 'static
 where
     JT: JsonWebKeyType,
 {
+    ///
+    /// Returns the type of key required to use this encryption algorithm.
+    ///
     fn key_type(&self) -> Result<JT, String>;
 }
 
+///
+/// JSON Web Encryption (JWE) key management algorithm.
+///
 pub trait JweKeyManagementAlgorithm: Debug + DeserializeOwned + Serialize + 'static {
     // TODO: add a key_type() method
 }
 
+///
+/// JSON Web Signature (JWS) algorithm.
+///
 pub trait JwsSigningAlgorithm<JT>:
     Clone + Debug + DeserializeOwned + Eq + Hash + PartialEq + Serialize + 'static
 where
     JT: JsonWebKeyType,
 {
+    ///
+    /// Returns the type of key required to use this signature algorithm.
+    ///
     fn key_type(&self) -> Result<JT, String>;
-    fn is_symmetric(&self) -> bool;
+
+    ///
+    /// Returns true if the signature algorithm uses a shared secret (symmetric key).
+    ///
+    fn uses_shared_secret(&self) -> bool;
+
+    fn hash_bytes(&self, bytes: &[u8]) -> Result<Vec<u8>, String>;
+
+    ///
+    /// Returns the RS256 algorithm.
+    ///
+    /// This is the default algorithm for OpenID Connect ID tokens and must be supported by all
+    /// implementations.
+    ///
     fn rsa_sha_256() -> Self;
 }
 
+///
+/// Response mode indicating how the OpenID Connect Provider should return the Authorization
+/// Response to the Relying Party (client).
+///
 pub trait ResponseMode: Debug + DeserializeOwned + Serialize + 'static {}
 
+///
+/// Response type indicating the desired authorization processing flow, including what
+/// parameters are returned from the endpoints used.
+///
 pub trait ResponseType: AsRef<str> + Debug + DeserializeOwned + Serialize + 'static {
+    ///
+    /// Converts this OpenID Connect response type to an [`oauth2::ResponseType`] used by the
+    /// underyling [`oauth2`] crate.
+    ///
     fn to_oauth2(&self) -> oauth2::ResponseType;
 }
 
+///
+/// Subject identifier type returned by an OpenID Connect Provider to uniquely identify its users.
+///
 pub trait SubjectIdentifierType: Debug + DeserializeOwned + Serialize + 'static {}
 
 new_type![
+    ///
+    /// Set of authentication methods or procedures that are considered to be equivalent to each
+    /// other in a particular context.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     AuthenticationContextClass(String)
 ];
@@ -204,13 +351,42 @@ impl AsRef<str> for AuthenticationContextClass {
 }
 
 new_type![
+    ///
+    /// Identifier for an authentication method (e.g., `password` or `totp`).
+    ///
+    /// Defining specific AMR identifiers is beyond the scope of the OpenID Connect Core spec.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     AuthenticationMethodReference(String)
 ];
 
 new_type![
+    ///
+    /// Access token hash.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     AccessTokenHash(String)
+    impl {
+        ///
+        /// Initialize a new access token hash from an [`AccessToken`] and signature algorithm.
+        ///
+        pub fn from_token<JS, JT>(
+            access_token: &AccessToken,
+            alg: &JS
+        ) -> Result<Self, SigningError>
+        where
+            JS: JwsSigningAlgorithm<JT>,
+            JT: JsonWebKeyType,
+        {
+            alg.hash_bytes(access_token.secret().as_bytes())
+                .map(|hash| {
+                    Self::new(
+                        base64::encode_config(&hash[0..hash.len() / 2], base64::URL_SAFE_NO_PAD)
+                    )
+                })
+                .map_err(SigningError::UnsupportedAlg)
+        }
+    }
 ];
 
 new_type![
@@ -239,8 +415,33 @@ new_type![
 ];
 
 new_type![
+    ///
+    /// Authorization code hash.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     AuthorizationCodeHash(String)
+    impl {
+        ///
+        /// Initialize a new authorization code hash from an [`AuthorizationCode`] and signature
+        /// algorithm.
+        ///
+        pub fn from_code<JS, JT>(
+            code: &AuthorizationCode,
+            alg: &JS
+        ) -> Result<Self, SigningError>
+        where
+            JS: JwsSigningAlgorithm<JT>,
+            JT: JsonWebKeyType,
+        {
+            alg.hash_bytes(code.secret().as_bytes())
+                .map(|hash| {
+                    Self::new(
+                        base64::encode_config(&hash[0..hash.len() / 2], base64::URL_SAFE_NO_PAD)
+                    )
+                })
+                .map_err(SigningError::UnsupportedAlg)
+        }
+    }
 ];
 
 new_type![

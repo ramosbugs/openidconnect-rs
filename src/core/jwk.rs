@@ -99,7 +99,7 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
     fn verify_signature(
         &self,
         signature_alg: &CoreJwsSigningAlgorithm,
-        msg: &[u8],
+        message: &[u8],
         signature: &[u8],
     ) -> Result<(), SignatureVerificationError> {
         if let Some(key_use) = self.key_use() {
@@ -123,47 +123,47 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256 => crypto::verify_rsa_signature(
                 self,
                 &ring_signature::RSA_PKCS1_2048_8192_SHA256,
-                msg,
+                message,
                 signature,
             ),
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384 => crypto::verify_rsa_signature(
                 self,
                 &ring_signature::RSA_PKCS1_2048_8192_SHA384,
-                msg,
+                message,
                 signature,
             ),
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512 => crypto::verify_rsa_signature(
                 self,
                 &ring_signature::RSA_PKCS1_2048_8192_SHA512,
-                msg,
+                message,
                 signature,
             ),
             CoreJwsSigningAlgorithm::RsaSsaPssSha256 => crypto::verify_rsa_signature(
                 self,
                 &ring_signature::RSA_PSS_2048_8192_SHA256,
-                msg,
+                message,
                 signature,
             ),
             CoreJwsSigningAlgorithm::RsaSsaPssSha384 => crypto::verify_rsa_signature(
                 self,
                 &ring_signature::RSA_PSS_2048_8192_SHA384,
-                msg,
+                message,
                 signature,
             ),
             CoreJwsSigningAlgorithm::RsaSsaPssSha512 => crypto::verify_rsa_signature(
                 self,
                 &ring_signature::RSA_PSS_2048_8192_SHA512,
-                msg,
+                message,
                 signature,
             ),
             CoreJwsSigningAlgorithm::HmacSha256 => {
-                crypto::verify_hmac(self, &digest::SHA256, msg, signature)
+                crypto::verify_hmac(self, &digest::SHA256, message, signature)
             }
             CoreJwsSigningAlgorithm::HmacSha384 => {
-                crypto::verify_hmac(self, &digest::SHA384, msg, signature)
+                crypto::verify_hmac(self, &digest::SHA384, message, signature)
             }
             CoreJwsSigningAlgorithm::HmacSha512 => {
-                crypto::verify_hmac(self, &digest::SHA512, msg, signature)
+                crypto::verify_hmac(self, &digest::SHA512, message, signature)
             }
             ref other => Err(SignatureVerificationError::UnsupportedAlg(
                 variant_name(other).to_string(),
@@ -206,7 +206,7 @@ impl
     fn sign(
         &self,
         signature_alg: &CoreJwsSigningAlgorithm,
-        msg: &[u8],
+        message: &[u8],
     ) -> Result<Vec<u8>, SigningError> {
         let digest_alg = match *signature_alg {
             CoreJwsSigningAlgorithm::HmacSha256 => &digest::SHA256,
@@ -218,12 +218,14 @@ impl
                 ))
             }
         };
-        Ok(crypto::sign_hmac(self.secret.as_ref(), &digest_alg, msg)
-            .as_ref()
-            .into())
+        Ok(
+            crypto::sign_hmac(self.secret.as_ref(), &digest_alg, message)
+                .as_ref()
+                .into(),
+        )
     }
 
-    fn to_verification_key(&self) -> CoreJsonWebKey {
+    fn as_verification_key(&self) -> CoreJsonWebKey {
         CoreJsonWebKey::new_symmetric(self.secret.clone())
     }
 }
@@ -300,7 +302,7 @@ impl
         crypto::sign_rsa(&self.key_pair, padding_alg, self.rng.as_ref(), msg)
     }
 
-    fn to_verification_key(&self) -> CoreJsonWebKey {
+    fn as_verification_key(&self) -> CoreJsonWebKey {
         let public_key = self.key_pair.public_key();
         CoreJsonWebKey {
             kty: CoreJsonWebKeyType::RSA,
@@ -743,7 +745,7 @@ mod tests {
         assert_eq!(expected_sig_base64, base64::encode(&sig));
 
         secret_key
-            .to_verification_key()
+            .as_verification_key()
             .verify_signature(alg, message, &sig)
             .unwrap();
     }
@@ -856,7 +858,7 @@ mod tests {
         let sig = private_key.sign(alg, message).unwrap();
         assert_eq!(expected_sig_base64, base64::encode(&sig));
 
-        let public_key = private_key.to_verification_key();
+        let public_key = private_key.as_verification_key();
         public_key.verify_signature(alg, message, &sig).unwrap();
     }
 
@@ -870,7 +872,7 @@ mod tests {
         )
         .unwrap();
 
-        let public_key_jwk = private_key.to_verification_key();
+        let public_key_jwk = private_key.as_verification_key();
         let public_key_jwk_str = serde_json::to_string(&public_key_jwk).unwrap();
         assert_eq!(
             "{\
