@@ -391,11 +391,12 @@ mod tests {
 
     use super::super::super::jwt::tests::TEST_RSA_PUB_KEY;
     use super::super::super::verification::SignatureVerificationError;
-    use super::super::super::{Base64UrlEncodedBytes, JsonWebKey, JsonWebKeyId};
+    use super::super::super::{JsonWebKey, JsonWebKeyId};
     use super::{
         CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse,
         CoreJwsSigningAlgorithm, CoreRsaPrivateSigningKey, PrivateSigningKey,
     };
+    use crate::types::Base64UrlEncodedBytes;
 
     #[test]
     fn test_core_jwk_deserialization_rsa() {

@@ -803,13 +803,14 @@ mod tests {
     use super::super::types::helpers::seconds_to_utc;
     use super::super::types::Seconds;
     use super::super::{
-        AccessToken, Audience, AuthorizationCode, Base64UrlEncodedBytes, EndUserName, IssuerUrl,
-        JsonWebKeyId, Nonce, StandardClaims, UserInfoError,
+        AccessToken, Audience, AuthorizationCode, EndUserName, IssuerUrl, JsonWebKeyId, Nonce,
+        StandardClaims, UserInfoError,
     };
     use super::{
         AudiencesClaim, ClaimsVerificationError, IssuerClaim, JsonWebTokenHeader,
         JwtClaimsVerifier, SignatureVerificationError, SubjectIdentifier,
     };
+    use crate::types::Base64UrlEncodedBytes;
 
     type CoreJsonWebTokenHeader = JsonWebTokenHeader<
         CoreJweContentEncryptionAlgorithm,

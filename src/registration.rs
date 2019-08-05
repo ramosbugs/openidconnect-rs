@@ -812,8 +812,8 @@ mod tests {
     };
     use super::super::jwt::tests::TEST_RSA_PUB_KEY;
     use super::super::{
-        AuthenticationContextClass, ClientClientContactEmail, ClientConfigUrl, ClientName,
-        ClientUrl, JsonWebKeySet, JsonWebKeySetUrl, LanguageTag, LogoUrl, PolicyUrl, RequestUrl,
+        AuthenticationContextClass, ClientConfigUrl, ClientContactEmail, ClientName, ClientUrl,
+        JsonWebKeySet, JsonWebKeySetUrl, LanguageTag, LogoUrl, PolicyUrl, RequestUrl,
         ResponseTypes, SectorIdentifierUrl, ToSUrl,
     };
 
@@ -898,8 +898,8 @@ mod tests {
         assert_eq!(
             *client_metadata.contacts().unwrap(),
             vec![
-                ClientClientContactEmail::new("user@example.com".to_string()),
-                ClientClientContactEmail::new("admin@openidconnect.local".to_string()),
+                ClientContactEmail::new("user@example.com".to_string()),
+                ClientContactEmail::new("admin@openidconnect.local".to_string()),
             ]
         );
         assert_eq!(
@@ -1222,8 +1222,8 @@ mod tests {
         assert_eq!(
             *registration_response.contacts().unwrap(),
             vec![
-                ClientClientContactEmail::new("user@example.com".to_string()),
-                ClientClientContactEmail::new("admin@openidconnect.local".to_string()),
+                ClientContactEmail::new("user@example.com".to_string()),
+                ClientContactEmail::new("admin@openidconnect.local".to_string()),
             ]
         );
         assert_eq!(
