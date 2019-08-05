@@ -33,7 +33,9 @@ use openidconnect::{
 #[macro_use]
 mod rp_common;
 
-use rp_common::{get_provider_metadata, init_log, issuer_url, register_client, PanicIfFail};
+use rp_common::{
+    get_provider_metadata, http_client, init_log, issuer_url, register_client, PanicIfFail,
+};
 
 struct TestState {
     access_token: Option<AccessToken>,
@@ -156,7 +158,7 @@ impl TestState {
                     .take()
                     .expect("no authorization_code"),
             )
-            .request(openidconnect::reqwest::http_client)
+            .request(http_client)
             .panic_if_fail("failed to exchange authorization code for token");
         log_debug!(
             "Authorization Server returned token response: {:?}",
@@ -202,11 +204,8 @@ impl TestState {
     }
 
     pub fn jwks(&self) -> CoreJsonWebKeySet {
-        CoreJsonWebKeySet::fetch(
-            self.provider_metadata.jwks_uri(),
-            openidconnect::reqwest::http_client,
-        )
-        .panic_if_fail("failed to fetch JWK set")
+        CoreJsonWebKeySet::fetch(self.provider_metadata.jwks_uri(), http_client)
+            .panic_if_fail("failed to fetch JWK set")
     }
 
     pub fn set_auth_type(mut self, auth_type: AuthType) -> Self {
@@ -222,7 +221,7 @@ impl TestState {
             )
             .unwrap()
             .require_signed_response(false)
-            .request(openidconnect::reqwest::http_client)
+            .request(http_client)
             .panic_if_fail("failed to get UserInfo")
     }
 
@@ -235,7 +234,7 @@ impl TestState {
             )
             .unwrap()
             .require_signed_response(false)
-            .request(openidconnect::reqwest::http_client);
+            .request(http_client);
         match user_info_result {
             Err(err) => err,
             _ => panic!("claims verification succeeded but was expected to fail"),
@@ -361,7 +360,7 @@ fn rp_id_token_iat() {
                 .take()
                 .expect("no authorization_code"),
         )
-        .request(openidconnect::reqwest::http_client);
+        .request(http_client);
 
     match token_response {
         Err(RequestTokenError::Parse(_, _)) => {
@@ -465,7 +464,7 @@ fn rp_id_token_sub() {
                 .take()
                 .expect("no authorization_code"),
         )
-        .request(openidconnect::reqwest::http_client);
+        .request(http_client);
 
     match token_response {
         Err(RequestTokenError::Parse(_, _)) => {
@@ -582,7 +581,7 @@ fn rp_userinfo_sig() {
         // that the RP SHOULD verify these.
         .require_audience_match(false)
         .require_issuer_match(false)
-        .request(openidconnect::reqwest::http_client)
+        .request(http_client)
         .panic_if_fail("failed to get UserInfo");
 
     log_debug!("UserInfo response: {:?}", user_info_claims);

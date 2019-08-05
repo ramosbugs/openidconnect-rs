@@ -1,11 +1,10 @@
+extern crate color_backtrace;
 extern crate env_logger;
 extern crate failure;
 
-#[cfg(test)]
-extern crate color_backtrace;
-
 use std::cell::RefCell;
 use std::sync::{Once, ONCE_INIT};
+use std::time::Duration;
 
 use failure::Fail;
 use url::Url;
@@ -15,7 +14,9 @@ use openidconnect::core::{
     CoreApplicationType, CoreClientRegistrationRequest, CoreClientRegistrationResponse,
     CoreProviderMetadata,
 };
-use openidconnect::{ClientContactEmail, ClientName, IssuerUrl, RedirectUrl};
+use openidconnect::{
+    ClientContactEmail, ClientName, HttpRequest, HttpResponse, IssuerUrl, RedirectUrl,
+};
 
 pub const CERTIFICATION_BASE_URL: &str = "https://rp.certification.openid.net:8080";
 pub const RP_CONTACT_EMAIL: &str = "ramos@cs.stanford.edu";
@@ -75,6 +76,26 @@ pub fn init_log(test_id: &'static str) {
     set_test_id(test_id);
 }
 
+pub fn http_client(request: HttpRequest) -> Result<HttpResponse, openidconnect::reqwest::Error> {
+    retry::retry(
+        (0..5).map(|i| {
+            if i != 0 {
+                warn!("Retrying HTTP request ({}/5)", i + 1)
+            }
+            Duration::from_millis(500)
+        }),
+        || openidconnect::reqwest::http_client(request.clone()),
+    )
+    .map_err(|err| match err {
+        retry::Error::Operation {
+            error,
+            total_delay: _,
+            tries: _,
+        } => error,
+        retry::Error::Internal(msg) => openidconnect::reqwest::Error::Other(msg),
+    })
+}
+
 pub trait PanicIfFail<T, F>
 where
     F: Fail,
@@ -113,9 +134,10 @@ pub fn issuer_url(test_id: &str) -> IssuerUrl {
 
 pub fn get_provider_metadata(test_id: &str) -> CoreProviderMetadata {
     let _issuer_url = issuer_url(test_id);
-    CoreProviderMetadata::discover(&_issuer_url, openidconnect::reqwest::http_client).expect(
-        &format!("Failed to fetch provider metadata from {:?}", _issuer_url),
-    )
+    CoreProviderMetadata::discover(&_issuer_url, http_client).expect(&format!(
+        "Failed to fetch provider metadata from {:?}",
+        _issuer_url
+    ))
 }
 
 pub fn register_client<F>(
@@ -145,7 +167,7 @@ where
         .registration_endpoint()
         .expect("provider does not support dynamic registration");
     registration_request_post
-        .register(&registration_endpoint, openidconnect::reqwest::http_client)
+        .register(&registration_endpoint, http_client)
         .expect(&format!(
             "Failed to register client at {:?}",
             registration_endpoint
