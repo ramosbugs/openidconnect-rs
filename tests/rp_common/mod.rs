@@ -15,7 +15,7 @@ use openidconnect::core::{
     CoreApplicationType, CoreClientRegistrationRequest, CoreClientRegistrationResponse,
     CoreProviderMetadata,
 };
-use openidconnect::{ClientName, ContactEmail, IssuerUrl, RedirectUrl};
+use openidconnect::{ClientContactEmail, ClientName, IssuerUrl, RedirectUrl};
 
 pub const CERTIFICATION_BASE_URL: &str = "https://rp.certification.openid.net:8080";
 pub const RP_CONTACT_EMAIL: &str = "ramos@cs.stanford.edu";
@@ -135,7 +135,9 @@ where
             .into_iter()
             .collect(),
     ))
-    .set_contacts(Some(vec![ContactEmail::new(RP_CONTACT_EMAIL.to_string())]));
+    .set_contacts(Some(vec![ClientContactEmail::new(
+        RP_CONTACT_EMAIL.to_string(),
+    )]));
 
     let registration_request_post = request_fn(registration_request_pre);
 

@@ -17,11 +17,12 @@ use serde_json;
 use super::http::{auth_bearer, check_content_type, MIME_TYPE_JSON};
 use super::types::helpers::{serde_utc_seconds_opt, split_language_tag_key};
 use super::types::{
-    ApplicationType, AuthenticationContextClass, ClientAuthMethod, ClientConfigUrl, ClientName,
-    ClientUrl, ContactEmail, GrantType, InitiateLoginUrl, JsonWebKeySetUrl, JsonWebKeyType,
-    JsonWebKeyUse, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm,
-    LocalizedClaim, LogoUrl, PolicyUrl, RegistrationAccessToken, RegistrationUrl, RequestUrl,
-    ResponseType, ResponseTypes, SectorIdentifierUrl, SubjectIdentifierType, ToSUrl,
+    ApplicationType, AuthenticationContextClass, ClientAuthMethod, ClientConfigUrl,
+    ClientContactEmail, ClientName, ClientUrl, GrantType, InitiateLoginUrl, JsonWebKeySetUrl,
+    JsonWebKeyType, JsonWebKeyUse, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm,
+    JwsSigningAlgorithm, LocalizedClaim, LogoUrl, PolicyUrl, RegistrationAccessToken,
+    RegistrationUrl, RequestUrl, ResponseType, ResponseTypes, SectorIdentifierUrl,
+    SubjectIdentifierType, ToSUrl,
 };
 use super::{
     AccessToken, ClientId, ClientSecret, ErrorResponseType, HttpRequest, HttpResponse, JsonWebKey,
@@ -119,7 +120,7 @@ where
             set_response_types -> response_types[Option<Vec<ResponseTypes<RT>>>],
             set_grant_types -> grant_types[Option<Vec<G>>],
             set_application_type -> application_type[Option<AT>],
-            set_contacts -> contacts[Option<Vec<ContactEmail>>],
+            set_contacts -> contacts[Option<Vec<ClientContactEmail>>],
             set_client_name -> client_name[Option<LocalizedClaim<ClientName>>],
             set_logo_uri -> logo_uri[Option<LocalizedClaim<LogoUrl>>],
             set_client_uri -> client_uri[Option<LocalizedClaim<ClientUrl>>],
@@ -175,7 +176,7 @@ where
     response_types: Option<Vec<ResponseTypes<RT>>>,
     grant_types: Option<Vec<G>>,
     application_type: Option<AT>,
-    contacts: Option<Vec<ContactEmail>>,
+    contacts: Option<Vec<ClientContactEmail>>,
     client_name: Option<LocalizedClaim<ClientName>>,
     logo_uri: Option<LocalizedClaim<LogoUrl>>,
     client_uri: Option<LocalizedClaim<ClientUrl>>,
@@ -570,7 +571,7 @@ where
             set_response_types -> response_types[Option<Vec<ResponseTypes<RT>>>],
             set_grant_types -> grant_types[Option<Vec<G>>],
             set_application_type -> application_type[Option<AT>],
-            set_contacts -> contacts[Option<Vec<ContactEmail>>],
+            set_contacts -> contacts[Option<Vec<ClientContactEmail>>],
             set_client_name -> client_name[Option<LocalizedClaim<ClientName>>],
             set_logo_uri -> logo_uri[Option<LocalizedClaim<LogoUrl>>],
             set_client_uri -> client_uri[Option<LocalizedClaim<ClientUrl>>],
@@ -725,7 +726,7 @@ where
             set_response_types -> response_types[Option<Vec<ResponseTypes<RT>>>],
             set_grant_types -> grant_types[Option<Vec<G>>],
             set_application_type -> application_type[Option<AT>],
-            set_contacts -> contacts[Option<Vec<ContactEmail>>],
+            set_contacts -> contacts[Option<Vec<ClientContactEmail>>],
             set_client_name -> client_name[Option<LocalizedClaim<ClientName>>],
             set_logo_uri -> logo_uri[Option<LocalizedClaim<LogoUrl>>],
             set_client_uri -> client_uri[Option<LocalizedClaim<ClientUrl>>],
@@ -811,8 +812,8 @@ mod tests {
     };
     use super::super::jwt::tests::TEST_RSA_PUB_KEY;
     use super::super::{
-        AuthenticationContextClass, ClientConfigUrl, ClientName, ClientUrl, ContactEmail,
-        JsonWebKeySet, JsonWebKeySetUrl, LanguageTag, LogoUrl, PolicyUrl, RequestUrl,
+        AuthenticationContextClass, ClientClientContactEmail, ClientConfigUrl, ClientName,
+        ClientUrl, JsonWebKeySet, JsonWebKeySetUrl, LanguageTag, LogoUrl, PolicyUrl, RequestUrl,
         ResponseTypes, SectorIdentifierUrl, ToSUrl,
     };
 
@@ -897,8 +898,8 @@ mod tests {
         assert_eq!(
             *client_metadata.contacts().unwrap(),
             vec![
-                ContactEmail::new("user@example.com".to_string()),
-                ContactEmail::new("admin@openidconnect.local".to_string()),
+                ClientClientContactEmail::new("user@example.com".to_string()),
+                ClientClientContactEmail::new("admin@openidconnect.local".to_string()),
             ]
         );
         assert_eq!(
@@ -1221,8 +1222,8 @@ mod tests {
         assert_eq!(
             *registration_response.contacts().unwrap(),
             vec![
-                ContactEmail::new("user@example.com".to_string()),
-                ContactEmail::new("admin@openidconnect.local".to_string()),
+                ClientClientContactEmail::new("user@example.com".to_string()),
+                ClientClientContactEmail::new("admin@openidconnect.local".to_string()),
             ]
         );
         assert_eq!(

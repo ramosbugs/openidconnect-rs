@@ -293,15 +293,23 @@ where
     JT: JsonWebKeyType,
 {
     ///
-    /// Returns the type of key required to use this signature algorithm.
+    /// Returns the type of key required to use this signature algorithm, or `None` if this
+    /// algorithm does not require a key.
     ///
-    fn key_type(&self) -> Result<JT, String>;
+    fn key_type(&self) -> Option<JT>;
 
     ///
     /// Returns true if the signature algorithm uses a shared secret (symmetric key).
     ///
     fn uses_shared_secret(&self) -> bool;
 
+    ///
+    /// Hashes the given `bytes` using the hash algorithm associated with this signing
+    /// algorithm, and returns the hashed bytes.
+    ///
+    /// If hashing fails or this signing algorithm does not have an associated hash function, an
+    /// `Err` is returned with a string describing the cause of the error.
+    ///
     fn hash_bytes(&self, bytes: &[u8]) -> Result<Vec<u8>, String>;
 
     ///
@@ -390,26 +398,41 @@ new_type![
 ];
 
 new_type![
+    ///
+    /// Country portion of address.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     AddressCountry(String)
 ];
 
 new_type![
+    ///
+    /// Locality portion of address.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     AddressLocality(String)
 ];
 
 new_type![
+    ///
+    /// Postal code portion of address.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     AddressPostalCode(String)
 ];
 
 new_type![
+    ///
+    /// Region portion of address.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     AddressRegion(String)
 ];
 
 new_type![
+    ///
+    /// Audience claim value.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     Audience(String)
 ];
@@ -446,92 +469,182 @@ new_type![
 
 new_type![
     #[derive(Deserialize, Eq, Hash, Serialize)]
-    Base64UrlEncodedBytes(
+    pub(crate) Base64UrlEncodedBytes(
         #[serde(with = "serde_base64url_byte_array")]
         Vec<u8>
     )
 ];
 
 new_type![
+    ///
+    /// OpenID Connect client name.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     ClientName(String)
 ];
 
-new_url_type![ClientConfigUrl];
+new_url_type![
+    ///
+    /// Client configuration endpoint URL.
+    ///
+    ClientConfigUrl
+];
 
-new_url_type![ClientUrl];
-
-new_type![
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
-    ContactEmail(String)
+new_url_type![
+    ///
+    /// Client homepage URL.
+    ///
+    ClientUrl
 ];
 
 new_type![
+    ///
+    /// Client contact e-mail address.
+    ///
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    ClientContactEmail(String)
+];
+
+new_type![
+    ///
+    /// End user's birthday, represented as an
+    /// [ISO 8601:2004](https://www.iso.org/standard/40874.html) `YYYY-MM-DD` format.
+    ///
+    /// The year MAY be `0000`, indicating that it is omitted. To represent only the year, `YYYY`
+    /// format is allowed. Note that depending on the underlying platform's date related function,
+    /// providing just year can result in varying month and day, so the implementers need to take
+    /// this factor into account to correctly process the dates.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     EndUserBirthday(String)
 ];
 
 new_type![
+    ///
+    /// End user's e-mail address.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     EndUserEmail(String)
 ];
 
 new_type![
+    ///
+    /// End user's family name.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     EndUserFamilyName(String)
 ];
 
 new_type![
+    ///
+    /// End user's given name.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     EndUserGivenName(String)
 ];
 
 new_type![
+    ///
+    /// End user's middle name.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     EndUserMiddleName(String)
 ];
 
 new_type![
+    ///
+    /// End user's name.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     EndUserName(String)
 ];
 
 new_type![
+    ///
+    /// End user's nickname.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     EndUserNickname(String)
 ];
 
 new_type![
+    ///
+    /// End user's phone number.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     EndUserPhoneNumber(String)
 ];
 
-new_url_type![EndUserPictureUrl];
+new_url_type![
+    ///
+    /// URL of end user's profile picture.
+    ///
+    EndUserPictureUrl
+];
 
-new_url_type![EndUserProfileUrl];
+new_url_type![
+    ///
+    /// URL of end user's profile page.
+    ///
+    EndUserProfileUrl
+];
 
 new_type![
+    ///
+    /// End user's time zone as a string from the
+    /// [time zone database](https://www.iana.org/time-zones).
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     EndUserTimezone(String)
 ];
 
-new_url_type![EndUserWebsiteUrl];
+new_url_type![
+    ///
+    /// URL of end user's website.
+    ///
+    EndUserWebsiteUrl
+];
 
 new_type![
+    ///
+    /// End user's username.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     EndUserUsername(String)
 ];
 
 new_type![
+    ///
+    /// Full mailing address, formatted for display or use on a mailing label.
+    ///
+    /// This field MAY contain multiple lines, separated by newlines. Newlines can be represented
+    /// either as a carriage return/line feed pair (`"\r\n"`) or as a single line feed character
+    /// (`"\n"`).
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     FormattedAddress(String)
 ];
 
-new_url_type![InitiateLoginUrl];
+new_url_type![
+    ///
+    /// URI using the `https` scheme that a third party can use to initiate a login by the Relying
+    /// Party.
+    ///
+    InitiateLoginUrl
+];
 
 new_url_type![
+    ///
+    /// URL using the `https` scheme with no query or fragment component that the OP asserts as its
+    /// Issuer Identifier.
+    ///
     IssuerUrl
     impl {
+        ///
+        /// Parse a string as a URL, with this URL as the base URL.
+        ///
+        /// See [`Url::parse`].
+        ///
         pub fn join(&self, suffix: &str) -> Result<Url, url::ParseError> {
             if let Some('/') = self.1.chars().next_back() {
                 Url::parse(&(self.1.clone() + suffix))
@@ -543,10 +656,16 @@ new_url_type![
 ];
 
 new_type![
+    ///
+    /// ID of a JSON Web Key.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     JsonWebKeyId(String)
 ];
 
+///
+/// JSON Web Key Set.
+///
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 pub struct JsonWebKeySet<JS, JT, JU, K>
 where
@@ -573,6 +692,9 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
+    ///
+    /// Create a new JSON Web Key Set.
+    ///
     pub fn new(keys: Vec<K>) -> Self {
         Self {
             keys,
@@ -580,6 +702,10 @@ where
         }
     }
 
+    ///
+    /// Fetch a remote JSON Web Key Set from the specified `url` using the given `http_client`
+    /// (e.g., [`crate::reqwest::http_client`] or [`crate::curl::http_client`]).
+    ///
     pub fn fetch<HC, RE>(
         url: &JsonWebKeySetUrl,
         http_client: HC,
@@ -593,6 +719,10 @@ where
             .and_then(Self::fetch_response)
     }
 
+    ///
+    /// Fetch a remote JSON Web Key Set from the specified `url` using the given async `http_client`
+    /// (e.g., [`crate::reqwest::async_http_client`]).
+    ///
     pub fn fetch_async<F, HC, RE>(
         url: &JsonWebKeySetUrl,
         http_client: HC,
@@ -641,6 +771,9 @@ where
         serde_json::from_slice(&http_response.body).map_err(DiscoveryError::Parse)
     }
 
+    ///
+    /// Return the keys in this JSON Web Key Set.
+    ///
     pub fn keys(&self) -> &Vec<K> {
         &self.keys
     }
@@ -668,9 +801,17 @@ where
     }
 }
 
-new_url_type![JsonWebKeySetUrl];
+new_url_type![
+    ///
+    /// JSON Web Key Set URL.
+    ///
+    JsonWebKeySetUrl
+];
 
 new_type![
+    ///
+    /// Language tag adhering to RFC 5646 (e.g., `fr` or `fr-CA`).
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     LanguageTag(String)
 ];
@@ -681,13 +822,27 @@ impl AsRef<str> for LanguageTag {
 }
 
 new_secret_type![
+    ///
+    /// Hint about the login identifier the End-User might use to log in.
+    ///
+    /// The use of this parameter is left to the OpenID Connect Provider's discretion.
+    ///
     #[derive(Clone, Deserialize, Serialize)]
     LoginHint(String)
 ];
 
-new_url_type![LogoUrl];
+new_url_type![
+    ///
+    /// URL that references a logo for the Client application.
+    ///
+    LogoUrl
+];
 
 new_secret_type![
+    ///
+    /// String value used to associate a client session with an ID Token, and to mitigate replay
+    /// attacks.
+    ///
     #[derive(Clone, Deserialize, Serialize)]
     Nonce(String)
     impl {
@@ -717,20 +872,48 @@ impl PartialEq for Nonce {
     }
 }
 
-new_url_type![OpPolicyUrl];
+new_url_type![
+    ///
+    /// URL providing the OpenID Connect Provider's data usage policies for client applications.
+    ///
+    OpPolicyUrl
+];
 
-new_url_type![OpTosUrl];
+new_url_type![
+    ///
+    /// URL providing the OpenID Connect Provider's Terms of Service.
+    ///
+    OpTosUrl
+];
 
-new_url_type![PolicyUrl];
+new_url_type![
+    ///
+    /// URL providing a client application's data usage policy.
+    ///
+    PolicyUrl
+];
 
 new_secret_type![
+    ///
+    /// Access token used by a client application to access the Client Registration endpoint.
+    ///
     #[derive(Clone, Deserialize, Serialize)]
     RegistrationAccessToken(String)
 ];
 
-new_url_type![RegistrationUrl];
+new_url_type![
+    ///
+    /// URL of the Client Registration endpoint.
+    ///
+    RegistrationUrl
+];
 
-new_url_type![RequestUrl];
+new_url_type![
+    ///
+    /// URL used to pass request parameters as JWTs by reference.
+    ///
+    RequestUrl
+];
 
 ///
 /// Informs the Authorization Server of the desired authorization processing flow, including what
@@ -763,24 +946,56 @@ impl<RT: ResponseType> Deref for ResponseTypes<RT> {
     }
 }
 
-new_type![#[derive(Deserialize, Serialize)]
-pub(crate) Seconds(serde_json::Number)];
+new_type![
+    ///
+    /// Time interval in seconds.
+    ///
+    #[derive(Deserialize, Serialize)]
+    pub(crate) Seconds(serde_json::Number)
+];
 
-new_url_type![SectorIdentifierUrl];
+new_url_type![
+    ///
+    /// URL for retrieving redirect URIs that should receive identical pairwise subject identifiers.
+    ///
+    SectorIdentifierUrl
+];
 
-new_url_type![ServiceDocUrl];
+new_url_type![
+    ///
+    /// URL for developer documentation for an OpenID Connect Provider.
+    ///
+    ServiceDocUrl
+];
 
 new_type![
+    ///
+    /// A user's street address.
+    ///
+    /// Full street address component, which MAY include house number, street name, Post Office Box,
+    /// and multi-line extended street address information. This field MAY contain multiple lines,
+    /// separated by newlines. Newlines can be represented either as a carriage return/line feed
+    /// pair (`\r\n`) or as a single line feed character (`\n`).
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     StreetAddress(String)
 ];
 
 new_type![
+    ///
+    /// Locally unique and never reassigned identifier within the Issuer for the End-User, which is
+    /// intended to be consumed by the client application.
+    ///
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
     SubjectIdentifier(String)
 ];
 
-new_url_type![ToSUrl];
+new_url_type![
+    ///
+    /// URL for the relying party's Terms of Service.
+    ///
+    ToSUrl
+];
 
 // FIXME: Add tests
 pub(crate) mod helpers {

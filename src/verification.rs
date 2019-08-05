@@ -407,9 +407,6 @@ where
         // if the JWK set contains more than one public key.
 
         // See if any key has a matching key ID (if supplied) and compatible type.
-        let key_type = signature_alg
-            .key_type()
-            .map_err(ClaimsVerificationError::Unsupported)?;
         let public_keys = {
             let jose_header = jwt.unverified_header();
             self.signature_keys
@@ -417,7 +414,7 @@ where
                 .iter()
                 .filter(|key|
                     // The key must be of the type expected for this signature algorithm.
-                    *key.key_type() == key_type &&
+                    Some(key.key_type()) == signature_alg.key_type().as_ref() &&
                         // Either the key hasn't specified it's allowed usage (in which case
                         // any usage is acceptable), or the key supports signing.
                         (key.key_use().is_none() ||

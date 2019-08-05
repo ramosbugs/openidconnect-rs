@@ -1,5 +1,5 @@
 // FIXME: uncomment
-//#![warn(missing_docs)]
+#![warn(missing_docs)]
 #![cfg_attr(feature = "nightly", feature(type_alias_enum_variants))]
 //!
 //! [OpenID Connect](https://openid.net/specs/openid-connect-core-1_0.html) library.
@@ -439,16 +439,16 @@ use jwt::{JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenH
 pub use types::{
     AccessTokenHash, AddressCountry, AddressLocality, AddressPostalCode, AddressRegion,
     ApplicationType, Audience, AuthDisplay, AuthPrompt, AuthenticationContextClass,
-    AuthenticationMethodReference, AuthorizationCodeHash, Base64UrlEncodedBytes, ClaimName,
-    ClaimType, ClientAuthMethod, ClientConfigUrl, ClientName, ClientUrl, ContactEmail,
-    EndUserBirthday, EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName,
-    EndUserName, EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl,
-    EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, FormattedAddress, GrantType,
-    InitiateLoginUrl, IssuerUrl, JsonWebKey, JsonWebKeyId, JsonWebKeySet, JsonWebKeySetUrl,
-    JsonWebKeyType, JsonWebKeyUse, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm,
-    JwsSigningAlgorithm, LanguageTag, LoginHint, LogoUrl, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl,
-    PrivateSigningKey, RegistrationAccessToken, RegistrationUrl, RequestUrl, ResponseMode,
-    ResponseType, ResponseTypes, SectorIdentifierUrl, ServiceDocUrl, SigningError, StreetAddress,
+    AuthenticationMethodReference, AuthorizationCodeHash, ClaimName, ClaimType, ClientAuthMethod,
+    ClientConfigUrl, ClientContactEmail, ClientName, ClientUrl, EndUserBirthday, EndUserEmail,
+    EndUserFamilyName, EndUserGivenName, EndUserMiddleName, EndUserName, EndUserNickname,
+    EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone, EndUserUsername,
+    EndUserWebsiteUrl, FormattedAddress, GrantType, InitiateLoginUrl, IssuerUrl, JsonWebKey,
+    JsonWebKeyId, JsonWebKeySet, JsonWebKeySetUrl, JsonWebKeyType, JsonWebKeyUse,
+    JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag,
+    LoginHint, LogoUrl, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl, PrivateSigningKey,
+    RegistrationAccessToken, RegistrationUrl, RequestUrl, ResponseMode, ResponseType,
+    ResponseTypes, SectorIdentifierUrl, ServiceDocUrl, SigningError, StreetAddress,
     SubjectIdentifier, SubjectIdentifierType, ToSUrl,
 };
 pub use user_info::{
@@ -477,7 +477,7 @@ pub mod registration;
 mod claims;
 mod discovery;
 mod id_token;
-mod types;
+pub(crate) mod types;
 mod user_info;
 mod verification;
 

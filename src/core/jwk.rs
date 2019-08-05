@@ -6,9 +6,10 @@ use ring::signature as ring_signature;
 use untrusted::Input;
 
 use super::super::types::helpers::deserialize_option_or_none;
+use super::super::types::Base64UrlEncodedBytes;
 use super::super::{
-    Base64UrlEncodedBytes, JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse,
-    JwsSigningAlgorithm, PrivateSigningKey, SignatureVerificationError, SigningError,
+    JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse, JwsSigningAlgorithm,
+    PrivateSigningKey, SignatureVerificationError, SigningError,
 };
 use super::{crypto, CoreJwsSigningAlgorithm};
 use ring::signature::KeyPair;
@@ -110,10 +111,7 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
             }
         }
 
-        let key_type = signature_alg
-            .key_type()
-            .map_err(SignatureVerificationError::Other)?;
-        if *self.key_type() != key_type {
+        if Some(self.key_type()) != signature_alg.key_type().as_ref() {
             return Err(SignatureVerificationError::InvalidKey(
                 "key type does not match signature algorithm".to_string(),
             ));
