@@ -30,7 +30,7 @@ script:
   # On nightly, test both the default config and special nightly features
   - cargo when --channel=nightly test --features nightly -- --test-threads=1
   - cargo test --example google
-  - cargo audit
+  - cargo audit --ignore RUSTSEC-2019-0011
 after_success: |
   RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin &&
   cargo tarpaulin --out Xml &&
