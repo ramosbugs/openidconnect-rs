@@ -791,7 +791,7 @@ where
                 .ok_or(NoUserInfoEndpoint)?
                 .to_owned(),
             access_token,
-            require_signed_response: true,
+            require_signed_response: false,
             signed_response_verifier: UserInfoVerifier::new(
                 self.client_id.clone(),
                 self.issuer.clone(),

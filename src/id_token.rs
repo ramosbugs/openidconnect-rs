@@ -23,6 +23,9 @@ use oauth2::helpers::variant_name;
 // This wrapper layer exists instead of directly verifying the JWT and returning the claims so that
 // we can pass it around and easily access a serialized JWT representation of it (e.g., for passing
 // to the authorization endpoint as an id_token_hint).
+///
+/// OpenID Connect ID token.
+///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct IdToken<
     AC: AdditionalClaims,
@@ -87,6 +90,9 @@ where
         .map(Self)
     }
 
+    ///
+    /// Verifies and returns the ID token claims.
+    ///
     pub fn claims<'a, 'b, JU, K, N>(
         &'a self,
         verifier: &'b IdTokenVerifier<JS, JT, JU, K>,
@@ -100,6 +106,11 @@ where
         verifier.verified_claims(&self.0, nonce_verifier)
     }
 
+    ///
+    /// Returns the [`JwsSigningAlgorithm`] used to sign this ID token.
+    ///
+    /// This function returns an error if the signing algorithm is unsupported.
+    ///
     pub fn signing_alg(&self) -> Result<JS, SigningError> {
         match self.0.unverified_header().alg {
             JsonWebTokenAlgorithm::Signature(ref signing_alg, _) => Ok(signing_alg.clone()),
@@ -130,6 +141,9 @@ where
     }
 }
 
+///
+/// OpenID Connect ID token claims.
+///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct IdTokenClaims<AC, GC>
 where
@@ -177,6 +191,9 @@ where
     AC: AdditionalClaims,
     GC: GenderClaim,
 {
+    ///
+    /// Initializes new ID token claims.
+    ///
     pub fn new(
         issuer: IssuerUrl,
         audiences: Vec<Audience>,
@@ -218,9 +235,15 @@ where
         }
     ];
 
+    ///
+    /// Returns the `sub` claim.
+    ///
     pub fn subject(&self) -> &SubjectIdentifier {
         &self.standard_claims.sub
     }
+    ///
+    /// Sets the `sub` claim.
+    ///
     pub fn set_subject(mut self, subject: SubjectIdentifier) -> Self {
         self.standard_claims.sub = subject;
         self
@@ -252,9 +275,15 @@ where
         }
     ];
 
+    ///
+    /// Returns additional ID token claims.
+    ///
     pub fn additional_claims(&self) -> &AC {
         &self.additional_claims
     }
+    ///
+    /// Returns mutable additional ID token claims.
+    ///
     pub fn additional_claims_mut(&mut self) -> &mut AC {
         &mut self.additional_claims
     }
@@ -325,6 +354,9 @@ where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
+    ///
+    /// Initializes new ID token fields containing the specified [`IdToken`] and extra fields.
+    ///
     pub fn new(id_token: IdToken<AC, GC, JE, JS, JT>, extra_fields: EF) -> Self {
         Self {
             id_token,
@@ -333,9 +365,15 @@ where
         }
     }
 
+    ///
+    /// Returns the [`IdToken`] contained in the OAuth2 token response.
+    ///
     pub fn id_token(&self) -> &IdToken<AC, GC, JE, JS, JT> {
         &self.id_token
     }
+    ///
+    /// Returns the extra fields contained in the OAuth2 token response.
+    ///
     pub fn extra_fields(&self) -> &EF {
         &self.extra_fields
     }
@@ -383,6 +421,9 @@ where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
+    ///
+    /// Initializes new ID token fields for use in an OAuth2 refresh request.
+    ///
     pub fn new(id_token: Option<IdToken<AC, GC, JE, JS, JT>>, extra_fields: EF) -> Self {
         Self {
             id_token,
@@ -391,9 +432,15 @@ where
         }
     }
 
+    ///
+    /// Returns the [`IdToken`] contained in the OAuth2 refresh token response.
+    ///
     pub fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS, JT>> {
         self.id_token.as_ref()
     }
+    ///
+    /// Returns the extra fields contained in the OAuth2 refresh token response.
+    ///
     pub fn extra_fields(&self) -> &EF {
         &self.extra_fields
     }
