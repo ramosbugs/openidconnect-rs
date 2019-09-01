@@ -22,14 +22,24 @@ use super::types::{
 };
 use super::{HttpRequest, HttpResponse, UserInfoUrl, CONFIG_URL_SUFFIX};
 
+///
+/// Trait for adding extra fields to [`ProviderMetadata`].
+///
 pub trait AdditionalProviderMetadata: Clone + Debug + DeserializeOwned + Serialize {}
 
 // In order to support serde flatten, this must be an empty struct rather than an empty
 // tuple struct.
+///
+/// Empty (default) extra [`ProviderMetadata`] fields.
+///
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct EmptyAdditionalProviderMetadata {}
 impl AdditionalProviderMetadata for EmptyAdditionalProviderMetadata {}
 
+///
+/// Provider metadata returned by [OpenID Connect Discovery](
+/// https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata).
+///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[allow(clippy::type_complexity)]
 pub struct ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RT, S>
@@ -190,6 +200,9 @@ where
     RT: ResponseType,
     S: SubjectIdentifierType,
 {
+    ///
+    /// Instantiates new provider metadata.
+    ///
     pub fn new(
         issuer: IssuerUrl,
         authorization_endpoint: AuthUrl,
@@ -406,29 +419,57 @@ where
         }
     }
 
+    ///
+    /// Returns additional provider metadata fields.
+    ///
     pub fn additional_metadata(&self) -> &A {
         &self.additional_metadata
     }
+    ///
+    /// Returns mutable additional provider metadata fields.
+    ///
     pub fn additional_metadata_mut(&mut self) -> &mut A {
         &mut self.additional_metadata
     }
 }
 
+///
+/// Error retrieving provider metadata.
+///
 #[derive(Debug, Fail)]
 pub enum DiscoveryError<RE>
 where
     RE: Fail,
 {
+    ///
+    /// An unexpected error occurred.
+    ///
     #[fail(display = "Other error: {}", _0)]
     Other(String),
+    ///
+    /// Failed to parse server response.
+    ///
     #[fail(display = "Failed to parse server response")]
     Parse(#[cause] serde_json::Error),
+    ///
+    /// An error occurred while sending the request or receiving the response (e.g., network
+    /// connectivity failed).
+    ///
     #[fail(display = "Request failed")]
     Request(#[cause] RE),
+    ///
+    /// Server returned an invalid response.
+    ///
     #[fail(display = "Server returned invalid response: {}", _2)]
     Response(StatusCode, Vec<u8>, String),
+    ///
+    /// Failed to parse discovery URL from issuer URL.
+    ///
     #[fail(display = "Failed to parse URL")]
     UrlParse(#[cause] url::ParseError),
+    ///
+    /// Failed to validate provider metadata.
+    ///
     #[fail(display = "Validation error: {}", _0)]
     Validation(String),
 }
