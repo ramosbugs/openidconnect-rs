@@ -37,16 +37,43 @@ impl AdditionalClaims for EmptyAdditionalClaims {}
 ///
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct AddressClaim {
+    ///
+    /// Full mailing address, formatted for display or use on a mailing label.
+    ///
+    /// This field MAY contain multiple lines, separated by newlines. Newlines can be represented
+    /// either as a carriage return/line feed pair (`\r\n`) or as a single line feed character
+    /// (`\n`).
+    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub formatted: Option<FormattedAddress>,
+    ///
+    /// Full street address component, which MAY include house number, street name, Post Office Box,
+    /// and multi-line extended street address information.
+    ///
+    /// This field MAY contain multiple lines, separated by newlines. Newlines can be represented
+    /// either as a carriage return/line feed pair (`\r\n`) or as a single line feed character
+    /// (`\n`).
+    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub street_address: Option<StreetAddress>,
+    ///
+    /// City or locality component.
+    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub locality: Option<AddressLocality>,
+    ///
+    /// State, province, prefecture, or region component.
+    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub region: Option<AddressRegion>,
+    ///
+    /// Zip code or postal code component.
+    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub postal_code: Option<AddressPostalCode>,
+    ///
+    /// Country name component.
+    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub country: Option<AddressCountry>,
 }
