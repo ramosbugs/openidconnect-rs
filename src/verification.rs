@@ -20,11 +20,11 @@ use super::{
     Nonce, SubjectIdentifier,
 };
 
-pub trait AudiencesClaim {
+pub(crate) trait AudiencesClaim {
     fn audiences(&self) -> Option<&Vec<Audience>>;
 }
 
-pub trait IssuerClaim {
+pub(crate) trait IssuerClaim {
     fn issuer(&self) -> Option<&IssuerUrl>;
 }
 
@@ -462,7 +462,15 @@ where
     }
 }
 
+///
+/// Trait for verifying ID token nonces.
+///
 pub trait NonceVerifier<'a> {
+    ///
+    /// Verifies the nonce.
+    ///
+    /// Returns `Ok(())` if the nonce is valid, or a string describing the error otherwise.
+    ///
     fn verify(self, nonce: Option<&'a Nonce>) -> Result<(), String>;
 }
 
@@ -528,6 +536,9 @@ where
         }
     }
 
+    ///
+    /// Initializes a new verifier for a public client (i.e., one without a client secret).
+    ///
     pub fn new_public_client(
         client_id: ClientId,
         issuer: IssuerUrl,
@@ -536,7 +547,14 @@ where
         Self::new(JwtClaimsVerifier::new(client_id, issuer, signature_keys))
     }
 
-    pub fn new_private_client(
+    ///
+    /// Initializes a new verifier for a confidential client (i.e., one with a client secret).
+    ///
+    /// A confidential client verifier is required in order to verify ID tokens signed using a
+    /// shared secret algorithm such as `HS256`, `HS384`, or `HS512`. For these algorithms, the
+    /// client secret is the shared secret.
+    ///
+    pub fn new_confidential_client(
         client_id: ClientId,
         client_secret: ClientSecret,
         issuer: IssuerUrl,
@@ -548,6 +566,9 @@ where
         )
     }
 
+    ///
+    /// Specifies which JSON Web Signature algorithms are supported.
+    ///
     pub fn set_allowed_algs<I>(mut self, algs: I) -> Self
     where
         I: IntoIterator<Item = JS>,
@@ -555,11 +576,21 @@ where
         self.jwt_verifier = self.jwt_verifier.set_allowed_algs(algs);
         self
     }
+
+    ///
+    /// Specifies that any signature algorithm is supported.
+    ///
     pub fn allow_any_alg(mut self) -> Self {
         self.jwt_verifier = self.jwt_verifier.allow_any_alg();
         self
     }
 
+    ///
+    /// Specifies a function for verifying the `acr` claim.
+    ///
+    /// The function should return `Ok(())` if the claim is valid, or a string describing the error
+    /// otherwise.
+    ///
     pub fn set_auth_context_verifier_fn<T>(mut self, acr_verifier_fn: T) -> Self
     where
         T: Fn(Option<&AuthenticationContextClass>) -> Result<(), String> + 'a,
@@ -568,6 +599,12 @@ where
         self
     }
 
+    ///
+    /// Specifies a function for verifying the `auth_time` claim.
+    ///
+    /// The function should return `Ok(())` if the claim is valid, or a string describing the error
+    /// otherwise.
+    ///
     pub fn set_auth_time_verifier_fn<T>(mut self, auth_time_verifier_fn: T) -> Self
     where
         T: Fn(Option<&DateTime<Utc>>) -> Result<(), String> + 'a,
@@ -576,15 +613,36 @@ where
         self
     }
 
+    ///
+    /// Enables signature verification.
+    ///
+    /// Signature verification is enabled by default, so this function is only useful if
+    /// [`IdTokenVerifier::insecure_disable_signature_check`] was previously invoked.
+    ///
     pub fn enable_signature_check(mut self) -> Self {
         self.jwt_verifier = self.jwt_verifier.require_signature_check(true);
         self
     }
+
+    ///
+    /// Disables signature verification.
+    ///
+    /// # Security Warning
+    ///
+    /// Unverified ID tokens may be subject to forgery. See [Section 16.3](
+    /// https://openid.net/specs/openid-connect-core-1_0.html#TokenManufacture) for more
+    /// information.
+    ///
     pub fn insecure_disable_signature_check(mut self) -> Self {
         self.jwt_verifier = self.jwt_verifier.require_signature_check(false);
         self
     }
 
+    ///
+    /// Specifies a function for returning the current time.
+    ///
+    /// This function is used for verifying the ID token expiration time.
+    ///
     pub fn set_time_fn<T>(mut self, time_fn: T) -> Self
     where
         T: Fn() -> DateTime<Utc> + 'a,
@@ -593,6 +651,12 @@ where
         self
     }
 
+    ///
+    /// Specifies a function for verifying the ID token issue time.
+    ///
+    /// The function should return `Ok(())` if the claim is valid, or a string describing the error
+    /// otherwise.
+    ///
     pub fn set_issue_time_verifier_fn<T>(mut self, iat_verifier_fn: T) -> Self
     where
         T: Fn(&DateTime<Utc>) -> Result<(), String> + 'a,
@@ -601,6 +665,16 @@ where
         self
     }
 
+    ///
+    /// Specifies a function for verifying audiences included in the `aud` claim that differ from
+    /// this client's client ID.
+    ///
+    /// The function should return `true` if the audience is trusted, or `false` otherwise.
+    ///
+    /// [Section 3.1.3.7](https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation)
+    /// states that *"The ID Token MUST be rejected if the ID Token does not list the Client as a
+    /// valid audience, or if it contains additional audiences not trusted by the Client."*
+    ///
     pub fn set_other_audience_verifier_fn<T>(mut self, other_aud_verifier_fn: T) -> Self
     where
         T: Fn(&Audience) -> bool + 'a,
@@ -725,6 +799,9 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
+    ///
+    /// Instantiates a user info verifier.
+    ///
     pub fn new(
         client_id: ClientId,
         issuer: IssuerUrl,
@@ -738,15 +815,21 @@ where
         }
     }
 
-    pub fn expected_subject(&self) -> Option<&SubjectIdentifier> {
+    pub(crate) fn expected_subject(&self) -> Option<&SubjectIdentifier> {
         self.expected_subject.as_ref()
     }
 
+    ///
+    /// Specifies whether the issuer claim must match the expected issuer URL for the provider.
+    ///
     pub fn require_issuer_match(mut self, iss_required: bool) -> Self {
         self.jwt_verifier = self.jwt_verifier.require_issuer_match(iss_required);
         self
     }
 
+    ///
+    /// Specifies whether the audience claim must match this client's client ID.
+    ///
     pub fn require_audience_match(mut self, aud_required: bool) -> Self {
         self.jwt_verifier = self.jwt_verifier.require_audience_match(aud_required);
         self
@@ -1583,7 +1666,7 @@ mod tests {
                         .to_string(),
                 ))
                 .expect("failed to deserialize");
-            let private_client_verifier = CoreIdTokenVerifier::new_private_client(
+            let private_client_verifier = CoreIdTokenVerifier::new_confidential_client(
                 client_id.clone(),
                 ClientSecret::new("my_secret".to_string()),
                 issuer.clone(),
@@ -1611,7 +1694,7 @@ mod tests {
 
             // Invalid signature
             let private_client_verifier_with_other_secret =
-                CoreIdTokenVerifier::new_private_client(
+                CoreIdTokenVerifier::new_confidential_client(
                     client_id.clone(),
                     ClientSecret::new("other_secret".to_string()),
                     issuer.clone(),

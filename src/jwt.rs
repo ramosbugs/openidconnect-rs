@@ -174,10 +174,19 @@ where
         JW: JsonWebKey<JS, JT, JU>;
 }
 
+///
+/// Error creating a JSON Web Token.
+///
 #[derive(Debug, Fail)]
 pub enum JsonWebTokenError {
+    ///
+    /// Failed to serialize JWT.
+    ///
     #[fail(display = "Failed to serialize JWT")]
     SerializationError(#[cause] serde_json::Error),
+    ///
+    /// Failed to sign JWT.
+    ///
     #[fail(display = "Failed to sign JWT")]
     SigningError(#[cause] SigningError),
 }

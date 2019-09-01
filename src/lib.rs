@@ -1,4 +1,3 @@
-// FIXME: uncomment
 #![warn(missing_docs)]
 #![cfg_attr(feature = "nightly", feature(type_alias_enum_variants))]
 //!
@@ -665,7 +664,7 @@ where
     ///
     pub fn id_token_verifier(&self) -> IdTokenVerifier<JS, JT, JU, K> {
         if let Some(ref client_secret) = self.client_secret {
-            IdTokenVerifier::new_private_client(
+            IdTokenVerifier::new_confidential_client(
                 self.client_id.clone(),
                 client_secret.clone(),
                 self.issuer.clone(),
