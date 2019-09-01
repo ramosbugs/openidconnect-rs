@@ -29,14 +29,23 @@ use super::{
     JsonWebKeySet, RedirectUrl, StandardErrorResponse,
 };
 
+///
+/// Trait for adding extra fields to [`ClientMetadata`].
+///
 pub trait AdditionalClientMetadata: Debug + DeserializeOwned + Serialize {}
 
 // In order to support serde flatten, this must be an empty struct rather than an empty
 // tuple struct.
+///
+/// Empty (default) extra [`ClientMetadata`] fields.
+///
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct EmptyAdditionalClientMetadata {}
 impl AdditionalClientMetadata for EmptyAdditionalClientMetadata {}
 
+///
+/// Client metadata used in dynamic client registration.
+///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ClientMetadata<A, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
 where
@@ -77,6 +86,9 @@ where
     RT: ResponseType,
     S: SubjectIdentifierType,
 {
+    ///
+    /// Instantiates new client metadata.
+    ///
     pub fn new(redirect_uris: Vec<RedirectUrl>, additional_metadata: A) -> Self {
         Self {
             standard_metadata: StandardClientMetadata {
@@ -149,9 +161,15 @@ where
         }
     ];
 
+    ///
+    /// Returns additional client metadata fields.
+    ///
     pub fn additional_metadata(&self) -> &A {
         &self.additional_metadata
     }
+    ///
+    /// Returns mutable additional client metadata fields.
+    ///
     pub fn additional_metadata_mut(&mut self) -> &mut A {
         &mut self.additional_metadata
     }
@@ -383,6 +401,9 @@ where
     }
 }
 
+///
+/// Dynamic client registration request.
+///
 #[derive(Clone, Debug)]
 pub struct ClientRegistrationRequest<AC, AR, AT, CA, ET, G, JE, JK, JS, JT, JU, K, RT, S>
 where
@@ -423,6 +444,9 @@ where
     RT: ResponseType,
     S: SubjectIdentifierType,
 {
+    ///
+    /// Instantiates a new dynamic client registration request.
+    ///
     pub fn new(redirect_uris: Vec<RedirectUrl>, additional_metadata: AC) -> Self {
         Self {
             client_metadata: ClientMetadata::new(redirect_uris, additional_metadata),
@@ -431,6 +455,10 @@ where
         }
     }
 
+    ///
+    /// Submits this request to the specified registration endpoint using the specified synchronous
+    /// HTTP client.
+    ///
     pub fn register<HC, RE>(
         &self,
         registration_endpoint: &RegistrationUrl,
@@ -450,6 +478,10 @@ where
             .and_then(Self::register_response)
     }
 
+    ///
+    /// Submits this request to the specified registration endpoint using the specified asynchronous
+    /// HTTP client.
+    ///
     pub fn register_async<F, HC, RE>(
         &self,
         registration_endpoint: &RegistrationUrl,
@@ -553,13 +585,22 @@ where
         serde_json::from_str(&response_body).map_err(ClientRegistrationError::Parse)
     }
 
+    ///
+    /// Returns the client metadata associated with this registration request.
+    ///
     pub fn client_metadata(&self) -> &ClientMetadata<AC, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S> {
         &self.client_metadata
     }
 
+    ///
+    /// Returns the initial access token associated with this registration request.
+    ///
     pub fn initial_access_token(&self) -> Option<&AccessToken> {
         self.initial_access_token.as_ref()
     }
+    ///
+    /// Sets the initial access token for this request.
+    ///
     pub fn set_initial_access_token(mut self, access_token: Option<AccessToken>) -> Self {
         self.initial_access_token = access_token;
         self
@@ -600,22 +641,37 @@ where
         }
     ];
 
+    ///
+    /// Returns additional client metadata fields.
+    ///
     pub fn additional_metadata(&self) -> &AC {
         &self.client_metadata.additional_metadata
     }
+    ///
+    /// Returns mutable additional client metadata fields.
+    ///
     pub fn additional_metadata_mut(&mut self) -> &mut AC {
         &mut self.client_metadata.additional_metadata
     }
 }
 
+///
+/// Trait for adding extra fields to the [`ClientRegistrationResponse`].
+///
 pub trait AdditionalClientRegistrationResponse: Debug + DeserializeOwned + Serialize {}
 
 // In order to support serde flatten, this must be an empty struct rather than an empty
 // tuple struct.
+///
+/// Empty (default) extra [`ClientRegistrationResponse`] fields.
+///
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct EmptyAdditionalClientRegistrationResponse {}
 impl AdditionalClientRegistrationResponse for EmptyAdditionalClientRegistrationResponse {}
 
+///
+/// Response to a dynamic client registration request.
+///
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
 where
@@ -673,6 +729,9 @@ where
     RT: ResponseType,
     S: SubjectIdentifierType,
 {
+    ///
+    /// Instantiates a new dynamic client registration response.
+    ///
     pub fn new(
         client_id: ClientId,
         redirect_uris: Vec<RedirectUrl>,
@@ -691,6 +750,9 @@ where
         }
     }
 
+    ///
+    /// Instantiates a new dynamic client registration response using the specified client metadata.
+    ///
     pub fn from_client_metadata(
         client_id: ClientId,
         client_metadata: ClientMetadata<AC, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
@@ -755,16 +817,28 @@ where
         }
     ];
 
+    ///
+    /// Returns additional client metadata fields.
+    ///
     pub fn additional_metadata(&self) -> &AC {
         &self.client_metadata.additional_metadata
     }
+    ///
+    /// Returns mutable additional client metadata fields.
+    ///
     pub fn additional_metadata_mut(&mut self) -> &mut AC {
         &mut self.client_metadata.additional_metadata
     }
 
+    ///
+    /// Returns additional response fields.
+    ///
     pub fn additional_response(&self) -> &AR {
         &self.additional_response
     }
+    ///
+    /// Returns mutable additional response fields.
+    ///
     pub fn additional_response_mut(&mut self) -> &mut AR {
         &mut self.additional_response
     }
@@ -772,28 +846,51 @@ where
 
 // TODO: implement client configuration endpoint request (Section 4)
 
+///
+/// Trait representing an error returned by the dynamic client registration endpoint.
+///
 pub trait RegisterErrorResponseType: ErrorResponseType + 'static {}
 
+///
+/// Error registering a client.
+///
 #[derive(Debug, Fail)]
 pub enum ClientRegistrationError<T, RE>
 where
     RE: Fail,
     T: RegisterErrorResponseType,
 {
+    ///
+    /// An unexpected error occurred.
+    ///
     #[fail(display = "Other error: {}", _0)]
     Other(String),
+    ///
+    /// Failed to parse server response.
+    ///
     #[fail(display = "Failed to parse server response")]
     Parse(#[cause] serde_json::Error),
+    ///
+    /// An error occurred while sending the request or receiving the response (e.g., network
+    /// connectivity failed).
+    ///
     #[fail(display = "Request failed")]
     Request(#[cause] RE),
+    ///
+    /// Server returned an invalid response.
+    ///
     #[fail(display = "Server returned invalid response: {}", _2)]
     Response(StatusCode, Vec<u8>, String),
+    ///
+    /// Failed to serialize client metadata.
+    ///
     #[fail(display = "Failed to serialize client metadata")]
     Serialize(#[cause] serde_json::Error),
+    ///
+    /// Server returned an error.
+    ///
     #[fail(display = "Server returned error")]
     ServerResponse(StandardErrorResponse<T>),
-    #[fail(display = "Validation error: {}", _0)]
-    Validation(String),
 }
 
 #[cfg(test)]
