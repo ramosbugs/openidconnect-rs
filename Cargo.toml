@@ -18,7 +18,7 @@ futures = "0.1"
 http = "0.1"
 itertools = "0.7.8"
 log = "0.4"
-oauth2 = { git = "https://github.com/ramosbugs/oauth2-rs", rev = "08c87e83ec3e2ce040139a69fe41543b58b3994d" }
+oauth2 = "3.0.0-alpha.3"
 rand = "0.6"
 retry = "0.5"
 ring = "0.14"
