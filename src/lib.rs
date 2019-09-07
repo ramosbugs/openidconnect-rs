@@ -445,7 +445,7 @@ pub use types::{
     EndUserWebsiteUrl, FormattedAddress, GrantType, InitiateLoginUrl, IssuerUrl, JsonWebKey,
     JsonWebKeyId, JsonWebKeySet, JsonWebKeySetUrl, JsonWebKeyType, JsonWebKeyUse,
     JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag,
-    LoginHint, LogoUrl, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl, PrivateSigningKey,
+    LocalizedClaim, LoginHint, LogoUrl, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl, PrivateSigningKey,
     RegistrationAccessToken, RegistrationUrl, RequestUrl, ResponseMode, ResponseType,
     ResponseTypes, SectorIdentifierUrl, ServiceDocUrl, SigningError, StreetAddress,
     SubjectIdentifier, SubjectIdentifierType, ToSUrl,
