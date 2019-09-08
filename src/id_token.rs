@@ -630,7 +630,7 @@ mod tests {
                            \"aud\":[\"s6BhdRkqt3\"],\
                            \"exp\":1311281970,\
                            \"iat\":1311280970,\
-                           \"auth_time\":1311282970.5,\
+                           \"auth_time\":1311282970,\
                            \"nonce\":\"Zm9vYmFy\",\
                            \"acr\":\"urn:mace:incommon:iap:silver\",\
                            \"amr\":[\"password\",\"totp\"],\
@@ -814,7 +814,7 @@ mod tests {
             },
             EmptyAdditionalClaims {},
         )
-        .set_auth_time(Some(Utc.timestamp(1311282970, 500000000)))
+        .set_auth_time(Some(Utc.timestamp(1311282970, 0)))
         .set_nonce(Some(Nonce::new("Zm9vYmFy".to_string())))
         .set_auth_context_ref(Some(AuthenticationContextClass::new(
             "urn:mace:incommon:iap:silver".to_string(),

@@ -1144,17 +1144,11 @@ pub(crate) mod helpers {
         Utc.timestamp_opt(secs, nsecs).single().ok_or(())
     }
 
+    // The spec is ambiguous about whether seconds should be expressed as integers, or
+    // whether floating-point values are allowed. For compatibility with a wide range of
+    // clients, we round down to the nearest second.
     pub(crate) fn utc_to_seconds(utc: &DateTime<Utc>) -> Seconds {
-        let (secs, nsecs) = (utc.timestamp(), utc.timestamp_subsec_nanos());
-        if nsecs == 0 {
-            Seconds::new(secs.into())
-        } else {
-            Seconds::new(
-                serde_json::Number::from_f64(secs as f64 + (f64::from(nsecs)) / 1_000_000_000.)
-                    // This really shouldn't happen for a valid DateTime
-                    .expect("Failed to convert timestamp to f64"),
-            )
-        }
+        Seconds::new(utc.timestamp().into())
     }
 
     pub mod serde_utc_seconds {
