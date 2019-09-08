@@ -468,7 +468,7 @@ macro_rules! deserialize_fields {
                 $field = Some(new);
                 $field.as_mut().unwrap()
             };
-        if localized_claim.contains_key(&$language_tag_opt) {
+        if localized_claim.contains_key($language_tag_opt.as_ref()) {
             return Err(serde::de::Error::custom(format!("duplicate field `{}`", $key)));
         }
 
@@ -591,7 +591,7 @@ macro_rules! serialize_fields {
     (@case $self:ident $map:ident LanguageTag($field:ident)) => {
         if let Some(ref field_map) = $self.$field {
             use itertools::sorted;
-            let sorted_field_map = sorted(field_map.clone());
+            let sorted_field_map = sorted(field_map.iter());
             for (language_tag_opt, $field) in sorted_field_map.iter() {
                 if let Some(ref language_tag) = *language_tag_opt {
                     $map.serialize_entry(

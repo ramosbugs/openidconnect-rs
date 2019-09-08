@@ -1805,7 +1805,7 @@ mod tests {
             .unwrap()
             .iter()
             .collect::<Vec<_>>(),
-            vec![(&None, &EndUserName::new("Jane Doe".to_string()))],
+            vec![(None, &EndUserName::new("Jane Doe".to_string()))],
         );
 
         // Invalid subject

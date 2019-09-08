@@ -35,7 +35,7 @@ use super::{
 /// claims values.
 ///
 #[derive(Clone, Debug, PartialEq)]
-pub struct LocalizedClaim<T>(HashMap<Option<LanguageTag>, T>);
+pub struct LocalizedClaim<T>(HashMap<LanguageTag, T>, Option<T>);
 impl<T> LocalizedClaim<T> {
     ///
     /// Initialize an empty claim.
@@ -47,22 +47,33 @@ impl<T> LocalizedClaim<T> {
     ///
     /// Returns true if the claim contains a value for the specified locale.
     ///
-    pub fn contains_key(&self, locale: &Option<LanguageTag>) -> bool {
-        self.0.contains_key(locale)
+    pub fn contains_key(&self, locale: Option<&LanguageTag>) -> bool {
+        if let Some(l) = locale {
+            self.0.contains_key(l)
+        } else {
+            self.1.is_some()
+        }
     }
 
     ///
     /// Returns the entry for the specified locale or `None` if there is no such entry.
     ///
-    pub fn get(&self, locale: &Option<LanguageTag>) -> Option<&T> {
-        self.0.get(locale)
+    pub fn get(&self, locale: Option<&LanguageTag>) -> Option<&T> {
+        if let Some(l) = locale {
+            self.0.get(l)
+        } else {
+            self.1.as_ref()
+        }
     }
 
     ///
     /// Returns an iterator over the locales and claim value entries.
     ///
-    pub fn iter(&self) -> std::collections::hash_map::Iter<Option<LanguageTag>, T> {
-        self.0.iter()
+    pub fn iter(&self) -> impl Iterator<Item = (Option<&LanguageTag>, &T)> {
+        self.1
+            .iter()
+            .map(|value| (None, value))
+            .chain(self.0.iter().map(|(locale, value)| (Some(locale), value)))
     }
 
     ///
@@ -72,7 +83,11 @@ impl<T> LocalizedClaim<T> {
     /// such entry.
     ///
     pub fn insert(&mut self, locale: Option<LanguageTag>, value: T) -> Option<T> {
-        self.0.insert(locale, value)
+        if let Some(l) = locale {
+            self.0.insert(l, value)
+        } else {
+            self.1.replace(value)
+        }
     }
 
     ///
@@ -81,45 +96,66 @@ impl<T> LocalizedClaim<T> {
     /// Returns the current value associated with the given locale, or `None` if there is no
     /// such entry.
     ///
-    pub fn remove(&mut self, locale: &Option<LanguageTag>) -> Option<T> {
-        self.0.remove(locale)
+    pub fn remove(&mut self, locale: Option<&LanguageTag>) -> Option<T> {
+        if let Some(l) = locale {
+            self.0.remove(l)
+        } else {
+            self.1.take()
+        }
     }
 }
 impl<T> Default for LocalizedClaim<T> {
     fn default() -> Self {
-        Self(HashMap::new())
-    }
-}
-impl<T> From<HashMap<Option<LanguageTag>, T>> for LocalizedClaim<T> {
-    fn from(inner: HashMap<Option<LanguageTag>, T>) -> Self {
-        Self(inner)
+        Self(HashMap::new(), None)
     }
 }
 impl<T> From<T> for LocalizedClaim<T> {
-    fn from(inner: T) -> Self {
-        Self(vec![(None, inner)].into_iter().collect())
+    fn from(default: T) -> Self {
+        Self(HashMap::new(), Some(default))
     }
 }
 impl<T> FromIterator<(Option<LanguageTag>, T)> for LocalizedClaim<T> {
     fn from_iter<I: IntoIterator<Item = (Option<LanguageTag>, T)>>(iter: I) -> Self {
-        let inner: HashMap<Option<LanguageTag>, T> = iter.into_iter().collect();
-        Self(inner)
+        let mut temp: HashMap<Option<LanguageTag>, T> = iter.into_iter().collect();
+        let default = temp.remove(&None);
+        Self(
+            temp.into_iter()
+                .filter_map(|(locale, value)| locale.map(|l| (l, value)))
+                .collect(),
+            default,
+        )
     }
 }
-impl<'a, T> IntoIterator for &'a LocalizedClaim<T> {
-    type Item = (&'a Option<LanguageTag>, &'a T);
-    type IntoIter = std::collections::hash_map::Iter<'a, Option<LanguageTag>, T>;
+impl<T> IntoIterator for LocalizedClaim<T>
+where
+    T: 'static,
+{
+    type Item = <LocalizedClaimIterator<T> as Iterator>::Item;
+    type IntoIter = LocalizedClaimIterator<T>;
 
-    fn into_iter(self) -> std::collections::hash_map::Iter<'a, Option<LanguageTag>, T> {
-        self.0.iter()
+    fn into_iter(self) -> Self::IntoIter {
+        LocalizedClaimIterator {
+            inner: Box::new(
+                self.1.into_iter().map(|value| (None, value)).chain(
+                    self.0
+                        .into_iter()
+                        .map(|(locale, value)| (Some(locale), value)),
+                ),
+            ),
+        }
     }
 }
-impl<T> IntoIterator for LocalizedClaim<T> {
+
+///
+/// Owned iterator over a LocalizedClaim.
+///
+pub struct LocalizedClaimIterator<T> {
+    inner: Box<dyn Iterator<Item = (Option<LanguageTag>, T)>>,
+}
+impl<T> Iterator for LocalizedClaimIterator<T> {
     type Item = (Option<LanguageTag>, T);
-    type IntoIter = std::collections::hash_map::IntoIter<Option<LanguageTag>, T>;
-
-    fn into_iter(self) -> std::collections::hash_map::IntoIter<Option<LanguageTag>, T> {
-        self.0.into_iter()
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
     }
 }
 
