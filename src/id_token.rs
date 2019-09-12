@@ -794,7 +794,7 @@ mod tests {
                 ),
                 email: Some(EndUserEmail::new("homer@homersimpson.me".to_string())),
                 email_verified: Some(true),
-                gender: Some(CoreGenderClaim::Male),
+                gender: Some(CoreGenderClaim::new("male".to_string())),
                 birthday: Some(EndUserBirthday::new("1956-05-12".to_string())),
                 zoneinfo: Some(EndUserTimezone::new("America/Los_Angeles".to_string())),
                 locale: Some(LanguageTag::new("en-US".to_string())),

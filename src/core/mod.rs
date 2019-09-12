@@ -442,21 +442,13 @@ pub enum CoreClientAuthMethod {
 }
 impl ClientAuthMethod for CoreClientAuthMethod {}
 
-///
-/// OpenID Connect Core gender claim.
-///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum CoreGenderClaim {
+new_type![
     ///
-    /// Female
+    /// OpenID Connect Core gender claim.
     ///
-    Female,
-    ///
-    /// Male
-    ///
-    Male,
-}
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    CoreGenderClaim(String)
+];
 impl GenderClaim for CoreGenderClaim {}
 
 ///
