@@ -413,11 +413,18 @@ use std::time::Duration;
 
 use oauth2::helpers::variant_name;
 use oauth2::ResponseType as OAuth2ResponseType;
+
+#[cfg(feature = "curl")]
+pub use oauth2::curl;
+
+#[cfg(feature = "reqwest")]
+pub use oauth2::reqwest;
+
 pub use oauth2::{
-    curl, reqwest, AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret,
-    CodeTokenRequest, CsrfToken, EmptyExtraTokenFields, ErrorResponse, ErrorResponseType,
-    ExtraTokenFields, HttpRequest, HttpResponse, PkceCodeChallenge, PkceCodeChallengeMethod,
-    PkceCodeVerifier, RedirectUrl, RefreshToken, RefreshTokenRequest, RequestTokenError, Scope,
+    AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CodeTokenRequest,
+    CsrfToken, EmptyExtraTokenFields, ErrorResponse, ErrorResponseType, ExtraTokenFields,
+    HttpRequest, HttpResponse, PkceCodeChallenge, PkceCodeChallengeMethod, PkceCodeVerifier,
+    RedirectUrl, RefreshToken, RefreshTokenRequest, RequestTokenError, Scope,
     StandardErrorResponse, StandardTokenResponse, TokenResponse as OAuth2TokenResponse, TokenType,
     TokenUrl,
 };

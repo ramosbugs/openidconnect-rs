@@ -6,7 +6,7 @@ extern crate log;
 extern crate openidconnect;
 #[macro_use]
 extern crate pretty_assertions;
-extern crate reqwest;
+extern crate reqwest_ as reqwest;
 extern crate url;
 
 use std::collections::HashMap;
@@ -102,7 +102,12 @@ impl TestState {
                 .build()
                 .unwrap();
             let redirect_response = http_client
-                .execute(http_client.request(Method::GET, url).build().unwrap())
+                .execute(
+                    http_client
+                        .request(Method::GET, url.as_str())
+                        .build()
+                        .unwrap(),
+                )
                 .unwrap();
             assert_eq!(redirect_response.status(), StatusCode::SEE_OTHER);
             let redirected_url = Url::parse(
