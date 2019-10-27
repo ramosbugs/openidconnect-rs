@@ -1,33 +1,33 @@
-use ring::digest;
 use ring::hmac;
 use ring::rand::SecureRandom;
 use ring::signature as ring_signature;
-use untrusted::Input;
 
 use crate::types::Base64UrlEncodedBytes;
 use crate::{JsonWebKey, SignatureVerificationError, SigningError};
 
 use super::{CoreJsonWebKey, CoreJsonWebKeyType};
 
+use std::ops::Deref;
+
 pub fn sign_hmac(
     key: &[u8],
-    digest_alg: &'static digest::Algorithm,
+    hmac_alg: hmac::Algorithm,
     msg: &[u8],
-) -> hmac::Signature {
-    let signing_key = hmac::SigningKey::new(digest_alg, key);
+) -> hmac::Tag {
+    let signing_key = hmac::Key::new(hmac_alg, key);
     hmac::sign(&signing_key, msg)
 }
 
 pub fn verify_hmac(
     key: &CoreJsonWebKey,
-    digest_alg: &'static digest::Algorithm,
+    hmac_alg: hmac::Algorithm,
     msg: &[u8],
     signature: &[u8],
 ) -> Result<(), SignatureVerificationError> {
     let k = key.k.as_ref().ok_or_else(|| {
         SignatureVerificationError::InvalidKey("Symmetric key `k` is missing".to_string())
     })?;
-    let verification_key = hmac::VerificationKey::new(digest_alg, k);
+    let verification_key = hmac::Key::new(hmac_alg, k);
     hmac::verify(&verification_key, msg, signature)
         .map_err(|_| SignatureVerificationError::CryptoError("bad HMAC".to_string()))
 }
@@ -68,12 +68,9 @@ pub fn verify_rsa_signature(
     signature: &[u8],
 ) -> Result<(), SignatureVerificationError> {
     let (n, e) = rsa_public_key(&key).map_err(SignatureVerificationError::InvalidKey)?;
+    let public_key = ring_signature::RsaPublicKeyComponents { n: n.deref(), e: e.deref() };
 
-    ring_signature::primitive::verify_rsa(
-        params,
-        (Input::from(n), Input::from(e)),
-        Input::from(msg),
-        Input::from(signature),
-    )
-    .map_err(|_| SignatureVerificationError::CryptoError("bad signature".to_string()))
+    public_key
+        .verify(params, msg, signature)
+        .map_err(|_| SignatureVerificationError::CryptoError("bad signature".to_string()))
 }

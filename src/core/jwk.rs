@@ -1,10 +1,9 @@
 use base64;
 use oauth2::helpers::variant_name;
-use ring::digest;
 use ring::rand;
 use ring::signature as ring_signature;
 use ring::signature::KeyPair;
-use untrusted::Input;
+use ring::hmac;
 
 use crate::types::helpers::deserialize_option_or_none;
 use crate::types::Base64UrlEncodedBytes;
@@ -156,13 +155,13 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
                 signature,
             ),
             CoreJwsSigningAlgorithm::HmacSha256 => {
-                crypto::verify_hmac(self, &digest::SHA256, message, signature)
+                crypto::verify_hmac(self, hmac::HMAC_SHA256, message, signature)
             }
             CoreJwsSigningAlgorithm::HmacSha384 => {
-                crypto::verify_hmac(self, &digest::SHA384, message, signature)
+                crypto::verify_hmac(self, hmac::HMAC_SHA384, message, signature)
             }
             CoreJwsSigningAlgorithm::HmacSha512 => {
-                crypto::verify_hmac(self, &digest::SHA512, message, signature)
+                crypto::verify_hmac(self, hmac::HMAC_SHA512, message, signature)
             }
             ref other => Err(SignatureVerificationError::UnsupportedAlg(
                 variant_name(other).to_string(),
@@ -207,10 +206,10 @@ impl
         signature_alg: &CoreJwsSigningAlgorithm,
         message: &[u8],
     ) -> Result<Vec<u8>, SigningError> {
-        let digest_alg = match *signature_alg {
-            CoreJwsSigningAlgorithm::HmacSha256 => &digest::SHA256,
-            CoreJwsSigningAlgorithm::HmacSha384 => &digest::SHA384,
-            CoreJwsSigningAlgorithm::HmacSha512 => &digest::SHA512,
+        let hmac_alg = match *signature_alg {
+            CoreJwsSigningAlgorithm::HmacSha256 => hmac::HMAC_SHA256,
+            CoreJwsSigningAlgorithm::HmacSha384 => hmac::HMAC_SHA384,
+            CoreJwsSigningAlgorithm::HmacSha512 => hmac::HMAC_SHA512,
             ref other => {
                 return Err(SigningError::UnsupportedAlg(
                     variant_name(other).to_string(),
@@ -218,7 +217,7 @@ impl
             }
         };
         Ok(
-            crypto::sign_hmac(self.secret.as_ref(), &digest_alg, message)
+            crypto::sign_hmac(self.secret.as_ref(), hmac_alg, message)
                 .as_ref()
                 .into(),
         )
@@ -248,7 +247,7 @@ impl CoreRsaPrivateSigningKey {
     /// Converts an RSA private key (in PEM format) to a JWK representing its public key.
     ///
     pub fn from_pem(pem: &str, kid: Option<JsonWebKeyId>) -> Result<Self, String> {
-        Self::from_pem_internal(pem, Box::new(rand::SystemRandom), kid)
+        Self::from_pem_internal(pem, Box::new(rand::SystemRandom::new()), kid)
     }
 
     pub(crate) fn from_pem_internal(
@@ -266,7 +265,7 @@ impl CoreRsaPrivateSigningKey {
         let der = base64::decode_config(base64_pem, base64::MIME)
             .map_err(|_| "Failed to decode RSA private key body as base64".to_string())?;
 
-        let key_pair = ring_signature::RsaKeyPair::from_der(Input::from(&der))
+        let key_pair = ring_signature::RsaKeyPair::from_der(&der)
             .map_err(|err| err.description_().to_string())?;
         Ok(Self { key_pair, rng, kid })
     }
@@ -311,14 +310,12 @@ impl
                 public_key
                     .modulus()
                     .big_endian_without_leading_zero()
-                    .as_slice_less_safe()
                     .into(),
             )),
             e: Some(Base64UrlEncodedBytes::new(
                 public_key
                     .exponent()
                     .big_endian_without_leading_zero()
-                    .as_slice_less_safe()
                     .into(),
             )),
             k: None,
