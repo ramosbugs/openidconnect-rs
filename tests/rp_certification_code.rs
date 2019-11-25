@@ -13,7 +13,6 @@ use std::collections::HashMap;
 
 use http::header::LOCATION;
 use http::method::Method;
-use http::status::StatusCode;
 use reqwest::{Client, RedirectPolicy};
 use url::Url;
 
@@ -109,7 +108,7 @@ impl TestState {
                         .unwrap(),
                 )
                 .unwrap();
-            assert_eq!(redirect_response.status(), StatusCode::SEE_OTHER);
+            assert!(redirect_response.status().is_redirection());
             let redirected_url = Url::parse(
                 redirect_response
                     .headers()

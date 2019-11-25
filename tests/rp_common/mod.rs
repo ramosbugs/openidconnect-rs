@@ -3,7 +3,7 @@ extern crate env_logger;
 extern crate failure;
 
 use std::cell::RefCell;
-use std::sync::{Once, ONCE_INIT};
+use std::sync::Once;
 use std::time::Duration;
 
 use failure::Fail;
@@ -23,7 +23,7 @@ pub const RP_CONTACT_EMAIL: &str = "ramos@cs.stanford.edu";
 pub const RP_NAME: &str = "openidconnect-rs";
 pub const RP_REDIRECT_URI: &str = "http://localhost:8080";
 
-static INIT_LOG: Once = ONCE_INIT;
+static INIT_LOG: Once = Once::new();
 
 thread_local! {
     static TEST_ID: RefCell<&'static str> = RefCell::new("UNINITIALIZED_TEST_ID");
