@@ -477,7 +477,6 @@ where
 #[cfg(test)]
 mod tests {
     use oauth2::{AuthUrl, Scope, TokenUrl};
-    use url::Url;
 
     use super::super::core::{
         CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClientAuthMethod, CoreGrantType,
@@ -729,12 +728,11 @@ mod tests {
             )
             .unwrap(),
             AuthUrl::new(
-                Url::parse(
-                    "https://rp.certification.openid.net:8080/openidconnect-rs/\
-                     rp-response_type-code/authorization",
-                )
-                .unwrap(),
-            ),
+                "https://rp.certification.openid.net:8080/openidconnect-rs/\
+                 rp-response_type-code/authorization"
+                    .to_string(),
+            )
+            .unwrap(),
             JsonWebKeySetUrl::new(
                 "https://rp.certification.openid.net:8080/static/jwks_3INbZl52IrrPCp2j.json"
                     .to_string(),
@@ -859,13 +857,14 @@ mod tests {
         ]))
         .set_request_uri_parameter_supported(Some(true))
         .set_request_parameter_supported(Some(true))
-        .set_token_endpoint(Some(TokenUrl::new(
-            Url::parse(
+        .set_token_endpoint(Some(
+            TokenUrl::new(
                 "https://rp.certification.openid.net:8080/openidconnect-rs/\
-                 rp-response_type-code/token",
+                 rp-response_type-code/token"
+                    .to_string(),
             )
             .unwrap(),
-        )))
+        ))
         .set_id_token_encryption_alg_values_supported(Some(all_encryption_algs.clone()))
         .set_userinfo_encryption_alg_values_supported(Some(all_encryption_algs.clone()))
         .set_userinfo_encryption_enc_values_supported(Some(vec![
@@ -896,22 +895,22 @@ mod tests {
         );
         assert_eq!(
             AuthUrl::new(
-                Url::parse(
-                    "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
+                "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
                  /authorization"
-                )
-                    .unwrap()
-            ),
+                    .to_string()
+            )
+            .unwrap(),
             *provider_metadata.authorization_endpoint()
         );
         assert_eq!(
-            Some(&TokenUrl::new(
-                Url::parse(
+            Some(
+                &TokenUrl::new(
                     "https://rp.certification.openid.net:8080/openidconnect-rs\
                      /rp-response_type-code/token"
+                        .to_string()
                 )
                 .unwrap()
-            )),
+            ),
             provider_metadata.token_endpoint()
         );
         assert_eq!(
@@ -1280,12 +1279,11 @@ mod tests {
         );
         assert_eq!(
             AuthUrl::new(
-                Url::parse(
-                    "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
+                "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
                  /authorization"
-                )
-                    .unwrap()
-            ),
+                    .to_string()
+            )
+            .unwrap(),
             *provider_metadata.authorization_endpoint()
         );
         assert_eq!(None, provider_metadata.token_endpoint());

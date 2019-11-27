@@ -77,9 +77,9 @@ fn main() {
     )
     // This example will be running its own server at localhost:8080.
     // See below for the server implementation.
-    .set_redirect_uri(RedirectUrl::new(
-        Url::parse("http://localhost:8080").expect("Invalid redirect URL"),
-    ));
+    .set_redirect_uri(
+        RedirectUrl::new("http://localhost:8080".to_string()).expect("Invalid redirect URL"),
+    );
 
     // Generate the authorization URL to which we'll redirect the user.
     let (authorize_url, csrf_state, nonce) = client

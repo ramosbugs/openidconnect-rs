@@ -7,7 +7,6 @@ use std::sync::Once;
 use std::time::Duration;
 
 use failure::Fail;
-use url::Url;
 
 use openidconnect;
 use openidconnect::core::{
@@ -76,7 +75,9 @@ pub fn init_log(test_id: &'static str) {
     set_test_id(test_id);
 }
 
-pub fn http_client(request: HttpRequest) -> Result<HttpResponse, openidconnect::reqwest::Error> {
+pub fn http_client(
+    request: HttpRequest,
+) -> Result<HttpResponse, openidconnect::reqwest::HttpClientError> {
     retry::retry(
         (0..5).map(|i| {
             if i != 0 {
@@ -148,7 +149,7 @@ where
     F: FnOnce(CoreClientRegistrationRequest) -> CoreClientRegistrationRequest,
 {
     let registration_request_pre = CoreClientRegistrationRequest::new(
-        vec![RedirectUrl::new(Url::parse(RP_REDIRECT_URI).unwrap())],
+        vec![RedirectUrl::new(RP_REDIRECT_URI.to_string()).unwrap()],
         Default::default(),
     )
     .set_application_type(Some(CoreApplicationType::Native))

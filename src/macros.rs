@@ -272,7 +272,8 @@ macro_rules! new_url_type {
         new_url_type![
             @new_type_pub $(#[$attr])*,
             $name,
-            concat!("Create a new `", stringify!($name), "` to wrap a URL."),
+            concat!("Create a new `", stringify!($name), "` from a `String` to wrap a URL."),
+            concat!("Create a new `", stringify!($name), "` from a `Url` to wrap a URL."),
             concat!("Return this `", stringify!($name), "` as a parsed `Url`."),
             impl {}
         ];
@@ -288,7 +289,8 @@ macro_rules! new_url_type {
         new_url_type![
             @new_type_pub $(#[$attr])*,
             $name,
-            concat!("Create a new `", stringify!($name), "` to wrap a URL."),
+            concat!("Create a new `", stringify!($name), "` from a `String` to wrap a URL."),
+            concat!("Create a new `", stringify!($name), "` from a `Url` to wrap a URL."),
             concat!("Return this `", stringify!($name), "` as a parsed `Url`."),
             impl {
                 $($item)*
@@ -300,6 +302,7 @@ macro_rules! new_url_type {
         @new_type_pub $(#[$attr:meta])*,
         $name:ident,
         $new_doc:expr,
+        $from_url_doc:expr,
         $url_doc:expr,
         impl {
             $($item:tt)*
@@ -313,7 +316,11 @@ macro_rules! new_url_type {
             pub fn new(url: String) -> Result<Self, ::url::ParseError> {
                 Ok($name(Url::parse(&url)?, url))
             }
-            #[doc = $url_doc]
+            #[doc = $from_url_doc]
+            pub fn from_url(url: Url) -> Self {
+                let s = url.to_string();
+                Self(url, s)
+            }            #[doc = $url_doc]
             pub fn url(&self) -> &Url {
                 return &self.0;
             }

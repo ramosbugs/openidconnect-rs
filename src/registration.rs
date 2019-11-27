@@ -899,7 +899,6 @@ mod tests {
     use itertools::sorted;
     use oauth2::{ClientId, RedirectUrl};
     use std::time::Duration;
-    use url::Url;
 
     use super::super::core::{
         CoreApplicationType, CoreClientAuthMethod, CoreClientMetadata,
@@ -963,8 +962,8 @@ mod tests {
         assert_eq!(
             *client_metadata.redirect_uris(),
             vec![
-                RedirectUrl::new(Url::parse("https://example.com/redirect-1").unwrap()),
-                RedirectUrl::new(Url::parse("https://example.com/redirect-2").unwrap()),
+                RedirectUrl::new("https://example.com/redirect-1".to_string()).unwrap(),
+                RedirectUrl::new("https://example.com/redirect-2".to_string()).unwrap(),
             ]
         );
         assert_eq!(
@@ -1164,9 +1163,7 @@ mod tests {
 
         assert_eq!(
             *client_metadata.redirect_uris(),
-            vec![RedirectUrl::new(
-                Url::parse("https://example.com/redirect-1").unwrap(),
-            )]
+            vec![RedirectUrl::new("https://example.com/redirect-1".to_string()).unwrap(),]
         );
         assert_eq!(client_metadata.response_types(), None);
         assert_eq!(client_metadata.grant_types(), None);
@@ -1287,8 +1284,8 @@ mod tests {
         assert_eq!(
             *registration_response.redirect_uris(),
             vec![
-                RedirectUrl::new(Url::parse("https://example.com/redirect-1").unwrap()),
-                RedirectUrl::new(Url::parse("https://example.com/redirect-2").unwrap()),
+                RedirectUrl::new("https://example.com/redirect-1".to_string()).unwrap(),
+                RedirectUrl::new("https://example.com/redirect-2".to_string()).unwrap(),
             ]
         );
         assert_eq!(

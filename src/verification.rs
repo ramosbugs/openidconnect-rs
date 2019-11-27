@@ -1796,7 +1796,7 @@ mod tests {
 
         // JSON response (default args)
         assert_eq!(
-            CoreUserInfoClaims::from_json::<super::super::reqwest::Error>(
+            CoreUserInfoClaims::from_json::<super::super::reqwest::HttpClientError>(
                 json_claims.as_bytes(),
                 Some(&sub)
             )
@@ -1809,7 +1809,7 @@ mod tests {
         );
 
         // Invalid subject
-        match CoreUserInfoClaims::from_json::<super::super::reqwest::Error>(
+        match CoreUserInfoClaims::from_json::<super::super::reqwest::HttpClientError>(
             json_claims.as_bytes(),
             Some(&SubjectIdentifier::new("wrong_subject".to_string())),
         ) {

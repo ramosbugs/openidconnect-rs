@@ -66,7 +66,7 @@
 //!         Some(ClientSecret::new("client_secret".to_string())),
 //!     )
 //!     // Set the URL the user will be redirected to after the authorization process.
-//!     .set_redirect_uri(RedirectUrl::new(Url::parse("http://redirect")?));
+//!     .set_redirect_uri(RedirectUrl::new("http://redirect".to_string())?);
 //!
 //! // Generate a PKCE challenge.
 //! let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
@@ -178,7 +178,7 @@
 //! let provider_metadata = CoreProviderMetadata::new(
 //!     // Parameters required by the OpenID Connect Discovery spec.
 //!     IssuerUrl::new("https://accounts.example.com".to_string())?,
-//!     AuthUrl::new(Url::parse("https://accounts.example.com/authorize")?),
+//!     AuthUrl::new("https://accounts.example.com/authorize".to_string())?,
 //!     // Use the JsonWebKeySet struct to serve the JWK Set at this URL.
 //!     JsonWebKeySetUrl::new("https://accounts.example.com/jwk".to_string())?,
 //!     // Supported response types (flows).
@@ -204,7 +204,7 @@
 //!     EmptyAdditionalProviderMetadata {},
 //! )
 //! // Specify the token endpoint (required for the code flow).
-//! .set_token_endpoint(Some(TokenUrl::new(Url::parse("https://accounts.example.com/token")?)))
+//! .set_token_endpoint(Some(TokenUrl::new("https://accounts.example.com/token".to_string())?))
 //! // Recommended: support the UserInfo endpoint.
 //! .set_userinfo_endpoint(
 //!     Some(UserInfoUrl::new("https://accounts.example.com/userinfo".to_string())?)
@@ -1132,7 +1132,6 @@ mod tests {
     use std::time::Duration;
 
     use oauth2::{AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl};
-    use url::Url;
 
     #[cfg(feature = "nightly")]
     use super::core::CoreAuthenticationFlow;
@@ -1149,8 +1148,8 @@ mod tests {
             ClientId::new("aaa".to_string()),
             Some(ClientSecret::new("bbb".to_string())),
             IssuerUrl::new("https://example".to_string()).unwrap(),
-            AuthUrl::new(Url::parse("https://example/authorize").unwrap()),
-            Some(TokenUrl::new(Url::parse("https://example/token").unwrap())),
+            AuthUrl::new("https://example/authorize".to_string()).unwrap(),
+            Some(TokenUrl::new("https://example/token".to_string()).unwrap()),
             None,
             JsonWebKeySet::default(),
         )
@@ -1177,9 +1176,8 @@ mod tests {
 
     #[test]
     fn test_authorize_url_full() {
-        let client = new_client().set_redirect_uri(RedirectUrl::new(
-            Url::parse("http://localhost:8888/").unwrap(),
-        ));
+        let client = new_client()
+            .set_redirect_uri(RedirectUrl::new("http://localhost:8888/".to_string()).unwrap());
 
         #[cfg(feature = "nightly")]
         let flow = CoreAuthenticationFlow::AuthorizationCode;

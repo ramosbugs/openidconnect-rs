@@ -229,7 +229,9 @@ impl TestState {
             .panic_if_fail("failed to get UserInfo")
     }
 
-    pub fn user_info_claims_failure(&self) -> UserInfoError<openidconnect::reqwest::Error> {
+    pub fn user_info_claims_failure(
+        &self,
+    ) -> UserInfoError<openidconnect::reqwest::HttpClientError> {
         let user_info_result: Result<CoreUserInfoClaims, _> = self
             .client
             .user_info(
