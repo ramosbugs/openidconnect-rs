@@ -170,6 +170,7 @@ fn main() {
             let id_token_claims: &CoreIdTokenClaims = token_response
                 .extra_fields()
                 .id_token()
+                .expect("Server did not return an ID token")
                 .claims(&id_token_verifier, &nonce)
                 .unwrap_or_else(|err| {
                     handle_error(&err, "Failed to verify ID token");

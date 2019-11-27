@@ -171,7 +171,11 @@ impl TestState {
 
         self.access_token = Some(token_response.access_token().clone());
 
-        let id_token = (*token_response.extra_fields().id_token()).clone();
+        let id_token = (*token_response
+            .extra_fields()
+            .id_token()
+            .expect("no id_token"))
+        .clone();
         self.id_token = Some(id_token);
 
         self

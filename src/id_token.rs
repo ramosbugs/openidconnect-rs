@@ -339,7 +339,7 @@ where
     JT: JsonWebKeyType,
 {
     #[serde(bound = "AC: AdditionalClaims")]
-    id_token: IdToken<AC, GC, JE, JS, JT>,
+    id_token: Option<IdToken<AC, GC, JE, JS, JT>>,
     #[serde(bound = "EF: ExtraTokenFields", flatten)]
     extra_fields: EF,
     #[serde(skip)]
@@ -357,7 +357,7 @@ where
     ///
     /// Initializes new ID token fields containing the specified [`IdToken`] and extra fields.
     ///
-    pub fn new(id_token: IdToken<AC, GC, JE, JS, JT>, extra_fields: EF) -> Self {
+    pub fn new(id_token: Option<IdToken<AC, GC, JE, JS, JT>>, extra_fields: EF) -> Self {
         Self {
             id_token,
             extra_fields,
@@ -368,8 +368,8 @@ where
     ///
     /// Returns the [`IdToken`] contained in the OAuth2 token response.
     ///
-    pub fn id_token(&self) -> &IdToken<AC, GC, JE, JS, JT> {
-        &self.id_token
+    pub fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS, JT>> {
+        self.id_token.as_ref()
     }
     ///
     /// Returns the extra fields contained in the OAuth2 token response.
@@ -525,7 +525,7 @@ mod tests {
         assert_eq!(*response.token_type(), BasicTokenType::Bearer);
 
         let id_token = response.extra_fields().id_token();
-        let claims = id_token.0.unverified_payload_ref();
+        let claims = id_token.unwrap().0.unverified_payload_ref();
 
         assert_eq!(
             *claims.issuer().url(),

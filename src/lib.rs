@@ -104,14 +104,17 @@
 //!         .request(http_client)?;
 //!
 //! // Extract the ID token claims after verifying its authenticity and nonce.
-//! let id_token = token_response.id_token().claims(&client.id_token_verifier(), &nonce)?;
+//! let id_token = token_response
+//!   .id_token()
+//!   .ok_or_else(|| failure::format_err!("Server did not return an ID token"))?;
+//! let claims = id_token.claims(&client.id_token_verifier(), &nonce)?;
 //!
 //! // Verify the access token hash to ensure that the access token hasn't been substituted for
 //! // another user's.
-//! if let Some(expected_access_token_hash) = id_token.access_token_hash() {
+//! if let Some(expected_access_token_hash) = claims.access_token_hash() {
 //!     let actual_access_token_hash = AccessTokenHash::from_token(
 //!         token_response.access_token(),
-//!         &token_response.id_token().signing_alg()?
+//!         &id_token.signing_alg()?
 //!     )?;
 //!     if actual_access_token_hash != *expected_access_token_hash {
 //!         return Err(failure::Error::from_boxed_compat("Invalid access token".into()));
@@ -122,8 +125,8 @@
 //! // complete listing of the available claims.
 //! println!(
 //!     "User {} with e-mail address {} has authenticated successfully",
-//!     id_token.subject().as_str(),
-//!     id_token.email().map(|email| email.as_str()).unwrap_or("<not provided>"),
+//!     claims.subject().as_str(),
+//!     claims.email().map(|email| email.as_str()).unwrap_or("<not provided>"),
 //! );
 //!
 //! // See the OAuth2TokenResponse trait for a listing of other available fields such as
@@ -375,7 +378,7 @@
 //! Ok(CoreTokenResponse::new(
 //!     AccessToken::new("some_secret".to_string()),
 //!     CoreTokenType::Bearer,
-//!     CoreIdTokenFields::new(id_token, EmptyExtraTokenFields {}),
+//!     CoreIdTokenFields::new(Some(id_token), EmptyExtraTokenFields {}),
 //! ))
 //! # }
 //! # fn main() {}
@@ -1060,7 +1063,10 @@ where
     ///
     /// Returns the ID token provided by the token response.
     ///
-    fn id_token(&self) -> &IdToken<AC, GC, JE, JS, JT>;
+    /// OpenID Connect authorization servers should always return this field, but it is optional
+    /// to allow for interoperability with authorization servers that only support OAuth2.
+    ///
+    fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS, JT>>;
 }
 
 impl<AC, EF, GC, JE, JS, JT, TT> TokenResponse<AC, GC, JE, JS, JT, TT>
@@ -1074,7 +1080,7 @@ where
     JT: JsonWebKeyType,
     TT: TokenType,
 {
-    fn id_token(&self) -> &IdToken<AC, GC, JE, JS, JT> {
+    fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS, JT>> {
         self.extra_fields().id_token()
     }
 }
