@@ -73,7 +73,7 @@ where
     /// Submits this request to the associated user info endpoint using the specified asynchronous
     /// HTTP client.
     ///
-    pub fn request_async<AC, C, F, GC, HC, RE>(
+    pub fn request_future<AC, C, F, GC, HC, RE>(
         self,
         http_client: C,
     ) -> impl Future<Item = UserInfoClaims<AC, GC>, Error = UserInfoError<RE>>
