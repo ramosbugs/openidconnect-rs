@@ -561,6 +561,7 @@ where
     issuer: IssuerUrl,
     userinfo_endpoint: Option<UserInfoUrl>,
     jwks: JsonWebKeySet<JS, JT, JU, K>,
+    use_openid_scope: bool,
     _phantom: PhantomData<(AC, AD, GC, JE, P)>,
 }
 impl<AC, AD, GC, JE, JS, JT, JU, K, P, RR, TE, TR, TT>
@@ -610,6 +611,7 @@ where
             issuer,
             userinfo_endpoint,
             jwks,
+            use_openid_scope: true,
             _phantom: PhantomData,
         }
     }
@@ -666,6 +668,25 @@ where
     pub fn set_redirect_uri(mut self, redirect_uri: RedirectUrl) -> Self {
         self.oauth2_client = self.oauth2_client.set_redirect_url(redirect_uri.clone());
         self.refresh_oauth2_client = self.refresh_oauth2_client.set_redirect_url(redirect_uri);
+        self
+    }
+
+    ///
+    /// Enables the `openid` scope to be requested automatically.
+    ///
+    /// This scope is requested by default, so this function is only useful after previous calls to
+    /// [`disable_openid_scope`].
+    ///
+    pub fn enable_openid_scope(mut self) -> Self {
+        self.use_openid_scope = true;
+        self
+    }
+
+    ///
+    /// Disables the `openid` scope from being requested automatically.
+    ///
+    pub fn disable_openid_scope(mut self) -> Self {
+        self.use_openid_scope = true;
         self
     }
 
@@ -730,7 +751,7 @@ where
         RT: ResponseType,
         SF: FnOnce() -> CsrfToken + 'static,
     {
-        AuthorizationRequest {
+        let request = AuthorizationRequest {
             inner: self.oauth2_client.authorize_url(state_fn),
             acr_values: Vec::new(),
             authentication_flow,
@@ -742,8 +763,12 @@ where
             nonce: nonce_fn(),
             prompts: Vec::new(),
             ui_locales: Vec::new(),
+        };
+        if self.use_openid_scope {
+            request.add_scope(Scope::new(OPENID_SCOPE.to_string()))
+        } else {
+            request
         }
-        .add_scope(Scope::new(OPENID_SCOPE.to_string()))
     }
 
     ///
