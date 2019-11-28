@@ -1,29 +1,32 @@
 use std::fmt::{Display, Error as FormatterError, Formatter};
 use std::ops::Deref;
 
+use oauth2::{
+    EmptyExtraTokenFields, ErrorResponseType, ResponseType as OAuth2ResponseType,
+    StandardErrorResponse, StandardTokenResponse,
+};
 pub use oauth2::basic::{
     BasicErrorResponseType as CoreErrorResponseType,
     BasicRequestTokenError as CoreRequestTokenError, BasicTokenType as CoreTokenType,
 };
 use oauth2::helpers::variant_name;
-use oauth2::{
-    EmptyExtraTokenFields, ErrorResponseType, ResponseType as OAuth2ResponseType,
-    StandardErrorResponse, StandardTokenResponse,
-};
 use serde::{Deserialize, Serialize};
 
-use super::registration::{
-    ClientMetadata, ClientRegistrationRequest, ClientRegistrationResponse,
-    EmptyAdditionalClientMetadata, EmptyAdditionalClientRegistrationResponse,
-    RegisterErrorResponseType,
-};
-use super::{
+use crate::{
     ApplicationType, AuthDisplay, AuthPrompt, ClaimName, ClaimType, Client, ClientAuthMethod,
     EmptyAdditionalClaims, EmptyAdditionalProviderMetadata, GenderClaim, GrantType, IdToken,
     IdTokenClaims, IdTokenFields, IdTokenVerifier, JsonWebKeySet, JweContentEncryptionAlgorithm,
     JweKeyManagementAlgorithm, JwsSigningAlgorithm, ProviderMetadata, ResponseMode, ResponseType,
     SubjectIdentifierType, UserInfoClaims, UserInfoJsonWebToken, UserInfoVerifier,
 };
+use crate::registration::{
+    ClientMetadata, ClientRegistrationRequest, ClientRegistrationResponse,
+    EmptyAdditionalClientMetadata, EmptyAdditionalClientRegistrationResponse,
+    RegisterErrorResponseType,
+};
+
+#[cfg(feature = "nightly")]
+use super::AuthenticationFlow;
 
 pub use self::jwk::{
     CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreRsaPrivateSigningKey,
@@ -33,9 +36,6 @@ mod crypto;
 
 // Private purely for organizational reasons; exported publicly above.
 mod jwk;
-
-#[cfg(feature = "nightly")]
-use super::AuthenticationFlow;
 
 ///
 /// OpenID Connect Core authentication flows.

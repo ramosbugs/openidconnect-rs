@@ -5,6 +5,7 @@ authors = ["David A. Ramos <ramos@cs.stanford.edu>"]
 description = "OpenID Connect library"
 license = "MIT"
 repository = "https://github.com/ramosbugs/openidconnect-rs"
+edition = "2018"
 
 [features]
 curl = ["oauth2/curl"]

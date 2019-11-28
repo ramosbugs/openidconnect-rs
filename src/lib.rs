@@ -386,13 +386,18 @@
 
 extern crate base64;
 extern crate chrono;
+#[cfg(test)]
+extern crate color_backtrace;
 extern crate failure;
-extern crate futures;
 #[macro_use]
 extern crate failure_derive;
+extern crate futures;
 extern crate http as http_;
 extern crate itertools;
 extern crate oauth2;
+#[cfg(test)]
+#[macro_use]
+extern crate pretty_assertions;
 extern crate rand;
 extern crate ring;
 extern crate serde;
@@ -402,35 +407,25 @@ extern crate serde_json;
 extern crate untrusted;
 extern crate url;
 
-#[cfg(test)]
-extern crate color_backtrace;
-
-#[cfg(test)]
-#[macro_use]
-extern crate pretty_assertions;
-
 use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::str;
 use std::time::Duration;
 
-use oauth2::helpers::variant_name;
-use oauth2::ResponseType as OAuth2ResponseType;
-
-#[cfg(feature = "curl")]
-pub use oauth2::curl;
-
-#[cfg(feature = "reqwest")]
-pub use oauth2::reqwest;
-
 pub use oauth2::{
-    AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CodeTokenRequest,
+    AccessToken, AuthorizationCode, AuthType, AuthUrl, ClientId, ClientSecret, CodeTokenRequest,
     CsrfToken, EmptyExtraTokenFields, ErrorResponse, ErrorResponseType, ExtraTokenFields,
     HttpRequest, HttpResponse, PkceCodeChallenge, PkceCodeChallengeMethod, PkceCodeVerifier,
     RedirectUrl, RefreshToken, RefreshTokenRequest, RequestTokenError, Scope,
     StandardErrorResponse, StandardTokenResponse, TokenResponse as OAuth2TokenResponse, TokenType,
     TokenUrl,
 };
+#[cfg(feature = "curl")]
+pub use oauth2::curl;
+use oauth2::helpers::variant_name;
+#[cfg(feature = "reqwest")]
+pub use oauth2::reqwest;
+use oauth2::ResponseType as OAuth2ResponseType;
 use url::Url;
 
 pub use claims::{
@@ -439,16 +434,16 @@ pub use claims::{
 pub use discovery::{
     AdditionalProviderMetadata, DiscoveryError, EmptyAdditionalProviderMetadata, ProviderMetadata,
 };
-pub use id_token::IdTokenFields;
 pub use id_token::{IdToken, IdTokenClaims};
-pub use jwt::JsonWebTokenError;
+pub use id_token::IdTokenFields;
 use jwt::{JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenHeader};
+pub use jwt::JsonWebTokenError;
 // Flatten the module hierarchy involving types. They're only separated to improve code
 // organization.
 pub use types::{
     AccessTokenHash, AddressCountry, AddressLocality, AddressPostalCode, AddressRegion,
-    ApplicationType, Audience, AuthDisplay, AuthPrompt, AuthenticationContextClass,
-    AuthenticationMethodReference, AuthorizationCodeHash, ClaimName, ClaimType, ClientAuthMethod,
+    ApplicationType, Audience, AuthDisplay, AuthenticationContextClass, AuthenticationMethodReference,
+    AuthorizationCodeHash, AuthPrompt, ClaimName, ClaimType, ClientAuthMethod,
     ClientConfigUrl, ClientContactEmail, ClientName, ClientUrl, EndUserBirthday, EndUserEmail,
     EndUserFamilyName, EndUserGivenName, EndUserMiddleName, EndUserName, EndUserNickname,
     EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone, EndUserUsername,
@@ -1164,14 +1159,14 @@ mod tests {
 
     use oauth2::{AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl};
 
-    #[cfg(feature = "nightly")]
-    use super::core::CoreAuthenticationFlow;
-    use super::core::{CoreAuthDisplay, CoreAuthPrompt, CoreClient, CoreIdToken, CoreResponseType};
-    use super::{
+    use crate::{
         AuthenticationContextClass, AuthenticationFlow, JsonWebKeySet, LanguageTag, LoginHint,
         Nonce,
     };
-    use IssuerUrl;
+    use crate::core::{CoreAuthDisplay, CoreAuthPrompt, CoreClient, CoreIdToken, CoreResponseType};
+    #[cfg(feature = "nightly")]
+    use crate::core::CoreAuthenticationFlow;
+    use crate::IssuerUrl;
 
     fn new_client() -> CoreClient {
         color_backtrace::install();

@@ -5,20 +5,20 @@ use std::ops::Deref;
 use std::rc::Rc;
 
 use chrono::{DateTime, Utc};
-use oauth2::helpers::variant_name;
 use oauth2::{ClientId, ClientSecret};
+use oauth2::helpers::variant_name;
 use ring::constant_time::verify_slices_are_equal;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use super::jwt::{JsonWebToken, JsonWebTokenJsonPayloadSerde};
-use super::user_info::UserInfoClaimsImpl;
-use super::{
+use crate::{
     AdditionalClaims, Audience, AuthenticationContextClass, GenderClaim, IdTokenClaims, IssuerUrl,
     JsonWebKey, JsonWebKeySet, JsonWebKeyType, JsonWebKeyUse, JsonWebTokenAccess,
     JsonWebTokenAlgorithm, JsonWebTokenHeader, JweContentEncryptionAlgorithm, JwsSigningAlgorithm,
     Nonce, SubjectIdentifier,
 };
+use crate::jwt::{JsonWebToken, JsonWebTokenJsonPayloadSerde};
+use crate::user_info::UserInfoClaimsImpl;
 
 pub(crate) trait AudiencesClaim {
     fn audiences(&self) -> Option<&Vec<Audience>>;
@@ -924,27 +924,27 @@ mod tests {
 
     use chrono::{TimeZone, Utc};
     use oauth2::{ClientId, ClientSecret};
-    use {serde_json, AuthenticationContextClass};
 
-    use super::super::core::{
+    use crate::{AuthenticationContextClass, serde_json};
+    use super::{
+        AudiencesClaim, ClaimsVerificationError, IssuerClaim, JsonWebTokenHeader,
+        JwtClaimsVerifier, SignatureVerificationError, SubjectIdentifier,
+    };
+    use crate::{
+        AccessToken, Audience, AuthorizationCode, EndUserName, IssuerUrl, JsonWebKeyId, Nonce,
+        StandardClaims, UserInfoError,
+    };
+    use crate::core::{
         CoreIdToken, CoreIdTokenClaims, CoreIdTokenVerifier, CoreJsonWebKey, CoreJsonWebKeySet,
         CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm,
         CoreJwsSigningAlgorithm, CoreRsaPrivateSigningKey, CoreUserInfoClaims,
         CoreUserInfoJsonWebToken, CoreUserInfoVerifier,
     };
-    use super::super::jwt::tests::{TEST_RSA_PRIV_KEY, TEST_RSA_PUB_KEY};
-    use super::super::jwt::{JsonWebToken, JsonWebTokenJsonPayloadSerde};
-    use super::super::types::helpers::seconds_to_utc;
-    use super::super::types::Seconds;
-    use super::super::{
-        AccessToken, Audience, AuthorizationCode, EndUserName, IssuerUrl, JsonWebKeyId, Nonce,
-        StandardClaims, UserInfoError,
-    };
-    use super::{
-        AudiencesClaim, ClaimsVerificationError, IssuerClaim, JsonWebTokenHeader,
-        JwtClaimsVerifier, SignatureVerificationError, SubjectIdentifier,
-    };
+    use crate::jwt::{JsonWebToken, JsonWebTokenJsonPayloadSerde};
+    use crate::jwt::tests::{TEST_RSA_PRIV_KEY, TEST_RSA_PUB_KEY};
     use crate::types::Base64UrlEncodedBytes;
+    use crate::types::helpers::seconds_to_utc;
+    use crate::types::Seconds;
 
     type CoreJsonWebTokenHeader = JsonWebTokenHeader<
         CoreJweContentEncryptionAlgorithm,
@@ -1851,7 +1851,7 @@ mod tests {
 
         // JSON response (default args)
         assert_eq!(
-            CoreUserInfoClaims::from_json::<super::super::reqwest::HttpClientError>(
+            CoreUserInfoClaims::from_json::<crate::reqwest::HttpClientError>(
                 json_claims.as_bytes(),
                 Some(&sub)
             )
@@ -1864,7 +1864,7 @@ mod tests {
         );
 
         // Invalid subject
-        match CoreUserInfoClaims::from_json::<super::super::reqwest::HttpClientError>(
+        match CoreUserInfoClaims::from_json::<crate::reqwest::HttpClientError>(
             json_claims.as_bytes(),
             Some(&SubjectIdentifier::new("wrong_subject".to_string())),
         ) {

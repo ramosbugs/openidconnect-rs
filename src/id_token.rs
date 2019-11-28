@@ -2,11 +2,9 @@ use std::marker::PhantomData;
 
 use chrono::{DateTime, Utc};
 use oauth2::ClientId;
+use oauth2::helpers::variant_name;
 
-use super::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
-use super::types::helpers::{deserialize_string_or_vec, serde_utc_seconds, serde_utc_seconds_opt};
-use super::types::LocalizedClaim;
-use super::{
+use crate::{
     AccessToken, AccessTokenHash, AdditionalClaims, AddressClaim, Audience, AudiencesClaim,
     AuthenticationContextClass, AuthenticationMethodReference, AuthorizationCode,
     AuthorizationCodeHash, ClaimsVerificationError, EndUserBirthday, EndUserEmail,
@@ -17,8 +15,10 @@ use super::{
     JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, Nonce, NonceVerifier,
     PrivateSigningKey, SigningError, StandardClaims, SubjectIdentifier,
 };
-use jwt::JsonWebTokenAccess;
-use oauth2::helpers::variant_name;
+use crate::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
+use crate::jwt::JsonWebTokenAccess;
+use crate::types::helpers::{deserialize_string_or_vec, serde_utc_seconds, serde_utc_seconds_opt};
+use crate::types::LocalizedClaim;
 
 // This wrapper layer exists instead of directly verifying the JWT and returning the claims so that
 // we can pass it around and easily access a serialized JWT representation of it (e.g., for passing
@@ -414,15 +414,12 @@ where
 #[cfg(test)]
 mod tests {
     use chrono::{TimeZone, Utc};
-    use oauth2::basic::BasicTokenType;
     use oauth2::{ClientId, TokenResponse};
+    use oauth2::basic::BasicTokenType;
     use url::Url;
-    use {serde_json, AddressClaim};
 
-    use super::super::claims::{AdditionalClaims, EmptyAdditionalClaims, StandardClaims};
-    use super::super::core::{CoreGenderClaim, CoreIdToken, CoreIdTokenClaims, CoreTokenResponse};
-    use super::super::jwt::JsonWebTokenAccess;
-    use super::super::{
+    use crate::{AddressClaim, serde_json};
+    use crate::{
         AccessTokenHash, AddressCountry, AddressLocality, AddressPostalCode, AddressRegion,
         Audience, AuthenticationContextClass, AuthenticationMethodReference, AuthorizationCodeHash,
         EndUserBirthday, EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName,
@@ -430,6 +427,10 @@ mod tests {
         EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, FormattedAddress, IssuerUrl,
         LanguageTag, Nonce, StreetAddress, SubjectIdentifier,
     };
+    use crate::claims::{AdditionalClaims, EmptyAdditionalClaims, StandardClaims};
+    use crate::core::{CoreGenderClaim, CoreIdToken, CoreIdTokenClaims, CoreTokenResponse};
+    use crate::jwt::JsonWebTokenAccess;
+
     use super::{AudiencesClaim, IdTokenClaims, IssuerClaim};
 
     #[test]

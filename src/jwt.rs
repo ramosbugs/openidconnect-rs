@@ -4,8 +4,8 @@ use std::ops::Deref;
 use std::str;
 
 use base64;
-use serde::de::{DeserializeOwned, Error as _, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::de::{DeserializeOwned, Error as _, Visitor};
 use serde_json;
 
 use super::{
@@ -450,11 +450,12 @@ pub mod tests {
 
     use serde_json;
 
-    use super::super::core::{
+    use crate::core::{
         CoreJsonWebKey, CoreJsonWebKeyType, CoreJweContentEncryptionAlgorithm,
         CoreJwsSigningAlgorithm, CoreRsaPrivateSigningKey,
     };
-    use super::super::JsonWebKeyId;
+    use crate::JsonWebKeyId;
+
     use super::{
         JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenJsonPayloadSerde,
         JsonWebTokenPayloadSerde,

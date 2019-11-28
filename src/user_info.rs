@@ -4,19 +4,14 @@ use std::str;
 use chrono::{DateTime, Utc};
 use failure::Fail;
 use futures::{Future, IntoFuture};
-use http_::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
+use http_::header::{ACCEPT, CONTENT_TYPE, HeaderValue};
 use http_::method::Method;
 use http_::status::StatusCode;
 use oauth2::AccessToken;
 use serde_json;
 use url::Url;
 
-use super::http::{auth_bearer, MIME_TYPE_JSON, MIME_TYPE_JWT};
-use super::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
-use super::types::helpers::deserialize_string_or_vec_opt;
-use super::types::LocalizedClaim;
-use super::verification::UserInfoVerifier;
-use super::{
+use crate::{
     AdditionalClaims, AddressClaim, Audience, AudiencesClaim, ClaimsVerificationError,
     EndUserBirthday, EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName,
     EndUserName, EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl,
@@ -25,6 +20,11 @@ use super::{
     JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, PrivateSigningKey,
     StandardClaims, SubjectIdentifier,
 };
+use crate::http::{auth_bearer, MIME_TYPE_JSON, MIME_TYPE_JWT};
+use crate::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
+use crate::types::helpers::deserialize_string_or_vec_opt;
+use crate::types::LocalizedClaim;
+use crate::verification::UserInfoVerifier;
 
 ///
 /// User info request.

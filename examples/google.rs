@@ -14,13 +14,6 @@
 //! ...and follow the instructions.
 //!
 
-extern crate base64;
-extern crate env_logger;
-extern crate failure;
-extern crate openidconnect;
-extern crate rand;
-extern crate url;
-
 use std::env;
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
@@ -29,14 +22,14 @@ use std::process::exit;
 use failure::Fail;
 use url::Url;
 
-use openidconnect::core::{
-    CoreClient, CoreIdTokenClaims, CoreIdTokenVerifier, CoreProviderMetadata, CoreResponseType,
-};
-use openidconnect::reqwest::http_client;
 use openidconnect::{
     AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce,
     OAuth2TokenResponse, RedirectUrl, Scope,
 };
+use openidconnect::core::{
+    CoreClient, CoreIdTokenClaims, CoreIdTokenVerifier, CoreProviderMetadata, CoreResponseType,
+};
+use openidconnect::reqwest::http_client;
 
 fn handle_error<T: Fail>(fail: &T, msg: &'static str) {
     let mut err_msg = format!("ERROR: {}", msg);

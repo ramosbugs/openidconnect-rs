@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use failure::Fail;
 use futures::{Future, IntoFuture};
-use http_::header::{HeaderValue, ACCEPT};
+use http_::header::{ACCEPT, HeaderValue};
 use http_::method::Method;
 use http_::status::StatusCode;
 use oauth2::{AuthUrl, Scope, TokenUrl};
@@ -12,6 +12,7 @@ use serde::Serialize;
 use serde_json;
 use url;
 
+use super::{CONFIG_URL_SUFFIX, HttpRequest, HttpResponse, UserInfoUrl};
 use super::http::{check_content_type, MIME_TYPE_JSON};
 use super::types::{
     AuthDisplay, AuthenticationContextClass, ClaimName, ClaimType, ClientAuthMethod, GrantType,
@@ -20,7 +21,6 @@ use super::types::{
     OpPolicyUrl, OpTosUrl, RegistrationUrl, ResponseMode, ResponseType, ResponseTypes,
     ServiceDocUrl, SubjectIdentifierType,
 };
-use super::{HttpRequest, HttpResponse, UserInfoUrl, CONFIG_URL_SUFFIX};
 
 ///
 /// Trait for adding extra fields to [`ProviderMetadata`].
@@ -478,12 +478,13 @@ where
 mod tests {
     use oauth2::{AuthUrl, Scope, TokenUrl};
 
-    use super::super::core::{
+    use crate::core::{
         CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClientAuthMethod, CoreGrantType,
         CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm,
         CoreProviderMetadata, CoreResponseMode, CoreResponseType, CoreSubjectIdentifierType,
     };
-    use super::super::{
+
+    use super::{
         AuthenticationContextClass, IssuerUrl, JsonWebKeySetUrl, LanguageTag, OpPolicyUrl,
         OpTosUrl, RegistrationUrl, ResponseTypes, ServiceDocUrl, UserInfoUrl,
     };

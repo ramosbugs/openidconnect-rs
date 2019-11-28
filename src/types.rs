@@ -1155,7 +1155,7 @@ pub(crate) mod helpers {
     }
 
     pub mod serde_utc_seconds {
-        use super::super::Seconds;
+        use crate::types::Seconds;
         use chrono::{DateTime, Utc};
         use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -1181,7 +1181,7 @@ pub(crate) mod helpers {
     }
 
     pub mod serde_utc_seconds_opt {
-        use super::super::Seconds;
+        use crate::types::Seconds;
         use chrono::{DateTime, Utc};
         use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -1246,7 +1246,7 @@ mod serde_base64url_byte_array {
 mod tests {
     use serde_json;
 
-    use super::super::IssuerUrl;
+    use super::IssuerUrl;
 
     #[test]
     fn test_issuer_url_append() {

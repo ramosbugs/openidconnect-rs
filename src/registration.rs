@@ -5,17 +5,20 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use failure::Fail;
 use futures::{Future, IntoFuture};
-use http_::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
+use http_::header::{ACCEPT, CONTENT_TYPE, HeaderMap, HeaderValue};
 use http_::method::Method;
 use http_::status::StatusCode;
 use serde;
+use serde::{Serialize, Serializer};
 use serde::de::{Deserialize, DeserializeOwned, Deserializer, MapAccess, Visitor};
 use serde::ser::SerializeMap;
-use serde::{Serialize, Serializer};
 use serde_json;
 
+use super::{
+    AccessToken, ClientId, ClientSecret, ErrorResponseType, HttpRequest, HttpResponse, JsonWebKey,
+    JsonWebKeySet, RedirectUrl, StandardErrorResponse,
+};
 use super::http::{auth_bearer, check_content_type, MIME_TYPE_JSON};
-use super::types::helpers::{serde_utc_seconds_opt, split_language_tag_key};
 use super::types::{
     ApplicationType, AuthenticationContextClass, ClientAuthMethod, ClientConfigUrl,
     ClientContactEmail, ClientName, ClientUrl, GrantType, InitiateLoginUrl, JsonWebKeySetUrl,
@@ -24,10 +27,7 @@ use super::types::{
     RegistrationUrl, RequestUrl, ResponseType, ResponseTypes, SectorIdentifierUrl,
     SubjectIdentifierType, ToSUrl,
 };
-use super::{
-    AccessToken, ClientId, ClientSecret, ErrorResponseType, HttpRequest, HttpResponse, JsonWebKey,
-    JsonWebKeySet, RedirectUrl, StandardErrorResponse,
-};
+use super::types::helpers::{serde_utc_seconds_opt, split_language_tag_key};
 
 ///
 /// Trait for adding extra fields to [`ClientMetadata`].
@@ -895,23 +895,24 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use chrono::{TimeZone, Utc};
     use itertools::sorted;
     use oauth2::{ClientId, RedirectUrl};
-    use std::time::Duration;
 
-    use super::super::core::{
+    use crate::{
+        AuthenticationContextClass, ClientConfigUrl, ClientContactEmail, ClientName, ClientUrl,
+        JsonWebKeySet, JsonWebKeySetUrl, LanguageTag, LogoUrl, PolicyUrl, RequestUrl,
+        ResponseTypes, SectorIdentifierUrl, ToSUrl,
+    };
+    use crate::core::{
         CoreApplicationType, CoreClientAuthMethod, CoreClientMetadata,
         CoreClientRegistrationResponse, CoreGrantType, CoreJweContentEncryptionAlgorithm,
         CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm, CoreResponseType,
         CoreSubjectIdentifierType,
     };
-    use super::super::jwt::tests::TEST_RSA_PUB_KEY;
-    use super::super::{
-        AuthenticationContextClass, ClientConfigUrl, ClientContactEmail, ClientName, ClientUrl,
-        JsonWebKeySet, JsonWebKeySetUrl, LanguageTag, LogoUrl, PolicyUrl, RequestUrl,
-        ResponseTypes, SectorIdentifierUrl, ToSUrl,
-    };
+    use crate::jwt::tests::TEST_RSA_PUB_KEY;
 
     #[test]
     fn test_metadata_serialization() {

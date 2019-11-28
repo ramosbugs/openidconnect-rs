@@ -4,19 +4,19 @@ use std::str;
 
 use chrono::{DateTime, Utc};
 use serde;
+use serde::{Serialize, Serializer};
 use serde::de::{Deserialize, DeserializeOwned, Deserializer, MapAccess, Visitor};
 use serde::ser::SerializeMap;
-use serde::{Serialize, Serializer};
 
-use super::types::helpers::{seconds_to_utc, split_language_tag_key, utc_to_seconds};
-use super::types::{LocalizedClaim, Seconds};
-use super::{
+use crate::{
     AddressCountry, AddressLocality, AddressPostalCode, AddressRegion, EndUserBirthday,
     EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName, EndUserName,
     EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone,
     EndUserUsername, EndUserWebsiteUrl, FormattedAddress, LanguageTag, StreetAddress,
     SubjectIdentifier,
 };
+use crate::types::{LocalizedClaim, Seconds};
+use crate::types::helpers::{seconds_to_utc, split_language_tag_key, utc_to_seconds};
 
 ///
 /// Additional claims beyond the set of Standard Claims defined by OpenID Connect Core.
