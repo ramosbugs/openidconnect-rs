@@ -21,9 +21,8 @@ use super::{
     ApplicationType, AuthDisplay, AuthPrompt, ClaimName, ClaimType, Client, ClientAuthMethod,
     EmptyAdditionalClaims, EmptyAdditionalProviderMetadata, GenderClaim, GrantType, IdToken,
     IdTokenClaims, IdTokenFields, IdTokenVerifier, JsonWebKeySet, JweContentEncryptionAlgorithm,
-    JweKeyManagementAlgorithm, JwsSigningAlgorithm, ProviderMetadata, RefreshIdTokenFields,
-    ResponseMode, ResponseType, SubjectIdentifierType, UserInfoClaims, UserInfoJsonWebToken,
-    UserInfoVerifier,
+    JweKeyManagementAlgorithm, JwsSigningAlgorithm, ProviderMetadata, ResponseMode, ResponseType,
+    SubjectIdentifierType, UserInfoClaims, UserInfoJsonWebToken, UserInfoVerifier,
 };
 
 pub use self::jwk::{
@@ -151,18 +150,6 @@ pub type CoreIdTokenFields = IdTokenFields<
 >;
 
 ///
-/// OpenID Connect Core ID token refresh token exchange fields.
-///
-pub type CoreRefreshIdTokenFields = RefreshIdTokenFields<
-    EmptyAdditionalClaims,
-    EmptyExtraTokenFields,
-    CoreGenderClaim,
-    CoreJweContentEncryptionAlgorithm,
-    CoreJwsSigningAlgorithm,
-    CoreJsonWebKeyType,
->;
-
-///
 /// OpenID Connect Core ID token verifier.
 ///
 pub type CoreIdTokenVerifier<'a> = IdTokenVerifier<
@@ -181,7 +168,7 @@ pub type CoreTokenResponse = StandardTokenResponse<CoreIdTokenFields, CoreTokenT
 ///
 /// OpenID Connect Core refresh token response.
 ///
-pub type CoreRefreshTokenResponse = StandardTokenResponse<CoreRefreshIdTokenFields, CoreTokenType>;
+pub type CoreRefreshTokenResponse = StandardTokenResponse<CoreIdTokenFields, CoreTokenType>;
 
 ///
 /// OpenID Connect Core JSON Web Key Set.

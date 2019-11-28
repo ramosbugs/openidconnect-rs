@@ -439,8 +439,8 @@ pub use claims::{
 pub use discovery::{
     AdditionalProviderMetadata, DiscoveryError, EmptyAdditionalProviderMetadata, ProviderMetadata,
 };
+pub use id_token::IdTokenFields;
 pub use id_token::{IdToken, IdTokenClaims};
-pub use id_token::{IdTokenFields, RefreshIdTokenFields};
 pub use jwt::JsonWebTokenError;
 use jwt::{JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenHeader};
 // Flatten the module hierarchy involving types. They're only separated to improve code
@@ -1132,7 +1132,7 @@ where
 }
 
 impl<AC, EF, GC, JE, JS, JT, TT> RefreshTokenResponse<AC, GC, JE, JS, JT, TT>
-    for StandardTokenResponse<RefreshIdTokenFields<AC, EF, GC, JE, JS, JT>, TT>
+    for StandardTokenResponse<IdTokenFields<AC, EF, GC, JE, JS, JT>, TT>
 where
     AC: AdditionalClaims,
     EF: ExtraTokenFields,
