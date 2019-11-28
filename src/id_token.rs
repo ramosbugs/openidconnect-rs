@@ -152,8 +152,14 @@ where
 {
     #[serde(rename = "iss")]
     issuer: IssuerUrl,
-    // We always serialize as an array, which is valid according to the spec.
-    #[serde(rename = "aud", deserialize_with = "deserialize_string_or_vec")]
+    // We always serialize as an array, which is valid according to the spec. This sets the
+    // 'default' attribute to be compatible with non-spec compliant OIDC providers that omit this
+    // field.
+    #[serde(
+        default,
+        rename = "aud",
+        deserialize_with = "deserialize_string_or_vec"
+    )]
     audiences: Vec<Audience>,
     #[serde(rename = "exp", with = "serde_utc_seconds")]
     expiration: DateTime<Utc>,
