@@ -639,6 +639,22 @@ where
     }
 
     ///
+    /// Specifies whether the issuer claim must match the expected issuer URL for the provider.
+    ///
+    pub fn require_issuer_match(mut self, iss_required: bool) -> Self {
+        self.jwt_verifier = self.jwt_verifier.require_issuer_match(iss_required);
+        self
+    }
+
+    ///
+    /// Specifies whether the audience claim must match this client's client ID.
+    ///
+    pub fn require_audience_match(mut self, aud_required: bool) -> Self {
+        self.jwt_verifier = self.jwt_verifier.require_audience_match(aud_required);
+        self
+    }
+
+    ///
     /// Specifies a function for returning the current time.
     ///
     /// This function is used for verifying the ID token expiration time.
