@@ -465,17 +465,17 @@ where
 ///
 /// Trait for verifying ID token nonces.
 ///
-pub trait NonceVerifier<'a> {
+pub trait NonceVerifier {
     ///
     /// Verifies the nonce.
     ///
     /// Returns `Ok(())` if the nonce is valid, or a string describing the error otherwise.
     ///
-    fn verify(self, nonce: Option<&'a Nonce>) -> Result<(), String>;
+    fn verify(self, nonce: Option<&Nonce>) -> Result<(), String>;
 }
 
-impl<'a> NonceVerifier<'a> for &Nonce {
-    fn verify(self, nonce: Option<&'a Nonce>) -> Result<(), String> {
+impl NonceVerifier for &Nonce {
+    fn verify(self, nonce: Option<&Nonce>) -> Result<(), String> {
         if let Some(claims_nonce) = nonce {
             if verify_slices_are_equal(claims_nonce.secret().as_bytes(), self.secret().as_bytes())
                 .is_err()
@@ -489,11 +489,11 @@ impl<'a> NonceVerifier<'a> for &Nonce {
     }
 }
 
-impl<'a, F> NonceVerifier<'a> for F
+impl<F> NonceVerifier for F
 where
-    F: FnOnce(Option<&'a Nonce>) -> Result<(), String>,
+    F: for<'a> FnOnce(Option<&'a Nonce>) -> Result<(), String>,
 {
-    fn verify(self, nonce: Option<&'a Nonce>) -> Result<(), String> {
+    fn verify(self, nonce: Option<&Nonce>) -> Result<(), String> {
         self(nonce)
     }
 }
@@ -710,7 +710,7 @@ where
         AC: AdditionalClaims,
         GC: GenderClaim,
         JE: JweContentEncryptionAlgorithm<JT>,
-        N: NonceVerifier<'b>,
+        N: NonceVerifier,
     {
         // The code below roughly follows the validation steps described in
         // https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
@@ -718,6 +718,41 @@ where
         // Steps 1--3 are handled by the generic JwtClaimsVerifier.
         let partially_verified_claims = self.jwt_verifier.verified_claims(jwt)?;
 
+        self.verify_claims(partially_verified_claims, nonce_verifier)?;
+        Ok(partially_verified_claims)
+    }
+
+    pub(super) fn verified_claims_owned<AC, GC, JE, N>(
+        &self,
+        jwt: JsonWebToken<JE, JS, JT, IdTokenClaims<AC, GC>, JsonWebTokenJsonPayloadSerde>,
+        nonce_verifier: N,
+    ) -> Result<IdTokenClaims<AC, GC>, ClaimsVerificationError>
+    where
+        AC: AdditionalClaims,
+        GC: GenderClaim,
+        JE: JweContentEncryptionAlgorithm<JT>,
+        N: NonceVerifier,
+    {
+        // The code below roughly follows the validation steps described in
+        // https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
+
+        // Steps 1--3 are handled by the generic JwtClaimsVerifier.
+        let partially_verified_claims = self.jwt_verifier.verified_claims(jwt)?;
+
+        self.verify_claims(&partially_verified_claims, nonce_verifier)?;
+        Ok(partially_verified_claims)
+    }
+
+    fn verify_claims<'b, AC, GC, N>(
+        &self,
+        partially_verified_claims: &'b IdTokenClaims<AC, GC>,
+        nonce_verifier: N,
+    ) -> Result<(), ClaimsVerificationError>
+    where
+        AC: AdditionalClaims,
+        GC: GenderClaim,
+        N: NonceVerifier,
+    {
         // 4. If the ID Token contains multiple audiences, the Client SHOULD verify that an azp
         //    Claim is present.
 
@@ -787,7 +822,7 @@ where
         (*self.auth_time_verifier_fn)(partially_verified_claims.auth_time())
             .map_err(ClaimsVerificationError::InvalidAuthTime)?;
 
-        Ok(partially_verified_claims)
+        Ok(())
     }
 }
 
@@ -1518,7 +1553,7 @@ mod tests {
                      Jv8mB_jFkTZGVKHTPpObHV-qptJ_rnlwvF_mP5GARBLng-4Yd7nmSr31onYL48QDjGOrwPqQ-IyaCQ"
                         .to_string(),
                 ))
-                    .expect("failed to deserialize"), |_| Ok(())) {
+                    .expect("failed to deserialize"), |_: Option<&Nonce>| Ok(())) {
                 Err(ClaimsVerificationError::InvalidIssuer(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
             }
@@ -1527,7 +1562,9 @@ mod tests {
 
             // Expired token
             mock_current_time.set(1544928549 + 3600);
-            match public_client_verifier.verified_claims(&test_jwt_without_nonce, |_| Ok(())) {
+            match public_client_verifier
+                .verified_claims(&test_jwt_without_nonce, |_: Option<&Nonce>| Ok(()))
+            {
                 Err(ClaimsVerificationError::Expired(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
             }
@@ -1535,7 +1572,9 @@ mod tests {
 
             // Invalid issue time
             mock_is_valid_issue_time.set(false);
-            match public_client_verifier.verified_claims(&test_jwt_without_nonce, |_| Ok(())) {
+            match public_client_verifier
+                .verified_claims(&test_jwt_without_nonce, |_: Option<&Nonce>| Ok(()))
+            {
                 Err(ClaimsVerificationError::Expired(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
             }
@@ -1545,7 +1584,7 @@ mod tests {
 
             // Successful verification w/o checking nonce
             public_client_verifier
-                .verified_claims(&test_jwt_without_nonce, |_| Ok(()))
+                .verified_claims(&test_jwt_without_nonce, |_: Option<&Nonce>| Ok(()))
                 .expect("verification should succeed");
 
             // Missing nonce
@@ -1620,7 +1659,7 @@ mod tests {
 
             // Missing auth_time (ok)
             public_client_verifier
-                .verified_claims(&test_jwt_without_auth_time, |_| Ok(()))
+                .verified_claims(&test_jwt_without_auth_time, |_: Option<&Nonce>| Ok(()))
                 .expect("verification should succeed");
 
             // Missing auth_time (error)
@@ -1630,7 +1669,7 @@ mod tests {
                     assert!(auth_time.is_none());
                     Err("Invalid auth_time claim".to_string())
                 })
-                .verified_claims(&test_jwt_without_auth_time, |_| Ok(()))
+                .verified_claims(&test_jwt_without_auth_time, |_: Option<&Nonce>| Ok(()))
             {
                 Err(ClaimsVerificationError::InvalidAuthTime(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
@@ -1654,7 +1693,7 @@ mod tests {
 
             // Successful verification with nonce, acr, and auth_time specified (no expected Nonce)
             public_client_verifier
-                .verified_claims(&test_jwt_with_nonce, |_| Ok(()))
+                .verified_claims(&test_jwt_with_nonce, |_: Option<&Nonce>| Ok(()))
                 .expect("verification should succeed");
 
             // Successful verification with nonce, acr, and auth_time specified (w/ expected Nonce)

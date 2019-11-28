@@ -91,19 +91,35 @@ where
     }
 
     ///
-    /// Verifies and returns the ID token claims.
+    /// Verifies and returns a reference to the ID token claims.
     ///
-    pub fn claims<'a, 'b, JU, K, N>(
+    pub fn claims<'a, JU, K, N>(
         &'a self,
-        verifier: &'b IdTokenVerifier<JS, JT, JU, K>,
+        verifier: &IdTokenVerifier<JS, JT, JU, K>,
         nonce_verifier: N,
     ) -> Result<&'a IdTokenClaims<AC, GC>, ClaimsVerificationError>
     where
         JU: JsonWebKeyUse,
         K: JsonWebKey<JS, JT, JU>,
-        N: NonceVerifier<'a>,
+        N: NonceVerifier,
     {
         verifier.verified_claims(&self.0, nonce_verifier)
+    }
+
+    ///
+    /// Verifies and returns the ID token claims.
+    ///
+    pub fn into_claims<JU, K, N>(
+        self,
+        verifier: &IdTokenVerifier<JS, JT, JU, K>,
+        nonce_verifier: N,
+    ) -> Result<IdTokenClaims<AC, GC>, ClaimsVerificationError>
+    where
+        JU: JsonWebKeyUse,
+        K: JsonWebKey<JS, JT, JU>,
+        N: NonceVerifier,
+    {
+        verifier.verified_claims_owned(self.0, nonce_verifier)
     }
 
     ///
