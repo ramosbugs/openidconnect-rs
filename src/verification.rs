@@ -491,7 +491,7 @@ impl NonceVerifier for &Nonce {
 
 impl<F> NonceVerifier for F
 where
-    F: for<'a> FnOnce(Option<&'a Nonce>) -> Result<(), String>,
+    F: FnOnce(Option<&Nonce>) -> Result<(), String>,
 {
     fn verify(self, nonce: Option<&Nonce>) -> Result<(), String> {
         self(nonce)
