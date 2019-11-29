@@ -12,7 +12,7 @@ curl = ["oauth2/curl"]
 reqwest = ["oauth2/reqwest"]
 futures-01 = ["oauth2/futures-01", "futures-0-1"]
 futures-03 = ["oauth2/futures-03", "futures-0-3"]
-default = ["reqwest"]
+default = ["reqwest", "futures-03"]
 nightly = []
 
 [dependencies]

@@ -33,7 +33,6 @@ script:
   - cargo when -v ^1.39 -- run --example google --features futures-03
   - cargo when -v ^1.39 -- build --features futures-03 --no-default-features
   - cargo build --features futures-01 --no-default-features
-  - cargo test --features futures-01 --no-default-features
   - cargo audit
 after_success: |
   RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin &&
