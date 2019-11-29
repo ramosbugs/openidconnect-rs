@@ -511,8 +511,8 @@ where
 {
     acr_verifier_fn: Rc<dyn Fn(Option<&AuthenticationContextClass>) -> Result<(), String> + 'a>,
     #[allow(clippy::type_complexity)]
-    auth_time_verifier_fn: Rc<dyn Fn(Option<&DateTime<Utc>>) -> Result<(), String> + 'a>,
-    iat_verifier_fn: Rc<dyn Fn(&DateTime<Utc>) -> Result<(), String> + 'a>,
+    auth_time_verifier_fn: Rc<dyn Fn(Option<DateTime<Utc>>) -> Result<(), String> + 'a>,
+    iat_verifier_fn: Rc<dyn Fn(DateTime<Utc>) -> Result<(), String> + 'a>,
     jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>,
     time_fn: Rc<dyn Fn() -> DateTime<Utc> + 'a>,
 }
@@ -607,7 +607,7 @@ where
     ///
     pub fn set_auth_time_verifier_fn<T>(mut self, auth_time_verifier_fn: T) -> Self
     where
-        T: Fn(Option<&DateTime<Utc>>) -> Result<(), String> + 'a,
+        T: Fn(Option<DateTime<Utc>>) -> Result<(), String> + 'a,
     {
         self.auth_time_verifier_fn = Rc::new(auth_time_verifier_fn);
         self
@@ -675,7 +675,7 @@ where
     ///
     pub fn set_issue_time_verifier_fn<T>(mut self, iat_verifier_fn: T) -> Self
     where
-        T: Fn(&DateTime<Utc>) -> Result<(), String> + 'a,
+        T: Fn(DateTime<Utc>) -> Result<(), String> + 'a,
     {
         self.iat_verifier_fn = Rc::new(iat_verifier_fn);
         self
@@ -787,7 +787,7 @@ where
 
         // 9. The current time MUST be before the time represented by the exp Claim.
         let cur_time = (*self.time_fn)();
-        if cur_time >= *partially_verified_claims.expiration() {
+        if cur_time >= partially_verified_claims.expiration() {
             return Err(ClaimsVerificationError::Expired(format!(
                 "ID token expired at {} (current time is {})",
                 partially_verified_claims.expiration(),
@@ -1680,7 +1680,7 @@ mod tests {
                 .clone()
                 .set_auth_time_verifier_fn(|auth_time| {
                     assert_eq!(
-                        *auth_time.unwrap(),
+                        auth_time.unwrap(),
                         seconds_to_utc(&Seconds::new(1544928548.into())).unwrap(),
                     );
                     Err("Invalid auth_time claim".to_string())

@@ -1274,11 +1274,11 @@ mod tests {
             ClientConfigUrl::new("https://example-provider.com/registration".to_string()).unwrap()
         );
         assert_eq!(
-            *registration_response.client_id_issued_at().unwrap(),
+            registration_response.client_id_issued_at().unwrap(),
             Utc.timestamp(1523953306, 0)
         );
         assert_eq!(
-            *registration_response.client_secret_expires_at().unwrap(),
+            registration_response.client_secret_expires_at().unwrap(),
             Utc.timestamp(1526545306, 0)
         );
         assert_eq!(

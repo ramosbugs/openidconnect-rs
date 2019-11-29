@@ -451,8 +451,8 @@ mod tests {
             *claims.audiences(),
             vec![Audience::new("s6BhdRkqt3".to_string())]
         );
-        assert_eq!(*claims.expiration(), Utc.timestamp(1311281970, 0));
-        assert_eq!(*claims.issue_time(), Utc.timestamp(1311280970, 0));
+        assert_eq!(claims.expiration(), Utc.timestamp(1311281970, 0));
+        assert_eq!(claims.issue_time(), Utc.timestamp(1311280970, 0));
         assert_eq!(
             *claims.subject(),
             SubjectIdentifier::new("24400320".to_string())
@@ -490,8 +490,8 @@ mod tests {
             *claims.audiences(),
             vec![Audience::new("s6BhdRkqt3".to_string())]
         );
-        assert_eq!(*claims.expiration(), Utc.timestamp(1311281970, 0));
-        assert_eq!(*claims.issue_time(), Utc.timestamp(1311280970, 0));
+        assert_eq!(claims.expiration(), Utc.timestamp(1311281970, 0));
+        assert_eq!(claims.issue_time(), Utc.timestamp(1311280970, 0));
         assert_eq!(
             *claims.subject(),
             SubjectIdentifier::new("24400320".to_string())

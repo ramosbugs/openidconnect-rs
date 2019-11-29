@@ -641,7 +641,19 @@ macro_rules! field_getters {
             $($body)+
         }
     };
-    (@case [$doc:expr] $vis:vis $self:ident [$zero:expr] $field:ident Option <$type:ty >) => {
+    (@case [$doc:expr] $vis:vis $self:ident [$zero:expr] $field:ident Option < DateTime < Utc >>) => {
+        #[doc = $doc]
+        $vis fn $field(&$self) -> Option<DateTime<Utc>> {
+            $zero.$field
+        }
+    };
+    (@case [$doc:expr] $vis:vis $self:ident [$zero:expr] $field:ident Option < DateTime < Utc >> { $($body:tt)+ }) => {
+        #[doc = $doc]
+        $vis fn $field(&$self) -> Option<DateTime<Utc>> {
+            $($body)+
+        }
+    };
+    (@case [$doc:expr] $vis:vis $self:ident [$zero:expr] $field:ident Option < $type:ty >) => {
         #[doc = $doc]
         $vis fn $field(&$self) -> Option<&$type> {
             $zero.$field.as_ref()
@@ -651,6 +663,12 @@ macro_rules! field_getters {
         #[doc = $doc]
         $vis fn $field(&$self) -> Option<$type> {
             $($body)+
+        }
+    };
+    (@case [$doc:expr] $vis:vis $self:ident [$zero:expr] $field:ident DateTime < Utc >) => {
+        #[doc = $doc]
+        $vis fn $field(&$self) -> DateTime<Utc> {
+            $zero.$field
         }
     };
     (@case [$doc:expr] $vis:vis $self:ident [$zero:expr] $field:ident $type:ty) => {
@@ -677,6 +695,18 @@ macro_rules! field_getters {
             $($body)+
         }
     };
+    (@case [$doc:expr] $self:ident [$zero:expr] $field:ident() Option < DateTime < Utc >>) => {
+        #[doc = $doc]
+        fn $field(&$self) -> Option<DateTime<Utc>> {
+            $zero.$field()
+        }
+    };
+    (@case [$doc:expr] $self:ident [$zero:expr] $field:ident() Option < DateTime < Utc >> { $($body:tt)+ }) => {
+        #[doc = $doc]
+        fn $field(&$self) -> Option<DateTime<Utc>> {
+            $($body)+
+        }
+    };
     (@case [$doc:expr] $self:ident [$zero:expr] $field:ident() Option < $type:ty >) => {
         #[doc = $doc]
         fn $field(&$self) -> Option<&$type> {
@@ -687,6 +717,12 @@ macro_rules! field_getters {
         #[doc = $doc]
         fn $field(&$self) -> Option<$type> {
             $($body)+
+        }
+    };
+    (@case [$doc:expr] $self:ident [$zero:expr] $field:ident() DateTime < Utc >) => {
+        #[doc = $doc]
+        fn $field(&$self) -> DateTime<Utc> {
+            $zero.$field()
         }
     };
     (@case [$doc:expr] $self:ident [$zero:expr] $field:ident() $type:ty) => {
