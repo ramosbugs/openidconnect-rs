@@ -4,8 +4,8 @@ use std::ops::Deref;
 use std::str;
 
 use base64;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::{DeserializeOwned, Error as _, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json;
 
 use super::{

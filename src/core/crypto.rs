@@ -4,8 +4,8 @@ use ring::rand::SecureRandom;
 use ring::signature as ring_signature;
 use untrusted::Input;
 
-use crate::{JsonWebKey, SignatureVerificationError, SigningError};
 use crate::types::Base64UrlEncodedBytes;
+use crate::{JsonWebKey, SignatureVerificationError, SigningError};
 
 use super::{CoreJsonWebKey, CoreJsonWebKeyType};
 

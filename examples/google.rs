@@ -8,7 +8,7 @@
 //! In order to run the example call:
 //!
 //! ```sh
-//! GOOGLE_CLIENT_ID=xxx GOOGLE_CLIENT_SECRET=yyy cargo run --example google
+//! GOOGLE_CLIENT_ID=xxx GOOGLE_CLIENT_SECRET=yyy cargo run --example google --features futures-03
 //! ```
 //!
 //! ...and follow the instructions.
@@ -24,14 +24,14 @@ use failure::Fail;
 use oauth2::async_internal::AsyncCodeTokenRequest;
 use url::Url;
 
-use openidconnect::{
-    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce,
-    OAuth2TokenResponse, RedirectUrl, Scope,
-};
 use openidconnect::core::{
     CoreClient, CoreIdTokenClaims, CoreIdTokenVerifier, CoreProviderMetadata, CoreResponseType,
 };
 use openidconnect::reqwest::async_http_client;
+use openidconnect::{
+    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce,
+    OAuth2TokenResponse, RedirectUrl, Scope,
+};
 
 fn handle_error<T: Fail>(fail: &T, msg: &'static str) {
     let mut err_msg = format!("ERROR: {}", msg);
@@ -59,7 +59,8 @@ async fn main() {
         IssuerUrl::new("https://accounts.google.com".to_string()).expect("Invalid issuer URL");
 
     // Fetch Google's OpenID Connect discovery document.
-    let provider_metadata = CoreProviderMetadata::discover_async(issuer_url, async_http_client).await
+    let provider_metadata = CoreProviderMetadata::discover_async(issuer_url, async_http_client)
+        .await
         .unwrap_or_else(|err| {
             handle_error(&err, "Failed to discover OpenID Provider");
             unreachable!();
@@ -71,11 +72,11 @@ async fn main() {
         google_client_id,
         Some(google_client_secret),
     )
-        // This example will be running its own server at localhost:8080.
-        // See below for the server implementation.
-        .set_redirect_uri(
-            RedirectUrl::new("http://localhost:8080".to_string()).expect("Invalid redirect URL"),
-        );
+    // This example will be running its own server at localhost:8080.
+    // See below for the server implementation.
+    .set_redirect_uri(
+        RedirectUrl::new("http://localhost:8080".to_string()).expect("Invalid redirect URL"),
+    );
 
     // Generate the authorization URL to which we'll redirect the user.
     let (authorize_url, csrf_state, nonce) = client
@@ -150,7 +151,8 @@ async fn main() {
             // Exchange the code with a token.
             let token_response = client
                 .exchange_code(code)
-                .request_async(async_http_client).await
+                .request_async(async_http_client)
+                .await
                 .unwrap_or_else(|err| {
                     handle_error(&err, "Failed to access token endpoint");
                     unreachable!();

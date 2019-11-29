@@ -5,20 +5,20 @@ use std::ops::Deref;
 use std::rc::Rc;
 
 use chrono::{DateTime, Utc};
-use oauth2::{ClientId, ClientSecret};
 use oauth2::helpers::variant_name;
+use oauth2::{ClientId, ClientSecret};
 use ring::constant_time::verify_slices_are_equal;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+use crate::jwt::{JsonWebToken, JsonWebTokenJsonPayloadSerde};
+use crate::user_info::UserInfoClaimsImpl;
 use crate::{
     AdditionalClaims, Audience, AuthenticationContextClass, GenderClaim, IdTokenClaims, IssuerUrl,
     JsonWebKey, JsonWebKeySet, JsonWebKeyType, JsonWebKeyUse, JsonWebTokenAccess,
     JsonWebTokenAlgorithm, JsonWebTokenHeader, JweContentEncryptionAlgorithm, JwsSigningAlgorithm,
     Nonce, SubjectIdentifier,
 };
-use crate::jwt::{JsonWebToken, JsonWebTokenJsonPayloadSerde};
-use crate::user_info::UserInfoClaimsImpl;
 
 pub(crate) trait AudiencesClaim {
     fn audiences(&self) -> Option<&Vec<Audience>>;
@@ -925,14 +925,9 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use oauth2::{ClientId, ClientSecret};
 
-    use crate::{AuthenticationContextClass, serde_json};
     use super::{
         AudiencesClaim, ClaimsVerificationError, IssuerClaim, JsonWebTokenHeader,
         JwtClaimsVerifier, SignatureVerificationError, SubjectIdentifier,
-    };
-    use crate::{
-        AccessToken, Audience, AuthorizationCode, EndUserName, IssuerUrl, JsonWebKeyId, Nonce,
-        StandardClaims, UserInfoError,
     };
     use crate::core::{
         CoreIdToken, CoreIdTokenClaims, CoreIdTokenVerifier, CoreJsonWebKey, CoreJsonWebKeySet,
@@ -940,11 +935,16 @@ mod tests {
         CoreJwsSigningAlgorithm, CoreRsaPrivateSigningKey, CoreUserInfoClaims,
         CoreUserInfoJsonWebToken, CoreUserInfoVerifier,
     };
-    use crate::jwt::{JsonWebToken, JsonWebTokenJsonPayloadSerde};
     use crate::jwt::tests::{TEST_RSA_PRIV_KEY, TEST_RSA_PUB_KEY};
-    use crate::types::Base64UrlEncodedBytes;
+    use crate::jwt::{JsonWebToken, JsonWebTokenJsonPayloadSerde};
     use crate::types::helpers::seconds_to_utc;
+    use crate::types::Base64UrlEncodedBytes;
     use crate::types::Seconds;
+    use crate::{serde_json, AuthenticationContextClass};
+    use crate::{
+        AccessToken, Audience, AuthorizationCode, EndUserName, IssuerUrl, JsonWebKeyId, Nonce,
+        StandardClaims, UserInfoError,
+    };
 
     type CoreJsonWebTokenHeader = JsonWebTokenHeader<
         CoreJweContentEncryptionAlgorithm,

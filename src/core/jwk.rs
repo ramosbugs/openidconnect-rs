@@ -6,14 +6,14 @@ use ring::signature as ring_signature;
 use ring::signature::KeyPair;
 use untrusted::Input;
 
+use crate::types::helpers::deserialize_option_or_none;
+use crate::types::Base64UrlEncodedBytes;
 use crate::{
     JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse, JwsSigningAlgorithm,
     PrivateSigningKey, SignatureVerificationError, SigningError,
 };
-use crate::types::Base64UrlEncodedBytes;
-use crate::types::helpers::deserialize_option_or_none;
 
-use super::{CoreJwsSigningAlgorithm, crypto};
+use super::{crypto, CoreJwsSigningAlgorithm};
 
 // Other than the 'kty' (key type) parameter, which must be present in all JWKs, Section 4 of RFC
 // 7517 states that "member names used for representing key parameters for different keys types
@@ -390,8 +390,8 @@ mod tests {
     use serde_json;
 
     use crate::jwt::tests::TEST_RSA_PUB_KEY;
-    use crate::types::{JsonWebKey, JsonWebKeyId};
     use crate::types::Base64UrlEncodedBytes;
+    use crate::types::{JsonWebKey, JsonWebKeyId};
     use crate::verification::SignatureVerificationError;
 
     use super::{base64, SigningError};

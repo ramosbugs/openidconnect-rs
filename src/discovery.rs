@@ -6,7 +6,7 @@ use failure::Fail;
 use futures_0_1::{Future, IntoFuture};
 #[cfg(feature = "futures-03")]
 use futures_0_3::Future;
-use http_::header::{ACCEPT, HeaderValue};
+use http_::header::{HeaderValue, ACCEPT};
 use http_::method::Method;
 use http_::status::StatusCode;
 use oauth2::{AuthUrl, Scope, TokenUrl};
@@ -15,7 +15,6 @@ use serde::Serialize;
 use serde_json;
 use url;
 
-use super::{CONFIG_URL_SUFFIX, HttpRequest, HttpResponse, UserInfoUrl};
 use super::http::{check_content_type, MIME_TYPE_JSON};
 use super::types::{
     AuthDisplay, AuthenticationContextClass, ClaimName, ClaimType, ClientAuthMethod, GrantType,
@@ -24,6 +23,7 @@ use super::types::{
     OpPolicyUrl, OpTosUrl, RegistrationUrl, ResponseMode, ResponseType, ResponseTypes,
     ServiceDocUrl, SubjectIdentifierType,
 };
+use super::{HttpRequest, HttpResponse, UserInfoUrl, CONFIG_URL_SUFFIX};
 
 ///
 /// Trait for adding extra fields to [`ProviderMetadata`].
@@ -379,7 +379,7 @@ where
     /// Asynchronously fetches the OpenID Connect Discovery document and associated JSON Web Key Set
     /// from the OpenID Connect Provider.
     ///
-    #[cfg(feature="futures-03")]
+    #[cfg(feature = "futures-03")]
     pub async fn discover_async<F, HC, RE>(
         issuer_url: IssuerUrl,
         http_client: HC,
@@ -400,11 +400,10 @@ where
 
         JsonWebKeySet::fetch_async(provider_metadata.jwks_uri(), http_client)
             .await
-            .map(|jwks|
-                Self {
-                    jwks,
-                    ..provider_metadata
-                })
+            .map(|jwks| Self {
+                jwks,
+                ..provider_metadata
+            })
     }
 
     fn discovery_request(discovery_url: url::Url) -> HttpRequest {

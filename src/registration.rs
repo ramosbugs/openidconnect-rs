@@ -8,20 +8,17 @@ use failure::Fail;
 use futures_0_1::{Future, IntoFuture};
 #[cfg(feature = "futures-03")]
 use futures_0_3::Future;
-use http_::header::{ACCEPT, CONTENT_TYPE, HeaderMap, HeaderValue};
+use http_::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
 use http_::method::Method;
 use http_::status::StatusCode;
 use serde;
-use serde::{Serialize, Serializer};
 use serde::de::{Deserialize, DeserializeOwned, Deserializer, MapAccess, Visitor};
 use serde::ser::SerializeMap;
+use serde::{Serialize, Serializer};
 use serde_json;
 
-use super::{
-    AccessToken, ClientId, ClientSecret, ErrorResponseType, HttpRequest, HttpResponse, JsonWebKey,
-    JsonWebKeySet, RedirectUrl, StandardErrorResponse,
-};
 use super::http::{auth_bearer, check_content_type, MIME_TYPE_JSON};
+use super::types::helpers::{serde_utc_seconds_opt, split_language_tag_key};
 use super::types::{
     ApplicationType, AuthenticationContextClass, ClientAuthMethod, ClientConfigUrl,
     ClientContactEmail, ClientName, ClientUrl, GrantType, InitiateLoginUrl, JsonWebKeySetUrl,
@@ -30,7 +27,10 @@ use super::types::{
     RegistrationUrl, RequestUrl, ResponseType, ResponseTypes, SectorIdentifierUrl,
     SubjectIdentifierType, ToSUrl,
 };
-use super::types::helpers::{serde_utc_seconds_opt, split_language_tag_key};
+use super::{
+    AccessToken, ClientId, ClientSecret, ErrorResponseType, HttpRequest, HttpResponse, JsonWebKey,
+    JsonWebKeySet, RedirectUrl, StandardErrorResponse,
+};
 
 ///
 /// Trait for adding extra fields to [`ClientMetadata`].
@@ -516,12 +516,14 @@ where
         &self,
         registration_endpoint: &RegistrationUrl,
         http_client: HC,
-    ) -> Result<ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
-        ClientRegistrationError<ET, RE>>
-        where
-            F: Future<Output=Result<HttpResponse, RE>>,
-            HC: FnOnce(HttpRequest) -> F,
-            RE: Fail,
+    ) -> Result<
+        ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+        ClientRegistrationError<ET, RE>,
+    >
+    where
+        F: Future<Output = Result<HttpResponse, RE>>,
+        HC: FnOnce(HttpRequest) -> F,
+        RE: Fail,
     {
         let http_request = self.prepare_registration(registration_endpoint)?;
         let http_response = http_client(http_request)
@@ -928,11 +930,6 @@ mod tests {
     use itertools::sorted;
     use oauth2::{ClientId, RedirectUrl};
 
-    use crate::{
-        AuthenticationContextClass, ClientConfigUrl, ClientContactEmail, ClientName, ClientUrl,
-        JsonWebKeySet, JsonWebKeySetUrl, LanguageTag, LogoUrl, PolicyUrl, RequestUrl,
-        ResponseTypes, SectorIdentifierUrl, ToSUrl,
-    };
     use crate::core::{
         CoreApplicationType, CoreClientAuthMethod, CoreClientMetadata,
         CoreClientRegistrationResponse, CoreGrantType, CoreJweContentEncryptionAlgorithm,
@@ -940,6 +937,11 @@ mod tests {
         CoreSubjectIdentifierType,
     };
     use crate::jwt::tests::TEST_RSA_PUB_KEY;
+    use crate::{
+        AuthenticationContextClass, ClientConfigUrl, ClientContactEmail, ClientName, ClientUrl,
+        JsonWebKeySet, JsonWebKeySetUrl, LanguageTag, LogoUrl, PolicyUrl, RequestUrl,
+        ResponseTypes, SectorIdentifierUrl, ToSUrl,
+    };
 
     #[test]
     fn test_metadata_serialization() {

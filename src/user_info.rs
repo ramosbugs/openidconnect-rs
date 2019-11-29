@@ -7,13 +7,18 @@ use failure::Fail;
 use futures_0_1::{Future, IntoFuture};
 #[cfg(feature = "futures-03")]
 use futures_0_3::Future;
-use http_::header::{ACCEPT, CONTENT_TYPE, HeaderValue};
+use http_::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
 use http_::method::Method;
 use http_::status::StatusCode;
 use oauth2::AccessToken;
 use serde_json;
 use url::Url;
 
+use crate::http::{auth_bearer, MIME_TYPE_JSON, MIME_TYPE_JWT};
+use crate::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
+use crate::types::helpers::deserialize_string_or_vec_opt;
+use crate::types::LocalizedClaim;
+use crate::verification::UserInfoVerifier;
 use crate::{
     AdditionalClaims, AddressClaim, Audience, AudiencesClaim, ClaimsVerificationError,
     EndUserBirthday, EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName,
@@ -23,11 +28,6 @@ use crate::{
     JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, PrivateSigningKey,
     StandardClaims, SubjectIdentifier,
 };
-use crate::http::{auth_bearer, MIME_TYPE_JSON, MIME_TYPE_JWT};
-use crate::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
-use crate::types::helpers::deserialize_string_or_vec_opt;
-use crate::types::LocalizedClaim;
-use crate::verification::UserInfoVerifier;
 
 ///
 /// User info request.
@@ -103,13 +103,13 @@ where
         self,
         http_client: C,
     ) -> Result<UserInfoClaims<AC, GC>, UserInfoError<RE>>
-        where
-            AC: AdditionalClaims,
-            C: FnOnce(HttpRequest) -> F,
-            F: Future<Output=Result<HttpResponse, RE>>,
-            GC: GenderClaim,
-            HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
-            RE: Fail,
+    where
+        AC: AdditionalClaims,
+        C: FnOnce(HttpRequest) -> F,
+        F: Future<Output = Result<HttpResponse, RE>>,
+        GC: GenderClaim,
+        HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
+        RE: Fail,
     {
         let http_request = self.prepare_request();
         let http_response = http_client(http_request)

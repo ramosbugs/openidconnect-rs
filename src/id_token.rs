@@ -1,9 +1,13 @@
 use std::marker::PhantomData;
 
 use chrono::{DateTime, Utc};
-use oauth2::ClientId;
 use oauth2::helpers::variant_name;
+use oauth2::ClientId;
 
+use crate::jwt::JsonWebTokenAccess;
+use crate::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
+use crate::types::helpers::{deserialize_string_or_vec, serde_utc_seconds, serde_utc_seconds_opt};
+use crate::types::LocalizedClaim;
 use crate::{
     AccessToken, AccessTokenHash, AdditionalClaims, AddressClaim, Audience, AudiencesClaim,
     AuthenticationContextClass, AuthenticationMethodReference, AuthorizationCode,
@@ -15,10 +19,6 @@ use crate::{
     JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, Nonce, NonceVerifier,
     PrivateSigningKey, SigningError, StandardClaims, SubjectIdentifier,
 };
-use crate::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
-use crate::jwt::JsonWebTokenAccess;
-use crate::types::helpers::{deserialize_string_or_vec, serde_utc_seconds, serde_utc_seconds_opt};
-use crate::types::LocalizedClaim;
 
 // This wrapper layer exists instead of directly verifying the JWT and returning the claims so that
 // we can pass it around and easily access a serialized JWT representation of it (e.g., for passing
@@ -414,11 +414,14 @@ where
 #[cfg(test)]
 mod tests {
     use chrono::{TimeZone, Utc};
-    use oauth2::{ClientId, TokenResponse};
     use oauth2::basic::BasicTokenType;
+    use oauth2::{ClientId, TokenResponse};
     use url::Url;
 
-    use crate::{AddressClaim, serde_json};
+    use crate::claims::{AdditionalClaims, EmptyAdditionalClaims, StandardClaims};
+    use crate::core::{CoreGenderClaim, CoreIdToken, CoreIdTokenClaims, CoreTokenResponse};
+    use crate::jwt::JsonWebTokenAccess;
+    use crate::{serde_json, AddressClaim};
     use crate::{
         AccessTokenHash, AddressCountry, AddressLocality, AddressPostalCode, AddressRegion,
         Audience, AuthenticationContextClass, AuthenticationMethodReference, AuthorizationCodeHash,
@@ -427,9 +430,6 @@ mod tests {
         EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, FormattedAddress, IssuerUrl,
         LanguageTag, Nonce, StreetAddress, SubjectIdentifier,
     };
-    use crate::claims::{AdditionalClaims, EmptyAdditionalClaims, StandardClaims};
-    use crate::core::{CoreGenderClaim, CoreIdToken, CoreIdTokenClaims, CoreTokenResponse};
-    use crate::jwt::JsonWebTokenAccess;
 
     use super::{AudiencesClaim, IdTokenClaims, IssuerClaim};
 
