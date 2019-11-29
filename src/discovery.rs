@@ -2,7 +2,10 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use failure::Fail;
-use futures::{Future, IntoFuture};
+#[cfg(feature = "futures-01")]
+use futures_0_1::{Future, IntoFuture};
+#[cfg(feature = "futures-03")]
+use futures_0_3::Future;
 use http_::header::{ACCEPT, HeaderValue};
 use http_::method::Method;
 use http_::status::StatusCode;
@@ -338,6 +341,7 @@ where
     /// Asynchronously fetches the OpenID Connect Discovery document and associated JSON Web Key Set
     /// from the OpenID Connect Provider.
     ///
+    #[cfg(feature = "futures-01")]
     pub fn discover_async<F, HC, RE>(
         issuer_url: IssuerUrl,
         http_client: HC,
@@ -369,6 +373,38 @@ where
                     }
                 })
             })
+    }
+
+    ///
+    /// Asynchronously fetches the OpenID Connect Discovery document and associated JSON Web Key Set
+    /// from the OpenID Connect Provider.
+    ///
+    #[cfg(feature="futures-03")]
+    pub async fn discover_async<F, HC, RE>(
+        issuer_url: IssuerUrl,
+        http_client: HC,
+    ) -> Result<Self, DiscoveryError<RE>>
+    where
+        F: Future<Output = Result<HttpResponse, RE>>,
+        HC: Fn(HttpRequest) -> F + 'static,
+        RE: Fail,
+    {
+        let discovery_url = issuer_url
+            .join(CONFIG_URL_SUFFIX)
+            .map_err(DiscoveryError::UrlParse)?;
+
+        let provider_metadata = http_client(Self::discovery_request(discovery_url))
+            .await
+            .map_err(DiscoveryError::Request)
+            .and_then(|http_response| Self::discovery_response(&issuer_url, http_response))?;
+
+        JsonWebKeySet::fetch_async(provider_metadata.jwks_uri(), http_client)
+            .await
+            .map(|jwks|
+                Self {
+                    jwks,
+                    ..provider_metadata
+                })
     }
 
     fn discovery_request(discovery_url: url::Url) -> HttpRequest {

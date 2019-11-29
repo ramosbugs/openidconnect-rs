@@ -391,7 +391,6 @@ extern crate color_backtrace;
 extern crate failure;
 #[macro_use]
 extern crate failure_derive;
-extern crate futures;
 extern crate http as http_;
 extern crate itertools;
 extern crate oauth2;
@@ -406,6 +405,7 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate untrusted;
 extern crate url;
+
 
 use std::borrow::Cow;
 use std::marker::PhantomData;

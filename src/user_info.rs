@@ -3,7 +3,10 @@ use std::str;
 
 use chrono::{DateTime, Utc};
 use failure::Fail;
-use futures::{Future, IntoFuture};
+#[cfg(feature = "futures-01")]
+use futures_0_1::{Future, IntoFuture};
+#[cfg(feature = "futures-03")]
+use futures_0_3::Future;
 use http_::header::{ACCEPT, CONTENT_TYPE, HeaderValue};
 use http_::method::Method;
 use http_::status::StatusCode;
@@ -73,6 +76,7 @@ where
     /// Submits this request to the associated user info endpoint using the specified asynchronous
     /// HTTP client.
     ///
+    #[cfg(feature = "futures-01")]
     pub fn request_future<AC, C, F, GC, HC, RE>(
         self,
         http_client: C,
@@ -88,6 +92,31 @@ where
         http_client(self.prepare_request())
             .map_err(UserInfoError::Request)
             .and_then(|http_response| self.user_info_response(http_response).into_future())
+    }
+
+    ///
+    /// Submits this request to the associated user info endpoint using the specified asynchronous
+    /// HTTP client.
+    ///
+    #[cfg(feature = "futures-03")]
+    pub async fn request_async<AC, C, F, GC, HC, RE>(
+        self,
+        http_client: C,
+    ) -> Result<UserInfoClaims<AC, GC>, UserInfoError<RE>>
+        where
+            AC: AdditionalClaims,
+            C: FnOnce(HttpRequest) -> F,
+            F: Future<Output=Result<HttpResponse, RE>>,
+            GC: GenderClaim,
+            HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
+            RE: Fail,
+    {
+        let http_request = self.prepare_request();
+        let http_response = http_client(http_request)
+            .await
+            .map_err(UserInfoError::Request)?;
+
+        self.user_info_response(http_response)
     }
 
     fn prepare_request(&self) -> HttpRequest {
