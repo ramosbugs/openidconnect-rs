@@ -297,6 +297,13 @@ where
     ];
 
     ///
+    /// Returns the standard claims as a `StandardClaims` object.
+    ///
+    pub fn standard_claims(&self) -> &StandardClaims<GC> {
+        &self.0.standard_claims
+    }
+
+    ///
     /// Returns additional user info claims.
     ///
     pub fn additional_claims(&self) -> &AC {
