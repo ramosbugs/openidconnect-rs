@@ -611,18 +611,20 @@ new_type![
     EndUserPhoneNumber(String)
 ];
 
-new_url_type![
+new_type![
     ///
     /// URL of end user's profile picture.
     ///
-    EndUserPictureUrl
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    EndUserPictureUrl(String)
 ];
 
-new_url_type![
+new_type![
     ///
     /// URL of end user's profile page.
     ///
-    EndUserProfileUrl
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    EndUserProfileUrl(String)
 ];
 
 new_type![
@@ -634,11 +636,12 @@ new_type![
     EndUserTimezone(String)
 ];
 
-new_url_type![
+new_type![
     ///
     /// URL of end user's website.
     ///
-    EndUserWebsiteUrl
+    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    EndUserWebsiteUrl(String)
 ];
 
 new_type![

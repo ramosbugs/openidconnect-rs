@@ -698,15 +698,13 @@ mod tests {
                             None,
                             EndUserProfileUrl::new(
                                 "https://example.com/profile?id=12345".to_string(),
-                            )
-                            .unwrap(),
+                            ),
                         ),
                         (
                             Some(LanguageTag::new("es".to_string())),
                             EndUserProfileUrl::new(
                                 "https://example.com/profile?id=12345&lang=es".to_string(),
-                            )
-                            .unwrap(),
+                            ),
                         ),
                     ]
                     .into_iter()
@@ -718,15 +716,13 @@ mod tests {
                             None,
                             EndUserPictureUrl::new(
                                 "https://example.com/avatar?id=12345".to_string(),
-                            )
-                            .unwrap(),
+                            ),
                         ),
                         (
                             Some(LanguageTag::new("es".to_string())),
                             EndUserPictureUrl::new(
                                 "https://example.com/avatar?id=12345&lang=es".to_string(),
-                            )
-                            .unwrap(),
+                            ),
                         ),
                     ]
                     .into_iter()
@@ -736,12 +732,11 @@ mod tests {
                     vec![
                         (
                             None,
-                            EndUserWebsiteUrl::new("https://homersimpson.me".to_string()).unwrap(),
+                            EndUserWebsiteUrl::new("https://homersimpson.me".to_string()),
                         ),
                         (
                             Some(LanguageTag::new("es".to_string())),
-                            EndUserWebsiteUrl::new("https://homersimpson.me/?lang=es".to_string())
-                                .unwrap(),
+                            EndUserWebsiteUrl::new("https://homersimpson.me/?lang=es".to_string()),
                         ),
                     ]
                     .into_iter()
