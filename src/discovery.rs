@@ -5,7 +5,7 @@ use failure::Fail;
 #[cfg(feature = "futures-01")]
 use futures_0_1::{Future, IntoFuture};
 #[cfg(feature = "futures-03")]
-use futures_0_3::Future;
+use futures_0_3;
 use http_::header::{HeaderValue, ACCEPT};
 use http_::method::Method;
 use http_::status::StatusCode;
@@ -385,7 +385,7 @@ where
         http_client: HC,
     ) -> Result<Self, DiscoveryError<RE>>
     where
-        F: Future<Output = Result<HttpResponse, RE>>,
+        F: futures_0_3::Future<Output = Result<HttpResponse, RE>>,
         HC: Fn(HttpRequest) -> F + 'static,
         RE: Fail,
     {

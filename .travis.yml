@@ -30,6 +30,8 @@ script:
   - cargo test --doc
   # On nightly, test both the default config and special nightly features
   - cargo when --channel=nightly test --features nightly -- --test-threads=1
+  - cargo when --channel=nightly build --all-features
+  - cargo build --features futures-01,futures-03
   - cargo when -v ^1.39 -- run --example google --features futures-03
   - cargo when -v ^1.39 -- build --features futures-03 --no-default-features
   - cargo build --features futures-01 --no-default-features

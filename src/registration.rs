@@ -7,7 +7,7 @@ use failure::Fail;
 #[cfg(feature = "futures-01")]
 use futures_0_1::{Future, IntoFuture};
 #[cfg(feature = "futures-03")]
-use futures_0_3::Future;
+use futures_0_3;
 use http_::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
 use http_::method::Method;
 use http_::status::StatusCode;
@@ -521,7 +521,7 @@ where
         ClientRegistrationError<ET, RE>,
     >
     where
-        F: Future<Output = Result<HttpResponse, RE>>,
+        F: futures_0_3::Future<Output = Result<HttpResponse, RE>>,
         HC: FnOnce(HttpRequest) -> F,
         RE: Fail,
     {

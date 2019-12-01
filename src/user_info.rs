@@ -6,7 +6,7 @@ use failure::Fail;
 #[cfg(feature = "futures-01")]
 use futures_0_1::{Future, IntoFuture};
 #[cfg(feature = "futures-03")]
-use futures_0_3::Future;
+use futures_0_3;
 use http_::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
 use http_::method::Method;
 use http_::status::StatusCode;
@@ -77,7 +77,7 @@ where
     /// HTTP client.
     ///
     #[cfg(feature = "futures-01")]
-    pub fn request_future<AC, C, F, GC, HC, RE>(
+    pub fn request_future<AC, C, F, GC, RE>(
         self,
         http_client: C,
     ) -> impl Future<Item = UserInfoClaims<AC, GC>, Error = UserInfoError<RE>>
@@ -86,7 +86,6 @@ where
         C: FnOnce(HttpRequest) -> F,
         F: Future<Item = HttpResponse, Error = RE>,
         GC: GenderClaim,
-        HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
         RE: Fail,
     {
         http_client(self.prepare_request())
@@ -99,16 +98,15 @@ where
     /// HTTP client.
     ///
     #[cfg(feature = "futures-03")]
-    pub async fn request_async<AC, C, F, GC, HC, RE>(
+    pub async fn request_async<AC, C, F, GC, RE>(
         self,
         http_client: C,
     ) -> Result<UserInfoClaims<AC, GC>, UserInfoError<RE>>
     where
         AC: AdditionalClaims,
         C: FnOnce(HttpRequest) -> F,
-        F: Future<Output = Result<HttpResponse, RE>>,
+        F: futures_0_3::Future<Output = Result<HttpResponse, RE>>,
         GC: GenderClaim,
-        HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
         RE: Fail,
     {
         let http_request = self.prepare_request();
