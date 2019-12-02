@@ -342,7 +342,7 @@ where
     /// from the OpenID Connect Provider.
     ///
     #[cfg(feature = "futures-01")]
-    pub fn discover_async<F, HC, RE>(
+    pub fn discover_future<F, HC, RE>(
         issuer_url: IssuerUrl,
         http_client: HC,
     ) -> impl Future<Item = Self, Error = DiscoveryError<RE>>
@@ -366,7 +366,7 @@ where
                     .map(|provider_metadata| (provider_metadata, http_client))
             })
             .and_then(|(provider_metadata, http_client)| {
-                JsonWebKeySet::fetch_async(provider_metadata.jwks_uri(), http_client).map(|jwks| {
+                JsonWebKeySet::fetch_future(provider_metadata.jwks_uri(), http_client).map(|jwks| {
                     Self {
                         jwks,
                         ..provider_metadata

@@ -486,7 +486,7 @@ where
     /// HTTP client.
     ///
     #[cfg(feature = "futures-01")]
-    pub fn register_async<F, HC, RE>(
+    pub fn register_future<F, HC, RE>(
         &self,
         registration_endpoint: &RegistrationUrl,
         http_client: HC,

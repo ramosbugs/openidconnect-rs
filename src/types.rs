@@ -766,7 +766,7 @@ where
     /// (e.g., [`crate::reqwest::async_http_client`]).
     ///
     #[cfg(feature = "futures-01")]
-    pub fn fetch_async<F, HC, RE>(
+    pub fn fetch_future<F, HC, RE>(
         url: &JsonWebKeySetUrl,
         http_client: HC,
     ) -> impl Future<Item = Self, Error = DiscoveryError<RE>>
