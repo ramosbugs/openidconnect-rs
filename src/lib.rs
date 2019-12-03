@@ -1,5 +1,4 @@
 #![warn(missing_docs)]
-#![cfg_attr(feature = "nightly", feature(type_alias_enum_variants))]
 //!
 //! [OpenID Connect](https://openid.net/specs/openid-connect-core-1_0.html) library.
 //!
@@ -70,9 +69,7 @@
 //! // Generate the full authorization URL.
 //! let (auth_url, csrf_token, nonce) = client
 //!     .authorize_url(
-//!         // If using nightly Rust, a CoreAuthenticationFlow trait alias is available by
-//!         // enabling the "nightly" feature in Cargo.toml.
-//!         AuthenticationFlow::<CoreResponseType>::AuthorizationCode,
+//!         CoreAuthenticationFlow::AuthorizationCode,
 //!         CsrfToken::new_random,
 //!         Nonce::new_random,
 //!     )
@@ -1341,7 +1338,6 @@ mod tests {
 
     use oauth2::{AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl};
 
-    #[cfg(feature = "nightly")]
     use crate::core::CoreAuthenticationFlow;
     use crate::core::{CoreAuthDisplay, CoreAuthPrompt, CoreClient, CoreIdToken, CoreResponseType};
     use crate::IssuerUrl;
@@ -1387,10 +1383,7 @@ mod tests {
         let client = new_client()
             .set_redirect_uri(RedirectUrl::new("http://localhost:8888/".to_string()).unwrap());
 
-        #[cfg(feature = "nightly")]
         let flow = CoreAuthenticationFlow::AuthorizationCode;
-        #[cfg(not(feature = "nightly"))]
-        let flow = AuthenticationFlow::AuthorizationCode::<CoreResponseType>;
 
         fn new_csrf() -> CsrfToken {
             CsrfToken::new("CSRF123".to_string())

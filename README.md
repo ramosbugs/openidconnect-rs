@@ -38,9 +38,3 @@ API documentation and examples are available on [docs.rs](https://docs.rs/openid
     * Client Registration endpoint
   * Unsupported features:
     * Client Configuration endpoint
-
-# Optional Features
-
-To access [trait aliases](https://github.com/rust-lang/rust/issues/41517) such as
-`CoreAuthenticationFlow`, enable the `nightly` feature, which requires the crate to be
-compiled with Nightly Rust.

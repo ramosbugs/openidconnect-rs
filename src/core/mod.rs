@@ -25,7 +25,6 @@ use crate::{
     SubjectIdentifierType, UserInfoClaims, UserInfoJsonWebToken, UserInfoVerifier,
 };
 
-#[cfg(feature = "nightly")]
 use super::AuthenticationFlow;
 
 pub use self::jwk::{
@@ -40,9 +39,6 @@ mod jwk;
 ///
 /// OpenID Connect Core authentication flows.
 ///
-/// Requires the `nightly` feature flag to be enabled.
-///
-#[cfg(feature = "nightly")]
 pub type CoreAuthenticationFlow = AuthenticationFlow<CoreResponseType>;
 
 ///
