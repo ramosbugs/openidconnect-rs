@@ -450,11 +450,12 @@ pub mod tests {
 
     use serde_json;
 
-    use super::super::core::{
+    use crate::core::{
         CoreJsonWebKey, CoreJsonWebKeyType, CoreJweContentEncryptionAlgorithm,
         CoreJwsSigningAlgorithm, CoreRsaPrivateSigningKey,
     };
-    use super::super::JsonWebKeyId;
+    use crate::JsonWebKeyId;
+
     use super::{
         JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenJsonPayloadSerde,
         JsonWebTokenPayloadSerde,

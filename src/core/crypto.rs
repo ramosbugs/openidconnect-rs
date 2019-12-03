@@ -4,8 +4,9 @@ use ring::rand::SecureRandom;
 use ring::signature as ring_signature;
 use untrusted::Input;
 
-use super::super::types::Base64UrlEncodedBytes;
-use super::super::{JsonWebKey, SignatureVerificationError, SigningError};
+use crate::types::Base64UrlEncodedBytes;
+use crate::{JsonWebKey, SignatureVerificationError, SigningError};
+
 use super::{CoreJsonWebKey, CoreJsonWebKeyType};
 
 pub fn sign_hmac(

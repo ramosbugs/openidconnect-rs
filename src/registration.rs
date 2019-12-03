@@ -4,7 +4,10 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use failure::Fail;
-use futures::{Future, IntoFuture};
+#[cfg(feature = "futures-01")]
+use futures_0_1::{Future, IntoFuture};
+#[cfg(feature = "futures-03")]
+use futures_0_3;
 use http_::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
 use http_::method::Method;
 use http_::status::StatusCode;
@@ -482,7 +485,8 @@ where
     /// Submits this request to the specified registration endpoint using the specified asynchronous
     /// HTTP client.
     ///
-    pub fn register_async<F, HC, RE>(
+    #[cfg(feature = "futures-01")]
+    pub fn register_future<F, HC, RE>(
         &self,
         registration_endpoint: &RegistrationUrl,
         http_client: HC,
@@ -501,6 +505,31 @@ where
                 http_client(http_request).map_err(ClientRegistrationError::Request)
             })
             .and_then(|http_response| Self::register_response(http_response).into_future())
+    }
+
+    ///
+    /// Submits this request to the specified registration endpoint using the specified asynchronous
+    /// HTTP client.
+    ///
+    #[cfg(feature = "futures-03")]
+    pub async fn register_async<F, HC, RE>(
+        &self,
+        registration_endpoint: &RegistrationUrl,
+        http_client: HC,
+    ) -> Result<
+        ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+        ClientRegistrationError<ET, RE>,
+    >
+    where
+        F: futures_0_3::Future<Output = Result<HttpResponse, RE>>,
+        HC: FnOnce(HttpRequest) -> F,
+        RE: Fail,
+    {
+        let http_request = self.prepare_registration(registration_endpoint)?;
+        let http_response = http_client(http_request)
+            .await
+            .map_err(ClientRegistrationError::Request)?;
+        Self::register_response(http_response)
     }
 
     fn prepare_registration<RE>(
@@ -895,19 +924,20 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use chrono::{TimeZone, Utc};
     use itertools::sorted;
     use oauth2::{ClientId, RedirectUrl};
-    use std::time::Duration;
 
-    use super::super::core::{
+    use crate::core::{
         CoreApplicationType, CoreClientAuthMethod, CoreClientMetadata,
         CoreClientRegistrationResponse, CoreGrantType, CoreJweContentEncryptionAlgorithm,
         CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm, CoreResponseType,
         CoreSubjectIdentifierType,
     };
-    use super::super::jwt::tests::TEST_RSA_PUB_KEY;
-    use super::super::{
+    use crate::jwt::tests::TEST_RSA_PUB_KEY;
+    use crate::{
         AuthenticationContextClass, ClientConfigUrl, ClientContactEmail, ClientName, ClientUrl,
         JsonWebKeySet, JsonWebKeySetUrl, LanguageTag, LogoUrl, PolicyUrl, RequestUrl,
         ResponseTypes, SectorIdentifierUrl, ToSUrl,

@@ -3,16 +3,17 @@ use oauth2::helpers::variant_name;
 use ring::digest;
 use ring::rand;
 use ring::signature as ring_signature;
+use ring::signature::KeyPair;
 use untrusted::Input;
 
-use super::super::types::helpers::deserialize_option_or_none;
-use super::super::types::Base64UrlEncodedBytes;
-use super::super::{
+use crate::types::helpers::deserialize_option_or_none;
+use crate::types::Base64UrlEncodedBytes;
+use crate::{
     JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse, JwsSigningAlgorithm,
     PrivateSigningKey, SignatureVerificationError, SigningError,
 };
+
 use super::{crypto, CoreJwsSigningAlgorithm};
-use ring::signature::KeyPair;
 
 // Other than the 'kty' (key type) parameter, which must be present in all JWKs, Section 4 of RFC
 // 7517 states that "member names used for representing key parameters for different keys types
@@ -387,16 +388,17 @@ impl JsonWebKeyUse for CoreJsonWebKeyUse {
 mod tests {
     use ring::test::rand::FixedByteRandom;
     use serde_json;
-    use {base64, SigningError};
 
-    use super::super::super::jwt::tests::TEST_RSA_PUB_KEY;
-    use super::super::super::verification::SignatureVerificationError;
-    use super::super::super::{JsonWebKey, JsonWebKeyId};
+    use crate::jwt::tests::TEST_RSA_PUB_KEY;
+    use crate::types::Base64UrlEncodedBytes;
+    use crate::types::{JsonWebKey, JsonWebKeyId};
+    use crate::verification::SignatureVerificationError;
+
+    use super::{base64, SigningError};
     use super::{
         CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse,
         CoreJwsSigningAlgorithm, CoreRsaPrivateSigningKey, PrivateSigningKey,
     };
-    use crate::types::Base64UrlEncodedBytes;
 
     #[test]
     fn test_core_jwk_deserialization_rsa() {

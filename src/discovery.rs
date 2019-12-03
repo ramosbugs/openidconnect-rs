@@ -2,7 +2,10 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use failure::Fail;
-use futures::{Future, IntoFuture};
+#[cfg(feature = "futures-01")]
+use futures_0_1::{Future, IntoFuture};
+#[cfg(feature = "futures-03")]
+use futures_0_3;
 use http_::header::{HeaderValue, ACCEPT};
 use http_::method::Method;
 use http_::status::StatusCode;
@@ -338,7 +341,8 @@ where
     /// Asynchronously fetches the OpenID Connect Discovery document and associated JSON Web Key Set
     /// from the OpenID Connect Provider.
     ///
-    pub fn discover_async<F, HC, RE>(
+    #[cfg(feature = "futures-01")]
+    pub fn discover_future<F, HC, RE>(
         issuer_url: IssuerUrl,
         http_client: HC,
     ) -> impl Future<Item = Self, Error = DiscoveryError<RE>>
@@ -362,12 +366,43 @@ where
                     .map(|provider_metadata| (provider_metadata, http_client))
             })
             .and_then(|(provider_metadata, http_client)| {
-                JsonWebKeySet::fetch_async(provider_metadata.jwks_uri(), http_client).map(|jwks| {
+                JsonWebKeySet::fetch_future(provider_metadata.jwks_uri(), http_client).map(|jwks| {
                     Self {
                         jwks,
                         ..provider_metadata
                     }
                 })
+            })
+    }
+
+    ///
+    /// Asynchronously fetches the OpenID Connect Discovery document and associated JSON Web Key Set
+    /// from the OpenID Connect Provider.
+    ///
+    #[cfg(feature = "futures-03")]
+    pub async fn discover_async<F, HC, RE>(
+        issuer_url: IssuerUrl,
+        http_client: HC,
+    ) -> Result<Self, DiscoveryError<RE>>
+    where
+        F: futures_0_3::Future<Output = Result<HttpResponse, RE>>,
+        HC: Fn(HttpRequest) -> F + 'static,
+        RE: Fail,
+    {
+        let discovery_url = issuer_url
+            .join(CONFIG_URL_SUFFIX)
+            .map_err(DiscoveryError::UrlParse)?;
+
+        let provider_metadata = http_client(Self::discovery_request(discovery_url))
+            .await
+            .map_err(DiscoveryError::Request)
+            .and_then(|http_response| Self::discovery_response(&issuer_url, http_response))?;
+
+        JsonWebKeySet::fetch_async(provider_metadata.jwks_uri(), http_client)
+            .await
+            .map(|jwks| Self {
+                jwks,
+                ..provider_metadata
             })
     }
 
@@ -478,12 +513,13 @@ where
 mod tests {
     use oauth2::{AuthUrl, Scope, TokenUrl};
 
-    use super::super::core::{
+    use crate::core::{
         CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClientAuthMethod, CoreGrantType,
         CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm,
         CoreProviderMetadata, CoreResponseMode, CoreResponseType, CoreSubjectIdentifierType,
     };
-    use super::super::{
+
+    use super::{
         AuthenticationContextClass, IssuerUrl, JsonWebKeySetUrl, LanguageTag, OpPolicyUrl,
         OpTosUrl, RegistrationUrl, ResponseTypes, ServiceDocUrl, UserInfoUrl,
     };

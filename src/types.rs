@@ -7,7 +7,10 @@ use std::ops::Deref;
 
 use base64;
 use failure::Fail;
-use futures::Future;
+#[cfg(feature = "futures-01")]
+use futures_0_1::Future;
+#[cfg(feature = "futures-03")]
+use futures_0_3;
 use http_::header::{HeaderValue, ACCEPT};
 use http_::method::Method;
 use http_::status::StatusCode;
@@ -762,7 +765,8 @@ where
     /// Fetch a remote JSON Web Key Set from the specified `url` using the given async `http_client`
     /// (e.g., [`crate::reqwest::async_http_client`]).
     ///
-    pub fn fetch_async<F, HC, RE>(
+    #[cfg(feature = "futures-01")]
+    pub fn fetch_future<F, HC, RE>(
         url: &JsonWebKeySetUrl,
         http_client: HC,
     ) -> impl Future<Item = Self, Error = DiscoveryError<RE>>
@@ -772,6 +776,26 @@ where
         RE: Fail,
     {
         http_client(Self::fetch_request(url))
+            .map_err(DiscoveryError::Request)
+            .and_then(Self::fetch_response)
+    }
+
+    ///
+    /// Fetch a remote JSON Web Key Set from the specified `url` using the given async `http_client`
+    /// (e.g., [`crate::reqwest::async_http_client`]).
+    ///
+    #[cfg(feature = "futures-03")]
+    pub async fn fetch_async<F, HC, RE>(
+        url: &JsonWebKeySetUrl,
+        http_client: HC,
+    ) -> Result<Self, DiscoveryError<RE>>
+    where
+        F: futures_0_3::Future<Output = Result<HttpResponse, RE>>,
+        HC: FnOnce(HttpRequest) -> F,
+        RE: Fail,
+    {
+        http_client(Self::fetch_request(url))
+            .await
             .map_err(DiscoveryError::Request)
             .and_then(Self::fetch_response)
     }
@@ -1155,7 +1179,7 @@ pub(crate) mod helpers {
     }
 
     pub mod serde_utc_seconds {
-        use super::super::Seconds;
+        use crate::types::Seconds;
         use chrono::{DateTime, Utc};
         use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -1181,7 +1205,7 @@ pub(crate) mod helpers {
     }
 
     pub mod serde_utc_seconds_opt {
-        use super::super::Seconds;
+        use crate::types::Seconds;
         use chrono::{DateTime, Utc};
         use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -1246,7 +1270,7 @@ mod serde_base64url_byte_array {
 mod tests {
     use serde_json;
 
-    use super::super::IssuerUrl;
+    use super::IssuerUrl;
 
     #[test]
     fn test_issuer_url_append() {

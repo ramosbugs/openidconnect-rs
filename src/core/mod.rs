@@ -12,18 +12,21 @@ use oauth2::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::registration::{
+use crate::registration::{
     ClientMetadata, ClientRegistrationRequest, ClientRegistrationResponse,
     EmptyAdditionalClientMetadata, EmptyAdditionalClientRegistrationResponse,
     RegisterErrorResponseType,
 };
-use super::{
+use crate::{
     ApplicationType, AuthDisplay, AuthPrompt, ClaimName, ClaimType, Client, ClientAuthMethod,
     EmptyAdditionalClaims, EmptyAdditionalProviderMetadata, GenderClaim, GrantType, IdToken,
     IdTokenClaims, IdTokenFields, IdTokenVerifier, JsonWebKeySet, JweContentEncryptionAlgorithm,
     JweKeyManagementAlgorithm, JwsSigningAlgorithm, ProviderMetadata, ResponseMode, ResponseType,
     SubjectIdentifierType, UserInfoClaims, UserInfoJsonWebToken, UserInfoVerifier,
 };
+
+#[cfg(feature = "nightly")]
+use super::AuthenticationFlow;
 
 pub use self::jwk::{
     CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreRsaPrivateSigningKey,
@@ -33,9 +36,6 @@ mod crypto;
 
 // Private purely for organizational reasons; exported publicly above.
 mod jwk;
-
-#[cfg(feature = "nightly")]
-use super::AuthenticationFlow;
 
 ///
 /// OpenID Connect Core authentication flows.

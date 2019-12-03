@@ -3,7 +3,10 @@ use std::str;
 
 use chrono::{DateTime, Utc};
 use failure::Fail;
-use futures::{Future, IntoFuture};
+#[cfg(feature = "futures-01")]
+use futures_0_1::{Future, IntoFuture};
+#[cfg(feature = "futures-03")]
+use futures_0_3;
 use http_::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
 use http_::method::Method;
 use http_::status::StatusCode;
@@ -11,12 +14,12 @@ use oauth2::AccessToken;
 use serde_json;
 use url::Url;
 
-use super::http::{auth_bearer, MIME_TYPE_JSON, MIME_TYPE_JWT};
-use super::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
-use super::types::helpers::deserialize_string_or_vec_opt;
-use super::types::LocalizedClaim;
-use super::verification::UserInfoVerifier;
-use super::{
+use crate::http::{auth_bearer, MIME_TYPE_JSON, MIME_TYPE_JWT};
+use crate::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
+use crate::types::helpers::deserialize_string_or_vec_opt;
+use crate::types::LocalizedClaim;
+use crate::verification::UserInfoVerifier;
+use crate::{
     AdditionalClaims, AddressClaim, Audience, AudiencesClaim, ClaimsVerificationError,
     EndUserBirthday, EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName,
     EndUserName, EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl,
@@ -73,7 +76,8 @@ where
     /// Submits this request to the associated user info endpoint using the specified asynchronous
     /// HTTP client.
     ///
-    pub fn request_future<AC, C, F, GC, HC, RE>(
+    #[cfg(feature = "futures-01")]
+    pub fn request_future<AC, C, F, GC, RE>(
         self,
         http_client: C,
     ) -> impl Future<Item = UserInfoClaims<AC, GC>, Error = UserInfoError<RE>>
@@ -82,12 +86,35 @@ where
         C: FnOnce(HttpRequest) -> F,
         F: Future<Item = HttpResponse, Error = RE>,
         GC: GenderClaim,
-        HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
         RE: Fail,
     {
         http_client(self.prepare_request())
             .map_err(UserInfoError::Request)
             .and_then(|http_response| self.user_info_response(http_response).into_future())
+    }
+
+    ///
+    /// Submits this request to the associated user info endpoint using the specified asynchronous
+    /// HTTP client.
+    ///
+    #[cfg(feature = "futures-03")]
+    pub async fn request_async<AC, C, F, GC, RE>(
+        self,
+        http_client: C,
+    ) -> Result<UserInfoClaims<AC, GC>, UserInfoError<RE>>
+    where
+        AC: AdditionalClaims,
+        C: FnOnce(HttpRequest) -> F,
+        F: futures_0_3::Future<Output = Result<HttpResponse, RE>>,
+        GC: GenderClaim,
+        RE: Fail,
+    {
+        let http_request = self.prepare_request();
+        let http_response = http_client(http_request)
+            .await
+            .map_err(UserInfoError::Request)?;
+
+        self.user_info_response(http_response)
     }
 
     fn prepare_request(&self) -> HttpRequest {
