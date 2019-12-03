@@ -13,6 +13,10 @@
 //! The [`Client`] struct provides the OpenID Connect Relying Party interface. The most common
 //! usage is provided by the [`core::CoreClient`] type alias.
 //!
+//! ## Examples
+//!
+//! * [Google](https://github.com/ramosbugs/openidconnect-rs/tree/master/examples/google.rs)
+//!
 //! ## Getting started: Authorization Code Grant w/ PKCE
 //!
 //! This is the most common OIDC/OAuth2 flow. PKCE is recommended whenever the client has no
@@ -22,10 +26,6 @@
 //! ### Example
 //!
 //! ```
-//! extern crate base64;
-//! extern crate openidconnect;
-//! extern crate url;
-//!
 //! use openidconnect::{
 //!     AccessTokenHash,
 //!     AuthenticationFlow,
@@ -39,11 +39,15 @@
 //!     RedirectUrl,
 //!     Scope,
 //! };
-//! use openidconnect::core::{CoreClient, CoreProviderMetadata, CoreResponseType};
+//! use openidconnect::core::{
+//!   CoreAuthenticationFlow,
+//!   CoreClient,
+//!   CoreProviderMetadata,
+//!   CoreResponseType,
+//! };
 //! use openidconnect::reqwest::http_client;
 //! use url::Url;
 //!
-//! # extern crate failure;
 //! # fn err_wrapper() -> Result<(), failure::Error> {
 //! // Use OpenID Connect Discovery to fetch the provider metadata.
 //! use openidconnect::{OAuth2TokenResponse, TokenResponse};
@@ -146,10 +150,6 @@
 //! ### Example
 //!
 //! ```
-//! extern crate openidconnect;
-//! extern crate serde_json;
-//! extern crate url;
-//!
 //! use openidconnect::{
 //!     AuthUrl,
 //!     EmptyAdditionalProviderMetadata,
@@ -169,7 +169,6 @@
 //! };
 //! use url::Url;
 //!
-//! # extern crate failure;
 //! # fn err_wrapper() -> Result<String, failure::Error> {
 //! let provider_metadata = CoreProviderMetadata::new(
 //!     // Parameters required by the OpenID Connect Discovery spec.
@@ -247,7 +246,6 @@
 //! use openidconnect::{JsonWebKeyId, PrivateSigningKey};
 //! use openidconnect::core::{CoreJsonWebKey, CoreJsonWebKeySet, CoreRsaPrivateSigningKey};
 //!
-//! # extern crate failure;
 //! # fn err_wrapper() -> Result<String, failure::Error> {
 //! # let rsa_pem = "";
 //! let jwks = CoreJsonWebKeySet::new(
@@ -287,9 +285,6 @@
 //! ### Example
 //!
 //! ```
-//! extern crate chrono;
-//! extern crate openidconnect;
-//!
 //! use chrono::{Duration, Utc};
 //! use openidconnect::{
 //!     AccessToken,
@@ -312,7 +307,6 @@
 //!     CoreTokenType,
 //! };
 //!
-//! # extern crate failure;
 //! # fn err_wrapper() -> Result<CoreTokenResponse, failure::Error> {
 //! # let rsa_pem = "";
 //! # let access_token = AccessToken::new("".to_string());
@@ -388,215 +382,142 @@
 //! default-features = false
 //! ```
 //!
-//! ## async/await Examples
+//! ## Example
 //!
-//!
-//! ```ignore
-//! use std::env;
-//! use std::io::{BufRead, BufReader, Write};
-//! use std::net::TcpListener;
-//! use std::process::exit;
-//!
-//! use async_std;
-//! use failure::Fail;
-//! use oauth2::async_internal::AsyncCodeTokenRequest;
-//! use url::Url;
-//!
+//! ```
+//! # #[cfg(feature = "futures-03")]
 //! use openidconnect::{
-//!     AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce,
-//!     OAuth2TokenResponse, RedirectUrl, Scope,
+//!     AccessTokenHash,
+//!     AsyncCodeTokenRequest,
+//!     AuthenticationFlow,
+//!     AuthorizationCode,
+//!     ClientId,
+//!     ClientSecret,
+//!     CsrfToken,
+//!     Nonce,
+//!     IssuerUrl,
+//!     PkceCodeChallenge,
+//!     RedirectUrl,
+//!     Scope,
 //! };
 //! use openidconnect::core::{
-//!     CoreClient, CoreIdTokenClaims, CoreIdTokenVerifier, CoreProviderMetadata, CoreResponseType,
+//!   CoreAuthenticationFlow,
+//!   CoreClient,
+//!   CoreProviderMetadata,
+//!   CoreResponseType,
 //! };
+//! # #[cfg(feature = "futures-03")]
 //! use openidconnect::reqwest::async_http_client;
+//! use url::Url;
 //!
-//! fn handle_error<T: Fail>(fail: &T, msg: &'static str) {
-//!     let mut err_msg = format!("ERROR: {}", msg);
-//!     let mut cur_fail: Option<&dyn Fail> = Some(fail);
-//!     while let Some(cause) = cur_fail {
-//!         err_msg += &format!("\n    caused by: {}", cause);
-//!         cur_fail = cause.cause();
-//!     }
-//!     println!("{}", err_msg);
-//!     exit(1);
-//! }
 //!
-//! #[cfg(feature="futures-03")]
-//! #[async_std::main]
-//! async fn main() {
-//!     env_logger::init();
+//! # #[cfg(feature = "futures-03")]
+//! # async fn err_wrapper() -> Result<(), failure::Error> {
+//! // Use OpenID Connect Discovery to fetch the provider metadata.
+//! use openidconnect::{OAuth2TokenResponse, TokenResponse};
+//! let provider_metadata = CoreProviderMetadata::discover_async(
+//!     IssuerUrl::new("https://accounts.example.com".to_string())?,
+//!     async_http_client,
+//! )
+//! .await?;
 //!
-//!     let google_client_id = ClientId::new(
-//!         env::var("GOOGLE_CLIENT_ID").expect("Missing the GOOGLE_CLIENT_ID environment variable."),
-//!     );
-//!     let google_client_secret = ClientSecret::new(
-//!         env::var("GOOGLE_CLIENT_SECRET")
-//!             .expect("Missing the GOOGLE_CLIENT_SECRET environment variable."),
-//!     );
-//!     let issuer_url =
-//!         IssuerUrl::new("https://accounts.google.com".to_string()).expect("Invalid issuer URL");
-//!
-//!     // Fetch Google's OpenID Connect discovery document.
-//!     let provider_metadata = CoreProviderMetadata::discover_async(issuer_url, async_http_client).await
-//!         .unwrap_or_else(|err| {
-//!             handle_error(&err, "Failed to discover OpenID Provider");
-//!             unreachable!();
-//!         });
-//!
-//!     // Set up the config for the Google OAuth2 process.
-//!     let client = CoreClient::from_provider_metadata(
+//! // Create an OpenID Connect client by specifying the client ID, client secret, authorization URL
+//! // and token URL.
+//! let client =
+//!     CoreClient::from_provider_metadata(
 //!         provider_metadata,
-//!         google_client_id,
-//!         Some(google_client_secret),
+//!         ClientId::new("client_id".to_string()),
+//!         Some(ClientSecret::new("client_secret".to_string())),
 //!     )
-//!         // This example will be running its own server at localhost:8080.
-//!         // See below for the server implementation.
-//!         .set_redirect_uri(
-//!             RedirectUrl::new("http://localhost:8080".to_string()).expect("Invalid redirect URL"),
-//!         );
+//!     // Set the URL the user will be redirected to after the authorization process.
+//!     .set_redirect_uri(RedirectUrl::new("http://redirect".to_string())?);
 //!
-//!     // Generate the authorization URL to which we'll redirect the user.
-//!     let (authorize_url, csrf_state, nonce) = client
-//!         .authorize_url(
-//!             AuthenticationFlow::<CoreResponseType>::AuthorizationCode,
-//!             CsrfToken::new_random,
-//!             Nonce::new_random,
-//!         )
-//!         // This example is requesting access to the "calendar" features and the user's profile.
-//!         .add_scope(Scope::new("email".to_string()))
-//!         .add_scope(Scope::new("profile".to_string()))
-//!         .url();
+//! // Generate a PKCE challenge.
+//! let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 //!
-//!     println!(
-//!         "Open this URL in your browser:\n{}\n",
-//!         authorize_url.to_string()
-//!     );
+//! // Generate the full authorization URL.
+//! let (auth_url, csrf_token, nonce) = client
+//!     .authorize_url(
+//!         CoreAuthenticationFlow::AuthorizationCode,
+//!         CsrfToken::new_random,
+//!         Nonce::new_random,
+//!     )
+//!     // Set the desired scopes.
+//!     .add_scope(Scope::new("read".to_string()))
+//!     .add_scope(Scope::new("write".to_string()))
+//!     // Set the PKCE code challenge.
+//!     .set_pkce_challenge(pkce_challenge)
+//!     .url();
 //!
-//!     // A very naive implementation of the redirect server.
-//!     let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
-//!     for stream in listener.incoming() {
-//!         if let Ok(mut stream) = stream {
-//!             let code;
-//!             let state;
-//!             {
-//!                 let mut reader = BufReader::new(&stream);
+//! // This is the URL you should redirect the user to, in order to trigger the authorization
+//! // process.
+//! println!("Browse to: {}", auth_url);
 //!
-//!                 let mut request_line = String::new();
-//!                 reader.read_line(&mut request_line).unwrap();
+//! // Once the user has been redirected to the redirect URL, you'll have access to the
+//! // authorization code. For security reasons, your code should verify that the `state`
+//! // parameter returned by the server matches `csrf_state`.
 //!
-//!                 let redirect_url = request_line.split_whitespace().nth(1).unwrap();
-//!                 let url = Url::parse(&("http://localhost".to_string() + redirect_url)).unwrap();
+//! // Now you can exchange it for an access token and ID token.
+//! let token_response =
+//!     client
+//!         .exchange_code(AuthorizationCode::new("some authorization code".to_string()))
+//!         // Set the PKCE code verifier.
+//!         .set_pkce_verifier(pkce_verifier)
+//!         .request_async(async_http_client)
+//!         .await?;
 //!
-//!                 let code_pair = url
-//!                     .query_pairs()
-//!                     .find(|pair| {
-//!                         let &(ref key, _) = pair;
-//!                         key == "code"
-//!                     })
-//!                     .unwrap();
+//! // Extract the ID token claims after verifying its authenticity and nonce.
+//! let id_token = token_response
+//!   .id_token()
+//!   .ok_or_else(|| failure::format_err!("Server did not return an ID token"))?;
+//! let claims = id_token.claims(&client.id_token_verifier(), &nonce)?;
 //!
-//!                 let (_, value) = code_pair;
-//!                 code = AuthorizationCode::new(value.into_owned());
-//!
-//!                 let state_pair = url
-//!                     .query_pairs()
-//!                     .find(|pair| {
-//!                         let &(ref key, _) = pair;
-//!                         key == "state"
-//!                     })
-//!                     .unwrap();
-//!
-//!                 let (_, value) = state_pair;
-//!                 state = CsrfToken::new(value.into_owned());
-//!             }
-//!
-//!             let message = "Go back to your terminal :)";
-//!             let response = format!(
-//!                 "HTTP/1.1 200 OK\r\ncontent-length: {}\r\n\r\n{}",
-//!                 message.len(),
-//!                 message
-//!             );
-//!             stream.write_all(response.as_bytes()).unwrap();
-//!
-//!             println!("Google returned the following code:\n{}\n", code.secret());
-//!             println!(
-//!                 "Google returned the following state:\n{} (expected `{}`)\n",
-//!                 state.secret(),
-//!                 csrf_state.secret()
-//!             );
-//!
-//!             // Exchange the code with a token.
-//!             let token_response = client
-//!                 .exchange_code(code)
-//!                 .request_async(async_http_client).await
-//!                 .unwrap_or_else(|err| {
-//!                     handle_error(&err, "Failed to access token endpoint");
-//!                     unreachable!();
-//!                 });
-//!
-//!             println!(
-//!                 "Google returned access token:\n{}\n",
-//!                 token_response.access_token().secret()
-//!             );
-//!             println!("Google returned scopes: {:?}", token_response.scopes());
-//!
-//!             let id_token_verifier: CoreIdTokenVerifier = client.id_token_verifier();
-//!             let id_token_claims: &CoreIdTokenClaims = token_response
-//!                 .extra_fields()
-//!                 .id_token()
-//!                 .expect("Server did not return an ID token")
-//!                 .claims(&id_token_verifier, &nonce)
-//!                 .unwrap_or_else(|err| {
-//!                     handle_error(&err, "Failed to verify ID token");
-//!                     unreachable!();
-//!                 });
-//!             println!("Google returned ID token: {:?}", id_token_claims);
-//!
-//!             // The server will terminate itself after collecting the first code.
-//!             break;
-//!         }
+//! // Verify the access token hash to ensure that the access token hasn't been substituted for
+//! // another user's.
+//! if let Some(expected_access_token_hash) = claims.access_token_hash() {
+//!     let actual_access_token_hash = AccessTokenHash::from_token(
+//!         token_response.access_token(),
+//!         &id_token.signing_alg()?
+//!     )?;
+//!     if actual_access_token_hash != *expected_access_token_hash {
+//!         return Err(failure::Error::from_boxed_compat("Invalid access token".into()));
 //!     }
 //! }
+//!
+//! // The authenticated user's identity is now available. See the IdTokenClaims struct for a
+//! // complete listing of the available claims.
+//! println!(
+//!     "User {} with e-mail address {} has authenticated successfully",
+//!     claims.subject().as_str(),
+//!     claims.email().map(|email| email.as_str()).unwrap_or("<not provided>"),
+//! );
+//!
+//! // See the OAuth2TokenResponse trait for a listing of other available fields such as
+//! // access_token() and refresh_token().
+//!
+//! # Ok(())
+//! # }
+//! # fn main() {}
 //! ```
 //!
-//! Sync example:
-//! * [Google](https://github.com/ramosbugs/openidconnect-rs/tree/master/examples/google.rs)
-//!
 
-extern crate base64;
-extern crate chrono;
-#[cfg(test)]
-extern crate color_backtrace;
-extern crate failure;
 #[macro_use]
 extern crate failure_derive;
-extern crate http as http_;
-extern crate itertools;
-extern crate oauth2;
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
-extern crate rand;
-extern crate ring;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
-extern crate untrusted;
-extern crate url;
+
+use oauth2::helpers::variant_name;
+use oauth2::ResponseType as OAuth2ResponseType;
+use url::Url;
 
 use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::str;
 use std::time::Duration;
 
-#[cfg(feature = "curl")]
-pub use oauth2::curl;
-use oauth2::helpers::variant_name;
-#[cfg(feature = "reqwest")]
-pub use oauth2::reqwest;
-use oauth2::ResponseType as OAuth2ResponseType;
 pub use oauth2::{
     AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CodeTokenRequest,
     CsrfToken, EmptyExtraTokenFields, ErrorResponse, ErrorResponseType, ExtraTokenFields,
@@ -605,7 +526,18 @@ pub use oauth2::{
     StandardErrorResponse, StandardTokenResponse, TokenResponse as OAuth2TokenResponse, TokenType,
     TokenUrl,
 };
-use url::Url;
+
+#[cfg(feature = "curl")]
+pub use oauth2::curl;
+
+#[cfg(any(feature = "reqwest", feature = "futures-03"))]
+pub use oauth2::reqwest;
+
+#[cfg(feature = "futures-03")]
+pub use oauth2::{
+    AsyncClientCredentialsTokenRequest, AsyncCodeTokenRequest, AsyncPasswordTokenRequest,
+    AsyncRefreshTokenRequest,
+};
 
 pub use claims::{
     AdditionalClaims, AddressClaim, EmptyAdditionalClaims, GenderClaim, StandardClaims,

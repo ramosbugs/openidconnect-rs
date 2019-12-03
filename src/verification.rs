@@ -940,10 +940,9 @@ mod tests {
     use crate::types::helpers::seconds_to_utc;
     use crate::types::Base64UrlEncodedBytes;
     use crate::types::Seconds;
-    use crate::{serde_json, AuthenticationContextClass};
     use crate::{
-        AccessToken, Audience, AuthorizationCode, EndUserName, IssuerUrl, JsonWebKeyId, Nonce,
-        StandardClaims, UserInfoError,
+        AccessToken, Audience, AuthenticationContextClass, AuthorizationCode, EndUserName,
+        IssuerUrl, JsonWebKeyId, Nonce, StandardClaims, UserInfoError,
     };
 
     type CoreJsonWebTokenHeader = JsonWebTokenHeader<

@@ -7,6 +7,9 @@ license = "MIT"
 repository = "https://github.com/ramosbugs/openidconnect-rs"
 edition = "2018"
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
 curl = ["oauth2/curl"]
 reqwest = ["oauth2/reqwest"]

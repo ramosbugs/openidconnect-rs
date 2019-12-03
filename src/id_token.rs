@@ -421,14 +421,13 @@ mod tests {
     use crate::claims::{AdditionalClaims, EmptyAdditionalClaims, StandardClaims};
     use crate::core::{CoreGenderClaim, CoreIdToken, CoreIdTokenClaims, CoreTokenResponse};
     use crate::jwt::JsonWebTokenAccess;
-    use crate::{serde_json, AddressClaim};
     use crate::{
-        AccessTokenHash, AddressCountry, AddressLocality, AddressPostalCode, AddressRegion,
-        Audience, AuthenticationContextClass, AuthenticationMethodReference, AuthorizationCodeHash,
-        EndUserBirthday, EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName,
-        EndUserName, EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl,
-        EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, FormattedAddress, IssuerUrl,
-        LanguageTag, Nonce, StreetAddress, SubjectIdentifier,
+        AccessTokenHash, AddressClaim, AddressCountry, AddressLocality, AddressPostalCode,
+        AddressRegion, Audience, AuthenticationContextClass, AuthenticationMethodReference,
+        AuthorizationCodeHash, EndUserBirthday, EndUserEmail, EndUserFamilyName, EndUserGivenName,
+        EndUserMiddleName, EndUserName, EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl,
+        EndUserProfileUrl, EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, FormattedAddress,
+        IssuerUrl, LanguageTag, Nonce, StreetAddress, SubjectIdentifier,
     };
 
     use super::{AudiencesClaim, IdTokenClaims, IssuerClaim};

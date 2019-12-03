@@ -6,9 +6,9 @@ use failure::Fail;
 use futures_0_1::{Future, IntoFuture};
 #[cfg(feature = "futures-03")]
 use futures_0_3;
-use http_::header::{HeaderValue, ACCEPT};
-use http_::method::Method;
-use http_::status::StatusCode;
+use http::header::{HeaderValue, ACCEPT};
+use http::method::Method;
+use http::status::StatusCode;
 use oauth2::{AuthUrl, Scope, TokenUrl};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
