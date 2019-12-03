@@ -22,14 +22,14 @@ use std::process::exit;
 use failure::Fail;
 use url::Url;
 
-use openidconnect::{
-    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce,
-    OAuth2TokenResponse, RedirectUrl, Scope,
-};
 use openidconnect::core::{
     CoreClient, CoreIdTokenClaims, CoreIdTokenVerifier, CoreProviderMetadata, CoreResponseType,
 };
 use openidconnect::reqwest::http_client;
+use openidconnect::{
+    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce,
+    OAuth2TokenResponse, RedirectUrl, Scope,
+};
 
 fn handle_error<T: Fail>(fail: &T, msg: &'static str) {
     let mut err_msg = format!("ERROR: {}", msg);
@@ -68,11 +68,11 @@ fn main() {
         google_client_id,
         Some(google_client_secret),
     )
-        // This example will be running its own server at localhost:8080.
-        // See below for the server implementation.
-        .set_redirect_uri(
-            RedirectUrl::new("http://localhost:8080".to_string()).expect("Invalid redirect URL"),
-        );
+    // This example will be running its own server at localhost:8080.
+    // See below for the server implementation.
+    .set_redirect_uri(
+        RedirectUrl::new("http://localhost:8080".to_string()).expect("Invalid redirect URL"),
+    );
 
     // Generate the authorization URL to which we'll redirect the user.
     let (authorize_url, csrf_state, nonce) = client
