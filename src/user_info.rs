@@ -15,7 +15,7 @@ use serde_json;
 use url::Url;
 
 use crate::helpers::FilteredFlatten;
-use crate::http_utils::{auth_bearer, MIME_TYPE_JSON, MIME_TYPE_JWT};
+use crate::http_utils::{auth_bearer, header_starts_with_ignoring_case, MIME_TYPE_JSON, MIME_TYPE_JWT};
 use crate::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
 use crate::types::helpers::deserialize_string_or_vec_opt;
 use crate::types::LocalizedClaim;
@@ -156,7 +156,7 @@ where
             .map(ToOwned::to_owned)
             .unwrap_or_else(|| HeaderValue::from_static(MIME_TYPE_JSON))
         {
-            ref content_type if content_type == HeaderValue::from_static(MIME_TYPE_JSON) => {
+            ref content_type if header_starts_with_ignoring_case(&content_type, MIME_TYPE_JSON) => {
                 if self.require_signed_response {
                     return Err(UserInfoError::ClaimsVerification(
                         ClaimsVerificationError::NoSignature,
@@ -167,7 +167,7 @@ where
                     self.signed_response_verifier.expected_subject(),
                 )
             }
-            ref content_type if content_type == HeaderValue::from_static(MIME_TYPE_JWT) => {
+            ref content_type if header_starts_with_ignoring_case(&content_type, MIME_TYPE_JWT) => {
                 let jwt_str = String::from_utf8(http_response.body).map_err(|_| {
                     UserInfoError::Other("response body has invalid UTF-8 encoding".to_string())
                 })?;
