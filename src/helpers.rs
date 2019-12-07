@@ -22,6 +22,9 @@ where
     F: FlattenFilter,
     T: DeserializeOwned + Serialize,
 {
+    // We include another level of flattening here because the derived flatten
+    // ([`serde::private::de::FlatMapDeserializer`]) seems to support a wider set of types
+    // (e.g., various forms of enum tagging) than [`serde_value::ValueDeserializer`].
     #[serde(flatten)]
     inner: Flatten<T>,
     #[serde(skip)]
