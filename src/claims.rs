@@ -3,11 +3,11 @@ use std::marker::PhantomData;
 use std::str;
 
 use chrono::{DateTime, Utc};
-use serde;
 use serde::de::{Deserialize, DeserializeOwned, Deserializer, MapAccess, Visitor};
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
 
+use crate::helpers::FlattenFilter;
 use crate::types::helpers::{seconds_to_utc, split_language_tag_key, utc_to_seconds};
 use crate::types::{LocalizedClaim, Seconds};
 use crate::{
@@ -186,6 +186,38 @@ where
             set_updated_at -> updated_at[Option<DateTime<Utc>>],
         }
     ];
+}
+impl<GC> FlattenFilter for StandardClaims<GC>
+where
+    GC: GenderClaim,
+{
+    // When another struct (i.e., additional claims) is co-flattened with this one, only include
+    // fields in that other struct which are not part of this struct.
+    fn should_include(field_name: &str) -> bool {
+        match split_language_tag_key(field_name) {
+            ("sub", None)
+            | ("name", _)
+            | ("given_name", _)
+            | ("family_name", _)
+            | ("middle_name", _)
+            | ("nickname", _)
+            | ("preferred_username", None)
+            | ("profile", _)
+            | ("picture", _)
+            | ("website", _)
+            | ("email", None)
+            | ("email_verified", None)
+            | ("gender", None)
+            | ("birthday", None)
+            | ("zoneinfo", None)
+            | ("locale", None)
+            | ("phone_number", None)
+            | ("phone_number_verified", None)
+            | ("address", None)
+            | ("updated_at", None) => false,
+            _ => true,
+        }
+    }
 }
 impl<'de, GC> Deserialize<'de> for StandardClaims<GC>
 where

@@ -591,6 +591,7 @@ pub mod registration;
 // via the pub use above.
 mod claims;
 mod discovery;
+mod helpers;
 mod id_token;
 pub(crate) mod types;
 mod user_info;

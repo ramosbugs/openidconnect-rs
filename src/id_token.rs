@@ -1,9 +1,12 @@
+use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use chrono::{DateTime, Utc};
 use oauth2::helpers::variant_name;
 use oauth2::ClientId;
+use serde::Serialize;
 
+use crate::helpers::FilteredFlatten;
 use crate::jwt::JsonWebTokenAccess;
 use crate::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
 use crate::types::helpers::{deserialize_string_or_vec, serde_utc_seconds, serde_utc_seconds_opt};
@@ -206,7 +209,7 @@ where
 
     #[serde(bound = "AC: AdditionalClaims")]
     #[serde(flatten)]
-    additional_claims: AC,
+    additional_claims: FilteredFlatten<StandardClaims<GC>, AC>,
 }
 impl<AC, GC> IdTokenClaims<AC, GC>
 where
@@ -237,7 +240,7 @@ where
             access_token_hash: None,
             code_hash: None,
             standard_claims,
-            additional_claims,
+            additional_claims: additional_claims.into(),
         }
     }
 
@@ -301,13 +304,13 @@ where
     /// Returns additional ID token claims.
     ///
     pub fn additional_claims(&self) -> &AC {
-        &self.additional_claims
+        self.additional_claims.as_ref()
     }
     ///
     /// Returns mutable additional ID token claims.
     ///
     pub fn additional_claims_mut(&mut self) -> &mut AC {
-        &mut self.additional_claims
+        self.additional_claims.as_mut()
     }
 }
 impl<AC, GC> AudiencesClaim for IdTokenClaims<AC, GC>
@@ -413,6 +416,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use chrono::{TimeZone, Utc};
     use oauth2::basic::BasicTokenType;
     use oauth2::{ClientId, TokenResponse};
@@ -989,6 +994,29 @@ mod tests {
             }",
         )
         .expect_err("missing claim should fail to deserialize");
+    }
+
+    #[derive(Debug, Deserialize, Serialize)]
+    struct AllOtherClaims(HashMap<String, serde_json::Value>);
+    impl AdditionalClaims for AllOtherClaims {}
+
+    #[test]
+    fn test_catch_all_additional_claims() {
+        let claims = serde_json::from_str::<IdTokenClaims<AllOtherClaims, CoreGenderClaim>>(
+            "{
+                \"iss\": \"https://server.example.com\",
+                \"sub\": \"24400320\",
+                \"aud\": [\"s6BhdRkqt3\"],
+                \"exp\": 1311281970,
+                \"iat\": 1311280970,
+                \"tfa_method\": \"u2f\",
+                \"updated_at\": 1000
+            }",
+        )
+        .expect("failed to deserialize");
+
+        assert_eq!(claims.additional_claims().0.len(), 1);
+        assert_eq!(claims.additional_claims().0["tfa_method"], "u2f");
     }
 
     #[test]

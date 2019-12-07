@@ -14,6 +14,7 @@ use oauth2::AccessToken;
 use serde_json;
 use url::Url;
 
+use crate::helpers::FilteredFlatten;
 use crate::http::{auth_bearer, MIME_TYPE_JSON, MIME_TYPE_JWT};
 use crate::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
 use crate::types::helpers::deserialize_string_or_vec_opt;
@@ -238,7 +239,7 @@ where
             issuer: None,
             audiences: None,
             standard_claims,
-            additional_claims,
+            additional_claims: additional_claims.into(),
         })
     }
 
@@ -334,13 +335,13 @@ where
     /// Returns additional user info claims.
     ///
     pub fn additional_claims(&self) -> &AC {
-        &self.0.additional_claims
+        self.0.additional_claims.as_ref()
     }
     ///
     /// Returns mutable additional user info claims.
     ///
     pub fn additional_claims_mut(&mut self) -> &mut AC {
-        &mut self.0.additional_claims
+        self.0.additional_claims.as_mut()
     }
 }
 
@@ -365,7 +366,7 @@ where
     pub standard_claims: StandardClaims<GC>,
 
     #[serde(bound = "AC: AdditionalClaims", flatten)]
-    pub additional_claims: AC,
+    pub additional_claims: FilteredFlatten<StandardClaims<GC>, AC>,
 }
 impl<AC, GC> AudiencesClaim for UserInfoClaimsImpl<AC, GC>
 where
@@ -508,3 +509,79 @@ where
 #[derive(Debug, Fail)]
 #[fail(display = "No user info endpoint specified")]
 pub struct NoUserInfoEndpoint;
+
+#[cfg(test)]
+mod tests {
+    use crate::core::CoreGenderClaim;
+    use crate::{AdditionalClaims, UserInfoClaims};
+
+    use std::collections::HashMap;
+
+    #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+    struct TestClaims {
+        pub tfa_method: String,
+    }
+    impl AdditionalClaims for TestClaims {}
+
+    #[test]
+    fn test_additional_claims() {
+        let claims = UserInfoClaims::<TestClaims, CoreGenderClaim>::from_json::<
+            crate::reqwest::HttpClientError,
+        >(
+            "{
+                \"iss\": \"https://server.example.com\",
+                \"sub\": \"24400320\",
+                \"aud\": [\"s6BhdRkqt3\"],
+                \"tfa_method\": \"u2f\"
+            }"
+            .as_bytes(),
+            None,
+        )
+        .expect("failed to deserialize");
+        assert_eq!(claims.additional_claims().tfa_method, "u2f");
+        assert_eq!(
+            serde_json::to_string(&claims).expect("failed to serialize"),
+            "{\
+             \"iss\":\"https://server.example.com\",\
+             \"aud\":[\"s6BhdRkqt3\"],\
+             \"sub\":\"24400320\",\
+             \"tfa_method\":\"u2f\"\
+             }",
+        );
+
+        UserInfoClaims::<TestClaims, CoreGenderClaim>::from_json::<crate::reqwest::HttpClientError>(
+            "{
+                \"iss\": \"https://server.example.com\",
+                \"sub\": \"24400320\",
+                \"aud\": [\"s6BhdRkqt3\"]
+            }".as_bytes(),
+            None,
+        )
+            .expect_err("missing claim should fail to deserialize");
+    }
+
+    #[derive(Debug, Deserialize, Serialize)]
+    struct AllOtherClaims(HashMap<String, serde_json::Value>);
+    impl AdditionalClaims for AllOtherClaims {}
+
+    #[test]
+    fn test_catch_all_additional_claims() {
+        let claims = UserInfoClaims::<AllOtherClaims, CoreGenderClaim>::from_json::<
+            crate::reqwest::HttpClientError,
+        >(
+            "{
+                \"iss\": \"https://server.example.com\",
+                \"sub\": \"24400320\",
+                \"aud\": [\"s6BhdRkqt3\"],
+                \"tfa_method\": \"u2f\",
+                \"updated_at\": 1000
+            }"
+            .as_bytes(),
+            None,
+        )
+        .expect("failed to deserialize");
+
+        assert_eq!(claims.additional_claims().0.len(), 1);
+        assert_eq!(claims.additional_claims().0["tfa_method"], "u2f");
+    }
+}
