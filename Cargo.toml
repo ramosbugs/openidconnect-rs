@@ -6,16 +6,21 @@ description = "OpenID Connect library"
 license = "MIT"
 repository = "https://github.com/ramosbugs/openidconnect-rs"
 edition = "2018"
+readme = "README.md"
 
 [package.metadata.docs.rs]
 all-features = true
 
+[badges]
+maintenance = { status = "actively-developed" }
+
 [features]
+default = ["reqwest-09"]
 curl = ["oauth2/curl"]
-reqwest = ["oauth2/reqwest"]
 futures-01 = ["oauth2/futures-01", "futures-0-1"]
 futures-03 = ["oauth2/futures-03", "futures-0-3"]
-default = ["reqwest"]
+reqwest-09 = ["oauth2/reqwest-09"]
+reqwest-010 = ["oauth2/reqwest-010"]
 nightly = []
 
 [dependencies]
@@ -28,7 +33,7 @@ futures-0-3 = { version = "0.3", optional = true, package = "futures" }
 http = "0.1"
 itertools = "0.7.8"
 log = "0.4"
-oauth2 = "=3.0.0-alpha.6"
+oauth2 = "=3.0.0-alpha.7"
 rand = "0.6"
 retry = "0.5"
 ring = "0.14"
@@ -45,4 +50,3 @@ env_logger = "0.5"
 hyper = "0.11"
 pretty_assertions = "0.5"
 reqwest_ = { package = "reqwest", version = "0.9" }
-async-std = { version = "1.2.0", features = ["attributes"] }

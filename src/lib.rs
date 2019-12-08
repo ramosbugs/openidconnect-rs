@@ -25,7 +25,7 @@
 //!
 //! ### Example
 //!
-//! ```
+//! ```rust,no_run
 //! use openidconnect::{
 //!     AccessTokenHash,
 //!     AuthenticationFlow,
@@ -45,9 +45,11 @@
 //!   CoreProviderMetadata,
 //!   CoreResponseType,
 //! };
+//! # #[cfg(any(feature = "reqwest-09", feature = "reqwest-010"))]
 //! use openidconnect::reqwest::http_client;
 //! use url::Url;
 //!
+//! # #[cfg(any(feature = "reqwest-09", feature = "reqwest-010"))]
 //! # fn err_wrapper() -> Result<(), failure::Error> {
 //! // Use OpenID Connect Discovery to fetch the provider metadata.
 //! use openidconnect::{OAuth2TokenResponse, TokenResponse};
@@ -131,7 +133,6 @@
 //!
 //! # Ok(())
 //! # }
-//! # fn main() {}
 //! ```
 //!
 //! # OpenID Connect Provider (Server) Interface
@@ -149,7 +150,7 @@
 //!
 //! ### Example
 //!
-//! ```
+//! ```rust,no_run
 //! use openidconnect::{
 //!     AuthUrl,
 //!     EmptyAdditionalProviderMetadata,
@@ -229,7 +230,6 @@
 //!
 //! serde_json::to_string(&provider_metadata).map_err(failure::Error::from)
 //! # }
-//! # fn main() {}
 //! ```
 //!
 //! ## OpenID Connect Discovery JSON Web Key Set
@@ -242,7 +242,7 @@
 //!
 //! ### Example
 //!
-//! ```
+//! ```rust,no_run
 //! use openidconnect::{JsonWebKeyId, PrivateSigningKey};
 //! use openidconnect::core::{CoreJsonWebKey, CoreJsonWebKeySet, CoreRsaPrivateSigningKey};
 //!
@@ -264,7 +264,6 @@
 //!
 //! serde_json::to_string(&jwks).map_err(failure::Error::from)
 //! # }
-//! # fn main() {}
 //! ```
 //!
 //! ## OpenID Connect ID Token
@@ -284,7 +283,7 @@
 //!
 //! ### Example
 //!
-//! ```
+//! ```rust,no_run
 //! use chrono::{Duration, Utc};
 //! use openidconnect::{
 //!     AccessToken,
@@ -368,7 +367,6 @@
 //!     CoreIdTokenFields::new(Some(id_token), EmptyExtraTokenFields {}),
 //! ))
 //! # }
-//! # fn main() {}
 //! ```
 //!
 //! # Async/Await API
@@ -384,8 +382,8 @@
 //!
 //! ## Example
 //!
-//! ```
-//! # #[cfg(feature = "futures-03")]
+//! ```rust,no_run
+//! # #[cfg(all(feature = "futures-03", feature = "reqwest-010"))]
 //! use openidconnect::{
 //!     AccessTokenHash,
 //!     AsyncCodeTokenRequest,
@@ -406,12 +404,12 @@
 //!   CoreProviderMetadata,
 //!   CoreResponseType,
 //! };
-//! # #[cfg(feature = "futures-03")]
+//! # #[cfg(all(feature = "futures-03", feature = "reqwest-010"))]
 //! use openidconnect::reqwest::async_http_client;
 //! use url::Url;
 //!
 //!
-//! # #[cfg(feature = "futures-03")]
+//! # #[cfg(all(feature = "futures-03", feature = "reqwest-010"))]
 //! # async fn err_wrapper() -> Result<(), failure::Error> {
 //! // Use OpenID Connect Discovery to fetch the provider metadata.
 //! use openidconnect::{OAuth2TokenResponse, TokenResponse};
@@ -497,7 +495,6 @@
 //!
 //! # Ok(())
 //! # }
-//! # fn main() {}
 //! ```
 //!
 
@@ -530,7 +527,7 @@ pub use oauth2::{
 #[cfg(feature = "curl")]
 pub use oauth2::curl;
 
-#[cfg(any(feature = "reqwest", feature = "futures-03"))]
+#[cfg(any(feature = "reqwest-09", feature = "reqwest-010"))]
 pub use oauth2::reqwest;
 
 #[cfg(feature = "futures-03")]
