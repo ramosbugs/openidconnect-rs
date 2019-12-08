@@ -8,6 +8,104 @@
 //! this crate may define their own extensions and custom type parameters in lieu of using the
 //! [`core`] module.
 //!
+//! # Contents
+//!  * [Importing `openidconnect`: selecting an HTTP client interface](#importing-openidconnect-selecting-an-http-client-interface)
+//!  * [OpenID Connect Relying Party (Client) Interface](#openid-connect-relying-party-client-interface)
+//!    * [Examples](#examples)
+//!    * [Getting started: Authorization Code Grant w/ PKCE](#getting-started-authorization-code-grant-w-pkce)
+//!  * [OpenID Connect Provider (Server) Interface](#openid-connect-provider-server-interface)
+//!    * [OpenID Connect Discovery document](#openid-connect-discovery-document)
+//!    * [OpenID Connect Discovery JSON Web Key Set](#openid-connect-discovery-json-web-key-set)
+//!    * [OpenID Connect ID Token](#openid-connect-id-token)
+//!  * [Async/Await API](#asyncawait-api)
+//!
+//! # Importing `openidconnect`: selecting an HTTP client interface
+//!
+//! This library offers a flexible HTTP client interface with three modes:
+//!  * **Synchronous (blocking)**
+//!
+//!    The synchronous interface is available for any combination of feature flags.
+//!
+//!    Example import in `Cargo.toml`:
+//!    ```toml
+//!    openidconnect = "1.0"
+//!    ```
+//!  * **Asynchronous via `futures` 0.1**
+//!
+//!    Support is enabled via the `futures-01` feature flag.
+//!
+//!    Example import in `Cargo.toml`:
+//!    ```toml
+//!    openidconnect = { version = "1.0", features = ["futures-01"] }
+//!    ```
+//!  * **Async/await via `futures` 0.3**
+//!
+//!    Support is enabled via the `futures-03` feature flag. Typically, the default
+//!    support for `reqwest` 0.9 is also disabled when using async/await. If desired, the
+//!    `reqwest-010` feature flag can be used to enable `reqwest` 0.10 and its async/await
+//!    client interface.
+//!
+//!    Example import in `Cargo.toml`:
+//!    ```toml
+//!    openidconnect = { version = "1.0", features = ["futures-03"], default-features = false }
+//!    ```
+//!
+//! For the HTTP client modes described above, the following HTTP client implementations can be
+//! used:
+//!  * **[`reqwest`]**
+//!
+//!    The `reqwest` HTTP client supports all three modes. By default, `reqwest` 0.9 is enabled,
+//!    which supports the synchronous and asynchronous `futures` 0.1 APIs.
+//!
+//!    Synchronous client: [`reqwest::http_client`]
+//!
+//!    Asynchronous `futures` 0.1 client: [`reqwest::future_http_client`]
+//!
+//!    Async/await `futures` 0.3 client: [`reqwest::async_http_client`]. This mode requires
+//!    `reqwest` 0.10, which can be enabled via the `reqwest-010` feature flag. Typically, the
+//!    default features are also disabled (`default-features = false` in `Cargo.toml`) to remove the
+//!    dependency on `reqwest` 0.9 when using `reqwest` 0.10. However, both can be used together if
+//!    both asynchronous interfaces are desired.
+//!
+//!  * **[`curl`]**
+//!
+//!    The `curl` HTTP client only supports the synchronous HTTP client mode and can be enabled in
+//!    `Cargo.toml` via the `curl` feature flag.
+//!
+//!    Synchronous client: [`curl::http_client`]
+//!
+//!  * **Custom**
+//!
+//!    In addition to the clients above, users may define their own HTTP clients, which must accept
+//!    an [`HttpRequest`] and return an [`HttpResponse`] or error. Users writing their own clients
+//!    may wish to disable the default `reqwest` 0.9 dependency by specifying
+//!    `default-features = false` in `Cargo.toml`:
+//!    ```toml
+//!    openidconnect = { version = "1.0", default-features = false }
+//!    ```
+//!
+//!    Synchronous HTTP clients should implement the following trait:
+//!    ```ignore
+//!    FnOnce(HttpRequest) -> Result<HttpResponse, RE>
+//!    where RE: failure::Fail
+//!    ```
+//!
+//!    Asynchronous `futures` 0.1 HTTP clients should implement the following trait:
+//!    ```ignore
+//!    FnOnce(HttpRequest) -> F
+//!    where
+//!      F: Future<Item = HttpResponse, Error = RE>,
+//!      RE: failure::Fail
+//!    ```
+//!
+//!    Async/await `futures` 0.3 HTTP clients should implement the following trait:
+//!    ```ignore
+//!    FnOnce(HttpRequest) -> F + Send
+//!    where
+//!      F: Future<Output = Result<HttpResponse, RE>> + Send,
+//!      RE: failure::Fail
+//!    ```
+//!
 //! # OpenID Connect Relying Party (Client) Interface
 //!
 //! The [`Client`] struct provides the OpenID Connect Relying Party interface. The most common
@@ -374,10 +472,7 @@
 //! An asynchronous API for async/await is also provided.
 //! In order to use `futures` 0.3, include the `openidconnect` crate like this:
 //! ```toml
-//! [dependencies.openidconnect]
-//! version = "<desired version>"
-//! features = ["futures-03"]
-//! default-features = false
+//! openidconnect = { version = "1.0", features = ["futures-03"], default-features = false }
 //! ```
 //!
 //! ## Example
@@ -779,7 +874,7 @@ where
     /// Enables the `openid` scope to be requested automatically.
     ///
     /// This scope is requested by default, so this function is only useful after previous calls to
-    /// [`disable_openid_scope`].
+    /// [`disable_openid_scope`][Client::disable_openid_scope].
     ///
     pub fn enable_openid_scope(mut self) -> Self {
         self.use_openid_scope = true;
