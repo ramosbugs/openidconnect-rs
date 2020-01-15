@@ -758,6 +758,102 @@ impl JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
 }
 
 ///
+/// OpenID Connect Core authentication error response types.
+///
+/// This type represents errors returned in a redirect from the Authorization Endpoint to the
+/// client's redirect URI.
+///
+/// These values are defined across both
+/// [Section 4.1.2.1](https://tools.ietf.org/html/rfc6749#section-4.1.2.1) of RFC 6749 and
+/// [Section 3.1.2.6](https://openid.net/specs/openid-connect-core-1_0.html#AuthError) of the
+/// OpenID Connect Core spec.
+///
+#[derive(Clone, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CoreAuthErrorResponseType {
+    ///
+    /// The resource owner or authorization server denied the request.
+    ///
+    AccessDenied,
+    ///
+    /// The End-User is REQUIRED to select a session at the Authorization Server. The End-User MAY
+    /// be authenticated at the Authorization Server with different associated accounts, but the
+    /// End-User did not select a session. This error MAY be returned when the `prompt` parameter
+    /// value in the Authentication Request is `none`, but the Authentication Request cannot be
+    /// completed without displaying a user interface to prompt for a session to use.
+    ///
+    AccountSelectionRequired,
+    ///
+    /// The Authorization Server requires End-User consent. This error MAY be returned when the
+    /// `prompt` parameter value in the Authentication Request is `none`, but the Authentication
+    /// Request cannot be completed without displaying a user interface for End-User consent.
+    ///
+    ConsentRequired,
+    ///
+    /// The Authorization Server requires End-User interaction of some form to proceed. This error
+    /// MAY be returned when the `prompt` parameter value in the Authentication Request is `none`,
+    /// but the Authentication Request cannot be completed without displaying a user interface for
+    /// End-User interaction.
+    ///
+    InteractionRequired,
+    ///
+    /// The request is missing a required parameter, includes an invalid parameter value, includes
+    /// a parameter more than once, or is otherwise malformed.
+    ///
+    InvalidRequest,
+    ///
+    /// The `request` parameter contains an invalid Request Object.
+    ///
+    InvalidRequestObject,
+    ///
+    /// The `request_uri` in the Authorization Request returns an error or contains invalid data.
+    ///
+    InvalidRequestUri,
+    ///
+    /// The requested scope is invalid, unknown, or malformed.
+    ///
+    InvalidScope,
+    ///
+    /// The Authorization Server requires End-User authentication. This error MAY be returned when
+    /// the `prompt` parameter value in the Authentication Request is `none`, but the Authentication
+    /// Request cannot be completed without displaying a user interface for End-User authentication.
+    ///
+    LoginRequired,
+    ///
+    /// The OpenID Connect Provider does not support use of the `registration` parameter.
+    ///
+    RegistrationNotSupported,
+    ///
+    /// The OpenID Connect Provider does not support use of the `request` parameter.
+    ///
+    RequestNotSupported,
+    ///
+    /// The OpenID Connect Provider does not support use of the `request_uri` parameter.
+    ///
+    RequestUriNotSupported,
+    ///
+    /// The authorization server encountered an unexpected condition that prevented it from
+    /// fulfilling the request. (This error code is needed because a 500 Internal Server Error HTTP
+    /// status code cannot be returned to the client via an HTTP redirect.)
+    ///
+    ServerError,
+    ///
+    /// The authorization server is currently unable to handle the request due to a temporary
+    /// overloading or maintenance of the server.  (This error code is needed because a 503 Service
+    /// Unavailable HTTP status code cannot be returned to the client via an HTTP redirect.)
+    ///
+    TemporarilyUnavailable,
+    ///
+    /// The client is not authorized to request an authorization code using this method.
+    ///
+    UnauthorizedClient,
+    ///
+    /// The authorization server does not support obtaining an authorization code using this method.
+    ///
+    UnsupportedResponseType,
+}
+
+///
 /// OpenID Connect Core registration error response type.
 ///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
