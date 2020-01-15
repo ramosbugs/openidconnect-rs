@@ -422,6 +422,12 @@ pub enum CoreClientAuthMethod {
     /// with the OpenID Connect provider.
     ///
     PrivateKeyJwt,
+    ///
+    /// The Client does not authenticate itself at the Token Endpoint, either because it uses only
+    /// the Implicit Flow (and so does not use the Token Endpoint) or because it is a Public Client
+    /// with no Client Secret or other authentication mechanism.
+    ///
+    None,
 }
 impl ClientAuthMethod for CoreClientAuthMethod {}
 
