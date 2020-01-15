@@ -54,7 +54,6 @@ pub type CoreClient = Client<
     CoreJsonWebKeyUse,
     CoreJsonWebKey,
     CoreAuthPrompt,
-    CoreRefreshTokenResponse,
     StandardErrorResponse<CoreErrorResponseType>,
     CoreTokenResponse,
     CoreTokenType,
@@ -160,11 +159,6 @@ pub type CoreIdTokenVerifier<'a> = IdTokenVerifier<
 /// OpenID Connect Core token response.
 ///
 pub type CoreTokenResponse = StandardTokenResponse<CoreIdTokenFields, CoreTokenType>;
-
-///
-/// OpenID Connect Core refresh token response.
-///
-pub type CoreRefreshTokenResponse = StandardTokenResponse<CoreIdTokenFields, CoreTokenType>;
 
 ///
 /// OpenID Connect Core JSON Web Key Set.

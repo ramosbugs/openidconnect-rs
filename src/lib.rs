@@ -734,7 +734,7 @@ pub enum AuthenticationFlow<RT: ResponseType> {
 
 /// OpenID Connect client.
 #[derive(Clone, Debug)]
-pub struct Client<AC, AD, GC, JE, JS, JT, JU, K, P, RR, TE, TR, TT>
+pub struct Client<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT>
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
@@ -745,16 +745,11 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
     P: AuthPrompt,
-    RR: RefreshTokenResponse<AC, GC, JE, JS, JT, TT>,
     TE: ErrorResponse,
     TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
     TT: TokenType + 'static,
 {
     oauth2_client: oauth2::Client<TE, TR, TT>,
-    // We need a separate client for refresh tokens because the ID token is optional in the
-    // refresh response, and the OAuth2 client returns the same data type for refresh requests as
-    // for exchange_code requests.
-    refresh_oauth2_client: oauth2::Client<TE, RR, TT>,
     client_id: ClientId,
     client_secret: Option<ClientSecret>,
     issuer: IssuerUrl,
@@ -763,8 +758,8 @@ where
     use_openid_scope: bool,
     _phantom: PhantomData<(AC, AD, GC, JE, P)>,
 }
-impl<AC, AD, GC, JE, JS, JT, JU, K, P, RR, TE, TR, TT>
-    Client<AC, AD, GC, JE, JS, JT, JU, K, P, RR, TE, TR, TT>
+impl<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT>
+    Client<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT>
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
@@ -775,7 +770,6 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
     P: AuthPrompt,
-    RR: RefreshTokenResponse<AC, GC, JE, JS, JT, TT>,
     TE: ErrorResponse,
     TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
     TT: TokenType + 'static,
@@ -798,12 +792,6 @@ where
                 client_secret.clone(),
                 auth_url.clone(),
                 token_url.clone(),
-            ),
-            refresh_oauth2_client: oauth2::Client::new(
-                client_id.clone(),
-                client_secret.clone(),
-                auth_url,
-                token_url,
             ),
             client_id,
             client_secret,
@@ -857,7 +845,6 @@ where
     ///
     pub fn set_auth_type(mut self, auth_type: AuthType) -> Self {
         self.oauth2_client = self.oauth2_client.set_auth_type(auth_type.clone());
-        self.refresh_oauth2_client = self.refresh_oauth2_client.set_auth_type(auth_type);
         self
     }
 
@@ -866,7 +853,6 @@ where
     ///
     pub fn set_redirect_uri(mut self, redirect_uri: RedirectUrl) -> Self {
         self.oauth2_client = self.oauth2_client.set_redirect_url(redirect_uri.clone());
-        self.refresh_oauth2_client = self.refresh_oauth2_client.set_redirect_url(redirect_uri);
         self
     }
 
@@ -990,12 +976,11 @@ where
     pub fn exchange_refresh_token<'a, 'b>(
         &'a self,
         refresh_token: &'b RefreshToken,
-    ) -> RefreshTokenRequest<'b, TE, RR, TT>
+    ) -> RefreshTokenRequest<'b, TE, TR, TT>
     where
         'a: 'b,
     {
-        self.refresh_oauth2_client
-            .exchange_refresh_token(refresh_token)
+        self.oauth2_client.exchange_refresh_token(refresh_token)
     }
 
     ///
@@ -1294,43 +1279,6 @@ where
 }
 
 impl<AC, EF, GC, JE, JS, JT, TT> TokenResponse<AC, GC, JE, JS, JT, TT>
-    for StandardTokenResponse<IdTokenFields<AC, EF, GC, JE, JS, JT>, TT>
-where
-    AC: AdditionalClaims,
-    EF: ExtraTokenFields,
-    GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    TT: TokenType,
-{
-    fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS, JT>> {
-        self.extra_fields().id_token()
-    }
-}
-
-///
-/// Extends the base OAuth2 token response with an optional ID token.
-///
-/// Unlike an initial token request, the ID token is an optional part of the response to a refresh
-/// token request.
-///
-pub trait RefreshTokenResponse<AC, GC, JE, JS, JT, TT>: OAuth2TokenResponse<TT>
-where
-    AC: AdditionalClaims,
-    GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    TT: TokenType,
-{
-    ///
-    /// Returns the optional ID token provided by the refresh token response.
-    ///
-    fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS, JT>>;
-}
-
-impl<AC, EF, GC, JE, JS, JT, TT> RefreshTokenResponse<AC, GC, JE, JS, JT, TT>
     for StandardTokenResponse<IdTokenFields<AC, EF, GC, JE, JS, JT>, TT>
 where
     AC: AdditionalClaims,
