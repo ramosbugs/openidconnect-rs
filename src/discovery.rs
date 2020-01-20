@@ -807,7 +807,7 @@ mod tests {
             Scope::new("offline_access".to_string()),
             Scope::new("openid".to_string()),
         ]))
-        .set_userinfo_signing_alg_values_supported(Some(all_signing_algs.clone()))
+        .set_userinfo_signing_alg_values_supported(Some(all_signing_algs))
         .set_id_token_encryption_enc_values_supported(Some(vec![
             CoreJweContentEncryptionAlgorithm::Aes128CbcHmacSha256,
             CoreJweContentEncryptionAlgorithm::Aes192CbcHmacSha384,
@@ -883,7 +883,7 @@ mod tests {
                 "locale",
             ]
             .iter()
-            .map(|claim| CoreClaimName::new(claim.to_string()))
+            .map(|claim| CoreClaimName::new((*claim).to_string()))
             .collect(),
         ))
         .set_request_object_encryption_alg_values_supported(Some(all_encryption_algs.clone()))
@@ -903,7 +903,7 @@ mod tests {
             .unwrap(),
         ))
         .set_id_token_encryption_alg_values_supported(Some(all_encryption_algs.clone()))
-        .set_userinfo_encryption_alg_values_supported(Some(all_encryption_algs.clone()))
+        .set_userinfo_encryption_alg_values_supported(Some(all_encryption_algs))
         .set_userinfo_encryption_enc_values_supported(Some(vec![
             CoreJweContentEncryptionAlgorithm::Aes128CbcHmacSha256,
             CoreJweContentEncryptionAlgorithm::Aes192CbcHmacSha384,
@@ -992,7 +992,7 @@ mod tests {
                     "openid",
                 ]
                 .iter()
-                .map(|s| s.to_string())
+                .map(|s| (*s).to_string())
                 .map(Scope::new)
                 .collect::<Vec<_>>()
             ),

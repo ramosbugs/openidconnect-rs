@@ -68,7 +68,7 @@ where
         // TODO: Figure out a way to deserialize the enums without giving up ownership
         } else if let Ok(val) = serde_json::from_value::<JE>(value.clone()) {
             Ok(JsonWebTokenAlgorithm::Encryption(val))
-        } else if let Ok(val) = serde_json::from_value::<JS>(value.clone()) {
+        } else if let Ok(val) = serde_json::from_value::<JS>(value) {
             Ok(JsonWebTokenAlgorithm::Signature(val, PhantomData))
         } else {
             Err(D::Error::custom(format!(

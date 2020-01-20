@@ -392,7 +392,7 @@ where
             if let Some(ref client_secret) = self.client_secret {
                 let key = K::new_symmetric(client_secret.secret().clone().into_bytes());
                 return jwt
-                    .payload(&signature_alg.clone(), &key)
+                    .payload(&signature_alg, &key)
                     .map_err(ClaimsVerificationError::SignatureVerification);
             } else {
                 // The client secret isn't confidential for public clients, so anyone can forge a
@@ -1315,7 +1315,7 @@ mod tests {
         verifier_with_client_secret
             .clone()
             .set_allowed_algs(vec![CoreJwsSigningAlgorithm::HmacSha256])
-            .verified_claims(valid_hs256_jwt.clone())
+            .verified_claims(valid_hs256_jwt)
             .expect("verification should succeed");
 
         // HS256 + invalid signature
@@ -1398,9 +1398,9 @@ mod tests {
             CoreJsonWebKeySet::new(vec![CoreJsonWebKey {
                 kty: CoreJsonWebKeyType::RSA,
                 use_: Some(CoreJsonWebKeyUse::Encryption),
-                kid: Some(kid.clone()),
-                n: Some(n.clone()),
-                e: Some(e.clone()),
+                kid: Some(kid),
+                n: Some(n),
+                e: Some(e),
                 k: None,
             }]),
         )
@@ -1453,9 +1453,9 @@ mod tests {
 
         // Multiple matching public keys: KID specified
         match CoreJwtClaimsVerifier::new(
-            client_id.clone(),
-            issuer.clone(),
-            CoreJsonWebKeySet::new(vec![rsa_key.clone(), rsa_key.clone()]),
+            client_id,
+            issuer,
+            CoreJsonWebKeySet::new(vec![rsa_key.clone(), rsa_key]),
         ).verified_claims(
             serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
                 "eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9.eyJhdWQiO\
@@ -1476,7 +1476,7 @@ mod tests {
 
         // RS256 + valid signature
         verifier
-            .verified_claims(valid_rs256_jwt.clone())
+            .verified_claims(valid_rs256_jwt)
             .expect("verification should succeed");
 
         // RS256 + invalid signature
@@ -1751,10 +1751,10 @@ mod tests {
             // Invalid signature
             let private_client_verifier_with_other_secret =
                 CoreIdTokenVerifier::new_confidential_client(
-                    client_id.clone(),
+                    client_id,
                     ClientSecret::new("other_secret".to_string()),
-                    issuer.clone(),
-                    CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
+                    issuer,
+                    CoreJsonWebKeySet::new(vec![rsa_key]),
                 )
                 .allow_any_alg()
                 .set_time_fn(|| {
@@ -1823,7 +1823,7 @@ mod tests {
         let verifier = CoreIdTokenVerifier::new_public_client(
             client_id,
             issuer,
-            CoreJsonWebKeySet::new(vec![rsa_pub_key.clone()]),
+            CoreJsonWebKeySet::new(vec![rsa_pub_key]),
         )
         .set_time_fn(|| seconds_to_utc(&Seconds::new(mock_current_time.get().into())).unwrap());
         id_token.claims(&verifier, &nonce).unwrap();
@@ -1928,7 +1928,7 @@ mod tests {
             .clone()
             .claims(
                 &CoreUserInfoVerifier::new(
-                    client_id.clone(),
+                    client_id,
                     IssuerUrl::new("https://attacker.com".to_string()).unwrap(),
                     CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
                     Some(sub.clone()),
@@ -1950,13 +1950,12 @@ mod tests {
 
         // JWT response with invalid audience claim (allowed)
         jwt_claims
-            .clone()
             .claims(
                 &CoreUserInfoVerifier::new(
                     ClientId::new("wrong_client".to_string()),
-                    issuer.clone(),
-                    CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
-                    Some(sub.clone()),
+                    issuer,
+                    CoreJsonWebKeySet::new(vec![rsa_key]),
+                    Some(sub),
                 )
                 .require_audience_match(false),
             )

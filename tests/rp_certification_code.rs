@@ -1,3 +1,4 @@
+#![allow(clippy::expect_fun_call)]
 extern crate env_logger;
 extern crate failure;
 extern crate http;
@@ -79,7 +80,7 @@ impl TestState {
         self.access_token.as_ref().expect("no access_token")
     }
 
-    pub fn authorize(mut self, scopes: &Vec<Scope>) -> Self {
+    pub fn authorize(mut self, scopes: &[Scope]) -> Self {
         let (authorization_code, nonce) = {
             let mut authorization_request = self.client.authorize_url(
                 AuthenticationFlow::AuthorizationCode::<CoreResponseType>,
@@ -254,7 +255,7 @@ impl TestState {
 
 #[test]
 fn rp_response_type_code() {
-    let test_state = TestState::init("rp-response_type-code", |reg| reg).authorize(&vec![]);
+    let test_state = TestState::init("rp-response_type-code", |reg| reg).authorize(&[]);
     assert!(
         test_state
             .authorization_code
@@ -269,7 +270,7 @@ fn rp_response_type_code() {
 fn rp_scope_userinfo_claims() {
     let user_info_scopes = vec!["profile", "email", "address", "phone"]
         .iter()
-        .map(|scope| Scope::new(scope.to_string()))
+        .map(|scope| Scope::new((*scope).to_string()))
         .collect::<Vec<_>>();
     let test_state = TestState::init("rp-scope-userinfo-claims", |reg| reg)
         .authorize(&user_info_scopes)
@@ -303,7 +304,7 @@ fn rp_scope_userinfo_claims() {
 #[test]
 fn rp_nonce_invalid() {
     let test_state = TestState::init("rp-nonce-invalid", |reg| reg)
-        .authorize(&vec![])
+        .authorize(&[])
         .exchange_code();
 
     match test_state.id_token_claims_failure() {
@@ -322,7 +323,7 @@ fn rp_token_endpoint_client_secret_basic() {
         reg.set_token_endpoint_auth_method(Some(CoreClientAuthMethod::ClientSecretBasic))
     })
     .set_auth_type(AuthType::BasicAuth)
-    .authorize(&vec![])
+    .authorize(&[])
     .exchange_code();
 
     let id_token_claims = test_state.id_token_claims();
@@ -337,7 +338,7 @@ fn rp_token_endpoint_client_secret_post() {
         reg.set_token_endpoint_auth_method(Some(CoreClientAuthMethod::ClientSecretPost))
     })
     .set_auth_type(AuthType::RequestBody)
-    .authorize(&vec![])
+    .authorize(&[])
     .exchange_code();
 
     let id_token_claims = test_state.id_token_claims();
@@ -349,7 +350,7 @@ fn rp_token_endpoint_client_secret_post() {
 #[test]
 fn rp_id_token_kid_absent_single_jwks() {
     let test_state = TestState::init("rp-id_token-kid-absent-single-jwks", |reg| reg)
-        .authorize(&vec![])
+        .authorize(&[])
         .exchange_code();
 
     let id_token_claims = test_state.id_token_claims();
@@ -360,7 +361,7 @@ fn rp_id_token_kid_absent_single_jwks() {
 
 #[test]
 fn rp_id_token_iat() {
-    let mut test_state = TestState::init("rp-id_token-iat", |reg| reg).authorize(&vec![]);
+    let mut test_state = TestState::init("rp-id_token-iat", |reg| reg).authorize(&[]);
 
     let token_response = test_state
         .client
@@ -384,7 +385,7 @@ fn rp_id_token_iat() {
 #[test]
 fn rp_id_token_aud() {
     let test_state = TestState::init("rp-id_token-aud", |reg| reg)
-        .authorize(&vec![])
+        .authorize(&[])
         .exchange_code();
 
     match test_state.id_token_claims_failure() {
@@ -400,7 +401,7 @@ fn rp_id_token_aud() {
 #[test]
 fn rp_id_token_kid_absent_multiple_jwks() {
     let test_state = TestState::init("rp-id_token-kid-absent-multiple-jwks", |reg| reg)
-        .authorize(&vec![])
+        .authorize(&[])
         .exchange_code();
 
     match test_state.id_token_claims_failure() {
@@ -416,7 +417,7 @@ fn rp_id_token_kid_absent_multiple_jwks() {
 #[test]
 fn rp_id_token_sig_none() {
     let test_state = TestState::init("rp-id_token-sig-none", |reg| reg)
-        .authorize(&vec![])
+        .authorize(&[])
         .exchange_code();
 
     let verifier = test_state
@@ -435,7 +436,7 @@ fn rp_id_token_sig_none() {
 #[test]
 fn rp_id_token_sig_rs256() {
     let test_state = TestState::init("rp-id_token-sig-rs256", |reg| reg)
-        .authorize(&vec![])
+        .authorize(&[])
         .exchange_code();
 
     let id_token_claims = test_state.id_token_claims();
@@ -447,7 +448,7 @@ fn rp_id_token_sig_rs256() {
 #[test]
 fn rp_id_token_sig_hs256() {
     let test_state = TestState::init("rp-id_token-sig-hs256", |reg| reg)
-        .authorize(&vec![])
+        .authorize(&[])
         .exchange_code();
 
     let verifier = test_state
@@ -464,7 +465,7 @@ fn rp_id_token_sig_hs256() {
 
 #[test]
 fn rp_id_token_sub() {
-    let mut test_state = TestState::init("rp-id_token-sub", |reg| reg).authorize(&vec![]);
+    let mut test_state = TestState::init("rp-id_token-sub", |reg| reg).authorize(&[]);
 
     let token_response = test_state
         .client
@@ -488,7 +489,7 @@ fn rp_id_token_sub() {
 #[test]
 fn rp_id_token_bad_sig_rs256() {
     let test_state = TestState::init("rp-id_token-bad-sig-rs256", |reg| reg)
-        .authorize(&vec![])
+        .authorize(&[])
         .exchange_code();
 
     match test_state.id_token_claims_failure() {
@@ -504,7 +505,7 @@ fn rp_id_token_bad_sig_rs256() {
 #[test]
 fn rp_id_token_bad_sig_hs256() {
     let test_state = TestState::init("rp-id_token-bad-sig-hs256", |reg| reg)
-        .authorize(&vec![])
+        .authorize(&[])
         .exchange_code();
 
     let verifier = test_state
@@ -527,7 +528,7 @@ fn rp_id_token_bad_sig_hs256() {
 #[test]
 fn rp_id_token_issuer_mismatch() {
     let test_state = TestState::init("rp-id_token-issuer-mismatch", |reg| reg)
-        .authorize(&vec![])
+        .authorize(&[])
         .exchange_code();
 
     match test_state.id_token_claims_failure() {
@@ -543,7 +544,7 @@ fn rp_id_token_issuer_mismatch() {
 #[test]
 fn rp_userinfo_bad_sub_claim() {
     let test_state = TestState::init("rp-userinfo-bad-sub-claim", |reg| reg)
-        .authorize(&vec![Scope::new("profile".to_string())])
+        .authorize(&[Scope::new("profile".to_string())])
         .exchange_code();
     let id_token_claims = test_state.id_token_claims();
     log_debug!("ID token: {:?}", id_token_claims);
@@ -560,7 +561,7 @@ fn rp_userinfo_bad_sub_claim() {
 #[test]
 fn rp_userinfo_bearer_header() {
     let test_state = TestState::init("rp-userinfo-bearer-header", |reg| reg)
-        .authorize(&vec![Scope::new("profile".to_string())])
+        .authorize(&[Scope::new("profile".to_string())])
         .exchange_code();
     let id_token_claims = test_state.id_token_claims();
     log_debug!("ID token: {:?}", id_token_claims);
@@ -575,7 +576,7 @@ fn rp_userinfo_sig() {
     let test_state = TestState::init("rp-userinfo-sig", |reg| {
         reg.set_userinfo_signed_response_alg(Some(CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256))
     })
-    .authorize(&vec![Scope::new("profile".to_string())])
+    .authorize(&[Scope::new("profile".to_string())])
     .exchange_code();
     let id_token_claims = test_state.id_token_claims();
     log_debug!("ID token: {:?}", id_token_claims);

@@ -1,3 +1,4 @@
+#![allow(clippy::cognitive_complexity)]
 extern crate env_logger;
 extern crate failure;
 #[macro_use]

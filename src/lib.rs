@@ -1,4 +1,6 @@
 #![warn(missing_docs)]
+#![allow(clippy::unreadable_literal, clippy::type_complexity)]
+#![cfg_attr(test, allow(clippy::cognitive_complexity))]
 //!
 //! [OpenID Connect](https://openid.net/specs/openid-connect-core-1_0.html) library.
 //!
@@ -791,8 +793,8 @@ where
             oauth2_client: oauth2::Client::new(
                 client_id.clone(),
                 client_secret.clone(),
-                auth_url.clone(),
-                token_url.clone(),
+                auth_url,
+                token_url,
             ),
             client_id,
             client_secret,
@@ -845,7 +847,7 @@ where
     /// [Section 2.3.1 of RFC 6749](https://tools.ietf.org/html/rfc6749#section-2.3.1).
     ///
     pub fn set_auth_type(mut self, auth_type: AuthType) -> Self {
-        self.oauth2_client = self.oauth2_client.set_auth_type(auth_type.clone());
+        self.oauth2_client = self.oauth2_client.set_auth_type(auth_type);
         self
     }
 
@@ -853,7 +855,7 @@ where
     /// Sets the the redirect URL used by the authorization endpoint.
     ///
     pub fn set_redirect_uri(mut self, redirect_uri: RedirectUrl) -> Self {
-        self.oauth2_client = self.oauth2_client.set_redirect_url(redirect_uri.clone());
+        self.oauth2_client = self.oauth2_client.set_redirect_url(redirect_uri);
         self
     }
 

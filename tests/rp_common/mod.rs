@@ -1,3 +1,4 @@
+#![allow(clippy::cognitive_complexity, clippy::expect_fun_call)]
 extern crate color_backtrace;
 extern crate env_logger;
 extern crate failure;
@@ -88,11 +89,7 @@ pub fn http_client(
         || openidconnect::reqwest::http_client(request.clone()),
     )
     .map_err(|err| match err {
-        retry::Error::Operation {
-            error,
-            total_delay: _,
-            tries: _,
-        } => error,
+        retry::Error::Operation { error, .. } => error,
         retry::Error::Internal(msg) => openidconnect::reqwest::Error::Other(msg),
     })
 }
