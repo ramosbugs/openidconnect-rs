@@ -703,6 +703,7 @@ const OPENID_SCOPE: &str = "openid";
 /// ID token and OAuth2 access token to the Relying Party.
 ///
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum AuthenticationFlow<RT: ResponseType> {
     ///
     /// Authorization Code Flow.

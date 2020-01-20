@@ -32,6 +32,7 @@ pub(crate) trait IssuerClaim {
 /// Error verifying claims.
 ///
 #[derive(Clone, Debug, Fail, PartialEq)]
+#[non_exhaustive]
 pub enum ClaimsVerificationError {
     /// Claims have expired.
     #[fail(display = "Expired: {}", _0)]
@@ -72,6 +73,7 @@ pub enum ClaimsVerificationError {
 /// Error verifying claims signature.
 ///
 #[derive(Clone, Debug, Fail, PartialEq)]
+#[non_exhaustive]
 pub enum SignatureVerificationError {
     /// More than one key matches the supplied key constraints (e.g., key ID).
     #[fail(display = "Ambiguous key identification: {}", _0)]

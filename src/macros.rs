@@ -865,3 +865,30 @@ macro_rules! field_getters_setters {
         ];
     };
 }
+
+macro_rules! deserialize_from_str {
+    ($type:path) => {
+        impl<'de> serde::Deserialize<'de> for $type {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::de::Deserializer<'de>,
+            {
+                let variant_str = String::deserialize(deserializer)?;
+                Ok(Self::from_str(&variant_str))
+            }
+        }
+    };
+}
+
+macro_rules! serialize_as_str {
+    ($type:path) => {
+        impl serde::ser::Serialize for $type {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::ser::Serializer,
+            {
+                serializer.serialize_str(self.as_ref())
+            }
+        }
+    };
+}

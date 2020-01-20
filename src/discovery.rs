@@ -472,6 +472,7 @@ where
 /// Error retrieving provider metadata.
 ///
 #[derive(Debug, Fail)]
+#[non_exhaustive]
 pub enum DiscoveryError<RE>
 where
     RE: Fail,

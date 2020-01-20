@@ -202,6 +202,7 @@ pub trait GrantType: Debug + DeserializeOwned + Serialize + 'static {}
 /// Error signing a message.
 ///
 #[derive(Clone, Debug, Fail, PartialEq)]
+#[non_exhaustive]
 pub enum SigningError {
     /// Failed to sign the message using the given key and parameters.
     #[fail(display = "Crypto error")]

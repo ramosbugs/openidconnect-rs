@@ -471,6 +471,7 @@ new_url_type![
 /// Error retrieving user info.
 ///
 #[derive(Debug, Fail)]
+#[non_exhaustive]
 pub enum UserInfoError<RE>
 where
     RE: Fail,

@@ -5,7 +5,6 @@ pub use oauth2::basic::{
     BasicErrorResponseType as CoreErrorResponseType,
     BasicRequestTokenError as CoreRequestTokenError, BasicTokenType as CoreTokenType,
 };
-use oauth2::helpers::variant_name;
 use oauth2::{
     EmptyExtraTokenFields, ErrorResponseType, ResponseType as OAuth2ResponseType,
     StandardErrorResponse, StandardTokenResponse,
@@ -222,8 +221,7 @@ pub type CoreUserInfoVerifier<'a> = UserInfoVerifier<
 /// [Section 2 of OpenID Connect Dynamic Client Registration 1.0](
 ///     http://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata).
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CoreApplicationType {
     ///
     /// Native Clients MUST only register `redirect_uri`s using custom URI schemes or URLs using
@@ -236,6 +234,33 @@ pub enum CoreApplicationType {
     /// scheme as `redirect_uri`s; they MUST NOT use `localhost` as the hostname.
     ///
     Web,
+    ///
+    /// An extension not defined by the OpenID Connect Dynamic Client Registration spec.
+    ///
+    Extension(String),
+}
+// FIXME: Once https://github.com/serde-rs/serde/issues/912 is resolved, use #[serde(other)] instead
+// of custom serializer/deserializers. Right now this isn't possible because serde(other) only
+// supports unit variants.
+deserialize_from_str!(CoreApplicationType);
+serialize_as_str!(CoreApplicationType);
+impl CoreApplicationType {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "native" => CoreApplicationType::Native,
+            "web" => CoreApplicationType::Web,
+            ext => CoreApplicationType::Extension(ext.to_string()),
+        }
+    }
+}
+impl AsRef<str> for CoreApplicationType {
+    fn as_ref(&self) -> &str {
+        match *self {
+            CoreApplicationType::Native => "native",
+            CoreApplicationType::Web => "web",
+            CoreApplicationType::Extension(ref ext) => ext.as_str(),
+        }
+    }
 }
 impl ApplicationType for CoreApplicationType {}
 
@@ -246,8 +271,7 @@ impl ApplicationType for CoreApplicationType {}
 /// These values are defined in
 /// [Section 3.1.2.1](http://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CoreAuthDisplay {
     ///
     /// The Authorization Server SHOULD display the authentication and consent UI consistent
@@ -272,8 +296,24 @@ pub enum CoreAuthDisplay {
     /// with a "feature phone" type display.
     ///
     Wap,
+    ///
+    /// An extension not defined by the OpenID Connect Core spec.
+    ///
+    Extension(String),
 }
-
+deserialize_from_str!(CoreAuthDisplay);
+serialize_as_str!(CoreAuthDisplay);
+impl CoreAuthDisplay {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "page" => CoreAuthDisplay::Page,
+            "popup" => CoreAuthDisplay::Popup,
+            "touch" => CoreAuthDisplay::Touch,
+            "wap" => CoreAuthDisplay::Wap,
+            ext => CoreAuthDisplay::Extension(ext.to_string()),
+        }
+    }
+}
 impl AsRef<str> for CoreAuthDisplay {
     fn as_ref(&self) -> &str {
         match *self {
@@ -281,11 +321,11 @@ impl AsRef<str> for CoreAuthDisplay {
             CoreAuthDisplay::Popup => "popup",
             CoreAuthDisplay::Touch => "touch",
             CoreAuthDisplay::Wap => "wap",
+            CoreAuthDisplay::Extension(ref ext) => ext.as_str(),
         }
     }
 }
 impl AuthDisplay for CoreAuthDisplay {}
-
 impl Display for CoreAuthDisplay {
     fn fmt(&self, f: &mut Formatter) -> Result<(), FormatterError> {
         write!(f, "{}", self.as_ref())
@@ -293,7 +333,7 @@ impl Display for CoreAuthDisplay {
 }
 
 ///
-/// Whether the Authorization Server should prompt the End-User for reauthentication and
+/// Whether the Authorization Server should prompt the End-User for re-authentication and
 /// consent.
 ///
 /// These values are defined in
@@ -330,8 +370,24 @@ pub enum CoreAuthPrompt {
     /// typically `account_selection_required`.
     ///
     SelectAccount,
+    ///
+    /// An extension not defined by the OpenID Connect Core spec.
+    ///
+    Extension(String),
 }
-
+deserialize_from_str!(CoreAuthPrompt);
+serialize_as_str!(CoreAuthPrompt);
+impl CoreAuthPrompt {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "none" => CoreAuthPrompt::None,
+            "login" => CoreAuthPrompt::Login,
+            "consent" => CoreAuthPrompt::Consent,
+            "select_account" => CoreAuthPrompt::SelectAccount,
+            ext => CoreAuthPrompt::Extension(ext.to_string()),
+        }
+    }
+}
 impl AsRef<str> for CoreAuthPrompt {
     fn as_ref(&self) -> &str {
         match *self {
@@ -339,6 +395,7 @@ impl AsRef<str> for CoreAuthPrompt {
             CoreAuthPrompt::Login => "login",
             CoreAuthPrompt::Consent => "consent",
             CoreAuthPrompt::SelectAccount => "select_account",
+            CoreAuthPrompt::Extension(ref ext) => ext.as_str(),
         }
     }
 }
@@ -365,14 +422,8 @@ impl ClaimName for CoreClaimName {}
 /// See [Section 5.6](http://openid.net/specs/openid-connect-core-1_0.html#ClaimTypes) for
 /// further information.
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CoreClaimType {
-    ///
-    /// Normal Claims are represented as members in a JSON object. The Claim Name is the member
-    /// name and the Claim Value is the member value.
-    ///
-    Normal,
     ///
     /// Aggregated Claim Type.
     ///
@@ -389,14 +440,44 @@ pub enum CoreClaimType {
     /// for details.
     ///
     Distributed,
+    ///
+    /// Normal Claims are represented as members in a JSON object. The Claim Name is the member
+    /// name and the Claim Value is the member value.
+    ///
+    Normal,
+    ///
+    /// An extension not defined by the OpenID Connect Core spec.
+    ///
+    Extension(String),
+}
+deserialize_from_str!(CoreClaimType);
+serialize_as_str!(CoreClaimType);
+impl CoreClaimType {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "normal" => CoreClaimType::Normal,
+            "aggregated" => CoreClaimType::Aggregated,
+            "distributed" => CoreClaimType::Distributed,
+            ext => CoreClaimType::Extension(ext.to_string()),
+        }
+    }
+}
+impl AsRef<str> for CoreClaimType {
+    fn as_ref(&self) -> &str {
+        match *self {
+            CoreClaimType::Normal => "normal",
+            CoreClaimType::Aggregated => "aggregated",
+            CoreClaimType::Distributed => "distributed",
+            CoreClaimType::Extension(ref ext) => ext.as_str(),
+        }
+    }
 }
 impl ClaimType for CoreClaimType {}
 
 ///
 /// OpenID Connect Core client authentication method.
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CoreClientAuthMethod {
     ///
     /// Client secret passed via the HTTP Basic authentication scheme.
@@ -422,6 +503,36 @@ pub enum CoreClientAuthMethod {
     /// with no Client Secret or other authentication mechanism.
     ///
     None,
+    ///
+    /// An extension not defined by the OpenID Connect Core spec.
+    ///
+    Extension(String),
+}
+deserialize_from_str!(CoreClientAuthMethod);
+serialize_as_str!(CoreClientAuthMethod);
+impl CoreClientAuthMethod {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "client_secret_basic" => CoreClientAuthMethod::ClientSecretBasic,
+            "client_secret_jwt" => CoreClientAuthMethod::ClientSecretJwt,
+            "client_secret_post" => CoreClientAuthMethod::ClientSecretPost,
+            "private_key_jwt" => CoreClientAuthMethod::PrivateKeyJwt,
+            "none" => CoreClientAuthMethod::None,
+            ext => CoreClientAuthMethod::Extension(ext.to_string()),
+        }
+    }
+}
+impl AsRef<str> for CoreClientAuthMethod {
+    fn as_ref(&self) -> &str {
+        match *self {
+            CoreClientAuthMethod::ClientSecretBasic => "client_secret_basic",
+            CoreClientAuthMethod::ClientSecretJwt => "client_secret_jwt",
+            CoreClientAuthMethod::ClientSecretPost => "client_secret_post",
+            CoreClientAuthMethod::PrivateKeyJwt => "private_key_jwt",
+            CoreClientAuthMethod::None => "none",
+            CoreClientAuthMethod::Extension(ref ext) => ext.as_str(),
+        }
+    }
 }
 impl ClientAuthMethod for CoreClientAuthMethod {}
 
@@ -439,8 +550,7 @@ impl GenderClaim for CoreGenderClaim {}
 ///
 // These are defined in various specs, including the Client Registration spec:
 //   http://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
-#[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CoreGrantType {
     ///
     /// Authorization code grant.
@@ -451,13 +561,16 @@ pub enum CoreGrantType {
     ///
     ClientCredentials,
     ///
+    /// Device Authorization Grant as described in [RFC 8628](https://tools.ietf.org/html/rfc8628).
+    ///
+    DeviceCode,
+    ///
     /// Implicit grant.
     ///
     Implicit,
     ///
     /// JWT-based authentication as described in [RFC 7523](https://tools.ietf.org/html/rfc7523).
     ///
-    #[serde(rename = "urn:ietf:params:oauth:grant-type:jwt-bearer")]
     JwtBearer,
     ///
     /// End user password grant.
@@ -467,6 +580,40 @@ pub enum CoreGrantType {
     /// Refresh token grant.
     ///
     RefreshToken,
+    ///
+    /// An extension not defined by any of the supported specifications.
+    ///
+    Extension(String),
+}
+deserialize_from_str!(CoreGrantType);
+serialize_as_str!(CoreGrantType);
+impl CoreGrantType {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "authorization_code" => CoreGrantType::AuthorizationCode,
+            "client_credentials" => CoreGrantType::ClientCredentials,
+            "urn:ietf:params:oauth:grant-type:device_code" => CoreGrantType::DeviceCode,
+            "implicit" => CoreGrantType::Implicit,
+            "urn:ietf:params:oauth:grant-type:jwt-bearer" => CoreGrantType::JwtBearer,
+            "password" => CoreGrantType::Password,
+            "refresh_token" => CoreGrantType::RefreshToken,
+            ext => CoreGrantType::Extension(ext.to_string()),
+        }
+    }
+}
+impl AsRef<str> for CoreGrantType {
+    fn as_ref(&self) -> &str {
+        match *self {
+            CoreGrantType::AuthorizationCode => "authorization_code",
+            CoreGrantType::ClientCredentials => "client_credentials",
+            CoreGrantType::DeviceCode => "urn:ietf:params:oauth:grant-type:device_code",
+            CoreGrantType::Implicit => "implicit",
+            CoreGrantType::JwtBearer => "urn:ietf:params:oauth:grant-type:jwt-bearer",
+            CoreGrantType::Password => "password",
+            CoreGrantType::RefreshToken => "refresh_token",
+            CoreGrantType::Extension(ref ext) => ext.as_str(),
+        }
+    }
 }
 impl GrantType for CoreGrantType {}
 
@@ -478,6 +625,7 @@ impl GrantType for CoreGrantType {}
 /// [Section 5.1 of RFC 7518](https://tools.ietf.org/html/rfc7518#section-5.1).
 ///
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[non_exhaustive]
 pub enum CoreJweContentEncryptionAlgorithm {
     ///
     /// AES-128 CBC HMAC SHA-256 authenticated encryption.
@@ -525,6 +673,7 @@ impl JweContentEncryptionAlgorithm<CoreJsonWebKeyType> for CoreJweContentEncrypt
 /// [Section 4.1 of RFC 7518](https://tools.ietf.org/html/rfc7518#section-4.1).
 ///
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[non_exhaustive]
 pub enum CoreJweKeyManagementAlgorithm {
     ///
     /// RSAES-PKCS1-V1_5.
@@ -623,6 +772,7 @@ impl JweKeyManagementAlgorithm for CoreJweKeyManagementAlgorithm {}
 /// [Section 3.1 of RFC 7518](https://tools.ietf.org/html/rfc7518#section-3.1).
 ///
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[non_exhaustive]
 pub enum CoreJwsSigningAlgorithm {
     ///
     /// HMAC using SHA-256 (currently unsupported).
@@ -762,8 +912,7 @@ impl JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
 /// [Section 3.1.2.6](https://openid.net/specs/openid-connect-core-1_0.html#AuthError) of the
 /// OpenID Connect Core spec.
 ///
-#[derive(Clone, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, PartialEq)]
 pub enum CoreAuthErrorResponseType {
     ///
     /// The resource owner or authorization server denied the request.
@@ -845,30 +994,105 @@ pub enum CoreAuthErrorResponseType {
     /// The authorization server does not support obtaining an authorization code using this method.
     ///
     UnsupportedResponseType,
+    ///
+    /// An extension not defined by any of the supported specifications.
+    ///
+    Extension(String),
+}
+deserialize_from_str!(CoreAuthErrorResponseType);
+serialize_as_str!(CoreAuthErrorResponseType);
+impl CoreAuthErrorResponseType {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "access_denied" => CoreAuthErrorResponseType::AccessDenied,
+            "account_selection_required" => CoreAuthErrorResponseType::AccountSelectionRequired,
+            "consent_required" => CoreAuthErrorResponseType::ConsentRequired,
+            "interaction_required" => CoreAuthErrorResponseType::InteractionRequired,
+            "invalid_request" => CoreAuthErrorResponseType::InvalidRequest,
+            "invalid_request_object" => CoreAuthErrorResponseType::InvalidRequestObject,
+            "invalid_request_uri" => CoreAuthErrorResponseType::InvalidRequestUri,
+            "invalid_scope" => CoreAuthErrorResponseType::InvalidScope,
+            "login_required" => CoreAuthErrorResponseType::LoginRequired,
+            "registration_not_supported" => CoreAuthErrorResponseType::RegistrationNotSupported,
+            "request_not_supported" => CoreAuthErrorResponseType::RequestNotSupported,
+            "request_uri_not_supported" => CoreAuthErrorResponseType::RequestUriNotSupported,
+            "server_error" => CoreAuthErrorResponseType::ServerError,
+            "temporarily_unavailable" => CoreAuthErrorResponseType::TemporarilyUnavailable,
+            "unauthorized_client" => CoreAuthErrorResponseType::UnauthorizedClient,
+            "unsupported_response_type" => CoreAuthErrorResponseType::UnsupportedResponseType,
+            ext => CoreAuthErrorResponseType::Extension(ext.to_string()),
+        }
+    }
+}
+impl AsRef<str> for CoreAuthErrorResponseType {
+    fn as_ref(&self) -> &str {
+        match *self {
+            CoreAuthErrorResponseType::AccessDenied => "access_denied",
+            CoreAuthErrorResponseType::AccountSelectionRequired => "account_selection_required",
+            CoreAuthErrorResponseType::ConsentRequired => "consent_required",
+            CoreAuthErrorResponseType::InteractionRequired => "interaction_required",
+            CoreAuthErrorResponseType::InvalidRequest => "invalid_request",
+            CoreAuthErrorResponseType::InvalidRequestObject => "invalid_request_obbject",
+            CoreAuthErrorResponseType::InvalidRequestUri => "invalid_request_uri",
+            CoreAuthErrorResponseType::InvalidScope => "invalid_scope",
+            CoreAuthErrorResponseType::LoginRequired => "login_required",
+            CoreAuthErrorResponseType::RegistrationNotSupported => "registration_not_supported",
+            CoreAuthErrorResponseType::RequestNotSupported => "request_not_supported",
+            CoreAuthErrorResponseType::RequestUriNotSupported => "request_uri_not_supported",
+            CoreAuthErrorResponseType::ServerError => "server_error",
+            CoreAuthErrorResponseType::TemporarilyUnavailable => "temporarily_unavailable",
+            CoreAuthErrorResponseType::UnauthorizedClient => "unauthorized_client",
+            CoreAuthErrorResponseType::UnsupportedResponseType => "unsupported_response_type",
+            CoreAuthErrorResponseType::Extension(ref ext) => ext.as_str(),
+        }
+    }
 }
 
 ///
 /// OpenID Connect Core registration error response type.
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CoreRegisterErrorResponseType {
-    ///
-    /// The value of one or more `redirect_uri`s is invalid.
-    ///
-    InvalidRedirectUri,
     ///
     /// The value of one of the Client Metadata fields is invalid and the server has rejected this
     /// request. Note that an Authorization Server MAY choose to substitute a valid value for any
     /// requested parameter of a Client's Metadata.
     ///
     InvalidClientMetadata,
+    ///
+    /// The value of one or more `redirect_uri`s is invalid.
+    ///
+    InvalidRedirectUri,
+    ///
+    /// An extension not defined by any of the supported specifications.
+    ///
+    Extension(String),
+}
+deserialize_from_str!(CoreRegisterErrorResponseType);
+serialize_as_str!(CoreRegisterErrorResponseType);
+impl CoreRegisterErrorResponseType {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "invalid_client_metadata" => CoreRegisterErrorResponseType::InvalidClientMetadata,
+            "invalid_redirect_uri" => CoreRegisterErrorResponseType::InvalidRedirectUri,
+            ext => CoreRegisterErrorResponseType::Extension(ext.to_string()),
+        }
+    }
+}
+impl AsRef<str> for CoreRegisterErrorResponseType {
+    fn as_ref(&self) -> &str {
+        match *self {
+            CoreRegisterErrorResponseType::InvalidClientMetadata => "invalid_client_metadata",
+            CoreRegisterErrorResponseType::InvalidRedirectUri => "invalid_redirect_uri",
+            CoreRegisterErrorResponseType::Extension(ref ext) => ext.as_str(),
+        }
+    }
 }
 impl ErrorResponseType for CoreRegisterErrorResponseType {}
 impl RegisterErrorResponseType for CoreRegisterErrorResponseType {}
 impl Display for CoreRegisterErrorResponseType {
     fn fmt(&self, f: &mut Formatter) -> Result<(), FormatterError> {
-        write!(f, "{}", variant_name(self))
+        write!(f, "{}", self.as_ref())
     }
 }
 
@@ -886,8 +1110,7 @@ impl Display for CoreRegisterErrorResponseType {
 /// and [OAuth 2.0 Form Post Response Mode](
 ///     http://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html#FormPostResponseMode).
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CoreResponseMode {
     ///
     /// In this mode, Authorization Response parameters are encoded in the query string added to
@@ -919,6 +1142,32 @@ pub enum CoreResponseMode {
     /// for further information.
     ///
     FormPost,
+    ///
+    /// An extension not defined by any of the supported specifications.
+    ///
+    Extension(String),
+}
+deserialize_from_str!(CoreResponseMode);
+serialize_as_str!(CoreResponseMode);
+impl CoreResponseMode {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "query" => CoreResponseMode::Query,
+            "fragment" => CoreResponseMode::Fragment,
+            "form_post" => CoreResponseMode::FormPost,
+            ext => CoreResponseMode::Extension(ext.to_string()),
+        }
+    }
+}
+impl AsRef<str> for CoreResponseMode {
+    fn as_ref(&self) -> &str {
+        match *self {
+            CoreResponseMode::Query => "query",
+            CoreResponseMode::Fragment => "fragment",
+            CoreResponseMode::FormPost => "form_post",
+            CoreResponseMode::Extension(ref ext) => ext.as_str(),
+        }
+    }
 }
 impl ResponseMode for CoreResponseMode {}
 
@@ -931,8 +1180,7 @@ impl ResponseMode for CoreResponseMode {}
 /// This type represents a single Response Type. Multiple Response Types are represented via the
 /// `ResponseTypes` type, which wraps a `Vec<ResponseType>`.
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CoreResponseType {
     ///
     /// Used by the OAuth 2.0 Authorization Code Flow.
@@ -962,15 +1210,38 @@ pub enum CoreResponseType {
     /// Used by the OAuth 2.0 Implicit Flow.
     ///
     Token,
+    ///
+    /// An extension not defined by the OpenID Connect Core spec.
+    ///
+    Extension(String),
 }
-impl ResponseType for CoreResponseType {
-    fn to_oauth2(&self) -> OAuth2ResponseType {
-        OAuth2ResponseType::new(self.as_ref().to_string())
+deserialize_from_str!(CoreResponseType);
+serialize_as_str!(CoreResponseType);
+impl CoreResponseType {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "code" => CoreResponseType::Code,
+            "id_token" => CoreResponseType::IdToken,
+            "none" => CoreResponseType::None,
+            "token" => CoreResponseType::Token,
+            ext => CoreResponseType::Extension(ext.to_string()),
+        }
     }
 }
 impl AsRef<str> for CoreResponseType {
     fn as_ref(&self) -> &str {
-        variant_name(self)
+        match *self {
+            CoreResponseType::Code => "code",
+            CoreResponseType::IdToken => "id_token",
+            CoreResponseType::None => "none",
+            CoreResponseType::Token => "token",
+            CoreResponseType::Extension(ref ext) => ext.as_str(),
+        }
+    }
+}
+impl ResponseType for CoreResponseType {
+    fn to_oauth2(&self) -> OAuth2ResponseType {
+        OAuth2ResponseType::new(self.as_ref().to_string())
     }
 }
 
@@ -983,8 +1254,7 @@ impl AsRef<str> for CoreResponseType {
 /// See [Section 8](http://openid.net/specs/openid-connect-core-1_0.html#SubjectIDTypes) for
 /// further information.
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CoreSubjectIdentifierType {
     ///
     /// This provides a different `sub` value to each Client, so as not to enable Clients to
@@ -996,6 +1266,30 @@ pub enum CoreSubjectIdentifierType {
     /// provider has no `subject_types_supported` element in its discovery document.
     ///
     Public,
+    ///
+    /// An extension not defined by the OpenID Connect Core spec.
+    ///
+    Extension(String),
+}
+deserialize_from_str!(CoreSubjectIdentifierType);
+serialize_as_str!(CoreSubjectIdentifierType);
+impl CoreSubjectIdentifierType {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "pairwise" => CoreSubjectIdentifierType::Pairwise,
+            "public" => CoreSubjectIdentifierType::Public,
+            ext => CoreSubjectIdentifierType::Extension(ext.to_string()),
+        }
+    }
+}
+impl AsRef<str> for CoreSubjectIdentifierType {
+    fn as_ref(&self) -> &str {
+        match *self {
+            CoreSubjectIdentifierType::Pairwise => "pairwise",
+            CoreSubjectIdentifierType::Public => "public",
+            CoreSubjectIdentifierType::Extension(ref ext) => ext.as_str(),
+        }
+    }
 }
 impl SubjectIdentifierType for CoreSubjectIdentifierType {}
 

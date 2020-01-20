@@ -330,6 +330,7 @@ impl
 /// Type of JSON Web Key.
 ///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[non_exhaustive]
 pub enum CoreJsonWebKeyType {
     ///
     /// Elliptic Curve Cryptography (ECC) key.
@@ -355,6 +356,7 @@ impl JsonWebKeyType for CoreJsonWebKeyType {}
 /// Usage restriction for a JSON Web key.
 ///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[non_exhaustive]
 pub enum CoreJsonWebKeyUse {
     ///
     /// Key may be used for digital signatures.

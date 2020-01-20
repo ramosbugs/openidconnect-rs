@@ -24,6 +24,7 @@ new_type![
 ];
 
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum JsonWebTokenAlgorithm<JE, JS, JT>
 where
     JE: JweContentEncryptionAlgorithm<JT>,
@@ -178,6 +179,7 @@ where
 /// Error creating a JSON Web Token.
 ///
 #[derive(Debug, Fail)]
+#[non_exhaustive]
 pub enum JsonWebTokenError {
     ///
     /// Failed to serialize JWT.

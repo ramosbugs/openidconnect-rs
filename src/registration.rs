@@ -884,6 +884,7 @@ pub trait RegisterErrorResponseType: ErrorResponseType + 'static {}
 /// Error registering a client.
 ///
 #[derive(Debug, Fail)]
+#[non_exhaustive]
 pub enum ClientRegistrationError<T, RE>
 where
     RE: Fail,
