@@ -221,7 +221,7 @@ pub type CoreUserInfoVerifier<'a> = UserInfoVerifier<
 /// [Section 2 of OpenID Connect Dynamic Client Registration 1.0](
 ///     http://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata).
 ///
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum CoreApplicationType {
     ///
     /// Native Clients MUST only register `redirect_uri`s using custom URI schemes or URLs using
@@ -271,7 +271,7 @@ impl ApplicationType for CoreApplicationType {}
 /// These values are defined in
 /// [Section 3.1.2.1](http://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
 ///
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum CoreAuthDisplay {
     ///
     /// The Authorization Server SHOULD display the authentication and consent UI consistent
@@ -339,7 +339,7 @@ impl Display for CoreAuthDisplay {
 /// These values are defined in
 /// [Section 3.1.2.1](http://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
 ///
-#[derive(PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum CoreAuthPrompt {
     ///
     /// The Authorization Server MUST NOT display any authentication or consent user interface
@@ -422,7 +422,7 @@ impl ClaimName for CoreClaimName {}
 /// See [Section 5.6](http://openid.net/specs/openid-connect-core-1_0.html#ClaimTypes) for
 /// further information.
 ///
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum CoreClaimType {
     ///
     /// Aggregated Claim Type.
@@ -477,7 +477,7 @@ impl ClaimType for CoreClaimType {}
 ///
 /// OpenID Connect Core client authentication method.
 ///
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum CoreClientAuthMethod {
     ///
     /// Client secret passed via the HTTP Basic authentication scheme.
@@ -912,7 +912,7 @@ impl JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
 /// [Section 3.1.2.6](https://openid.net/specs/openid-connect-core-1_0.html#AuthError) of the
 /// OpenID Connect Core spec.
 ///
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum CoreAuthErrorResponseType {
     ///
     /// The resource owner or authorization server denied the request.
@@ -1051,7 +1051,7 @@ impl AsRef<str> for CoreAuthErrorResponseType {
 ///
 /// OpenID Connect Core registration error response type.
 ///
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum CoreRegisterErrorResponseType {
     ///
     /// The value of one of the Client Metadata fields is invalid and the server has rejected this
@@ -1110,7 +1110,7 @@ impl Display for CoreRegisterErrorResponseType {
 /// and [OAuth 2.0 Form Post Response Mode](
 ///     http://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html#FormPostResponseMode).
 ///
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum CoreResponseMode {
     ///
     /// In this mode, Authorization Response parameters are encoded in the query string added to
@@ -1180,7 +1180,7 @@ impl ResponseMode for CoreResponseMode {}
 /// This type represents a single Response Type. Multiple Response Types are represented via the
 /// `ResponseTypes` type, which wraps a `Vec<ResponseType>`.
 ///
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum CoreResponseType {
     ///
     /// Used by the OAuth 2.0 Authorization Code Flow.
@@ -1254,7 +1254,7 @@ impl ResponseType for CoreResponseType {
 /// See [Section 8](http://openid.net/specs/openid-connect-core-1_0.html#SubjectIDTypes) for
 /// further information.
 ///
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum CoreSubjectIdentifierType {
     ///
     /// This provides a different `sub` value to each Client, so as not to enable Clients to
