@@ -15,7 +15,7 @@ use serde_json;
 use url::Url;
 
 use crate::helpers::FilteredFlatten;
-use crate::http::{auth_bearer, MIME_TYPE_JSON, MIME_TYPE_JWT};
+use crate::http_utils::{auth_bearer, MIME_TYPE_JSON, MIME_TYPE_JWT};
 use crate::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
 use crate::types::helpers::deserialize_string_or_vec_opt;
 use crate::types::LocalizedClaim;

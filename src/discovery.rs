@@ -15,7 +15,7 @@ use serde::Serialize;
 use serde_json;
 use url;
 
-use super::http::{check_content_type, MIME_TYPE_JSON};
+use super::http_utils::{check_content_type, MIME_TYPE_JSON};
 use super::types::{
     AuthDisplay, AuthenticationContextClass, ClaimName, ClaimType, ClientAuthMethod, GrantType,
     IssuerUrl, JsonWebKey, JsonWebKeySet, JsonWebKeySetUrl, JsonWebKeyType, JsonWebKeyUse,

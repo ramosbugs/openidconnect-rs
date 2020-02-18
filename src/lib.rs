@@ -621,6 +621,12 @@ pub use oauth2::{
     TokenUrl,
 };
 
+///
+/// Public re-exports of types used for HTTP client interfaces.
+///
+pub use oauth2::http;
+pub use oauth2::url;
+
 #[cfg(feature = "curl")]
 pub use oauth2::curl;
 
@@ -692,7 +698,7 @@ mod user_info;
 mod verification;
 
 // Private module for HTTP(S) utilities.
-mod http;
+mod http_utils;
 
 // Private module for JWT utilities.
 mod jwt;

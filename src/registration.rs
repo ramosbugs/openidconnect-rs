@@ -17,7 +17,7 @@ use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
 use serde_json;
 
-use super::http::{auth_bearer, check_content_type, MIME_TYPE_JSON};
+use super::http_utils::{auth_bearer, check_content_type, MIME_TYPE_JSON};
 use super::types::helpers::{serde_utc_seconds_opt, split_language_tag_key};
 use super::types::{
     ApplicationType, AuthenticationContextClass, ClientAuthMethod, ClientConfigUrl,

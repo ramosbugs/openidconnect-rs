@@ -24,7 +24,7 @@ use serde_json;
 use url;
 use url::Url;
 
-use super::http::{check_content_type, MIME_TYPE_JSON};
+use super::http_utils::{check_content_type, MIME_TYPE_JSON};
 use super::{
     AccessToken, AuthorizationCode, DiscoveryError, HttpRequest, HttpResponse,
     SignatureVerificationError,
