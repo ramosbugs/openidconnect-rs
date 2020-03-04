@@ -7,9 +7,9 @@ use failure::Fail;
 use futures_0_1::{Future, IntoFuture};
 #[cfg(feature = "futures-03")]
 use futures_0_3;
-use http::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
-use http::method::Method;
-use http::status::StatusCode;
+use oauth2::http::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
+use oauth2::http::method::Method;
+use oauth2::http::status::StatusCode;
 use oauth2::AccessToken;
 use serde_json;
 use url::Url;

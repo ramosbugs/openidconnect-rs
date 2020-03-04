@@ -1,4 +1,4 @@
-use http::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+use oauth2::http::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use oauth2::AccessToken;
 
 pub const MIME_TYPE_JSON: &str = "application/json";

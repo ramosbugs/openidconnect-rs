@@ -1,7 +1,6 @@
 #![allow(clippy::expect_fun_call)]
 extern crate env_logger;
 extern crate failure;
-extern crate http;
 #[macro_use]
 extern crate log;
 extern crate openidconnect;
@@ -12,8 +11,8 @@ extern crate url;
 
 use std::collections::HashMap;
 
-use http::header::LOCATION;
-use http::method::Method;
+use reqwest::header::LOCATION;
+use reqwest::Method;
 use reqwest::{Client, RedirectPolicy};
 use url::Url;
 

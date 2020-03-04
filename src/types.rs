@@ -11,11 +11,11 @@ use failure::Fail;
 use futures_0_1::Future;
 #[cfg(feature = "futures-03")]
 use futures_0_3;
-use http::header::{HeaderValue, ACCEPT};
-use http::method::Method;
-use http::status::StatusCode;
 use oauth2;
 use oauth2::helpers::deserialize_space_delimited_vec;
+use oauth2::http::header::{HeaderValue, ACCEPT};
+use oauth2::http::method::Method;
+use oauth2::http::status::StatusCode;
 use rand::{thread_rng, Rng};
 use ring::constant_time;
 use serde::de::DeserializeOwned;
