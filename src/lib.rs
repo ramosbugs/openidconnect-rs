@@ -618,7 +618,7 @@ pub use oauth2::{
     HttpRequest, HttpResponse, PkceCodeChallenge, PkceCodeChallengeMethod, PkceCodeVerifier,
     RedirectUrl, RefreshToken, RefreshTokenRequest, RequestTokenError, Scope,
     StandardErrorResponse, StandardTokenResponse, TokenResponse as OAuth2TokenResponse, TokenType,
-    TokenUrl,
+    TokenUrl, ResourceOwnerUsername, ResourceOwnerPassword, PasswordTokenRequest
 };
 
 ///
@@ -990,6 +990,22 @@ where
         'a: 'b,
     {
         self.oauth2_client.exchange_refresh_token(refresh_token)
+    }
+
+    ///
+    /// Creates a request builder for exchanging credentials for an access token.
+    ///
+    /// See https://tools.ietf.org/html/rfc6749#section-6
+    ///
+    pub fn exchange_password<'a, 'b>(
+        &'a self,
+        username: &'b ResourceOwnerUsername,
+        password: &'b ResourceOwnerPassword,
+    ) -> PasswordTokenRequest<'b, TE, TR, TT>
+    where
+        'a: 'b,
+    {
+        self.oauth2_client.exchange_password(username, password)
     }
 
     ///
