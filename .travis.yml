@@ -6,9 +6,6 @@ rust:
 sudo: required
 dist: trusty
 #cache: cargo
-branches:
-  only:
-    - master
 # Needed for codecov reporting
 addons:
   apt:
