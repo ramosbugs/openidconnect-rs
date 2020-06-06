@@ -1216,6 +1216,14 @@ where
     }
 
     ///
+    /// Overrides the `redirect_url` to the one specified.
+    /// 
+    pub fn set_redirect_url(mut self, redirect_url: Cow<'a, RedirectUrl>) -> Self {
+        self.inner = self.inner.set_redirect_url(redirect_url);
+        self
+    }
+
+    ///
     /// Returns the full authorization URL and CSRF state for this authorization
     /// request.
     ///
@@ -1333,6 +1341,7 @@ where
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
+    use std::borrow::Cow;
 
     use oauth2::{AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl};
 
@@ -1451,6 +1460,44 @@ mod tests {
                  max_age=1800&prompt=login+consent&ui_locales=fr-CA+fr+en",
                 serialized_jwt
             ),
+            authorize_url.to_string()
+        );
+    }
+
+    #[test]
+    fn test_authorize_url_redirect_url_override() {
+        let client = new_client()
+            .set_redirect_uri(RedirectUrl::new("http://localhost:8888/".to_string()).unwrap());
+
+        let flow = CoreAuthenticationFlow::AuthorizationCode;
+
+        fn new_csrf() -> CsrfToken {
+            CsrfToken::new("CSRF123".to_string())
+        }
+        fn new_nonce() -> Nonce {
+            Nonce::new("NONCE456".to_string())
+        }
+
+        let (authorize_url, _, _) = client
+            .authorize_url(flow.clone(), new_csrf, new_nonce)
+            .add_scope(Scope::new("email".to_string()))
+            .set_display(CoreAuthDisplay::Touch)
+            .add_prompt(CoreAuthPrompt::Login)
+            .add_prompt(CoreAuthPrompt::Consent)
+            .set_max_age(Duration::from_secs(1800))
+            .add_ui_locale(LanguageTag::new("fr-CA".to_string()))
+            .add_ui_locale(LanguageTag::new("fr".to_string()))
+            .add_ui_locale(LanguageTag::new("en".to_string()))
+            .add_auth_context_value(AuthenticationContextClass::new(
+                "urn:mace:incommon:iap:silver".to_string(),
+            ))
+            .set_redirect_url(Cow::Owned(RedirectUrl::new("http://localhost:8888/alternative".to_string()).unwrap()))
+            .url();
+        assert_eq!(
+            "https://example/authorize?response_type=code&client_id=aaa&\
+             state=CSRF123&redirect_uri=http%3A%2F%2Flocalhost%3A8888%2Falternative&scope=openid+email&\
+             nonce=NONCE456&acr_values=urn%3Amace%3Aincommon%3Aiap%3Asilver&display=touch&\
+             max_age=1800&prompt=login+consent&ui_locales=fr-CA+fr+en",
             authorize_url.to_string()
         );
     }
