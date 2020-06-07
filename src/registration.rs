@@ -1030,7 +1030,8 @@ mod tests {
             ]
         );
         assert_eq!(
-            sorted(client_metadata.client_name().unwrap().clone()),
+            sorted(client_metadata.client_name().unwrap().clone())
+                .collect::<Vec<(Option<LanguageTag>, ClientName)>>(),
             vec![
                 (None, ClientName::new("Example".to_string())),
                 (
@@ -1040,7 +1041,8 @@ mod tests {
             ]
         );
         assert_eq!(
-            sorted(client_metadata.logo_uri().unwrap().clone()),
+            sorted(client_metadata.logo_uri().unwrap().clone())
+                .collect::<Vec<(Option<LanguageTag>, LogoUrl)>>(),
             vec![
                 (
                     None,
@@ -1053,7 +1055,8 @@ mod tests {
             ]
         );
         assert_eq!(
-            sorted(client_metadata.client_uri().unwrap().clone()),
+            sorted(client_metadata.client_uri().unwrap().clone())
+                .collect::<Vec<(Option<LanguageTag>, ClientUrl)>>(),
             vec![
                 (
                     None,
@@ -1066,7 +1069,8 @@ mod tests {
             ]
         );
         assert_eq!(
-            sorted(client_metadata.policy_uri().unwrap().clone()),
+            sorted(client_metadata.policy_uri().unwrap().clone())
+                .collect::<Vec<(Option<LanguageTag>, PolicyUrl)>>(),
             vec![
                 (
                     None,
@@ -1079,7 +1083,8 @@ mod tests {
             ]
         );
         assert_eq!(
-            sorted(client_metadata.tos_uri().unwrap().clone()),
+            sorted(client_metadata.tos_uri().unwrap().clone())
+                .collect::<Vec<(Option<LanguageTag>, ToSUrl)>>(),
             vec![
                 (
                     None,
@@ -1352,7 +1357,8 @@ mod tests {
             ]
         );
         assert_eq!(
-            sorted(registration_response.client_name().unwrap().clone()),
+            sorted(registration_response.client_name().unwrap().clone())
+                .collect::<Vec<(Option<LanguageTag>, ClientName)>>(),
             vec![
                 (None, ClientName::new("Example".to_string())),
                 (
@@ -1362,7 +1368,8 @@ mod tests {
             ]
         );
         assert_eq!(
-            sorted(registration_response.logo_uri().unwrap().clone()),
+            sorted(registration_response.logo_uri().unwrap().clone())
+                .collect::<Vec<(Option<LanguageTag>, LogoUrl)>>(),
             vec![
                 (
                     None,
@@ -1375,7 +1382,8 @@ mod tests {
             ]
         );
         assert_eq!(
-            sorted(registration_response.client_uri().unwrap().clone()),
+            sorted(registration_response.client_uri().unwrap().clone())
+                .collect::<Vec<(Option<LanguageTag>, ClientUrl)>>(),
             vec![
                 (
                     None,
@@ -1388,7 +1396,8 @@ mod tests {
             ]
         );
         assert_eq!(
-            sorted(registration_response.policy_uri().unwrap().clone()),
+            sorted(registration_response.policy_uri().unwrap().clone())
+                .collect::<Vec<(Option<LanguageTag>, PolicyUrl)>>(),
             vec![
                 (
                     None,
@@ -1401,7 +1410,8 @@ mod tests {
             ]
         );
         assert_eq!(
-            sorted(registration_response.tos_uri().unwrap().clone()),
+            sorted(registration_response.tos_uri().unwrap().clone())
+                .collect::<Vec<(Option<LanguageTag>, ToSUrl)>>(),
             vec![
                 (
                     None,
