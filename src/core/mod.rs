@@ -1293,5 +1293,9 @@ impl AsRef<str> for CoreSubjectIdentifierType {
 }
 impl SubjectIdentifierType for CoreSubjectIdentifierType {}
 
+pub(crate) fn base64_url_safe_no_pad() -> base64::Config {
+    base64::URL_SAFE_NO_PAD.decode_allow_trailing_bits(true)
+}
+
 #[cfg(test)]
 mod tests;

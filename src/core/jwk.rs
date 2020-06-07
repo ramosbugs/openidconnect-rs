@@ -263,12 +263,36 @@ impl CoreRsaPrivateSigningKey {
             return Err(format!("RSA private key must end with {}", RSA_FOOTER));
         }
         let base64_pem = &trimmed_pem[RSA_HEADER.len()..trimmed_pem.len() - RSA_FOOTER.len()];
-        let der = base64::decode_config(base64_pem, base64::MIME)
+        let base64_pem = Self::lax_base64_parsing(base64_pem);
+        let config = base64::STANDARD.decode_allow_trailing_bits(true);
+        let der = base64::decode_config(base64_pem, config)
             .map_err(|_| "Failed to decode RSA private key body as base64".to_string())?;
 
         let key_pair = ring_signature::RsaKeyPair::from_der(Input::from(&der))
             .map_err(|err| err.description_().to_string())?;
         Ok(Self { key_pair, rng, kid })
+    }
+
+    /// Filters characters from the base64 input string.
+    /// Charcters are specified according to lax base64 parsing.
+    ///
+    /// RFC 7468 Lax Parsing
+    fn lax_base64_parsing(input: &str) -> String {
+        input
+            .chars()
+            .filter(Self::keep_char_in_lax_base64_parsing)
+            .collect()
+    }
+
+    /// Returns whether a character is part of the base64 or should
+    /// be removed in accordance to lax base64 parsing.
+    ///
+    /// RFC 7468 Lax Parsing
+    fn keep_char_in_lax_base64_parsing(input: &char) -> bool {
+        match input {
+            ' ' | '\n' | '\t' | '\r' | '\x0b' | '\x0c' => false,
+            _ => true,
+        }
     }
 }
 impl
@@ -517,8 +541,9 @@ mod tests {
         signing_input: &str,
         signature_base64: &str,
     ) {
-        let signature = base64::decode_config(signature_base64, base64::URL_SAFE_NO_PAD)
-            .expect("failed to base64url decode");
+        let signature =
+            base64::decode_config(signature_base64, crate::core::base64_url_safe_no_pad())
+                .expect("failed to base64url decode");
         key.verify_signature(alg, signing_input.as_bytes(), &signature)
             .expect("signature verification failed");
         key.verify_signature(
