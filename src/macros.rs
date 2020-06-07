@@ -599,8 +599,8 @@ macro_rules! serialize_fields {
         if let Some(ref field_map) = $self.$field {
             use itertools::sorted;
             let sorted_field_map = sorted(field_map.iter());
-            for (language_tag_opt, $field) in sorted_field_map.iter() {
-                if let Some(ref language_tag) = *language_tag_opt {
+            for (language_tag_opt, $field) in sorted_field_map {
+                if let Some(ref language_tag) = language_tag_opt {
                     $map.serialize_entry(
                         &format!(concat!(stringify!($field), "#{}"), language_tag.as_ref()),
                         &$field
