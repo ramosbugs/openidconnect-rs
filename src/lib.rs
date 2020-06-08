@@ -618,8 +618,14 @@ pub use oauth2::{
     HttpRequest, HttpResponse, PkceCodeChallenge, PkceCodeChallengeMethod, PkceCodeVerifier,
     RedirectUrl, RefreshToken, RefreshTokenRequest, RequestTokenError, Scope,
     StandardErrorResponse, StandardTokenResponse, TokenResponse as OAuth2TokenResponse, TokenType,
-    TokenUrl,
+    TokenUrl, ResourceOwnerUsername, ResourceOwnerPassword, PasswordTokenRequest
 };
+
+///
+/// Public re-exports of types used for HTTP client interfaces.
+///
+pub use oauth2::http;
+pub use oauth2::url;
 
 #[cfg(feature = "curl")]
 pub use oauth2::curl;
@@ -692,7 +698,7 @@ mod user_info;
 mod verification;
 
 // Private module for HTTP(S) utilities.
-mod http;
+mod http_utils;
 
 // Private module for JWT utilities.
 mod jwt;
@@ -984,6 +990,22 @@ where
         'a: 'b,
     {
         self.oauth2_client.exchange_refresh_token(refresh_token)
+    }
+
+    ///
+    /// Creates a request builder for exchanging credentials for an access token.
+    ///
+    /// See https://tools.ietf.org/html/rfc6749#section-6
+    ///
+    pub fn exchange_password<'a, 'b>(
+        &'a self,
+        username: &'b ResourceOwnerUsername,
+        password: &'b ResourceOwnerPassword,
+    ) -> PasswordTokenRequest<'b, TE, TR, TT>
+    where
+        'a: 'b,
+    {
+        self.oauth2_client.exchange_password(username, password)
     }
 
     ///

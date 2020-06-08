@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::Deref;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use oauth2::helpers::variant_name;
@@ -130,7 +130,7 @@ where
     iss_required: bool,
     issuer: IssuerUrl,
     is_signature_check_enabled: bool,
-    other_aud_verifier_fn: Rc<dyn Fn(&Audience) -> bool + 'a>,
+    other_aud_verifier_fn: Arc<dyn Fn(&Audience) -> bool + 'a + Send + Sync>,
     signature_keys: JsonWebKeySet<JS, JT, JU, K>,
 }
 impl<'a, JS, JT, JU, K> JwtClaimsVerifier<'a, JS, JT, JU, K>
@@ -156,7 +156,7 @@ where
             // Secure default: reject all other audiences as untrusted, since any other audience
             // can potentially impersonate the user when by sending its copy of these claims
             // to this relying party.
-            other_aud_verifier_fn: Rc::new(|_| false),
+            other_aud_verifier_fn: Arc::new(|_| false),
             signature_keys,
         }
     }
@@ -195,9 +195,9 @@ where
 
     pub fn set_other_audience_verifier_fn<T>(mut self, other_aud_verifier_fn: T) -> Self
     where
-        T: Fn(&Audience) -> bool + 'a,
+        T: Fn(&Audience) -> bool + 'a + Send + Sync,
     {
-        self.other_aud_verifier_fn = Rc::new(other_aud_verifier_fn);
+        self.other_aud_verifier_fn = Arc::new(other_aud_verifier_fn);
         self
     }
 
@@ -511,12 +511,12 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
-    acr_verifier_fn: Rc<dyn Fn(Option<&AuthenticationContextClass>) -> Result<(), String> + 'a>,
+    acr_verifier_fn: Arc<dyn Fn(Option<&AuthenticationContextClass>) -> Result<(), String> + 'a>,
     #[allow(clippy::type_complexity)]
-    auth_time_verifier_fn: Rc<dyn Fn(Option<DateTime<Utc>>) -> Result<(), String> + 'a>,
-    iat_verifier_fn: Rc<dyn Fn(DateTime<Utc>) -> Result<(), String> + 'a>,
+    auth_time_verifier_fn: Arc<dyn Fn(Option<DateTime<Utc>>) -> Result<(), String> + 'a>,
+    iat_verifier_fn: Arc<dyn Fn(DateTime<Utc>) -> Result<(), String> + 'a>,
     jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>,
-    time_fn: Rc<dyn Fn() -> DateTime<Utc> + 'a>,
+    time_fn: Arc<dyn Fn() -> DateTime<Utc> + 'a>,
 }
 impl<'a, JS, JT, JU, K> IdTokenVerifier<'a, JS, JT, JU, K>
 where
@@ -528,13 +528,13 @@ where
     fn new(jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>) -> Self {
         IdTokenVerifier {
             // By default, accept authorization context reference (acr claim).
-            acr_verifier_fn: Rc::new(|_| Ok(())),
-            auth_time_verifier_fn: Rc::new(|_| Ok(())),
+            acr_verifier_fn: Arc::new(|_| Ok(())),
+            auth_time_verifier_fn: Arc::new(|_| Ok(())),
             // By default, accept any issued time (iat claim).
-            iat_verifier_fn: Rc::new(|_| Ok(())),
+            iat_verifier_fn: Arc::new(|_| Ok(())),
             jwt_verifier,
             // By default, use the current system time.
-            time_fn: Rc::new(Utc::now),
+            time_fn: Arc::new(Utc::now),
         }
     }
 
@@ -597,7 +597,7 @@ where
     where
         T: Fn(Option<&AuthenticationContextClass>) -> Result<(), String> + 'a,
     {
-        self.acr_verifier_fn = Rc::new(acr_verifier_fn);
+        self.acr_verifier_fn = Arc::new(acr_verifier_fn);
         self
     }
 
@@ -611,7 +611,7 @@ where
     where
         T: Fn(Option<DateTime<Utc>>) -> Result<(), String> + 'a,
     {
-        self.auth_time_verifier_fn = Rc::new(auth_time_verifier_fn);
+        self.auth_time_verifier_fn = Arc::new(auth_time_verifier_fn);
         self
     }
 
@@ -665,7 +665,7 @@ where
     where
         T: Fn() -> DateTime<Utc> + 'a,
     {
-        self.time_fn = Rc::new(time_fn);
+        self.time_fn = Arc::new(time_fn);
         self
     }
 
@@ -679,7 +679,7 @@ where
     where
         T: Fn(DateTime<Utc>) -> Result<(), String> + 'a,
     {
-        self.iat_verifier_fn = Rc::new(iat_verifier_fn);
+        self.iat_verifier_fn = Arc::new(iat_verifier_fn);
         self
     }
 
@@ -695,7 +695,7 @@ where
     ///
     pub fn set_other_audience_verifier_fn<T>(mut self, other_aud_verifier_fn: T) -> Self
     where
-        T: Fn(&Audience) -> bool + 'a,
+        T: Fn(&Audience) -> bool + 'a + Send + Sync,
     {
         self.jwt_verifier = self
             .jwt_verifier

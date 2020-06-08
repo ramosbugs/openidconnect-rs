@@ -24,7 +24,7 @@ use serde_json;
 use url;
 use url::Url;
 
-use super::http::{check_content_type, MIME_TYPE_JSON};
+use super::http_utils::{check_content_type, MIME_TYPE_JSON, MIME_TYPE_JWKS};
 use super::{
     AccessToken, AuthorizationCode, DiscoveryError, HttpRequest, HttpResponse,
     SignatureVerificationError,
@@ -824,13 +824,17 @@ where
             ));
         }
 
-        check_content_type(&http_response.headers, MIME_TYPE_JSON).map_err(|err_msg| {
-            DiscoveryError::Response(
-                http_response.status_code,
-                http_response.body.clone(),
-                err_msg,
-            )
-        })?;
+        check_content_type(&http_response.headers, MIME_TYPE_JSON)
+            .or_else(|err| {
+                check_content_type(&http_response.headers, MIME_TYPE_JWKS).map_err(|_| err)
+            })
+            .map_err(|err_msg| {
+                DiscoveryError::Response(
+                    http_response.status_code,
+                    http_response.body.clone(),
+                    err_msg,
+                )
+            })?;
 
         serde_json::from_slice(&http_response.body).map_err(DiscoveryError::Parse)
     }

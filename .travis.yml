@@ -4,11 +4,8 @@ rust:
   - beta
   - nightly
 sudo: required
-dist: trusty
+dist: bionic
 #cache: cargo
-branches:
-  only:
-    - master
 # Needed for codecov reporting
 addons:
   apt:
