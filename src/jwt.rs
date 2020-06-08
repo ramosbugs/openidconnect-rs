@@ -387,25 +387,30 @@ where
                         )));
                     }
 
-                    let header_json = base64::decode_config(parts[0], base64::URL_SAFE_NO_PAD)
-                        .map_err(|err| {
-                            DE::custom(format!("Invalid base64url header encoding: {:?}", err))
-                        })?;
+                    let header_json =
+                        base64::decode_config(parts[0], crate::core::base64_url_safe_no_pad())
+                            .map_err(|err| {
+                                DE::custom(format!("Invalid base64url header encoding: {:?}", err))
+                            })?;
                     header = serde_json::from_slice(&header_json).map_err(|err| {
                         DE::custom(format!("Failed to parse header JSON: {:?}", err))
                     })?;
 
-                    let raw_payload = base64::decode_config(parts[1], base64::URL_SAFE_NO_PAD)
-                        .map_err(|err| {
-                            DE::custom(format!("Invalid base64url payload encoding: {:?}", err))
-                        })?;
+                    let raw_payload =
+                        base64::decode_config(parts[1], crate::core::base64_url_safe_no_pad())
+                            .map_err(|err| {
+                                DE::custom(format!("Invalid base64url payload encoding: {:?}", err))
+                            })?;
                     payload = S::deserialize::<DE>(&raw_payload)?;
 
-                    signature = base64::decode_config(parts[2], base64::URL_SAFE_NO_PAD).map_err(
-                        |err| {
-                            DE::custom(format!("Invalid base64url signature encoding: {:?}", err))
-                        },
-                    )?;
+                    signature =
+                        base64::decode_config(parts[2], crate::core::base64_url_safe_no_pad())
+                            .map_err(|err| {
+                                DE::custom(format!(
+                                    "Invalid base64url signature encoding: {:?}",
+                                    err
+                                ))
+                            })?;
 
                     signing_input = format!("{}.{}", parts[0], parts[1]);
                 }

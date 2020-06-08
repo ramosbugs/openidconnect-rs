@@ -1254,12 +1254,14 @@ mod serde_base64url_byte_array {
         let value: Value = Deserialize::deserialize(deserializer)?;
         let base64_encoded: String = from_value(value).map_err(D::Error::custom)?;
 
-        base64::decode_config(&base64_encoded, base64::URL_SAFE_NO_PAD).map_err(|err| {
-            D::Error::custom(format!(
-                "invalid base64url encoding `{}`: {:?}",
-                base64_encoded, err
-            ))
-        })
+        base64::decode_config(&base64_encoded, crate::core::base64_url_safe_no_pad()).map_err(
+            |err| {
+                D::Error::custom(format!(
+                    "invalid base64url encoding `{}`: {:?}",
+                    base64_encoded, err
+                ))
+            },
+        )
     }
 
     pub fn serialize<S>(v: &[u8], serializer: S) -> Result<S::Ok, S::Error>
