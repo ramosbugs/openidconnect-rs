@@ -2,8 +2,8 @@
 
 [![crates.io](https://img.shields.io/crates/v/openidconnect.svg)](https://crates.io/crates/openidconnect)
 [![docs.rs](https://docs.rs/openidconnect/badge.svg)](https://docs.rs/openidconnect)
-[![Build Status](https://travis-ci.org/ramosbugs/openidconnect-rs.svg?branch=master)](https://travis-ci.org/ramosbugs/openidconnect-rs)
-[![codecov](https://codecov.io/gh/ramosbugs/openidconnect-rs/branch/master/graph/badge.svg)](https://codecov.io/gh/ramosbugs/openidconnect-rs)
+[![Build Status](https://travis-ci.org/ramosbugs/openidconnect-rs.svg?branch=main)](https://travis-ci.org/ramosbugs/openidconnect-rs)
+[![codecov](https://codecov.io/gh/ramosbugs/openidconnect-rs/branch/main/graph/badge.svg)](https://codecov.io/gh/ramosbugs/openidconnect-rs)
 
 
 This library provides extensible, strongly-typed interfaces for the OpenID Connect protocol.
