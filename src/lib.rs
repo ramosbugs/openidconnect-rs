@@ -23,51 +23,20 @@
 //!
 //! # Importing `openidconnect`: selecting an HTTP client interface
 //!
-//! This library offers a flexible HTTP client interface with three modes:
+//! This library offers a flexible HTTP client interface with two modes:
 //!  * **Synchronous (blocking)**
-//!
-//!    The synchronous interface is available for any combination of feature flags.
-//!
-//!    Example import in `Cargo.toml`:
-//!    ```toml
-//!    openidconnect = "1.0"
-//!    ```
-//!  * **Asynchronous via `futures` 0.1**
-//!
-//!    Support is enabled via the `futures-01` feature flag.
-//!
-//!    Example import in `Cargo.toml`:
-//!    ```toml
-//!    openidconnect = { version = "1.0", features = ["futures-01"] }
-//!    ```
-//!  * **Async/await via `futures` 0.3**
-//!
-//!    Support is enabled via the `futures-03` feature flag. Typically, the default
-//!    support for `reqwest` 0.9 is also disabled when using async/await. If desired, the
-//!    `reqwest-010` feature flag can be used to enable `reqwest` 0.10 and its async/await
-//!    client interface.
-//!
-//!    Example import in `Cargo.toml`:
-//!    ```toml
-//!    openidconnect = { version = "1.0", features = ["futures-03"], default-features = false }
-//!    ```
+//!  * **Async/await**
 //!
 //! For the HTTP client modes described above, the following HTTP client implementations can be
 //! used:
 //!  * **[`reqwest`]**
 //!
-//!    The `reqwest` HTTP client supports all three modes. By default, `reqwest` 0.9 is enabled,
+//!    The `reqwest` HTTP client supports both modes. By default, `reqwest` 0.10 is enabled,
 //!    which supports the synchronous and asynchronous `futures` 0.1 APIs.
 //!
 //!    Synchronous client: [`reqwest::http_client`]
 //!
-//!    Asynchronous `futures` 0.1 client: [`reqwest::future_http_client`]
-//!
-//!    Async/await `futures` 0.3 client: [`reqwest::async_http_client`]. This mode requires
-//!    `reqwest` 0.10, which can be enabled via the `reqwest-010` feature flag. Typically, the
-//!    default features are also disabled (`default-features = false` in `Cargo.toml`) to remove the
-//!    dependency on `reqwest` 0.9 when using `reqwest` 0.10. However, both can be used together if
-//!    both asynchronous interfaces are desired.
+//!    Async/await `futures` 0.3 client: [`reqwest::async_http_client`]
 //!
 //!  * **[`curl`]**
 //!
@@ -80,7 +49,7 @@
 //!
 //!    In addition to the clients above, users may define their own HTTP clients, which must accept
 //!    an [`HttpRequest`] and return an [`HttpResponse`] or error. Users writing their own clients
-//!    may wish to disable the default `reqwest` 0.9 dependency by specifying
+//!    may wish to disable the default `reqwest` 0.10 dependency by specifying
 //!    `default-features = false` in `Cargo.toml`:
 //!    ```toml
 //!    openidconnect = { version = "1.0", default-features = false }
@@ -90,21 +59,12 @@
 //!    ```ignore
 //!    FnOnce(HttpRequest) -> Result<HttpResponse, RE>
 //!    where RE: failure::Fail
-//!    ```
-//!
-//!    Asynchronous `futures` 0.1 HTTP clients should implement the following trait:
-//!    ```ignore
-//!    FnOnce(HttpRequest) -> F
-//!    where
-//!      F: Future<Item = HttpResponse, Error = RE>,
-//!      RE: failure::Fail
-//!    ```
 //!
 //!    Async/await `futures` 0.3 HTTP clients should implement the following trait:
 //!    ```ignore
-//!    FnOnce(HttpRequest) -> F + Send
+//!    FnOnce(HttpRequest) -> F
 //!    where
-//!      F: Future<Output = Result<HttpResponse, RE>> + Send,
+//!      F: Future<Output = Result<HttpResponse, RE>>,
 //!      RE: failure::Fail
 //!    ```
 //!
@@ -145,11 +105,11 @@
 //!   CoreProviderMetadata,
 //!   CoreResponseType,
 //! };
-//! # #[cfg(any(feature = "reqwest-09", feature = "reqwest-010"))]
+//! # #[cfg(feature = "reqwest-010")]
 //! use openidconnect::reqwest::http_client;
 //! use url::Url;
 //!
-//! # #[cfg(any(feature = "reqwest-09", feature = "reqwest-010"))]
+//! # #[cfg(feature = "reqwest-010")]
 //! # fn err_wrapper() -> Result<(), failure::Error> {
 //! // Use OpenID Connect Discovery to fetch the provider metadata.
 //! use openidconnect::{OAuth2TokenResponse, TokenResponse};
@@ -472,18 +432,13 @@
 //! # Async/Await API
 //!
 //! An asynchronous API for async/await is also provided.
-//! In order to use `futures` 0.3, include the `openidconnect` crate like this:
-//! ```toml
-//! openidconnect = { version = "1.0", features = ["futures-03"], default-features = false }
-//! ```
 //!
 //! ## Example
 //!
 //! ```rust,no_run
-//! # #[cfg(all(feature = "futures-03", feature = "reqwest-010"))]
+//! # #[cfg(feature = "reqwest-010")]
 //! use openidconnect::{
 //!     AccessTokenHash,
-//!     AsyncCodeTokenRequest,
 //!     AuthenticationFlow,
 //!     AuthorizationCode,
 //!     ClientId,
@@ -501,12 +456,12 @@
 //!   CoreProviderMetadata,
 //!   CoreResponseType,
 //! };
-//! # #[cfg(all(feature = "futures-03", feature = "reqwest-010"))]
+//! # #[cfg(feature = "reqwest-010")]
 //! use openidconnect::reqwest::async_http_client;
 //! use url::Url;
 //!
 //!
-//! # #[cfg(all(feature = "futures-03", feature = "reqwest-010"))]
+//! # #[cfg(feature = "reqwest-010")]
 //! # async fn err_wrapper() -> Result<(), failure::Error> {
 //! // Use OpenID Connect Discovery to fetch the provider metadata.
 //! use openidconnect::{OAuth2TokenResponse, TokenResponse};
@@ -615,10 +570,10 @@ use std::time::Duration;
 pub use oauth2::{
     AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CodeTokenRequest,
     CsrfToken, EmptyExtraTokenFields, ErrorResponse, ErrorResponseType, ExtraTokenFields,
-    HttpRequest, HttpResponse, PkceCodeChallenge, PkceCodeChallengeMethod, PkceCodeVerifier,
-    RedirectUrl, RefreshToken, RefreshTokenRequest, RequestTokenError, Scope,
-    StandardErrorResponse, StandardTokenResponse, TokenResponse as OAuth2TokenResponse, TokenType,
-    TokenUrl, ResourceOwnerUsername, ResourceOwnerPassword, PasswordTokenRequest
+    HttpRequest, HttpResponse, PasswordTokenRequest, PkceCodeChallenge, PkceCodeChallengeMethod,
+    PkceCodeVerifier, RedirectUrl, RefreshToken, RefreshTokenRequest, RequestTokenError,
+    ResourceOwnerPassword, ResourceOwnerUsername, Scope, StandardErrorResponse,
+    StandardTokenResponse, TokenResponse as OAuth2TokenResponse, TokenType, TokenUrl,
 };
 
 ///
@@ -630,14 +585,8 @@ pub use oauth2::url;
 #[cfg(feature = "curl")]
 pub use oauth2::curl;
 
-#[cfg(any(feature = "reqwest-09", feature = "reqwest-010"))]
+#[cfg(feature = "reqwest-010")]
 pub use oauth2::reqwest;
-
-#[cfg(feature = "futures-03")]
-pub use oauth2::{
-    AsyncClientCredentialsTokenRequest, AsyncCodeTokenRequest, AsyncPasswordTokenRequest,
-    AsyncRefreshTokenRequest,
-};
 
 pub use claims::{
     AdditionalClaims, AddressClaim, EmptyAdditionalClaims, GenderClaim, StandardClaims,
@@ -779,7 +728,7 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
     P: AuthPrompt,
-    TE: ErrorResponse,
+    TE: 'static + ErrorResponse,
     TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
     TT: TokenType + 'static,
 {
@@ -1479,7 +1428,7 @@ mod tests {
         }
 
         let (authorize_url, _, _) = client
-            .authorize_url(flow.clone(), new_csrf, new_nonce)
+            .authorize_url(flow, new_csrf, new_nonce)
             .add_scope(Scope::new("email".to_string()))
             .set_display(CoreAuthDisplay::Touch)
             .add_prompt(CoreAuthPrompt::Login)
@@ -1491,7 +1440,9 @@ mod tests {
             .add_auth_context_value(AuthenticationContextClass::new(
                 "urn:mace:incommon:iap:silver".to_string(),
             ))
-            .set_redirect_url(Cow::Owned(RedirectUrl::new("http://localhost:8888/alternative".to_string()).unwrap()))
+            .set_redirect_url(Cow::Owned(
+                RedirectUrl::new("http://localhost:8888/alternative".to_string()).unwrap(),
+            ))
             .url();
         assert_eq!(
             "https://example/authorize?response_type=code&client_id=aaa&\

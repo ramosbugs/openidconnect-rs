@@ -15,11 +15,8 @@ all-features = true
 maintenance = { status = "actively-developed" }
 
 [features]
-default = ["reqwest-09"]
+default = ["reqwest-010"]
 curl = ["oauth2/curl"]
-futures-01 = ["oauth2/futures-01", "futures-0-1"]
-futures-03 = ["oauth2/futures-03", "futures-0-3"]
-reqwest-09 = ["oauth2/reqwest-09"]
 reqwest-010 = ["oauth2/reqwest-010"]
 nightly = []
 
@@ -28,12 +25,10 @@ base64 = "0.12"
 chrono = "0.4"
 failure = "0.1"
 failure_derive = "0.1"
-futures-0-1 = { version = "0.1", optional = true, package = "futures" }
-futures-0-3 = { version = "0.3", optional = true, package = "futures" }
-http = "0.1"
+http = "0.2"
 itertools = "0.9"
 log = "0.4"
-oauth2 = "3.0"
+oauth2 = { version = "4.0.0-alpha.1", default-features = false }
 rand = "0.7"
 ring = "0.16"
 serde = "1.0"
@@ -44,8 +39,8 @@ untrusted = "0.7"
 url = "2.1"
 
 [dev-dependencies]
-color-backtrace = { version = "0.2" }
-env_logger = "0.5"
-pretty_assertions = "0.5"
-reqwest_ = { package = "reqwest", version = "0.9" }
-retry = "0.5"
+color-backtrace = { version = "0.4" }
+env_logger = "0.7"
+pretty_assertions = "0.6"
+reqwest_ = { package = "reqwest", features = ["blocking"], version = "0.10" }
+retry = "1.0"

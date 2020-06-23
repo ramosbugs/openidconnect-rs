@@ -130,7 +130,7 @@ where
     iss_required: bool,
     issuer: IssuerUrl,
     is_signature_check_enabled: bool,
-    other_aud_verifier_fn: Arc<dyn Fn(&Audience) -> bool + 'a + Send + Sync>,
+    other_aud_verifier_fn: Arc<dyn Fn(&Audience) -> bool + 'a>,
     signature_keys: JsonWebKeySet<JS, JT, JU, K>,
 }
 impl<'a, JS, JT, JU, K> JwtClaimsVerifier<'a, JS, JT, JU, K>
@@ -195,7 +195,7 @@ where
 
     pub fn set_other_audience_verifier_fn<T>(mut self, other_aud_verifier_fn: T) -> Self
     where
-        T: Fn(&Audience) -> bool + 'a + Send + Sync,
+        T: Fn(&Audience) -> bool + 'a,
     {
         self.other_aud_verifier_fn = Arc::new(other_aud_verifier_fn);
         self
@@ -695,7 +695,7 @@ where
     ///
     pub fn set_other_audience_verifier_fn<T>(mut self, other_aud_verifier_fn: T) -> Self
     where
-        T: Fn(&Audience) -> bool + 'a + Send + Sync,
+        T: Fn(&Audience) -> bool + 'a,
     {
         self.jwt_verifier = self
             .jwt_verifier

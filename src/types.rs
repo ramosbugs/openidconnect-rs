@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Error as FormatterError, Formatter};
+use std::future::Future;
 use std::hash::Hash;
 use std::iter::FromIterator;
 use std::marker::PhantomData;
@@ -7,10 +8,6 @@ use std::ops::Deref;
 
 use base64;
 use failure::Fail;
-#[cfg(feature = "futures-01")]
-use futures_0_1::Future;
-#[cfg(feature = "futures-03")]
-use futures_0_3;
 use http::header::{HeaderValue, ACCEPT};
 use http::method::Method;
 use http::status::StatusCode;
@@ -766,32 +763,12 @@ where
     /// Fetch a remote JSON Web Key Set from the specified `url` using the given async `http_client`
     /// (e.g., [`crate::reqwest::async_http_client`]).
     ///
-    #[cfg(feature = "futures-01")]
-    pub fn fetch_future<F, HC, RE>(
-        url: &JsonWebKeySetUrl,
-        http_client: HC,
-    ) -> impl Future<Item = Self, Error = DiscoveryError<RE>>
-    where
-        F: Future<Item = HttpResponse, Error = RE>,
-        HC: FnOnce(HttpRequest) -> F,
-        RE: Fail,
-    {
-        http_client(Self::fetch_request(url))
-            .map_err(DiscoveryError::Request)
-            .and_then(Self::fetch_response)
-    }
-
-    ///
-    /// Fetch a remote JSON Web Key Set from the specified `url` using the given async `http_client`
-    /// (e.g., [`crate::reqwest::async_http_client`]).
-    ///
-    #[cfg(feature = "futures-03")]
     pub async fn fetch_async<F, HC, RE>(
         url: &JsonWebKeySetUrl,
         http_client: HC,
     ) -> Result<Self, DiscoveryError<RE>>
     where
-        F: futures_0_3::Future<Output = Result<HttpResponse, RE>>,
+        F: Future<Output = Result<HttpResponse, RE>>,
         HC: FnOnce(HttpRequest) -> F,
         RE: Fail,
     {
