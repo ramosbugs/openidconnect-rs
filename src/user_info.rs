@@ -3,7 +3,7 @@ use std::ops::Deref;
 use std::str;
 
 use chrono::{DateTime, Utc};
-use failure::Fail;
+use thiserror::Error;
 use http::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
 use http::method::Method;
 use http::status::StatusCode;
@@ -63,7 +63,7 @@ where
         AC: AdditionalClaims,
         GC: GenderClaim,
         HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
-        RE: Fail,
+        RE: std::error::Error + Send + Sync + 'static,
     {
         http_client(self.prepare_request())
             .map_err(UserInfoError::Request)
@@ -83,7 +83,7 @@ where
         C: FnOnce(HttpRequest) -> F,
         F: Future<Output = Result<HttpResponse, RE>>,
         GC: GenderClaim,
-        RE: Fail,
+        RE: std::error::Error + Send + Sync + 'static,
     {
         let http_request = self.prepare_request();
         let http_response = http_client(http_request)
@@ -115,7 +115,7 @@ where
     where
         AC: AdditionalClaims,
         GC: GenderClaim,
-        RE: Fail,
+        RE: std::error::Error + Send + Sync + 'static,
     {
         if http_response.status_code != StatusCode::OK {
             return Err(UserInfoError::Response(
@@ -229,7 +229,7 @@ where
         expected_subject: Option<&SubjectIdentifier>,
     ) -> Result<Self, UserInfoError<RE>>
     where
-        RE: Fail,
+        RE: std::error::Error + Send + Sync + 'static,
     {
         let user_info = serde_json::from_slice::<UserInfoClaimsImpl<AC, GC>>(&user_info_json)
             .map_err(UserInfoError::Parse)?;
@@ -445,45 +445,45 @@ new_url_type![
 ///
 /// Error retrieving user info.
 ///
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum UserInfoError<RE>
 where
-    RE: Fail,
+    RE: std::error::Error + Send + Sync + 'static,
 {
     ///
     /// Failed to verify user info claims.
     ///
-    #[fail(display = "Failed to verify claims")]
-    ClaimsVerification(#[cause] ClaimsVerificationError),
+    #[error("Failed to verify claims")]
+    ClaimsVerification(#[source] ClaimsVerificationError),
     ///
     /// Failed to parse server response.
     ///
-    #[fail(display = "Failed to parse server response")]
-    Parse(#[cause] serde_json::Error),
+    #[error("Failed to parse server response")]
+    Parse(#[source] serde_json::Error),
     ///
     /// An error occurred while sending the request or receiving the response (e.g., network
     /// connectivity failed).
     ///
-    #[fail(display = "Request failed")]
-    Request(#[cause] RE),
+    #[error("Request failed")]
+    Request(#[source] RE),
     ///
     /// Server returned an invalid response.
     ///
-    #[fail(display = "Server returned invalid response: {}", _2)]
+    #[error("Server returned invalid response: {2}")]
     Response(StatusCode, Vec<u8>, String),
     ///
     /// An unexpected error occurred.
     ///
-    #[fail(display = "Other error: {}", _0)]
+    #[error("Other error: {0}")]
     Other(String),
 }
 
 ///
 /// The OpenID Connect Provider has no associated user info endpoint.
 ///
-#[derive(Debug, Fail)]
-#[fail(display = "No user info endpoint specified")]
+#[derive(Debug, Error)]
+#[error("No user info endpoint specified")]
 pub struct NoUserInfoEndpoint;
 
 #[cfg(test)]

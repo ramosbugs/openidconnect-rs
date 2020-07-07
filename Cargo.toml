@@ -23,8 +23,7 @@ nightly = []
 [dependencies]
 base64 = "0.12"
 chrono = "0.4"
-failure = "0.1"
-failure_derive = "0.1"
+thiserror = "1.0"
 http = "0.2"
 itertools = "0.9"
 log = "0.4"
@@ -44,3 +43,4 @@ env_logger = "0.7"
 pretty_assertions = "0.6"
 reqwest_ = { package = "reqwest", features = ["blocking", "rustls-tls"], version = "0.10", default-features = false }
 retry = "1.0"
+anyhow = "1.0"

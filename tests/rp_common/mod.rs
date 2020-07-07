@@ -1,13 +1,10 @@
 #![allow(clippy::cognitive_complexity, clippy::expect_fun_call)]
 extern crate color_backtrace;
 extern crate env_logger;
-extern crate failure;
 
 use std::cell::RefCell;
 use std::sync::Once;
 use std::time::Duration;
-
-use failure::Fail;
 
 use openidconnect;
 use openidconnect::core::{
@@ -96,13 +93,13 @@ pub fn http_client(
 
 pub trait PanicIfFail<T, F>
 where
-    F: Fail,
+    F: std::error::Error,
 {
     fn panic_if_fail(self, msg: &'static str) -> T;
 }
 impl<T, F> PanicIfFail<T, F> for Result<T, F>
 where
-    F: Fail,
+    F: std::error::Error,
 {
     fn panic_if_fail(self, msg: &'static str) -> T {
         match self {
@@ -110,10 +107,10 @@ where
             Err(fail) => {
                 let mut err_msg = format!("Panic: {}", msg);
 
-                let mut cur_fail: Option<&dyn Fail> = Some(&fail);
+                let mut cur_fail: Option<&dyn std::error::Error> = Some(&fail);
                 while let Some(cause) = cur_fail {
                     err_msg += &format!("\n    caused by: {}", cause);
-                    cur_fail = cause.cause();
+                    cur_fail = cause.source();
                 }
                 error!("[{}] {}", get_test_id(), err_msg);
                 panic!(msg);

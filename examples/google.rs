@@ -19,7 +19,6 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::process::exit;
 
-use failure::Fail;
 use url::Url;
 
 use openidconnect::core::{
@@ -31,12 +30,12 @@ use openidconnect::{
     OAuth2TokenResponse, RedirectUrl, Scope,
 };
 
-fn handle_error<T: Fail>(fail: &T, msg: &'static str) {
+fn handle_error<T: std::error::Error>(fail: &T, msg: &'static str) {
     let mut err_msg = format!("ERROR: {}", msg);
-    let mut cur_fail: Option<&dyn Fail> = Some(fail);
+    let mut cur_fail: Option<&dyn std::error::Error> = Some(fail);
     while let Some(cause) = cur_fail {
         err_msg += &format!("\n    caused by: {}", cause);
-        cur_fail = cause.cause();
+        cur_fail = cause.source();
     }
     println!("{}", err_msg);
     exit(1);
