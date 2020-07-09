@@ -58,14 +58,14 @@
 //!    Synchronous HTTP clients should implement the following trait:
 //!    ```ignore
 //!    FnOnce(HttpRequest) -> Result<HttpResponse, RE>
-//!    where RE: std::error::Error + Send + Sync + 'static
+//!    where RE: std::error::Error + 'static
 //!
 //!    Async/await `futures` 0.3 HTTP clients should implement the following trait:
 //!    ```ignore
 //!    FnOnce(HttpRequest) -> F
 //!    where
-//!      RE: std::error::Error + Send + Sync + 'static
 //!      F: Future<Output = Result<HttpResponse, RE>>,
+//!      RE: std::error::Error + 'static
 //!    ```
 //!
 //! # OpenID Connect Relying Party (Client) Interface
@@ -464,10 +464,11 @@
 //! # #[cfg(feature = "reqwest-010")]
 //! use openidconnect::reqwest::async_http_client;
 //! use url::Url;
+//! use anyhow::anyhow;
 //!
 //!
 //! # #[cfg(feature = "reqwest-010")]
-//! # async fn err_wrapper() -> Result<(), dyn std::error::Error> {
+//! # async fn err_wrapper() -> Result<(), anyhow::Error> {
 //! // Use OpenID Connect Discovery to fetch the provider metadata.
 //! use openidconnect::{OAuth2TokenResponse, TokenResponse};
 //! let provider_metadata = CoreProviderMetadata::discover_async(
@@ -524,7 +525,7 @@
 //! // Extract the ID token claims after verifying its authenticity and nonce.
 //! let id_token = token_response
 //!   .id_token()
-//!   .ok_or_else(|| failure::format_err!("Server did not return an ID token"))?;
+//!   .ok_or_else(|| anyhow!("Server did not return an ID token"))?;
 //! let claims = id_token.claims(&client.id_token_verifier(), &nonce)?;
 //!
 //! // Verify the access token hash to ensure that the access token hasn't been substituted for
@@ -535,7 +536,7 @@
 //!         &id_token.signing_alg()?
 //!     )?;
 //!     if actual_access_token_hash != *expected_access_token_hash {
-//!         return Err(failure::Error::from_boxed_compat("Invalid access token".into()));
+//!         return Err(anyhow!("Invalid access token"));
 //!     }
 //! }
 //!

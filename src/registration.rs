@@ -469,7 +469,7 @@ where
     >
     where
         HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
-        RE: std::error::Error + Send + Sync + 'static,
+        RE: std::error::Error + 'static,
     {
         self.prepare_registration(registration_endpoint)
             .and_then(|http_request| {
@@ -493,7 +493,7 @@ where
     where
         F: Future<Output = Result<HttpResponse, RE>>,
         HC: FnOnce(HttpRequest) -> F,
-        RE: std::error::Error + Send + Sync + 'static,
+        RE: std::error::Error + 'static,
     {
         let http_request = self.prepare_registration(registration_endpoint)?;
         let http_response = http_client(http_request)
@@ -507,7 +507,7 @@ where
         registration_endpoint: &RegistrationUrl,
     ) -> Result<HttpRequest, ClientRegistrationError<ET, RE>>
     where
-        RE: std::error::Error + Send + Sync + 'static,
+        RE: std::error::Error + 'static,
     {
         let request_json = serde_json::to_string(self.client_metadata())
             .map_err(ClientRegistrationError::Serialize)?
@@ -541,7 +541,7 @@ where
         ClientRegistrationError<ET, RE>,
     >
     where
-        RE: std::error::Error + Send + Sync + 'static,
+        RE: std::error::Error + 'static,
     {
         // TODO: check for WWW-Authenticate response header if bearer auth was used (see
         //   https://tools.ietf.org/html/rfc6750#section-3)
@@ -857,8 +857,8 @@ pub trait RegisterErrorResponseType: ErrorResponseType + 'static {}
 #[non_exhaustive]
 pub enum ClientRegistrationError<T, RE>
 where
-    RE: std::error::Error + Send + Sync + 'static,
-    T: RegisterErrorResponseType + Send + Sync,
+    RE: std::error::Error + 'static,
+    T: RegisterErrorResponseType,
 {
     ///
     /// An unexpected error occurred.

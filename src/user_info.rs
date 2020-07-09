@@ -63,7 +63,7 @@ where
         AC: AdditionalClaims,
         GC: GenderClaim,
         HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
-        RE: std::error::Error + Send + Sync + 'static,
+        RE: std::error::Error + 'static,
     {
         http_client(self.prepare_request())
             .map_err(UserInfoError::Request)
@@ -83,7 +83,7 @@ where
         C: FnOnce(HttpRequest) -> F,
         F: Future<Output = Result<HttpResponse, RE>>,
         GC: GenderClaim,
-        RE: std::error::Error + Send + Sync + 'static,
+        RE: std::error::Error + 'static,
     {
         let http_request = self.prepare_request();
         let http_response = http_client(http_request)
@@ -115,7 +115,7 @@ where
     where
         AC: AdditionalClaims,
         GC: GenderClaim,
-        RE: std::error::Error + Send + Sync + 'static,
+        RE: std::error::Error + 'static,
     {
         if http_response.status_code != StatusCode::OK {
             return Err(UserInfoError::Response(
@@ -229,7 +229,7 @@ where
         expected_subject: Option<&SubjectIdentifier>,
     ) -> Result<Self, UserInfoError<RE>>
     where
-        RE: std::error::Error + Send + Sync + 'static,
+        RE: std::error::Error + 'static,
     {
         let user_info = serde_json::from_slice::<UserInfoClaimsImpl<AC, GC>>(&user_info_json)
             .map_err(UserInfoError::Parse)?;
@@ -449,7 +449,7 @@ new_url_type![
 #[non_exhaustive]
 pub enum UserInfoError<RE>
 where
-    RE: std::error::Error + Send + Sync + 'static,
+    RE: std::error::Error + 'static,
 {
     ///
     /// Failed to verify user info claims.

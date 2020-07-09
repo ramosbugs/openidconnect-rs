@@ -317,7 +317,7 @@ where
     ) -> Result<Self, DiscoveryError<RE>>
     where
         HC: Fn(HttpRequest) -> Result<HttpResponse, RE>,
-        RE: std::error::Error + Send + Sync + 'static,
+        RE: std::error::Error + 'static,
     {
         let discovery_url = issuer_url
             .join(CONFIG_URL_SUFFIX)
@@ -345,7 +345,7 @@ where
     where
         F: Future<Output = Result<HttpResponse, RE>>,
         HC: Fn(HttpRequest) -> F + 'static,
-        RE: std::error::Error + Send + Sync + 'static,
+        RE: std::error::Error + 'static,
     {
         let discovery_url = issuer_url
             .join(CONFIG_URL_SUFFIX)
@@ -380,7 +380,7 @@ where
         discovery_response: HttpResponse,
     ) -> Result<Self, DiscoveryError<RE>>
     where
-        RE: std::error::Error + Send + Sync + 'static,
+        RE: std::error::Error + 'static,
     {
         if discovery_response.status_code != StatusCode::OK {
             return Err(DiscoveryError::Response(
@@ -433,7 +433,7 @@ where
 #[non_exhaustive]
 pub enum DiscoveryError<RE>
 where
-    RE: std::error::Error + Send + Sync + 'static,
+    RE: std::error::Error + 'static,
 {
     ///
     /// An unexpected error occurred.

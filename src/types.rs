@@ -752,7 +752,7 @@ where
     ) -> Result<Self, DiscoveryError<RE>>
     where
         HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
-        RE: std::error::Error + Send + Sync + 'static,
+        RE: std::error::Error + 'static,
     {
         http_client(Self::fetch_request(url))
             .map_err(DiscoveryError::Request)
@@ -770,7 +770,7 @@ where
     where
         F: Future<Output = Result<HttpResponse, RE>>,
         HC: FnOnce(HttpRequest) -> F,
-        RE: std::error::Error + Send + Sync + 'static,
+        RE: std::error::Error + 'static,
     {
         http_client(Self::fetch_request(url))
             .await
@@ -791,7 +791,7 @@ where
 
     fn fetch_response<RE>(http_response: HttpResponse) -> Result<Self, DiscoveryError<RE>>
     where
-        RE: std::error::Error + Send + Sync + 'static,
+        RE: std::error::Error + 'static,
     {
         if http_response.status_code != StatusCode::OK {
             return Err(DiscoveryError::Response(
