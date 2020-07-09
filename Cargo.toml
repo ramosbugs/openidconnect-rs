@@ -36,11 +36,11 @@ serde_derive = "1.0"
 serde_json = "1.0"
 serde-value = "0.6"
 untrusted = "0.7"
-url = "2.1"
+url = { version = "2.1", features = ["serde"] }
 
 [dev-dependencies]
 color-backtrace = { version = "0.4" }
 env_logger = "0.7"
 pretty_assertions = "0.6"
-reqwest_ = { package = "reqwest", features = ["blocking"], version = "0.10" }
+reqwest_ = { package = "reqwest", features = ["blocking", "rustls-tls"], version = "0.10", default-features = false }
 retry = "1.0"
