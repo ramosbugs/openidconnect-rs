@@ -1,13 +1,10 @@
 use std::fmt::{Debug, Formatter, Result as FormatterResult};
+use std::future::Future;
 use std::marker::PhantomData;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use failure::Fail;
-#[cfg(feature = "futures-01")]
-use futures_0_1::{Future, IntoFuture};
-#[cfg(feature = "futures-03")]
-use futures_0_3;
 use http::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
 use http::method::Method;
 use http::status::StatusCode;
@@ -436,7 +433,7 @@ where
     AR: AdditionalClientRegistrationResponse,
     AT: ApplicationType,
     CA: ClientAuthMethod,
-    ET: RegisterErrorResponseType,
+    ET: RegisterErrorResponseType + Send + Sync,
     G: GrantType,
     JE: JweContentEncryptionAlgorithm<JT>,
     JK: JweKeyManagementAlgorithm,
@@ -445,7 +442,7 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
     RT: ResponseType,
-    S: SubjectIdentifierType,
+    S: SubjectIdentifierType + Send + Sync,
 {
     ///
     /// Instantiates a new dynamic client registration request.
@@ -485,33 +482,6 @@ where
     /// Submits this request to the specified registration endpoint using the specified asynchronous
     /// HTTP client.
     ///
-    #[cfg(feature = "futures-01")]
-    pub fn register_future<F, HC, RE>(
-        &self,
-        registration_endpoint: &RegistrationUrl,
-        http_client: HC,
-    ) -> impl Future<
-        Item = ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
-        Error = ClientRegistrationError<ET, RE>,
-    >
-    where
-        F: Future<Item = HttpResponse, Error = RE>,
-        HC: FnOnce(HttpRequest) -> F,
-        RE: Fail,
-    {
-        self.prepare_registration(registration_endpoint)
-            .into_future()
-            .and_then(|http_request| {
-                http_client(http_request).map_err(ClientRegistrationError::Request)
-            })
-            .and_then(|http_response| Self::register_response(http_response).into_future())
-    }
-
-    ///
-    /// Submits this request to the specified registration endpoint using the specified asynchronous
-    /// HTTP client.
-    ///
-    #[cfg(feature = "futures-03")]
     pub async fn register_async<F, HC, RE>(
         &self,
         registration_endpoint: &RegistrationUrl,
@@ -521,7 +491,7 @@ where
         ClientRegistrationError<ET, RE>,
     >
     where
-        F: futures_0_3::Future<Output = Result<HttpResponse, RE>>,
+        F: Future<Output = Result<HttpResponse, RE>>,
         HC: FnOnce(HttpRequest) -> F,
         RE: Fail,
     {
@@ -888,7 +858,7 @@ pub trait RegisterErrorResponseType: ErrorResponseType + 'static {}
 pub enum ClientRegistrationError<T, RE>
 where
     RE: Fail,
-    T: RegisterErrorResponseType,
+    T: RegisterErrorResponseType + Send + Sync,
 {
     ///
     /// An unexpected error occurred.

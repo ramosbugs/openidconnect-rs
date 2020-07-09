@@ -1,11 +1,8 @@
 use std::fmt::Debug;
+use std::future::Future;
 use std::marker::PhantomData;
 
 use failure::Fail;
-#[cfg(feature = "futures-01")]
-use futures_0_1::{Future, IntoFuture};
-#[cfg(feature = "futures-03")]
-use futures_0_3;
 use http::header::{HeaderValue, ACCEPT};
 use http::method::Method;
 use http::status::StatusCode;
@@ -341,51 +338,12 @@ where
     /// Asynchronously fetches the OpenID Connect Discovery document and associated JSON Web Key Set
     /// from the OpenID Connect Provider.
     ///
-    #[cfg(feature = "futures-01")]
-    pub fn discover_future<F, HC, RE>(
-        issuer_url: IssuerUrl,
-        http_client: HC,
-    ) -> impl Future<Item = Self, Error = DiscoveryError<RE>>
-    where
-        F: Future<Item = HttpResponse, Error = RE>,
-        HC: Fn(HttpRequest) -> F + 'static,
-        RE: Fail,
-    {
-        issuer_url
-            .join(CONFIG_URL_SUFFIX)
-            .map_err(DiscoveryError::UrlParse)
-            .into_future()
-            .and_then(move |discovery_url| {
-                http_client(Self::discovery_request(discovery_url))
-                    .map_err(DiscoveryError::Request)
-                    .map(|http_response| (http_response, http_client))
-            })
-            .and_then(move |(http_response, http_client)| {
-                Self::discovery_response(&issuer_url, http_response)
-                    .into_future()
-                    .map(|provider_metadata| (provider_metadata, http_client))
-            })
-            .and_then(|(provider_metadata, http_client)| {
-                JsonWebKeySet::fetch_future(provider_metadata.jwks_uri(), http_client).map(|jwks| {
-                    Self {
-                        jwks,
-                        ..provider_metadata
-                    }
-                })
-            })
-    }
-
-    ///
-    /// Asynchronously fetches the OpenID Connect Discovery document and associated JSON Web Key Set
-    /// from the OpenID Connect Provider.
-    ///
-    #[cfg(feature = "futures-03")]
     pub async fn discover_async<F, HC, RE>(
         issuer_url: IssuerUrl,
         http_client: HC,
     ) -> Result<Self, DiscoveryError<RE>>
     where
-        F: futures_0_3::Future<Output = Result<HttpResponse, RE>>,
+        F: Future<Output = Result<HttpResponse, RE>>,
         HC: Fn(HttpRequest) -> F + 'static,
         RE: Fail,
     {

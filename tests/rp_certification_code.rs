@@ -14,7 +14,7 @@ use std::collections::HashMap;
 
 use http::header::LOCATION;
 use http::method::Method;
-use reqwest::{Client, RedirectPolicy};
+use reqwest::{blocking::Client, redirect::Policy};
 use url::Url;
 
 use openidconnect::core::{
@@ -98,7 +98,7 @@ impl TestState {
             log_debug!("Authorize URL: {:?}", url);
 
             let http_client = Client::builder()
-                .redirect(RedirectPolicy::none())
+                .redirect(Policy::none())
                 .build()
                 .unwrap();
             let redirect_response = http_client
