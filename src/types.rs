@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 
 use base64;
-use failure::Fail;
+use thiserror::Error;
 use http::header::{HeaderValue, ACCEPT};
 use http::method::Method;
 use http::status::StatusCode;
@@ -198,17 +198,17 @@ pub trait GrantType: Debug + DeserializeOwned + Serialize + 'static {}
 ///
 /// Error signing a message.
 ///
-#[derive(Clone, Debug, Fail, PartialEq)]
+#[derive(Clone, Debug, Error, PartialEq)]
 #[non_exhaustive]
 pub enum SigningError {
     /// Failed to sign the message using the given key and parameters.
-    #[fail(display = "Crypto error")]
+    #[error("Crypto error")]
     CryptoError,
     /// Unsupported signature algorithm.
-    #[fail(display = "Unsupported signature algorithm: {}", _0)]
+    #[error("Unsupported signature algorithm: {0}")]
     UnsupportedAlg(String),
     /// An unexpected error occurred.
-    #[fail(display = "Other error: {}", _0)]
+    #[error("Other error: {0}")]
     Other(String),
 }
 
@@ -752,7 +752,7 @@ where
     ) -> Result<Self, DiscoveryError<RE>>
     where
         HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
-        RE: Fail,
+        RE: std::error::Error + 'static,
     {
         http_client(Self::fetch_request(url))
             .map_err(DiscoveryError::Request)
@@ -770,7 +770,7 @@ where
     where
         F: Future<Output = Result<HttpResponse, RE>>,
         HC: FnOnce(HttpRequest) -> F,
-        RE: Fail,
+        RE: std::error::Error + 'static,
     {
         http_client(Self::fetch_request(url))
             .await
@@ -791,7 +791,7 @@ where
 
     fn fetch_response<RE>(http_response: HttpResponse) -> Result<Self, DiscoveryError<RE>>
     where
-        RE: Fail,
+        RE: std::error::Error + 'static,
     {
         if http_response.status_code != StatusCode::OK {
             return Err(DiscoveryError::Response(
@@ -962,7 +962,7 @@ new_url_type![
 
 ///
 /// Informs the Authorization Server of the desired authorization processing flow, including what
-/// parameters are returned from the endpoints used.  
+/// parameters are returned from the endpoints used.
 ///
 /// See [OAuth 2.0 Multiple Response Type Encoding Practices](
 ///     http://openid.net/specs/oauth-v2-multiple-response-types-1_0.html#ResponseTypesAndModes)

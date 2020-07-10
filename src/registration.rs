@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use failure::Fail;
+use thiserror::Error;
 use http::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
 use http::method::Method;
 use http::status::StatusCode;
@@ -469,7 +469,7 @@ where
     >
     where
         HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
-        RE: Fail,
+        RE: std::error::Error + 'static,
     {
         self.prepare_registration(registration_endpoint)
             .and_then(|http_request| {
@@ -493,7 +493,7 @@ where
     where
         F: Future<Output = Result<HttpResponse, RE>>,
         HC: FnOnce(HttpRequest) -> F,
-        RE: Fail,
+        RE: std::error::Error + 'static,
     {
         let http_request = self.prepare_registration(registration_endpoint)?;
         let http_response = http_client(http_request)
@@ -507,7 +507,7 @@ where
         registration_endpoint: &RegistrationUrl,
     ) -> Result<HttpRequest, ClientRegistrationError<ET, RE>>
     where
-        RE: Fail,
+        RE: std::error::Error + 'static,
     {
         let request_json = serde_json::to_string(self.client_metadata())
             .map_err(ClientRegistrationError::Serialize)?
@@ -541,7 +541,7 @@ where
         ClientRegistrationError<ET, RE>,
     >
     where
-        RE: Fail,
+        RE: std::error::Error + 'static,
     {
         // TODO: check for WWW-Authenticate response header if bearer auth was used (see
         //   https://tools.ietf.org/html/rfc6750#section-3)
@@ -853,43 +853,43 @@ pub trait RegisterErrorResponseType: ErrorResponseType + 'static {}
 ///
 /// Error registering a client.
 ///
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum ClientRegistrationError<T, RE>
 where
-    RE: Fail,
-    T: RegisterErrorResponseType + Send + Sync,
+    RE: std::error::Error + 'static,
+    T: RegisterErrorResponseType,
 {
     ///
     /// An unexpected error occurred.
     ///
-    #[fail(display = "Other error: {}", _0)]
+    #[error("Other error: {0}")]
     Other(String),
     ///
     /// Failed to parse server response.
     ///
-    #[fail(display = "Failed to parse server response")]
-    Parse(#[cause] serde_json::Error),
+    #[error("Failed to parse server response")]
+    Parse(#[source] serde_json::Error),
     ///
     /// An error occurred while sending the request or receiving the response (e.g., network
     /// connectivity failed).
     ///
-    #[fail(display = "Request failed")]
-    Request(#[cause] RE),
+    #[error("Request failed")]
+    Request(#[source] RE),
     ///
     /// Server returned an invalid response.
     ///
-    #[fail(display = "Server returned invalid response: {}", _2)]
+    #[error("Server returned invalid response: {2}")]
     Response(StatusCode, Vec<u8>, String),
     ///
     /// Failed to serialize client metadata.
     ///
-    #[fail(display = "Failed to serialize client metadata")]
-    Serialize(#[cause] serde_json::Error),
+    #[error("Failed to serialize client metadata")]
+    Serialize(#[source] serde_json::Error),
     ///
     /// Server returned an error.
     ///
-    #[fail(display = "Server returned error")]
+    #[error("Server returned error")]
     ServerResponse(StandardErrorResponse<T>),
 }
 

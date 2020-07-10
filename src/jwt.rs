@@ -7,6 +7,7 @@ use base64;
 use serde::de::{DeserializeOwned, Error as _, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json;
+use thiserror::Error;
 
 use super::{
     JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse, JweContentEncryptionAlgorithm,
@@ -178,19 +179,19 @@ where
 ///
 /// Error creating a JSON Web Token.
 ///
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum JsonWebTokenError {
     ///
     /// Failed to serialize JWT.
     ///
-    #[fail(display = "Failed to serialize JWT")]
-    SerializationError(#[cause] serde_json::Error),
+    #[error("Failed to serialize JWT")]
+    SerializationError(#[source] serde_json::Error),
     ///
     /// Failed to sign JWT.
     ///
-    #[fail(display = "Failed to sign JWT")]
-    SigningError(#[cause] SigningError),
+    #[error("Failed to sign JWT")]
+    SigningError(#[source] SigningError),
 }
 
 #[derive(Clone, Debug, PartialEq)]

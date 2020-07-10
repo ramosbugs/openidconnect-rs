@@ -1,6 +1,5 @@
 #![allow(clippy::expect_fun_call)]
 extern crate env_logger;
-extern crate failure;
 extern crate http;
 #[macro_use]
 extern crate log;

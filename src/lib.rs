@@ -58,14 +58,14 @@
 //!    Synchronous HTTP clients should implement the following trait:
 //!    ```ignore
 //!    FnOnce(HttpRequest) -> Result<HttpResponse, RE>
-//!    where RE: failure::Fail
+//!    where RE: std::error::Error + 'static
 //!
 //!    Async/await `futures` 0.3 HTTP clients should implement the following trait:
 //!    ```ignore
 //!    FnOnce(HttpRequest) -> F
 //!    where
 //!      F: Future<Output = Result<HttpResponse, RE>>,
-//!      RE: failure::Fail
+//!      RE: std::error::Error + 'static
 //!    ```
 //!
 //! # OpenID Connect Relying Party (Client) Interface
@@ -105,12 +105,14 @@
 //!   CoreProviderMetadata,
 //!   CoreResponseType,
 //! };
+//! use anyhow::anyhow;
+//!
 //! # #[cfg(feature = "reqwest-010")]
 //! use openidconnect::reqwest::http_client;
 //! use url::Url;
 //!
 //! # #[cfg(feature = "reqwest-010")]
-//! # fn err_wrapper() -> Result<(), failure::Error> {
+//! # fn err_wrapper() -> Result<(), anyhow::Error> {
 //! // Use OpenID Connect Discovery to fetch the provider metadata.
 //! use openidconnect::{OAuth2TokenResponse, TokenResponse};
 //! let provider_metadata = CoreProviderMetadata::discover(
@@ -165,7 +167,7 @@
 //! // Extract the ID token claims after verifying its authenticity and nonce.
 //! let id_token = token_response
 //!   .id_token()
-//!   .ok_or_else(|| failure::format_err!("Server did not return an ID token"))?;
+//!   .ok_or_else(|| anyhow!("Server did not return an ID token"))?;
 //! let claims = id_token.claims(&client.id_token_verifier(), &nonce)?;
 //!
 //! // Verify the access token hash to ensure that the access token hasn't been substituted for
@@ -176,7 +178,7 @@
 //!         &id_token.signing_alg()?
 //!     )?;
 //!     if actual_access_token_hash != *expected_access_token_hash {
-//!         return Err(failure::Error::from_boxed_compat("Invalid access token".into()));
+//!         return Err(anyhow!("Invalid access token"));
 //!     }
 //! }
 //!
@@ -229,8 +231,9 @@
 //!     CoreSubjectIdentifierType
 //! };
 //! use url::Url;
+//! use anyhow;
 //!
-//! # fn err_wrapper() -> Result<String, failure::Error> {
+//! # fn err_wrapper() -> Result<String, anyhow::Error> {
 //! let provider_metadata = CoreProviderMetadata::new(
 //!     // Parameters required by the OpenID Connect Discovery spec.
 //!     IssuerUrl::new("https://accounts.example.com".to_string())?,
@@ -288,7 +291,7 @@
 //!     CoreClaimName::new("locale".to_string()),
 //! ]));
 //!
-//! serde_json::to_string(&provider_metadata).map_err(failure::Error::from)
+//! serde_json::to_string(&provider_metadata).map_err(From::from)
 //! # }
 //! ```
 //!
@@ -305,8 +308,9 @@
 //! ```rust,no_run
 //! use openidconnect::{JsonWebKeyId, PrivateSigningKey};
 //! use openidconnect::core::{CoreJsonWebKey, CoreJsonWebKeySet, CoreRsaPrivateSigningKey};
+//! use anyhow;
 //!
-//! # fn err_wrapper() -> Result<String, failure::Error> {
+//! # fn err_wrapper() -> Result<String, anyhow::Error> {
 //! # let rsa_pem = "";
 //! let jwks = CoreJsonWebKeySet::new(
 //!     vec![
@@ -322,7 +326,7 @@
 //!     ]
 //! );
 //!
-//! serde_json::to_string(&jwks).map_err(failure::Error::from)
+//! serde_json::to_string(&jwks).map_err(From::from)
 //! # }
 //! ```
 //!
@@ -365,8 +369,9 @@
 //!     CoreTokenResponse,
 //!     CoreTokenType,
 //! };
+//! use anyhow;
 //!
-//! # fn err_wrapper() -> Result<CoreTokenResponse, failure::Error> {
+//! # fn err_wrapper() -> Result<CoreTokenResponse, anyhow::Error> {
 //! # let rsa_pem = "";
 //! # let access_token = AccessToken::new("".to_string());
 //! let id_token = CoreIdToken::new(
@@ -459,10 +464,11 @@
 //! # #[cfg(feature = "reqwest-010")]
 //! use openidconnect::reqwest::async_http_client;
 //! use url::Url;
+//! use anyhow::anyhow;
 //!
 //!
 //! # #[cfg(feature = "reqwest-010")]
-//! # async fn err_wrapper() -> Result<(), failure::Error> {
+//! # async fn err_wrapper() -> Result<(), anyhow::Error> {
 //! // Use OpenID Connect Discovery to fetch the provider metadata.
 //! use openidconnect::{OAuth2TokenResponse, TokenResponse};
 //! let provider_metadata = CoreProviderMetadata::discover_async(
@@ -519,7 +525,7 @@
 //! // Extract the ID token claims after verifying its authenticity and nonce.
 //! let id_token = token_response
 //!   .id_token()
-//!   .ok_or_else(|| failure::format_err!("Server did not return an ID token"))?;
+//!   .ok_or_else(|| anyhow!("Server did not return an ID token"))?;
 //! let claims = id_token.claims(&client.id_token_verifier(), &nonce)?;
 //!
 //! // Verify the access token hash to ensure that the access token hasn't been substituted for
@@ -530,7 +536,7 @@
 //!         &id_token.signing_alg()?
 //!     )?;
 //!     if actual_access_token_hash != *expected_access_token_hash {
-//!         return Err(failure::Error::from_boxed_compat("Invalid access token".into()));
+//!         return Err(anyhow!("Invalid access token"));
 //!     }
 //! }
 //!
@@ -550,8 +556,6 @@
 //! ```
 //!
 
-#[macro_use]
-extern crate failure_derive;
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
@@ -728,7 +732,7 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
     P: AuthPrompt,
-    TE: 'static + ErrorResponse,
+    TE: ErrorResponse + 'static,
     TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
     TT: TokenType + 'static,
 {
@@ -1166,7 +1170,7 @@ where
 
     ///
     /// Overrides the `redirect_url` to the one specified.
-    /// 
+    ///
     pub fn set_redirect_url(mut self, redirect_url: Cow<'a, RedirectUrl>) -> Self {
         self.inner = self.inner.set_redirect_url(redirect_url);
         self

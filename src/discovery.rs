@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::future::Future;
 use std::marker::PhantomData;
 
-use failure::Fail;
+use thiserror::Error;
 use http::header::{HeaderValue, ACCEPT};
 use http::method::Method;
 use http::status::StatusCode;
@@ -317,7 +317,7 @@ where
     ) -> Result<Self, DiscoveryError<RE>>
     where
         HC: Fn(HttpRequest) -> Result<HttpResponse, RE>,
-        RE: Fail,
+        RE: std::error::Error + 'static,
     {
         let discovery_url = issuer_url
             .join(CONFIG_URL_SUFFIX)
@@ -345,7 +345,7 @@ where
     where
         F: Future<Output = Result<HttpResponse, RE>>,
         HC: Fn(HttpRequest) -> F + 'static,
-        RE: Fail,
+        RE: std::error::Error + 'static,
     {
         let discovery_url = issuer_url
             .join(CONFIG_URL_SUFFIX)
@@ -380,7 +380,7 @@ where
         discovery_response: HttpResponse,
     ) -> Result<Self, DiscoveryError<RE>>
     where
-        RE: Fail,
+        RE: std::error::Error + 'static,
     {
         if discovery_response.status_code != StatusCode::OK {
             return Err(DiscoveryError::Response(
@@ -429,42 +429,42 @@ where
 ///
 /// Error retrieving provider metadata.
 ///
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum DiscoveryError<RE>
 where
-    RE: Fail,
+    RE: std::error::Error + 'static,
 {
     ///
     /// An unexpected error occurred.
     ///
-    #[fail(display = "Other error: {}", _0)]
+    #[error("Other error: {0}")]
     Other(String),
     ///
     /// Failed to parse server response.
     ///
-    #[fail(display = "Failed to parse server response")]
-    Parse(#[cause] serde_json::Error),
+    #[error("Failed to parse server response")]
+    Parse(#[source] serde_json::Error),
     ///
     /// An error occurred while sending the request or receiving the response (e.g., network
     /// connectivity failed).
     ///
-    #[fail(display = "Request failed")]
-    Request(#[cause] RE),
+    #[error("Request failed")]
+    Request(#[source] RE),
     ///
     /// Server returned an invalid response.
     ///
-    #[fail(display = "Server returned invalid response: {}", _2)]
+    #[error("Server returned invalid response: {2}")]
     Response(StatusCode, Vec<u8>, String),
     ///
     /// Failed to parse discovery URL from issuer URL.
     ///
-    #[fail(display = "Failed to parse URL")]
-    UrlParse(#[cause] url::ParseError),
+    #[error("Failed to parse URL")]
+    UrlParse(#[source] url::ParseError),
     ///
     /// Failed to validate provider metadata.
     ///
-    #[fail(display = "Validation error: {}", _0)]
+    #[error("Validation error: {0}")]
     Validation(String),
 }
 

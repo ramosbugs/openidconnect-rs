@@ -10,6 +10,7 @@ use oauth2::{ClientId, ClientSecret};
 use ring::constant_time::verify_slices_are_equal;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use thiserror::Error;
 
 use crate::jwt::{JsonWebToken, JsonWebTokenJsonPayloadSerde};
 use crate::user_info::UserInfoClaimsImpl;
@@ -31,63 +32,63 @@ pub(crate) trait IssuerClaim {
 ///
 /// Error verifying claims.
 ///
-#[derive(Clone, Debug, Fail, PartialEq)]
+#[derive(Clone, Debug, Error, PartialEq)]
 #[non_exhaustive]
 pub enum ClaimsVerificationError {
     /// Claims have expired.
-    #[fail(display = "Expired: {}", _0)]
+    #[error("Expired: {0}")]
     Expired(String),
     /// Audience claim is invalid.
-    #[fail(display = "Invalid audiences: {}", _0)]
+    #[error("Invalid audiences: {0}")]
     InvalidAudience(String),
     /// Authorization context class reference (`acr`) claim is invalid.
-    #[fail(display = "Invalid authorization context class reference: {}", _0)]
+    #[error("Invalid authorization context class reference: {0}")]
     InvalidAuthContext(String),
     /// User authenticated too long ago.
-    #[fail(display = "Invalid authentication time: {}", _0)]
+    #[error("Invalid authentication time: {0}")]
     InvalidAuthTime(String),
     /// Issuer claim is invalid.
-    #[fail(display = "Invalid issuer: {}", _0)]
+    #[error("Invalid issuer: {0}")]
     InvalidIssuer(String),
     /// Nonce is invalid.
-    #[fail(display = "Invalid nonce: {}", _0)]
+    #[error("Invalid nonce: {0}")]
     InvalidNonce(String),
     /// Subject claim is invalid.
-    #[fail(display = "Invalid subject: {}", _0)]
+    #[error("Invalid subject: {0}")]
     InvalidSubject(String),
     /// No signature present but claims must be signed.
-    #[fail(display = "Claims must be signed")]
+    #[error("Claims must be signed")]
     NoSignature,
     /// An unexpected error occurred.
-    #[fail(display = "{}", _0)]
+    #[error("{0}")]
     Other(String),
     /// Failed to verify the claims signature.
-    #[fail(display = "Signature verification failed")]
-    SignatureVerification(#[cause] SignatureVerificationError),
+    #[error("Signature verification failed")]
+    SignatureVerification(#[source] SignatureVerificationError),
     /// Unsupported argument or value.
-    #[fail(display = "Unsupported: {}", _0)]
+    #[error("Unsupported: {0}")]
     Unsupported(String),
 }
 
 ///
 /// Error verifying claims signature.
 ///
-#[derive(Clone, Debug, Fail, PartialEq)]
+#[derive(Clone, Debug, Error, PartialEq)]
 #[non_exhaustive]
 pub enum SignatureVerificationError {
     /// More than one key matches the supplied key constraints (e.g., key ID).
-    #[fail(display = "Ambiguous key identification: {}", _0)]
+    #[error("Ambiguous key identification: {0}")]
     AmbiguousKeyId(String),
     /// Invalid signature for the supplied claims and signing key.
-    #[fail(display = "Crypto error: {}", _0)]
+    #[error("Crypto error: {0}")]
     CryptoError(String),
     /// The supplied signature algorithm is disallowed by the verifier.
-    #[fail(display = "Disallowed signature algorithm: {}", _0)]
+    #[error("Disallowed signature algorithm: {0}")]
     DisallowedAlg(String),
     /// The supplied key cannot be used in this context. This may occur if the key type does not
     /// match the signature type (e.g., an RSA key used to validate an HMAC) or the JWK usage
     /// disallows signatures.
-    #[fail(display = "Invalid cryptographic key: {}", _0)]
+    #[error("Invalid cryptographic key: {0}")]
     InvalidKey(String),
     /// The signing key needed for verifying the
     /// [JSON Web Token](https://tools.ietf.org/html/rfc7519)'s signature/MAC could not be found.
@@ -104,13 +105,13 @@ pub enum SignatureVerificationError {
     /// This error can also occur if the identified
     /// [JSON Web Key](https://tools.ietf.org/html/rfc7517) is of the wrong type (e.g., an RSA key
     /// when the JOSE header specifies an ECDSA algorithm) or does not support signing.
-    #[fail(display = "No matching key found")]
+    #[error("No matching key found")]
     NoMatchingKey,
     /// Unsupported signature algorithm.
-    #[fail(display = "Unsupported signature algorithm: {}", _0)]
+    #[error("Unsupported signature algorithm: {0}")]
     UnsupportedAlg(String),
     /// An unexpected error occurred.
-    #[fail(display = "Other error: {}", _0)]
+    #[error("Other error: {0}")]
     Other(String),
 }
 
