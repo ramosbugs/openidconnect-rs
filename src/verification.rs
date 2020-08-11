@@ -131,7 +131,7 @@ where
     iss_required: bool,
     issuer: IssuerUrl,
     is_signature_check_enabled: bool,
-    other_aud_verifier_fn: Arc<dyn Fn(&Audience) -> bool + 'a>,
+    other_aud_verifier_fn: Arc<dyn Fn(&Audience) -> bool + 'a + Send + Sync>,
     signature_keys: JsonWebKeySet<JS, JT, JU, K>,
 }
 impl<'a, JS, JT, JU, K> JwtClaimsVerifier<'a, JS, JT, JU, K>
@@ -196,7 +196,7 @@ where
 
     pub fn set_other_audience_verifier_fn<T>(mut self, other_aud_verifier_fn: T) -> Self
     where
-        T: Fn(&Audience) -> bool + 'a,
+        T: Fn(&Audience) -> bool + 'a + Send + Sync,
     {
         self.other_aud_verifier_fn = Arc::new(other_aud_verifier_fn);
         self
@@ -512,12 +512,12 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
-    acr_verifier_fn: Arc<dyn Fn(Option<&AuthenticationContextClass>) -> Result<(), String> + 'a>,
+    acr_verifier_fn: Arc<dyn Fn(Option<&AuthenticationContextClass>) -> Result<(), String> + 'a + Send + Sync>,
     #[allow(clippy::type_complexity)]
-    auth_time_verifier_fn: Arc<dyn Fn(Option<DateTime<Utc>>) -> Result<(), String> + 'a>,
-    iat_verifier_fn: Arc<dyn Fn(DateTime<Utc>) -> Result<(), String> + 'a>,
+    auth_time_verifier_fn: Arc<dyn Fn(Option<DateTime<Utc>>) -> Result<(), String> + 'a + Send + Sync>,
+    iat_verifier_fn: Arc<dyn Fn(DateTime<Utc>) -> Result<(), String> + 'a + Send + Sync>,
     jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>,
-    time_fn: Arc<dyn Fn() -> DateTime<Utc> + 'a>,
+    time_fn: Arc<dyn Fn() -> DateTime<Utc> + 'a + Send + Sync>,
 }
 impl<'a, JS, JT, JU, K> IdTokenVerifier<'a, JS, JT, JU, K>
 where
@@ -596,7 +596,7 @@ where
     ///
     pub fn set_auth_context_verifier_fn<T>(mut self, acr_verifier_fn: T) -> Self
     where
-        T: Fn(Option<&AuthenticationContextClass>) -> Result<(), String> + 'a,
+        T: Fn(Option<&AuthenticationContextClass>) -> Result<(), String> + 'a + Send + Sync,
     {
         self.acr_verifier_fn = Arc::new(acr_verifier_fn);
         self
@@ -610,7 +610,7 @@ where
     ///
     pub fn set_auth_time_verifier_fn<T>(mut self, auth_time_verifier_fn: T) -> Self
     where
-        T: Fn(Option<DateTime<Utc>>) -> Result<(), String> + 'a,
+        T: Fn(Option<DateTime<Utc>>) -> Result<(), String> + 'a + Send + Sync,
     {
         self.auth_time_verifier_fn = Arc::new(auth_time_verifier_fn);
         self
@@ -664,7 +664,7 @@ where
     ///
     pub fn set_time_fn<T>(mut self, time_fn: T) -> Self
     where
-        T: Fn() -> DateTime<Utc> + 'a,
+        T: Fn() -> DateTime<Utc> + 'a + Send + Sync,
     {
         self.time_fn = Arc::new(time_fn);
         self
@@ -678,7 +678,7 @@ where
     ///
     pub fn set_issue_time_verifier_fn<T>(mut self, iat_verifier_fn: T) -> Self
     where
-        T: Fn(DateTime<Utc>) -> Result<(), String> + 'a,
+        T: Fn(DateTime<Utc>) -> Result<(), String> + 'a + Send + Sync,
     {
         self.iat_verifier_fn = Arc::new(iat_verifier_fn);
         self
@@ -696,7 +696,7 @@ where
     ///
     pub fn set_other_audience_verifier_fn<T>(mut self, other_aud_verifier_fn: T) -> Self
     where
-        T: Fn(&Audience) -> bool + 'a,
+        T: Fn(&Audience) -> bool + 'a + Send + Sync,
     {
         self.jwt_verifier = self
             .jwt_verifier
@@ -923,7 +923,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::cell::Cell;
+    use std::sync::atomic::{AtomicUsize, Ordering, AtomicBool};
 
     use chrono::{TimeZone, Utc};
     use oauth2::{ClientId, ClientSecret};
@@ -1510,8 +1510,8 @@ mod tests {
 
         let client_id = ClientId::new("my_client".to_string());
         let issuer = IssuerUrl::new("https://example.com".to_string()).unwrap();
-        let mock_current_time = Cell::new(1544932149);
-        let mock_is_valid_issue_time = Cell::new(true);
+        let mock_current_time = AtomicUsize::new(1544932149);
+        let mock_is_valid_issue_time = AtomicBool::new(true);
         // Extra scope needed to ensure closures are destroyed before the values they borrow.
         {
             let public_client_verifier = CoreIdTokenVerifier::new_public_client(
@@ -1519,9 +1519,9 @@ mod tests {
                 issuer.clone(),
                 CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
             )
-            .set_time_fn(|| seconds_to_utc(&Seconds::new(mock_current_time.get().into())).unwrap())
+            .set_time_fn(|| seconds_to_utc(&Seconds::new(mock_current_time.load(Ordering::Relaxed).into())).unwrap())
             .set_issue_time_verifier_fn(|_| {
-                if mock_is_valid_issue_time.get() {
+                if mock_is_valid_issue_time.load(Ordering::Relaxed) {
                     Ok(())
                 } else {
                     Err("Invalid iat claim".to_string())
@@ -1563,24 +1563,24 @@ mod tests {
             // TODO: disallowed algs
 
             // Expired token
-            mock_current_time.set(1544928549 + 3600);
+            mock_current_time.store(1544928549 + 3600, Ordering::Relaxed);
             match public_client_verifier
                 .verified_claims(&test_jwt_without_nonce, |_: Option<&Nonce>| Ok(()))
             {
                 Err(ClaimsVerificationError::Expired(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
             }
-            mock_current_time.set(1544928549 + 1);
+            mock_current_time.store(1544928549 + 1, Ordering::Relaxed);
 
             // Invalid issue time
-            mock_is_valid_issue_time.set(false);
+            mock_is_valid_issue_time.store(false, Ordering::Relaxed);
             match public_client_verifier
                 .verified_claims(&test_jwt_without_nonce, |_: Option<&Nonce>| Ok(()))
             {
                 Err(ClaimsVerificationError::Expired(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
             }
-            mock_is_valid_issue_time.set(true);
+            mock_is_valid_issue_time.store(true, Ordering::Relaxed);
 
             let valid_nonce = Nonce::new("the_nonce".to_string());
 
@@ -1729,7 +1729,7 @@ mod tests {
                 issuer.clone(),
                 CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
             )
-            .set_time_fn(|| seconds_to_utc(&Seconds::new(mock_current_time.get().into())).unwrap());
+            .set_time_fn(|| seconds_to_utc(&Seconds::new(mock_current_time.load(Ordering::Relaxed).into())).unwrap());
             match private_client_verifier.verified_claims(&test_jwt_hs256, &valid_nonce) {
                 Err(ClaimsVerificationError::SignatureVerification(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
@@ -1759,7 +1759,7 @@ mod tests {
                 )
                 .allow_any_alg()
                 .set_time_fn(|| {
-                    seconds_to_utc(&Seconds::new(mock_current_time.get().into())).unwrap()
+                    seconds_to_utc(&Seconds::new(mock_current_time.load(Ordering::Relaxed).into())).unwrap()
                 });
             match private_client_verifier_with_other_secret
                 .verified_claims(&test_jwt_hs256, &valid_nonce)
@@ -1820,13 +1820,13 @@ mod tests {
         let rsa_pub_key = serde_json::from_str::<CoreJsonWebKey>(TEST_RSA_PUB_KEY)
             .expect("deserialization failed");
 
-        let mock_current_time = Cell::new(1544932148);
+        let mock_current_time = AtomicUsize::new(1544932148);
         let verifier = CoreIdTokenVerifier::new_public_client(
             client_id,
             issuer,
             CoreJsonWebKeySet::new(vec![rsa_pub_key]),
         )
-        .set_time_fn(|| seconds_to_utc(&Seconds::new(mock_current_time.get().into())).unwrap());
+        .set_time_fn(|| seconds_to_utc(&Seconds::new(mock_current_time.load(Ordering::Relaxed).into())).unwrap());
         id_token.claims(&verifier, &nonce).unwrap();
     }
 
