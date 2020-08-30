@@ -961,10 +961,10 @@ where
         self.oauth2_client.exchange_password(username, password)
 	}
 	
-	///
+    ///
     /// Creates a request builder for exchanging client credentials for an access token.
     ///
-    /// See https://tools.ietf.org/html/rfc6749#section-6
+    /// See https://tools.ietf.org/html/rfc6749#section-4.4
     ///
     pub fn exchange_client_credentials<'a, 'b>(
         &'a self,
