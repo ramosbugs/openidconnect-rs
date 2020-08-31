@@ -15,6 +15,7 @@ use rp_common::{
 mod rp_common;
 
 #[test]
+#[ignore]
 fn rp_discovery_openid_configuration() {
     const TEST_ID: &str = "rp-discovery-openid-configuration";
     init_log(TEST_ID);
@@ -74,6 +75,7 @@ fn rp_discovery_openid_configuration() {
 }
 
 #[test]
+#[ignore]
 fn rp_registration_dynamic() {
     const TEST_ID: &str = "rp-registration-dynamic";
     init_log(TEST_ID);

@@ -253,6 +253,7 @@ impl TestState {
 }
 
 #[test]
+#[ignore]
 fn rp_response_type_code() {
     let test_state = TestState::init("rp-response_type-code", |reg| reg).authorize(&[]);
     assert!(
@@ -266,6 +267,7 @@ fn rp_response_type_code() {
 }
 
 #[test]
+#[ignore]
 fn rp_scope_userinfo_claims() {
     let user_info_scopes = vec!["profile", "email", "address", "phone"]
         .iter()
@@ -301,6 +303,7 @@ fn rp_scope_userinfo_claims() {
 }
 
 #[test]
+#[ignore]
 fn rp_nonce_invalid() {
     let test_state = TestState::init("rp-nonce-invalid", |reg| reg)
         .authorize(&[])
@@ -317,6 +320,7 @@ fn rp_nonce_invalid() {
 }
 
 #[test]
+#[ignore]
 fn rp_token_endpoint_client_secret_basic() {
     let test_state = TestState::init("rp-token_endpoint-client_secret_basic", |reg| {
         reg.set_token_endpoint_auth_method(Some(CoreClientAuthMethod::ClientSecretBasic))
@@ -332,6 +336,7 @@ fn rp_token_endpoint_client_secret_basic() {
 }
 
 #[test]
+#[ignore]
 fn rp_token_endpoint_client_secret_post() {
     let test_state = TestState::init("rp-token_endpoint-client_secret_post", |reg| {
         reg.set_token_endpoint_auth_method(Some(CoreClientAuthMethod::ClientSecretPost))
@@ -347,6 +352,7 @@ fn rp_token_endpoint_client_secret_post() {
 }
 
 #[test]
+#[ignore]
 fn rp_id_token_kid_absent_single_jwks() {
     let test_state = TestState::init("rp-id_token-kid-absent-single-jwks", |reg| reg)
         .authorize(&[])
@@ -359,6 +365,7 @@ fn rp_id_token_kid_absent_single_jwks() {
 }
 
 #[test]
+#[ignore]
 fn rp_id_token_iat() {
     let mut test_state = TestState::init("rp-id_token-iat", |reg| reg).authorize(&[]);
 
@@ -382,6 +389,7 @@ fn rp_id_token_iat() {
 }
 
 #[test]
+#[ignore]
 fn rp_id_token_aud() {
     let test_state = TestState::init("rp-id_token-aud", |reg| reg)
         .authorize(&[])
@@ -398,6 +406,7 @@ fn rp_id_token_aud() {
 }
 
 #[test]
+#[ignore]
 fn rp_id_token_kid_absent_multiple_jwks() {
     let test_state = TestState::init("rp-id_token-kid-absent-multiple-jwks", |reg| reg)
         .authorize(&[])
@@ -414,6 +423,7 @@ fn rp_id_token_kid_absent_multiple_jwks() {
 }
 
 #[test]
+#[ignore]
 fn rp_id_token_sig_none() {
     let test_state = TestState::init("rp-id_token-sig-none", |reg| reg)
         .authorize(&[])
@@ -433,6 +443,7 @@ fn rp_id_token_sig_none() {
 }
 
 #[test]
+#[ignore]
 fn rp_id_token_sig_rs256() {
     let test_state = TestState::init("rp-id_token-sig-rs256", |reg| reg)
         .authorize(&[])
@@ -445,6 +456,7 @@ fn rp_id_token_sig_rs256() {
 }
 
 #[test]
+#[ignore]
 fn rp_id_token_sig_hs256() {
     let test_state = TestState::init("rp-id_token-sig-hs256", |reg| reg)
         .authorize(&[])
@@ -463,6 +475,7 @@ fn rp_id_token_sig_hs256() {
 }
 
 #[test]
+#[ignore]
 fn rp_id_token_sub() {
     let mut test_state = TestState::init("rp-id_token-sub", |reg| reg).authorize(&[]);
 
@@ -486,6 +499,7 @@ fn rp_id_token_sub() {
 }
 
 #[test]
+#[ignore]
 fn rp_id_token_bad_sig_rs256() {
     let test_state = TestState::init("rp-id_token-bad-sig-rs256", |reg| reg)
         .authorize(&[])
@@ -502,6 +516,7 @@ fn rp_id_token_bad_sig_rs256() {
 }
 
 #[test]
+#[ignore]
 fn rp_id_token_bad_sig_hs256() {
     let test_state = TestState::init("rp-id_token-bad-sig-hs256", |reg| reg)
         .authorize(&[])
@@ -525,6 +540,7 @@ fn rp_id_token_bad_sig_hs256() {
 }
 
 #[test]
+#[ignore]
 fn rp_id_token_issuer_mismatch() {
     let test_state = TestState::init("rp-id_token-issuer-mismatch", |reg| reg)
         .authorize(&[])
@@ -541,6 +557,7 @@ fn rp_id_token_issuer_mismatch() {
 }
 
 #[test]
+#[ignore]
 fn rp_userinfo_bad_sub_claim() {
     let test_state = TestState::init("rp-userinfo-bad-sub-claim", |reg| reg)
         .authorize(&[Scope::new("profile".to_string())])
@@ -558,6 +575,7 @@ fn rp_userinfo_bad_sub_claim() {
 }
 
 #[test]
+#[ignore]
 fn rp_userinfo_bearer_header() {
     let test_state = TestState::init("rp-userinfo-bearer-header", |reg| reg)
         .authorize(&[Scope::new("profile".to_string())])
@@ -571,6 +589,7 @@ fn rp_userinfo_bearer_header() {
 }
 
 #[test]
+#[ignore]
 fn rp_userinfo_sig() {
     let test_state = TestState::init("rp-userinfo-sig", |reg| {
         reg.set_userinfo_signed_response_alg(Some(CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256))
