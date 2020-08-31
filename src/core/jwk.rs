@@ -276,7 +276,7 @@ impl CoreRsaPrivateSigningKey {
     fn lax_base64_parsing(input: &str) -> String {
         input
             .chars()
-            .filter(Self::keep_char_in_lax_base64_parsing)
+            .filter(|c| Self::keep_char_in_lax_base64_parsing(*c))
             .collect()
     }
 
@@ -284,7 +284,7 @@ impl CoreRsaPrivateSigningKey {
     /// be removed in accordance to lax base64 parsing.
     ///
     /// RFC 7468 Lax Parsing
-    fn keep_char_in_lax_base64_parsing(input: &char) -> bool {
+    fn keep_char_in_lax_base64_parsing(input: char) -> bool {
         match input {
             ' ' | '\n' | '\t' | '\r' | '\x0b' | '\x0c' => false,
             _ => true,
