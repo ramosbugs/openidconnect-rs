@@ -548,6 +548,7 @@ macro_rules! deserialize_fields {
     (@struct_recurs [$($struct_type:tt)+] {
         $($name:ident: $e:expr),+ =>
     }) => {
+        #[allow(clippy::redundant_field_names)]
         $($struct_type)+ {
             $($name: $e),+
         }
