@@ -23,8 +23,10 @@ before_script:
   - cargo install --force cargo-audit
   - cargo install --force cargo-when
   - rustup component add clippy
+  - rustup component add rustfmt
 script:
   - cargo clippy --all --all-targets --offline -- --deny warnings
+  - cargo fmt --all -- --check
   - cargo test --tests --examples
   - cargo test --doc
   - cargo test --all-features
