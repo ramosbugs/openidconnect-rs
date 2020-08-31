@@ -572,12 +572,13 @@ use std::str;
 use std::time::Duration;
 
 pub use oauth2::{
-    AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CodeTokenRequest,
-    CsrfToken, EmptyExtraTokenFields, ErrorResponse, ErrorResponseType, ExtraTokenFields,
-    HttpRequest, HttpResponse, PasswordTokenRequest, ClientCredentialsTokenRequest, PkceCodeChallenge, PkceCodeChallengeMethod,
-    PkceCodeVerifier, RedirectUrl, RefreshToken, RefreshTokenRequest, RequestTokenError,
-    ResourceOwnerPassword, ResourceOwnerUsername, Scope, StandardErrorResponse,
-    StandardTokenResponse, TokenResponse as OAuth2TokenResponse, TokenType, TokenUrl,
+    AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientCredentialsTokenRequest, ClientId,
+    ClientSecret, CodeTokenRequest, CsrfToken, EmptyExtraTokenFields, ErrorResponse,
+    ErrorResponseType, ExtraTokenFields, HttpRequest, HttpResponse, PasswordTokenRequest,
+    PkceCodeChallenge, PkceCodeChallengeMethod, PkceCodeVerifier, RedirectUrl, RefreshToken,
+    RefreshTokenRequest, RequestTokenError, ResourceOwnerPassword, ResourceOwnerUsername, Scope,
+    StandardErrorResponse, StandardTokenResponse, TokenResponse as OAuth2TokenResponse, TokenType,
+    TokenUrl,
 };
 
 ///
@@ -959,8 +960,8 @@ where
         'a: 'b,
     {
         self.oauth2_client.exchange_password(username, password)
-	}
-	
+    }
+
     ///
     /// Creates a request builder for exchanging client credentials for an access token.
     ///
@@ -1307,8 +1308,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
     use std::borrow::Cow;
+    use std::time::Duration;
 
     use oauth2::{AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl};
 

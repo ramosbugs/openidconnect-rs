@@ -3,12 +3,11 @@ use std::ops::Deref;
 use std::str;
 
 use chrono::{DateTime, Utc};
-use thiserror::Error;
 use http::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
 use http::method::Method;
 use http::status::StatusCode;
 use oauth2::AccessToken;
-use serde_json;
+use thiserror::Error;
 use url::Url;
 
 use crate::helpers::FilteredFlatten;
@@ -120,7 +119,7 @@ where
         if http_response.status_code != StatusCode::OK {
             return Err(UserInfoError::Response(
                 http_response.status_code,
-                http_response.body.clone(),
+                http_response.body,
                 "unexpected HTTP status code".to_string(),
             ));
         }

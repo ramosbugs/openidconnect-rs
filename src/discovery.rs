@@ -2,15 +2,13 @@ use std::fmt::Debug;
 use std::future::Future;
 use std::marker::PhantomData;
 
-use thiserror::Error;
 use http::header::{HeaderValue, ACCEPT};
 use http::method::Method;
 use http::status::StatusCode;
 use oauth2::{AuthUrl, Scope, TokenUrl};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use serde_json;
-use url;
+use thiserror::Error;
 
 use super::http_utils::{check_content_type, MIME_TYPE_JSON};
 use super::types::{

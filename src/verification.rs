@@ -512,9 +512,11 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
-    acr_verifier_fn: Arc<dyn Fn(Option<&AuthenticationContextClass>) -> Result<(), String> + 'a + Send + Sync>,
+    acr_verifier_fn:
+        Arc<dyn Fn(Option<&AuthenticationContextClass>) -> Result<(), String> + 'a + Send + Sync>,
     #[allow(clippy::type_complexity)]
-    auth_time_verifier_fn: Arc<dyn Fn(Option<DateTime<Utc>>) -> Result<(), String> + 'a + Send + Sync>,
+    auth_time_verifier_fn:
+        Arc<dyn Fn(Option<DateTime<Utc>>) -> Result<(), String> + 'a + Send + Sync>,
     iat_verifier_fn: Arc<dyn Fn(DateTime<Utc>) -> Result<(), String> + 'a + Send + Sync>,
     jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>,
     time_fn: Arc<dyn Fn() -> DateTime<Utc> + 'a + Send + Sync>,
@@ -923,7 +925,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicUsize, Ordering, AtomicBool};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
     use chrono::{TimeZone, Utc};
     use oauth2::{ClientId, ClientSecret};
@@ -1519,7 +1521,12 @@ mod tests {
                 issuer.clone(),
                 CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
             )
-            .set_time_fn(|| seconds_to_utc(&Seconds::new(mock_current_time.load(Ordering::Relaxed).into())).unwrap())
+            .set_time_fn(|| {
+                seconds_to_utc(&Seconds::new(
+                    mock_current_time.load(Ordering::Relaxed).into(),
+                ))
+                .unwrap()
+            })
             .set_issue_time_verifier_fn(|_| {
                 if mock_is_valid_issue_time.load(Ordering::Relaxed) {
                     Ok(())
@@ -1729,7 +1736,12 @@ mod tests {
                 issuer.clone(),
                 CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
             )
-            .set_time_fn(|| seconds_to_utc(&Seconds::new(mock_current_time.load(Ordering::Relaxed).into())).unwrap());
+            .set_time_fn(|| {
+                seconds_to_utc(&Seconds::new(
+                    mock_current_time.load(Ordering::Relaxed).into(),
+                ))
+                .unwrap()
+            });
             match private_client_verifier.verified_claims(&test_jwt_hs256, &valid_nonce) {
                 Err(ClaimsVerificationError::SignatureVerification(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
@@ -1759,7 +1771,10 @@ mod tests {
                 )
                 .allow_any_alg()
                 .set_time_fn(|| {
-                    seconds_to_utc(&Seconds::new(mock_current_time.load(Ordering::Relaxed).into())).unwrap()
+                    seconds_to_utc(&Seconds::new(
+                        mock_current_time.load(Ordering::Relaxed).into(),
+                    ))
+                    .unwrap()
                 });
             match private_client_verifier_with_other_secret
                 .verified_claims(&test_jwt_hs256, &valid_nonce)
@@ -1826,7 +1841,12 @@ mod tests {
             issuer,
             CoreJsonWebKeySet::new(vec![rsa_pub_key]),
         )
-        .set_time_fn(|| seconds_to_utc(&Seconds::new(mock_current_time.load(Ordering::Relaxed).into())).unwrap());
+        .set_time_fn(|| {
+            seconds_to_utc(&Seconds::new(
+                mock_current_time.load(Ordering::Relaxed).into(),
+            ))
+            .unwrap()
+        });
         id_token.claims(&verifier, &nonce).unwrap();
     }
 

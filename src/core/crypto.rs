@@ -9,11 +9,7 @@ use super::{CoreJsonWebKey, CoreJsonWebKeyType};
 
 use std::ops::Deref;
 
-pub fn sign_hmac(
-    key: &[u8],
-    hmac_alg: hmac::Algorithm,
-    msg: &[u8],
-) -> hmac::Tag {
+pub fn sign_hmac(key: &[u8], hmac_alg: hmac::Algorithm, msg: &[u8]) -> hmac::Tag {
     let signing_key = hmac::Key::new(hmac_alg, key);
     hmac::sign(&signing_key, msg)
 }
@@ -68,7 +64,10 @@ pub fn verify_rsa_signature(
     signature: &[u8],
 ) -> Result<(), SignatureVerificationError> {
     let (n, e) = rsa_public_key(&key).map_err(SignatureVerificationError::InvalidKey)?;
-    let public_key = ring_signature::RsaPublicKeyComponents { n: n.deref(), e: e.deref() };
+    let public_key = ring_signature::RsaPublicKeyComponents {
+        n: n.deref(),
+        e: e.deref(),
+    };
 
     public_key
         .verify(params, msg, signature)

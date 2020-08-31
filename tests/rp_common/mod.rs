@@ -6,7 +6,6 @@ use std::cell::RefCell;
 use std::sync::Once;
 use std::time::Duration;
 
-use openidconnect;
 use openidconnect::core::{
     CoreApplicationType, CoreClientRegistrationRequest, CoreClientRegistrationResponse,
     CoreProviderMetadata,

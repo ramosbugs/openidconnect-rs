@@ -96,10 +96,7 @@ impl TestState {
             let (url, state, nonce) = authorization_request.url();
             log_debug!("Authorize URL: {:?}", url);
 
-            let http_client = Client::builder()
-                .redirect(Policy::none())
-                .build()
-                .unwrap();
+            let http_client = Client::builder().redirect(Policy::none()).build().unwrap();
             let redirect_response = http_client
                 .execute(
                     http_client

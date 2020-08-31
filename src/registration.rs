@@ -4,15 +4,13 @@ use std::marker::PhantomData;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use thiserror::Error;
 use http::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
 use http::method::Method;
 use http::status::StatusCode;
-use serde;
 use serde::de::{Deserialize, DeserializeOwned, Deserializer, MapAccess, Visitor};
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
-use serde_json;
+use thiserror::Error;
 
 use super::http_utils::{auth_bearer, check_content_type, MIME_TYPE_JSON};
 use super::types::helpers::{serde_utc_seconds_opt, split_language_tag_key};

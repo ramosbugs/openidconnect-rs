@@ -1,5 +1,3 @@
-use serde_json;
-
 use super::CoreGrantType;
 
 #[test]

@@ -6,19 +6,15 @@ use std::iter::FromIterator;
 use std::marker::PhantomData;
 use std::ops::Deref;
 
-use base64;
-use thiserror::Error;
 use http::header::{HeaderValue, ACCEPT};
 use http::method::Method;
 use http::status::StatusCode;
-use oauth2;
 use oauth2::helpers::deserialize_space_delimited_vec;
 use rand::{thread_rng, Rng};
 use ring::constant_time;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use serde_json;
-use url;
+use thiserror::Error;
 use url::Url;
 
 use super::http_utils::{check_content_type, MIME_TYPE_JSON, MIME_TYPE_JWKS};
@@ -1219,7 +1215,6 @@ pub(crate) mod helpers {
 }
 
 mod serde_base64url_byte_array {
-    use base64;
     use serde::de::Error;
     use serde::{Deserialize, Deserializer, Serializer};
     use serde_json::{from_value, Value};
@@ -1252,8 +1247,6 @@ mod serde_base64url_byte_array {
 
 #[cfg(test)]
 mod tests {
-    use serde_json;
-
     use super::IssuerUrl;
 
     #[test]
