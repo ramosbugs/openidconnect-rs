@@ -5,7 +5,7 @@ use ring::rand;
 use ring::signature as ring_signature;
 use ring::signature::KeyPair;
 
-use crate::types::helpers::deserialize_option_or_none;
+use crate::types::{JsonCurveType, helpers::deserialize_option_or_none};
 use crate::types::Base64UrlEncodedBytes;
 use crate::{
     JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse, JwsSigningAlgorithm,
@@ -13,6 +13,7 @@ use crate::{
 };
 
 use super::{crypto, CoreJwsSigningAlgorithm};
+
 
 // Other than the 'kty' (key type) parameter, which must be present in all JWKs, Section 4 of RFC
 // 7517 states that "member names used for representing key parameters for different keys types
@@ -49,6 +50,31 @@ pub struct CoreJsonWebKey {
     )]
     pub(crate) e: Option<Base64UrlEncodedBytes>,
 
+    //Elliptic Curve
+    #[serde(
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) crv : Option<CoreJsonCurveType>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_option_or_none",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) x: Option<Base64UrlEncodedBytes>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_option_or_none",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) y: Option<Base64UrlEncodedBytes>,
+
+    #[serde(
+        default,
+        deserialize_with = "deserialize_option_or_none",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) d: Option<Base64UrlEncodedBytes>,
+
     // Used for symmetric keys, which we only generate internally from the client secret; these
     // are never part of the JWK set.
     #[serde(
@@ -72,6 +98,29 @@ impl CoreJsonWebKey {
             n: Some(Base64UrlEncodedBytes::new(n)),
             e: Some(Base64UrlEncodedBytes::new(e)),
             k: None,
+            crv : None,
+            x : None,
+            y : None,
+            d : None
+        }
+    }
+    /// Instantiate a new EC public key from the raw x (`x`) and y(`y`) part of the curve,
+    /// along with an optional (but recommended) key ID.
+    ///
+    /// The key ID is used for matching signed JSON Web Tokens with the keys used for verifying
+    /// their signatures.
+    pub fn new_ec(x: Vec<u8>, y: Vec<u8>, crv : CoreJsonCurveType, kid: Option<JsonWebKeyId>) -> Self {
+        Self {
+            kty: CoreJsonWebKeyType::EllipticCurve,
+            use_: Some(CoreJsonWebKeyUse::Signature),
+            kid,
+            n: None,
+            e: None,
+            k: None,
+            crv : Some(crv),
+            x : Some(Base64UrlEncodedBytes::new(x)),
+            y : Some(Base64UrlEncodedBytes::new(y)),
+            d : None
         }
     }
 }
@@ -94,6 +143,10 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
             n: None,
             e: None,
             k: Some(Base64UrlEncodedBytes::new(key)),
+            crv : None,
+            x : None,
+            y : None,
+            d : None
         }
     }
 
@@ -162,7 +215,10 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
             }
             CoreJwsSigningAlgorithm::HmacSha512 => {
                 crypto::verify_hmac(self, hmac::HMAC_SHA512, message, signature)
-            }
+            },
+            CoreJwsSigningAlgorithm::EcdsaP256Sha256 => {
+                crypto::verify_ec_signature(self, message, signature)
+            },
             ref other => Err(SignatureVerificationError::UnsupportedAlg(
                 variant_name(other).to_string(),
             )),
@@ -340,6 +396,10 @@ impl
                     .into(),
             )),
             k: None,
+            crv : None,
+            x : None,
+            y : None,
+            d : None
         }
     }
 }
@@ -369,6 +429,21 @@ pub enum CoreJsonWebKeyType {
     Symmetric,
 }
 impl JsonWebKeyType for CoreJsonWebKeyType {}
+
+///
+/// Type of EC-Curve
+///
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[non_exhaustive]
+pub enum CoreJsonCurveType {
+    ///
+    /// P-256 Curve
+    ///
+    #[serde(rename = "P-256")]
+    P256
+}
+impl JsonCurveType for CoreJsonWebKeyType {}
+
 
 ///
 /// Usage restriction for a JSON Web key.
