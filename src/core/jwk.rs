@@ -443,7 +443,18 @@ pub enum CoreJsonCurveType {
     /// P-256 Curve
     ///
     #[serde(rename = "P-256")]
-    P256
+    P256,
+    ///
+    /// P-384 Curve
+    ///
+    #[serde(rename = "P-384")]
+    P384,
+    ///
+    /// P-521 Curve (currently not supported)
+    ///
+    #[serde(rename = "P-521")]
+    P521
+
 }
 impl JsonCurveType for CoreJsonWebKeyType {}
 
