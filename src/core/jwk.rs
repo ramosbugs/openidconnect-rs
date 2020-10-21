@@ -217,7 +217,10 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
                 crypto::verify_hmac(self, hmac::HMAC_SHA512, message, signature)
             },
             CoreJwsSigningAlgorithm::EcdsaP256Sha256 => {
-                crypto::verify_ec_signature(self, message, signature)
+                crypto::verify_ec_signature(self, &ring_signature::ECDSA_P256_SHA256_FIXED ,message, signature)
+            },
+            CoreJwsSigningAlgorithm::EcdsaP384Sha384 => {
+                crypto::verify_ec_signature(self, &ring_signature::ECDSA_P384_SHA384_FIXED ,message, signature)
             },
             ref other => Err(SignatureVerificationError::UnsupportedAlg(
                 variant_name(other).to_string(),

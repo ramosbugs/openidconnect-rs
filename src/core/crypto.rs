@@ -96,6 +96,7 @@ pub fn verify_rsa_signature(
 
 pub fn verify_ec_signature(
     key: &CoreJsonWebKey,
+    params: &'static ring_signature::EcdsaVerificationAlgorithm,
     msg: &[u8],
     signature: &[u8],
 ) -> Result<(), SignatureVerificationError> {
@@ -106,7 +107,7 @@ pub fn verify_ec_signature(
     let mut pk = vec![0x04];
     pk.extend(x.deref());
     pk.extend(y.deref());
-    let public_key = ring_signature::UnparsedPublicKey::new(&ring_signature::ECDSA_P256_SHA256_FIXED, pk);
+    let public_key = ring_signature::UnparsedPublicKey::new(params, pk);
     public_key.verify(msg, signature)
     .map_err(|_| SignatureVerificationError::CryptoError("EC Signature was wrong".to_string()))
 }
