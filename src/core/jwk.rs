@@ -52,6 +52,8 @@ pub struct CoreJsonWebKey {
 
     //Elliptic Curve
     #[serde(
+        default,
+        deserialize_with = "deserialize_option_or_none",
         skip_serializing_if = "Option::is_none"
     )]
     pub(crate) crv : Option<CoreJsonCurveType>,
