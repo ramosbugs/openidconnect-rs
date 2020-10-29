@@ -91,7 +91,7 @@ pub fn verify_ec_signature(
 ) -> Result<(), SignatureVerificationError> {
     let (x, y, crv) = ec_public_key(&key).map_err(SignatureVerificationError::InvalidKey)?;
     if *crv == CoreJsonCurveType::P521{
-        return Err(SignatureVerificationError::UnsupportedAlg("Only P256 and P384 are supported for now".to_string()));
+        return Err(SignatureVerificationError::UnsupportedAlg("P521".to_string()));
     }
     let mut pk = vec![0x04];
     pk.extend(x.deref());
