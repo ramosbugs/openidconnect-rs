@@ -46,14 +46,10 @@ fn rsa_public_key(
 ) -> Result<(&Base64UrlEncodedBytes, &Base64UrlEncodedBytes), String> {
     if *key.key_type() != CoreJsonWebKeyType::RSA {
         Err("RSA key required".to_string())
-    } else if let Some(n) = key.n.as_ref() {
-        if let Some(e) = key.e.as_ref() {
-            Ok((n, e))
-        } else {
-            Err("RSA exponent `e` is missing".to_string())
-        }
-    } else {
-        Err("RSA modulus `n` is missing".to_string())
+    } else{
+        let n = key.n.as_ref().ok_or_else(|| "RSA modulus `n` is missing".to_string())?;
+        let e = key.e.as_ref().ok_or_else(|| "RSA exponent `e` is missing".to_string())?;
+        Ok((n,e))
     }
 }
 
@@ -62,18 +58,11 @@ fn ec_public_key(
 ) -> Result<(&Base64UrlEncodedBytes, &Base64UrlEncodedBytes, &CoreJsonCurveType), String> {
     if *key.key_type() != CoreJsonWebKeyType::EllipticCurve {
         Err("EC key required".to_string())
-    } else if let Some(x) = key.x.as_ref() {
-        if let Some(y) = key.y.as_ref() {
-            if let Some(crv) = key.crv.as_ref() {
-                Ok((x,y, crv))
-            } else {
-                Err("CurveType is missing".to_string())
-            }
-        } else {
-            Err("EC `x` part is missing".to_string())
-        }
     } else {
-        Err("EC `y` part is missing".to_string())
+        let x = key.x.as_ref().ok_or_else(|| "EC `x` part is missing".to_string())?;
+        let y = key.y.as_ref().ok_or_else(|| "EC `y` part is missing".to_string())?;
+        let crv = key.crv.as_ref().ok_or_else(|| "EC `crv` part is missing".to_string())?;
+        Ok((x, y, crv))
     }
 }
 
