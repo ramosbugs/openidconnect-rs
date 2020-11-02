@@ -505,7 +505,7 @@ mod tests {
     use crate::types::{JsonWebKey, JsonWebKeyId};
     use crate::verification::SignatureVerificationError;
 
-    use super::{base64, SigningError};
+    use super::{CoreJsonCurveType, SigningError, base64};
     use super::{
         CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse,
         CoreJwsSigningAlgorithm, CoreRsaPrivateSigningKey, PrivateSigningKey,
@@ -551,6 +551,38 @@ mod tests {
         );
         assert_eq!(key.e, Some(Base64UrlEncodedBytes::new(vec![1, 0, 1])));
         assert_eq!(key.k, None);
+    }
+    #[test]
+    fn test_core_jwk_deserialization_ec() {
+        let json = "{
+            \"kty\": \"EC\",
+            \"use\": \"sig\",
+            \"kid\": \"2011-04-29\",
+            \"crv\": \"P-256\",
+            \"x\": \"kXCGZIr3oI6sKbnT6rRsIdxFXw3_VbLk_cveajgqXk8\",
+            \"y\": \"StDvKIgXqAxJ6DuebREh-1vgvZRW3dfrOxSIKzBtRI0\"
+        }";
+
+        let key: CoreJsonWebKey = serde_json::from_str(json).expect("deserialization failed");
+        assert_eq!(key.kty, CoreJsonWebKeyType::EllipticCurve);
+        assert_eq!(key.use_, Some(CoreJsonWebKeyUse::Signature));
+        assert_eq!(key.kid, Some(JsonWebKeyId::new("2011-04-29".to_string())));
+        assert_eq!(key.crv, Some(CoreJsonCurveType::P256));
+        assert_eq!(
+            key.y,
+            Some(Base64UrlEncodedBytes::new(vec![
+                0x4a, 0xd0, 0xef, 0x28, 0x88, 0x17, 0xa8, 0x0c, 0x49, 0xe8, 0x3b, 0x9e,
+                0x6d, 0x11, 0x21, 0xfb, 0x5b, 0xe0, 0xbd, 0x94, 0x56, 0xdd, 0xd7, 0xeb,
+                0x3b, 0x14, 0x88, 0x2b, 0x30, 0x6d, 0x44, 0x8d
+            ]))
+        );
+        assert_eq!(
+            key.x, 
+            Some(Base64UrlEncodedBytes::new(vec![
+                0x91, 0x70, 0x86, 0x64, 0x8a, 0xf7, 0xa0, 0x8e, 0xac, 0x29, 0xb9, 0xd3,
+                0xea, 0xb4, 0x6c, 0x21, 0xdc, 0x45, 0x5f, 0x0d, 0xff, 0x55, 0xb2, 0xe4,
+                0xfd, 0xcb, 0xde, 0x6a, 0x38, 0x2a, 0x5e, 0x4f
+            ])));
     }
 
     #[test]
