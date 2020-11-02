@@ -500,7 +500,7 @@ mod tests {
     use ring::test::rand::FixedByteRandom;
     use serde_json;
 
-    use crate::jwt::tests::TEST_RSA_PUB_KEY;
+    use crate::jwt::tests::{TEST_EC_PUB_KEY_P256, TEST_EC_PUB_KEY_P384, TEST_RSA_PUB_KEY};
     use crate::types::Base64UrlEncodedBytes;
     use crate::types::{JsonWebKey, JsonWebKeyId};
     use crate::verification::SignatureVerificationError;
@@ -669,6 +669,42 @@ mod tests {
             &signature,
         )
         .expect_err("signature verification should fail");
+    }
+
+    #[test]
+    fn test_ecdsa_verification() {
+        let key_p256: CoreJsonWebKey =
+            serde_json::from_str(TEST_EC_PUB_KEY_P256).expect("deserialization failed");
+        let key_p384: CoreJsonWebKey =
+            serde_json::from_str(TEST_EC_PUB_KEY_P384).expect("deserialization failed");
+        let pkcs1_signing_input = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZX\
+                                   hhbXBsZSJ9.\
+                                   SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\
+                                   lvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\
+                                   b24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\
+                                   UgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4";
+        let signature_p256 = "EnKCtAHhzhqxV2GTr1VEurse2kQ7oHpFoVqM66sYGlmahDRGSlfrVAsGCzdLv66OS2Qf1zt6OPHX-5ZAkMgzlA";
+        let signature_p384 = "B_9oDAabMasZ2Yt_cnAS21owaN0uWSInQBPxTqqiM3N3XjkksBRMGqguJLV5WoSMcvqgXwHTTQtbHGuh0Uf4g6LEr7XtO1T2KCttQR27d5YbvVZdORrzCm0Nsm1zkV-i";
+
+        //test p256
+        verify_signature(&key_p256, &CoreJwsSigningAlgorithm::EcdsaP256Sha256, pkcs1_signing_input, signature_p256);
+        
+        //wrong algo should fail
+        key_p256.verify_signature(&CoreJwsSigningAlgorithm::EcdsaP384Sha384, pkcs1_signing_input.as_bytes(), signature_p256.as_bytes())
+            .expect_err("verification should fail");
+        key_p256.verify_signature(&CoreJwsSigningAlgorithm::EcdsaP384Sha384, pkcs1_signing_input.as_bytes(), signature_p384.as_bytes())
+            .expect_err("verification should fail");
+        
+        //test p384
+        verify_signature(&key_p384, &CoreJwsSigningAlgorithm::EcdsaP384Sha384, pkcs1_signing_input, signature_p384);
+        
+        //wrong algo should fail
+        key_p384.verify_signature(&CoreJwsSigningAlgorithm::EcdsaP384Sha384, pkcs1_signing_input.as_bytes(), signature_p256.as_bytes())
+          .expect_err("verification should fail");
+        key_p384.verify_signature(&CoreJwsSigningAlgorithm::EcdsaP256Sha256, pkcs1_signing_input.as_bytes(), signature_p384.as_bytes())
+          .expect_err("verification should fail");
+      
+        
     }
 
     #[test]
