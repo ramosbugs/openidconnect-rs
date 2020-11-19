@@ -1,9 +1,9 @@
 use base64;
 use oauth2::helpers::variant_name;
+use ring::hmac;
 use ring::rand;
 use ring::signature as ring_signature;
 use ring::signature::KeyPair;
-use ring::hmac;
 
 use crate::types::helpers::deserialize_option_or_none;
 use crate::types::Base64UrlEncodedBytes;
@@ -216,11 +216,9 @@ impl
                 ))
             }
         };
-        Ok(
-            crypto::sign_hmac(self.secret.as_ref(), hmac_alg, message)
-                .as_ref()
-                .into(),
-        )
+        Ok(crypto::sign_hmac(self.secret.as_ref(), hmac_alg, message)
+            .as_ref()
+            .into())
     }
 
     fn as_verification_key(&self) -> CoreJsonWebKey {

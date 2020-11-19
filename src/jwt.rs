@@ -505,8 +505,7 @@ pub mod tests {
 
     // This is the PEM form of the test private key from:
     // https://tools.ietf.org/html/rfc7520#section-3.4
-    pub const TEST_RSA_PRIV_KEY: &str =
-        "-----BEGIN RSA PRIVATE KEY-----\n\
+    pub const TEST_RSA_PRIV_KEY: &str = "-----BEGIN RSA PRIVATE KEY-----\n\
          MIIEowIBAAKCAQEAn4EPtAOCc9AlkeQHPzHStgAbgs7bTZLwUBZdR8/KuKPEHLd4\n\
          rHVTeT+O+XV2jRojdNhxJWTDvNd7nqQ0VEiZQHz/AJmSCpMaJMRBSFKrKb2wqVwG\n\
          U/NsYOYL+QtiWN2lbzcEe6XC0dApr5ydQLrHqkHHig3RBordaZ6Aj+oBHqFEHYpP\n\

@@ -615,10 +615,10 @@ use std::time::Duration;
 pub use oauth2::{
     AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CodeTokenRequest,
     CsrfToken, EmptyExtraTokenFields, ErrorResponse, ErrorResponseType, ExtraTokenFields,
-    HttpRequest, HttpResponse, PkceCodeChallenge, PkceCodeChallengeMethod, PkceCodeVerifier,
-    RedirectUrl, RefreshToken, RefreshTokenRequest, RequestTokenError, Scope,
-    StandardErrorResponse, StandardTokenResponse, TokenResponse as OAuth2TokenResponse, TokenType,
-    TokenUrl, ResourceOwnerUsername, ResourceOwnerPassword, PasswordTokenRequest
+    HttpRequest, HttpResponse, PasswordTokenRequest, PkceCodeChallenge, PkceCodeChallengeMethod,
+    PkceCodeVerifier, RedirectUrl, RefreshToken, RefreshTokenRequest, RequestTokenError,
+    ResourceOwnerPassword, ResourceOwnerUsername, Scope, StandardErrorResponse,
+    StandardTokenResponse, TokenResponse as OAuth2TokenResponse, TokenType, TokenUrl,
 };
 
 ///
@@ -1217,7 +1217,7 @@ where
 
     ///
     /// Overrides the `redirect_url` to the one specified.
-    /// 
+    ///
     pub fn set_redirect_url(mut self, redirect_url: Cow<'a, RedirectUrl>) -> Self {
         self.inner = self.inner.set_redirect_url(redirect_url);
         self
@@ -1340,8 +1340,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
     use std::borrow::Cow;
+    use std::time::Duration;
 
     use oauth2::{AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl};
 
@@ -1491,7 +1491,9 @@ mod tests {
             .add_auth_context_value(AuthenticationContextClass::new(
                 "urn:mace:incommon:iap:silver".to_string(),
             ))
-            .set_redirect_url(Cow::Owned(RedirectUrl::new("http://localhost:8888/alternative".to_string()).unwrap()))
+            .set_redirect_url(Cow::Owned(
+                RedirectUrl::new("http://localhost:8888/alternative".to_string()).unwrap(),
+            ))
             .url();
         assert_eq!(
             "https://example/authorize?response_type=code&client_id=aaa&\
