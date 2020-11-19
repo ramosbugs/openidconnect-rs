@@ -26,7 +26,7 @@ before_script:
   - rustup component add clippy
   - rustup component add rustfmt
 script:
-  - cargo when --equals TRAVIS_RUST_VERSION=stable clippy --all --all-features -- --deny warnings
+  - cargo when -v 1.41.0 clippy --all --all-features -- --deny warnings
   - cargo when --equals TRAVIS_RUST_VERSION=stable fmt --all -- --check
   - cargo test --tests --examples
   - cargo test --doc
