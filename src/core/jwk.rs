@@ -264,8 +264,7 @@ impl CoreRsaPrivateSigningKey {
         let der = base64::decode_config(base64_pem, config)
             .map_err(|_| "Failed to decode RSA private key body as base64".to_string())?;
 
-        let key_pair = ring_signature::RsaKeyPair::from_der(&der)
-            .map_err(|err| err.description_().to_string())?;
+        let key_pair = ring_signature::RsaKeyPair::from_der(&der).map_err(|err| err.to_string())?;
         Ok(Self { key_pair, rng, kid })
     }
 
