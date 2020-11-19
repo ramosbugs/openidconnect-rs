@@ -22,16 +22,16 @@ addons:
 env: RUST_BACKTRACE=full
 before_script:
   - cargo install --force cargo-when
-  - cargo when -c stable install --force cargo-audit
+  - cargo when --equals TRAVIS_RUST_VERSION=stable install --force cargo-audit
   - rustup component add clippy
   - rustup component add rustfmt
 script:
-  - cargo when -c stable clippy --all --all-features -- --deny warnings
-  - cargo when -c stable fmt --all -- --check
+  - cargo when --equals TRAVIS_RUST_VERSION=stable clippy --all --all-features -- --deny warnings
+  - cargo when --equals TRAVIS_RUST_VERSION=stable fmt --all -- --check
   - cargo test --tests --examples
   - cargo test --doc
   - cargo test --all-features
-  - cargo when -c stable audit
+  - cargo when --equals TRAVIS_RUST_VERSION=stable audit
 after_success: |
   RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin &&
   cargo tarpaulin --out Xml &&
