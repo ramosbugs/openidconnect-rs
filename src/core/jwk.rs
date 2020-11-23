@@ -219,10 +219,22 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
                 crypto::verify_hmac(self, hmac::HMAC_SHA512, message, signature)
             },
             CoreJwsSigningAlgorithm::EcdsaP256Sha256 => {
-                crypto::verify_ec_signature(self, &ring_signature::ECDSA_P256_SHA256_FIXED ,message, signature)
+                if matches!(self.crv, Some(CoreJsonCurveType::P256)) {
+                    crypto::verify_ec_signature(self, &ring_signature::ECDSA_P256_SHA256_FIXED ,message, signature)
+                } else {
+                    Err(SignatureVerificationError::InvalidKey(
+                        "Key uses different CRV than JWT".to_string(),
+                    ))
+                }
             },
             CoreJwsSigningAlgorithm::EcdsaP384Sha384 => {
-                crypto::verify_ec_signature(self, &ring_signature::ECDSA_P384_SHA384_FIXED ,message, signature)
+                if matches!(self.crv, Some(CoreJsonCurveType::P384)) {
+                    crypto::verify_ec_signature(self, &ring_signature::ECDSA_P384_SHA384_FIXED ,message, signature)
+                } else {
+                    Err(SignatureVerificationError::InvalidKey(
+                        "Key uses different CRV than JWT".to_string(),
+                    ))
+                }
             },
             ref other => Err(SignatureVerificationError::UnsupportedAlg(
                 variant_name(other).to_string(),
@@ -689,22 +701,43 @@ mod tests {
         //test p256
         verify_signature(&key_p256, &CoreJwsSigningAlgorithm::EcdsaP256Sha256, pkcs1_signing_input, signature_p256);
         
-        //wrong algo should fail
-        key_p256.verify_signature(&CoreJwsSigningAlgorithm::EcdsaP384Sha384, pkcs1_signing_input.as_bytes(), signature_p256.as_bytes())
-            .expect_err("verification should fail");
-        key_p256.verify_signature(&CoreJwsSigningAlgorithm::EcdsaP384Sha384, pkcs1_signing_input.as_bytes(), signature_p384.as_bytes())
+        //wrong algo should fail before ring validation
+        if let Some(err) = key_p256.verify_signature(&CoreJwsSigningAlgorithm::EcdsaP384Sha384, pkcs1_signing_input.as_bytes(), signature_p256.as_bytes())
+            .err() {
+                let error_msg = "Key uses different CRV than JWT".to_string();
+                match err {
+                    SignatureVerificationError::InvalidKey(msg) => {
+                        if msg != error_msg {
+                            panic!("The error should be about different CRVs")
+                        }
+                    },
+                    _ => panic!("We should fail before actual validation")
+                }
+            }
+        // suppose we have alg specified correctly, but the signature given is actually a p384
+        key_p256.verify_signature(&CoreJwsSigningAlgorithm::EcdsaP256Sha256, pkcs1_signing_input.as_bytes(), signature_p384.as_bytes())
             .expect_err("verification should fail");
         
         //test p384
         verify_signature(&key_p384, &CoreJwsSigningAlgorithm::EcdsaP384Sha384, pkcs1_signing_input, signature_p384);
         
-        //wrong algo should fail
+        // suppose we have alg specified correctly, but the signature given is actually a p256
         key_p384.verify_signature(&CoreJwsSigningAlgorithm::EcdsaP384Sha384, pkcs1_signing_input.as_bytes(), signature_p256.as_bytes())
           .expect_err("verification should fail");
-        key_p384.verify_signature(&CoreJwsSigningAlgorithm::EcdsaP256Sha256, pkcs1_signing_input.as_bytes(), signature_p384.as_bytes())
-          .expect_err("verification should fail");
-      
-        
+
+        //wrong algo should fail before ring validation
+        if let Some(err) = key_p384.verify_signature(&CoreJwsSigningAlgorithm::EcdsaP256Sha256, pkcs1_signing_input.as_bytes(), signature_p384.as_bytes())
+            .err() {
+                let error_msg = "Key uses different CRV than JWT".to_string();
+                match err {
+                    SignatureVerificationError::InvalidKey(msg) => {
+                        if msg != error_msg {
+                            panic!("The error should be about different CRVs")
+                        }
+                    },
+                    _ => panic!("We should fail before actual validation")
+                }
+            }
     }
 
     #[test]
