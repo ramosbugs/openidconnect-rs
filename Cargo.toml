@@ -1,6 +1,6 @@
 [package]
 name = "openidconnect"
-version = "1.0.2"
+version = "1.1.0"
 authors = ["David A. Ramos <ramos@cs.stanford.edu>"]
 description = "OpenID Connect library"
 license = "MIT"
