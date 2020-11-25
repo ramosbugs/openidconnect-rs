@@ -20,7 +20,7 @@ API documentation and examples are available on [docs.rs](https://docs.rs/openid
     * Relying Party flows: code, implicit, hybrid
     * Standard claims
     * UserInfo endpoint
-    * RSA, HMAC-based ID token verification
+    * RSA, HMAC, and ECDSA (P-256/P-384 curves) ID token verification
   * Unsupported features:
     * Aggregated and distributed claims
     * Passing request parameters as JWTs
