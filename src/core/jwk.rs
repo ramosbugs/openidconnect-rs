@@ -5,7 +5,7 @@ use ring::rand;
 use ring::signature as ring_signature;
 use ring::signature::KeyPair;
 
-use crate::types::helpers::deserialize_option_or_none;
+use crate::types::{JsonCurveType, helpers::deserialize_option_or_none};
 use crate::types::Base64UrlEncodedBytes;
 use crate::{
     JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse, JwsSigningAlgorithm,
@@ -13,6 +13,7 @@ use crate::{
 };
 
 use super::{crypto, CoreJwsSigningAlgorithm};
+
 
 // Other than the 'kty' (key type) parameter, which must be present in all JWKs, Section 4 of RFC
 // 7517 states that "member names used for representing key parameters for different keys types
@@ -49,6 +50,33 @@ pub struct CoreJsonWebKey {
     )]
     pub(crate) e: Option<Base64UrlEncodedBytes>,
 
+    //Elliptic Curve
+    #[serde(
+        default,
+        deserialize_with = "deserialize_option_or_none",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) crv : Option<CoreJsonCurveType>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_option_or_none",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) x: Option<Base64UrlEncodedBytes>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_option_or_none",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) y: Option<Base64UrlEncodedBytes>,
+
+    #[serde(
+        default,
+        deserialize_with = "deserialize_option_or_none",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) d: Option<Base64UrlEncodedBytes>,
+
     // Used for symmetric keys, which we only generate internally from the client secret; these
     // are never part of the JWK set.
     #[serde(
@@ -72,6 +100,29 @@ impl CoreJsonWebKey {
             n: Some(Base64UrlEncodedBytes::new(n)),
             e: Some(Base64UrlEncodedBytes::new(e)),
             k: None,
+            crv : None,
+            x : None,
+            y : None,
+            d : None
+        }
+    }
+    /// Instantiate a new EC public key from the raw x (`x`) and y(`y`) part of the curve,
+    /// along with an optional (but recommended) key ID.
+    ///
+    /// The key ID is used for matching signed JSON Web Tokens with the keys used for verifying
+    /// their signatures.
+    pub fn new_ec(x: Vec<u8>, y: Vec<u8>, crv : CoreJsonCurveType, kid: Option<JsonWebKeyId>) -> Self {
+        Self {
+            kty: CoreJsonWebKeyType::EllipticCurve,
+            use_: Some(CoreJsonWebKeyUse::Signature),
+            kid,
+            n: None,
+            e: None,
+            k: None,
+            crv : Some(crv),
+            x : Some(Base64UrlEncodedBytes::new(x)),
+            y : Some(Base64UrlEncodedBytes::new(y)),
+            d : None
         }
     }
 }
@@ -94,6 +145,10 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
             n: None,
             e: None,
             k: Some(Base64UrlEncodedBytes::new(key)),
+            crv : None,
+            x : None,
+            y : None,
+            d : None
         }
     }
 
@@ -162,7 +217,25 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
             }
             CoreJwsSigningAlgorithm::HmacSha512 => {
                 crypto::verify_hmac(self, hmac::HMAC_SHA512, message, signature)
-            }
+            },
+            CoreJwsSigningAlgorithm::EcdsaP256Sha256 => {
+                if matches!(self.crv, Some(CoreJsonCurveType::P256)) {
+                    crypto::verify_ec_signature(self, &ring_signature::ECDSA_P256_SHA256_FIXED ,message, signature)
+                } else {
+                    Err(SignatureVerificationError::InvalidKey(
+                        "Key uses different CRV than JWT".to_string(),
+                    ))
+                }
+            },
+            CoreJwsSigningAlgorithm::EcdsaP384Sha384 => {
+                if matches!(self.crv, Some(CoreJsonCurveType::P384)) {
+                    crypto::verify_ec_signature(self, &ring_signature::ECDSA_P384_SHA384_FIXED ,message, signature)
+                } else {
+                    Err(SignatureVerificationError::InvalidKey(
+                        "Key uses different CRV than JWT".to_string(),
+                    ))
+                }
+            },
             ref other => Err(SignatureVerificationError::UnsupportedAlg(
                 variant_name(other).to_string(),
             )),
@@ -340,6 +413,10 @@ impl
                     .into(),
             )),
             k: None,
+            crv : None,
+            x : None,
+            y : None,
+            d : None
         }
     }
 }
@@ -369,6 +446,32 @@ pub enum CoreJsonWebKeyType {
     Symmetric,
 }
 impl JsonWebKeyType for CoreJsonWebKeyType {}
+
+///
+/// Type of EC-Curve
+///
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[non_exhaustive]
+pub enum CoreJsonCurveType {
+    ///
+    /// P-256 Curve
+    ///
+    #[serde(rename = "P-256")]
+    P256,
+    ///
+    /// P-384 Curve
+    ///
+    #[serde(rename = "P-384")]
+    P384,
+    ///
+    /// P-521 Curve (currently not supported)
+    ///
+    #[serde(rename = "P-521")]
+    P521
+
+}
+impl JsonCurveType for CoreJsonWebKeyType {}
+
 
 ///
 /// Usage restriction for a JSON Web key.
@@ -409,12 +512,12 @@ mod tests {
     use ring::test::rand::FixedByteRandom;
     use serde_json;
 
-    use crate::jwt::tests::TEST_RSA_PUB_KEY;
+    use crate::jwt::tests::{TEST_EC_PUB_KEY_P256, TEST_EC_PUB_KEY_P384, TEST_RSA_PUB_KEY};
     use crate::types::Base64UrlEncodedBytes;
     use crate::types::{JsonWebKey, JsonWebKeyId};
     use crate::verification::SignatureVerificationError;
 
-    use super::{base64, SigningError};
+    use super::{CoreJsonCurveType, SigningError, base64};
     use super::{
         CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse,
         CoreJwsSigningAlgorithm, CoreRsaPrivateSigningKey, PrivateSigningKey,
@@ -460,6 +563,38 @@ mod tests {
         );
         assert_eq!(key.e, Some(Base64UrlEncodedBytes::new(vec![1, 0, 1])));
         assert_eq!(key.k, None);
+    }
+    #[test]
+    fn test_core_jwk_deserialization_ec() {
+        let json = "{
+            \"kty\": \"EC\",
+            \"use\": \"sig\",
+            \"kid\": \"2011-04-29\",
+            \"crv\": \"P-256\",
+            \"x\": \"kXCGZIr3oI6sKbnT6rRsIdxFXw3_VbLk_cveajgqXk8\",
+            \"y\": \"StDvKIgXqAxJ6DuebREh-1vgvZRW3dfrOxSIKzBtRI0\"
+        }";
+
+        let key: CoreJsonWebKey = serde_json::from_str(json).expect("deserialization failed");
+        assert_eq!(key.kty, CoreJsonWebKeyType::EllipticCurve);
+        assert_eq!(key.use_, Some(CoreJsonWebKeyUse::Signature));
+        assert_eq!(key.kid, Some(JsonWebKeyId::new("2011-04-29".to_string())));
+        assert_eq!(key.crv, Some(CoreJsonCurveType::P256));
+        assert_eq!(
+            key.y,
+            Some(Base64UrlEncodedBytes::new(vec![
+                0x4a, 0xd0, 0xef, 0x28, 0x88, 0x17, 0xa8, 0x0c, 0x49, 0xe8, 0x3b, 0x9e,
+                0x6d, 0x11, 0x21, 0xfb, 0x5b, 0xe0, 0xbd, 0x94, 0x56, 0xdd, 0xd7, 0xeb,
+                0x3b, 0x14, 0x88, 0x2b, 0x30, 0x6d, 0x44, 0x8d
+            ]))
+        );
+        assert_eq!(
+            key.x, 
+            Some(Base64UrlEncodedBytes::new(vec![
+                0x91, 0x70, 0x86, 0x64, 0x8a, 0xf7, 0xa0, 0x8e, 0xac, 0x29, 0xb9, 0xd3,
+                0xea, 0xb4, 0x6c, 0x21, 0xdc, 0x45, 0x5f, 0x0d, 0xff, 0x55, 0xb2, 0xe4,
+                0xfd, 0xcb, 0xde, 0x6a, 0x38, 0x2a, 0x5e, 0x4f
+            ])));
     }
 
     #[test]
@@ -546,6 +681,63 @@ mod tests {
             &signature,
         )
         .expect_err("signature verification should fail");
+    }
+
+    #[test]
+    fn test_ecdsa_verification() {
+        let key_p256: CoreJsonWebKey =
+            serde_json::from_str(TEST_EC_PUB_KEY_P256).expect("deserialization failed");
+        let key_p384: CoreJsonWebKey =
+            serde_json::from_str(TEST_EC_PUB_KEY_P384).expect("deserialization failed");
+        let pkcs1_signing_input = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZX\
+                                   hhbXBsZSJ9.\
+                                   SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\
+                                   lvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\
+                                   b24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\
+                                   UgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4";
+        let signature_p256 = "EnKCtAHhzhqxV2GTr1VEurse2kQ7oHpFoVqM66sYGlmahDRGSlfrVAsGCzdLv66OS2Qf1zt6OPHX-5ZAkMgzlA";
+        let signature_p384 = "B_9oDAabMasZ2Yt_cnAS21owaN0uWSInQBPxTqqiM3N3XjkksBRMGqguJLV5WoSMcvqgXwHTTQtbHGuh0Uf4g6LEr7XtO1T2KCttQR27d5YbvVZdORrzCm0Nsm1zkV-i";
+
+        //test p256
+        verify_signature(&key_p256, &CoreJwsSigningAlgorithm::EcdsaP256Sha256, pkcs1_signing_input, signature_p256);
+        
+        //wrong algo should fail before ring validation
+        if let Some(err) = key_p256.verify_signature(&CoreJwsSigningAlgorithm::EcdsaP384Sha384, pkcs1_signing_input.as_bytes(), signature_p256.as_bytes())
+            .err() {
+                let error_msg = "Key uses different CRV than JWT".to_string();
+                match err {
+                    SignatureVerificationError::InvalidKey(msg) => {
+                        if msg != error_msg {
+                            panic!("The error should be about different CRVs")
+                        }
+                    },
+                    _ => panic!("We should fail before actual validation")
+                }
+            }
+        // suppose we have alg specified correctly, but the signature given is actually a p384
+        key_p256.verify_signature(&CoreJwsSigningAlgorithm::EcdsaP256Sha256, pkcs1_signing_input.as_bytes(), signature_p384.as_bytes())
+            .expect_err("verification should fail");
+        
+        //test p384
+        verify_signature(&key_p384, &CoreJwsSigningAlgorithm::EcdsaP384Sha384, pkcs1_signing_input, signature_p384);
+        
+        // suppose we have alg specified correctly, but the signature given is actually a p256
+        key_p384.verify_signature(&CoreJwsSigningAlgorithm::EcdsaP384Sha384, pkcs1_signing_input.as_bytes(), signature_p256.as_bytes())
+          .expect_err("verification should fail");
+
+        //wrong algo should fail before ring validation
+        if let Some(err) = key_p384.verify_signature(&CoreJwsSigningAlgorithm::EcdsaP256Sha256, pkcs1_signing_input.as_bytes(), signature_p384.as_bytes())
+            .err() {
+                let error_msg = "Key uses different CRV than JWT".to_string();
+                match err {
+                    SignatureVerificationError::InvalidKey(msg) => {
+                        if msg != error_msg {
+                            panic!("The error should be about different CRVs")
+                        }
+                    },
+                    _ => panic!("We should fail before actual validation")
+                }
+            }
     }
 
     #[test]
