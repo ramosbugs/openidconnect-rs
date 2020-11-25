@@ -500,6 +500,23 @@ pub mod tests {
             \"e\": \"AQAB\"
         }";
 
+    pub const TEST_EC_PUB_KEY_P256: &str = r#"{
+        "kty": "EC",
+        "kid": "bilbo.baggins@hobbiton.example",
+        "use": "sig",
+        "crv": "P-256",
+        "x": "t6PHivOTggpaX9lkMkis2p8kMhy-CktJAFTz6atReZw",
+        "y": "ODobXupKlD0DeM1yRd7bX4XFNBO1HOgCT1UCu0KY3lc"
+    }"#;
+    pub const TEST_EC_PUB_KEY_P384: &str = r#"{
+        "kty": "EC",
+        "kid": "bilbo.baggins@hobbiton.example",
+        "use": "sig",
+        "crv" : "P-384",
+        "x": "9ywsUbxX59kJXFRiWHcx97wRKNiF8Hc9F5wI08n8h2ek_qAl0veEc36k1Qz6KLiL",
+        "y": "6PWlqjRbaV7V8ohDscM243IneuLZmxDGLiGNA1w69fQhEDsvZtKLUQ5KiHLgR3op"
+    }"#;
+
     // This is the PEM form of the test private key from:
     // https://tools.ietf.org/html/rfc7520#section-3.4
     pub const TEST_RSA_PRIV_KEY: &str = "-----BEGIN RSA PRIVATE KEY-----\n\

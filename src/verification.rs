@@ -1384,6 +1384,10 @@ mod tests {
                 n: None,
                 e: None,
                 k: Some(Base64UrlEncodedBytes::new(vec![1, 2, 3, 4])),
+                crv: None,
+                x: None,
+                y: None,
+                d: None,
             }]),
         )
         .verified_claims(valid_rs256_jwt.clone())
@@ -1405,6 +1409,10 @@ mod tests {
                 n: Some(n),
                 e: Some(e),
                 k: None,
+                crv: None,
+                x: None,
+                y: None,
+                d: None,
             }]),
         )
         .verified_claims(valid_rs256_jwt.clone())

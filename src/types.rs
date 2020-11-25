@@ -282,6 +282,14 @@ pub trait JsonWebKeyType:
 }
 
 ///
+/// Curve type (e.g., P256).
+///
+pub trait JsonCurveType:
+    Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
+{
+}
+
+///
 /// Allowed key usage.
 ///
 pub trait JsonWebKeyUse: Debug + DeserializeOwned + Serialize + 'static {
