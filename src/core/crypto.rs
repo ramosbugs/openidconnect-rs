@@ -46,22 +46,44 @@ fn rsa_public_key(
 ) -> Result<(&Base64UrlEncodedBytes, &Base64UrlEncodedBytes), String> {
     if *key.key_type() != CoreJsonWebKeyType::RSA {
         Err("RSA key required".to_string())
-    } else{
-        let n = key.n.as_ref().ok_or_else(|| "RSA modulus `n` is missing".to_string())?;
-        let e = key.e.as_ref().ok_or_else(|| "RSA exponent `e` is missing".to_string())?;
-        Ok((n,e))
+    } else {
+        let n = key
+            .n
+            .as_ref()
+            .ok_or_else(|| "RSA modulus `n` is missing".to_string())?;
+        let e = key
+            .e
+            .as_ref()
+            .ok_or_else(|| "RSA exponent `e` is missing".to_string())?;
+        Ok((n, e))
     }
 }
 
 fn ec_public_key(
     key: &CoreJsonWebKey,
-) -> Result<(&Base64UrlEncodedBytes, &Base64UrlEncodedBytes, &CoreJsonCurveType), String> {
+) -> Result<
+    (
+        &Base64UrlEncodedBytes,
+        &Base64UrlEncodedBytes,
+        &CoreJsonCurveType,
+    ),
+    String,
+> {
     if *key.key_type() != CoreJsonWebKeyType::EllipticCurve {
         Err("EC key required".to_string())
     } else {
-        let x = key.x.as_ref().ok_or_else(|| "EC `x` part is missing".to_string())?;
-        let y = key.y.as_ref().ok_or_else(|| "EC `y` part is missing".to_string())?;
-        let crv = key.crv.as_ref().ok_or_else(|| "EC `crv` part is missing".to_string())?;
+        let x = key
+            .x
+            .as_ref()
+            .ok_or_else(|| "EC `x` part is missing".to_string())?;
+        let y = key
+            .y
+            .as_ref()
+            .ok_or_else(|| "EC `y` part is missing".to_string())?;
+        let crv = key
+            .crv
+            .as_ref()
+            .ok_or_else(|| "EC `crv` part is missing".to_string())?;
         Ok((x, y, crv))
     }
 }
@@ -84,8 +106,8 @@ pub fn verify_rsa_signature(
 }
 /// According to RFC5480, Section-2.2 implementations of Elliptic Curve Cryptography MUST support the uncompressed form.
 /// The first octet of the octet string indicates whether the uncompressed or compressed form is used. For the uncompressed
-/// form, the first octet has to be 0x04. 
-/// According to https://briansmith.org/rustdoc/ring/signature/index.html#ecdsa__fixed-details-fixed-length-pkcs11-style-ecdsa-signatures, 
+/// form, the first octet has to be 0x04.
+/// According to https://briansmith.org/rustdoc/ring/signature/index.html#ecdsa__fixed-details-fixed-length-pkcs11-style-ecdsa-signatures,
 /// to recover the X and Y coordinates from an octet string, the Octet-String-To-Elliptic-Curve-Point Conversion
 /// is used (Section 2.3.4 of https://www.secg.org/sec1-v2.pdf).
 
@@ -96,13 +118,16 @@ pub fn verify_ec_signature(
     signature: &[u8],
 ) -> Result<(), SignatureVerificationError> {
     let (x, y, crv) = ec_public_key(&key).map_err(SignatureVerificationError::InvalidKey)?;
-    if *crv == CoreJsonCurveType::P521{
-        return Err(SignatureVerificationError::UnsupportedAlg("P521".to_string()));
+    if *crv == CoreJsonCurveType::P521 {
+        return Err(SignatureVerificationError::UnsupportedAlg(
+            "P521".to_string(),
+        ));
     }
     let mut pk = vec![0x04];
     pk.extend(x.deref());
     pk.extend(y.deref());
     let public_key = ring_signature::UnparsedPublicKey::new(params, pk);
-    public_key.verify(msg, signature)
-    .map_err(|_| SignatureVerificationError::CryptoError("EC Signature was wrong".to_string()))
+    public_key
+        .verify(msg, signature)
+        .map_err(|_| SignatureVerificationError::CryptoError("EC Signature was wrong".to_string()))
 }
