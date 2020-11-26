@@ -223,7 +223,7 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
                 crypto::verify_hmac(self, hmac::HMAC_SHA512, message, signature)
             }
             CoreJwsSigningAlgorithm::EcdsaP256Sha256 => {
-                if matches!(self.crv, Some(CoreJsonCurveType::P256)) {
+                if let Some(CoreJsonCurveType::P256) = self.crv {
                     crypto::verify_ec_signature(
                         self,
                         &ring_signature::ECDSA_P256_SHA256_FIXED,
@@ -237,7 +237,7 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
                 }
             }
             CoreJwsSigningAlgorithm::EcdsaP384Sha384 => {
-                if matches!(self.crv, Some(CoreJsonCurveType::P384)) {
+                if let Some(CoreJsonCurveType::P384) = self.crv {
                     crypto::verify_ec_signature(
                         self,
                         &ring_signature::ECDSA_P384_SHA384_FIXED,
