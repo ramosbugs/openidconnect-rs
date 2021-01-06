@@ -15,9 +15,9 @@ all-features = true
 maintenance = { status = "actively-developed" }
 
 [features]
-default = ["reqwest-010"]
+default = ["reqwest"]
 curl = ["oauth2/curl"]
-reqwest-010 = ["oauth2/reqwest-010"]
+reqwest = ["oauth2/reqwest"]
 nightly = []
 
 [dependencies]
@@ -27,7 +27,7 @@ thiserror = "1.0"
 http = "0.2"
 itertools = "0.9"
 log = "0.4"
-oauth2 = { version = "4.0.0-alpha.1", default-features = false }
+oauth2 = { version = "4.0.0-alpha.3", default-features = false }
 rand = "0.7"
 ring = "0.16"
 serde = "1.0"
@@ -41,6 +41,6 @@ url = { version = "2.1", features = ["serde"] }
 color-backtrace = { version = "0.4" }
 env_logger = "0.7"
 pretty_assertions = "0.6"
-reqwest_ = { package = "reqwest", features = ["blocking", "rustls-tls"], version = "0.10", default-features = false }
+reqwest_ = { package = "reqwest", features = ["blocking", "rustls-tls"], version = "0.11", default-features = false }
 retry = "1.0"
 anyhow = "1.0"

@@ -107,11 +107,11 @@
 //! };
 //! use anyhow::anyhow;
 //!
-//! # #[cfg(feature = "reqwest-010")]
+//! # #[cfg(feature = "reqwest")]
 //! use openidconnect::reqwest::http_client;
 //! use url::Url;
 //!
-//! # #[cfg(feature = "reqwest-010")]
+//! # #[cfg(feature = "reqwest")]
 //! # fn err_wrapper() -> Result<(), anyhow::Error> {
 //! // Use OpenID Connect Discovery to fetch the provider metadata.
 //! use openidconnect::{OAuth2TokenResponse, TokenResponse};
@@ -441,7 +441,7 @@
 //! ## Example
 //!
 //! ```rust,no_run
-//! # #[cfg(feature = "reqwest-010")]
+//! # #[cfg(feature = "reqwest")]
 //! use openidconnect::{
 //!     AccessTokenHash,
 //!     AuthenticationFlow,
@@ -461,13 +461,13 @@
 //!   CoreProviderMetadata,
 //!   CoreResponseType,
 //! };
-//! # #[cfg(feature = "reqwest-010")]
+//! # #[cfg(feature = "reqwest")]
 //! use openidconnect::reqwest::async_http_client;
 //! use url::Url;
 //! use anyhow::anyhow;
 //!
 //!
-//! # #[cfg(feature = "reqwest-010")]
+//! # #[cfg(feature = "reqwest")]
 //! # async fn err_wrapper() -> Result<(), anyhow::Error> {
 //! // Use OpenID Connect Discovery to fetch the provider metadata.
 //! use openidconnect::{OAuth2TokenResponse, TokenResponse};
@@ -563,7 +563,7 @@ extern crate pretty_assertions;
 extern crate serde_derive;
 
 use oauth2::helpers::variant_name;
-use oauth2::ResponseType as OAuth2ResponseType;
+use oauth2::{ResponseType as OAuth2ResponseType, StandardTokenInspectionResponse};
 use url::Url;
 
 use std::borrow::Cow;
@@ -590,7 +590,7 @@ pub use oauth2::url;
 #[cfg(feature = "curl")]
 pub use oauth2::curl;
 
-#[cfg(feature = "reqwest-010")]
+#[cfg(feature = "reqwest")]
 pub use oauth2::reqwest;
 
 pub use claims::{
@@ -712,7 +712,9 @@ where
     TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
     TT: TokenType + 'static,
 {
-    oauth2_client: oauth2::Client<TE, TR, TT>,
+    // FIXME: Add support for OAuth 2 Token Introspection
+    oauth2_client:
+        oauth2::Client<TE, TR, TT, StandardTokenInspectionResponse<EmptyExtraTokenFields, TT>>,
     client_id: ClientId,
     client_secret: Option<ClientSecret>,
     issuer: IssuerUrl,

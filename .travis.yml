@@ -1,6 +1,6 @@
 language: rust
 rust:
-  - 1.42.0
+  - 1.45.0
   - stable
   - beta
   - nightly
@@ -23,18 +23,18 @@ env: RUST_BACKTRACE=full
 before_script:
   - cargo install --force cargo-when
   - |
-    if [ "$TRAVIS_RUST_VERSION" == "1.42.0" ]; then
+    if [ "$TRAVIS_RUST_VERSION" == "1.45.0" ]; then
       rustup component add clippy
-    elif [ "$TRAVIS_RUST_VERSION" == "stable" ]; then
       rustup component add rustfmt
+    elif [ "$TRAVIS_RUST_VERSION" == "stable" ]; then
       cargo install --force cargo-audit
     fi
 script:
   - cargo test --tests --examples
   - cargo test --doc
   - cargo test --all-features
-  - cargo when --equals TRAVIS_RUST_VERSION=1.42.0 clippy --all --all-features -- --deny warnings
-  - cargo when --equals TRAVIS_RUST_VERSION=stable fmt --all -- --check
+  - cargo when --equals TRAVIS_RUST_VERSION=1.45.0 clippy --all --all-features -- --deny warnings
+  - cargo when --equals TRAVIS_RUST_VERSION=1.45.0 fmt --all -- --check
   - cargo when --equals TRAVIS_RUST_VERSION=stable audit
 after_success: |
   RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin &&
