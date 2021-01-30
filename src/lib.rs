@@ -190,6 +190,41 @@
 //!     claims.email().map(|email| email.as_str()).unwrap_or("<not provided>"),
 //! );
 //!
+//! // If available, we can use the UserInfo endpoint to request additional information
+//!
+//! // First we need a struct that contains the AdditionalClaims we want to retrieve
+//! #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+//! struct MyClaims {
+//!     roles: String,
+//! }
+//! // We use an empty implementation
+//! impl AdditionalClaims for MyClaims {}
+//!
+//! // Now we create a new user_info request using the client
+//! let userinfo_request = match client.user_info(
+//! AccessToken::new(
+//!   // We re-use the access_token we used for requesting the IdToken
+//!   token_response.access_token().secret().to_string()),
+//!   None,
+//! ) {
+//!   Ok(o) => o,
+//!   Err(e) => return Err(format!("No user info endpoint: {:?}", e)),
+//! };
+//!
+//! // When issuing the actual request, a UserInfoClaims struct based on
+//! // our own claims and the CoreGenderClaim is returned.
+//! let userinfo: UserInfoClaims<MyClaims, CoreGenderClaim> =
+//! match userinfo_request.request(http_client) {
+//!     Ok(o) => o,
+//!     Err(e) => return Err(format!("Failed requesting user info: {:?}", e)),
+//! };
+//!
+//! // In the end we can check whether the roles of our additional claim (in this case MyClaims)
+//! // contain the role String we are looking for
+//! if userinfo.additional_claims().roles.contains("my-role") {
+//!   // Do stuff
+//! }
+//!
 //! // See the OAuth2TokenResponse trait for a listing of other available fields such as
 //! // access_token() and refresh_token().
 //!
