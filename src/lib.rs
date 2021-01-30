@@ -104,6 +104,7 @@
 //!   CoreClient,
 //!   CoreProviderMetadata,
 //!   CoreResponseType,
+//!   CoreUserInfoClaims,
 //! };
 //! use anyhow::anyhow;
 //!
@@ -189,6 +190,17 @@
 //!     claims.subject().as_str(),
 //!     claims.email().map(|email| email.as_str()).unwrap_or("<not provided>"),
 //! );
+//!
+//! // If available, we can use the UserInfo endpoint to request additional information.
+//!
+//! // The user_info request uses the AccessToken returned in the token response. To parse custom
+//! // claims, use UserInfoClaims directly (with the desired type parameters) rather than using the
+//! // CoreUserInfoClaims type alias.
+//! let userinfo: CoreUserInfoClaims = client
+//!   .user_info(token_response.access_token().to_owned(), None)
+//!   .map_err(|err| anyhow!("No user info endpoint: {:?}", err))?
+//!   .request(http_client)
+//!   .map_err(|err| anyhow!("Failed requesting user info: {:?}", err))?;
 //!
 //! // See the OAuth2TokenResponse trait for a listing of other available fields such as
 //! // access_token() and refresh_token().
