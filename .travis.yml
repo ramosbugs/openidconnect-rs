@@ -28,6 +28,12 @@ before_script:
       cargo install --force cargo-audit
     fi
 script:
+  # Newer dependency versions don't support rustc 1.41, so we use a Cargo.lock file for those
+  # builds.
+  - |
+    if [ "${TRAVIS_RUST_VERSION}" == "1.41.0" ]; then
+      cp Cargo-1.41.lock Cargo.lock
+    fi
   - cargo test --tests --examples
   - cargo test --doc
   - cargo test --all-features
