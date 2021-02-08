@@ -39,7 +39,7 @@ script:
   - cargo test --all-features
   - cargo build --features futures-01 --no-default-features
   - cargo build --features futures-03 --no-default-features
-  - cargo when --equals TRAVIS_RUST_VERSION=stable -- fmt --all --check
+  - cargo when --equals TRAVIS_RUST_VERSION=stable fmt --all -- --check
   - cargo when --equals TRAVIS_RUST_VERSION=stable -- audit --ignore RUSTSEC-2021-0020
 after_success: |
   RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin &&
