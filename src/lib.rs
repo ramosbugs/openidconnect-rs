@@ -575,7 +575,7 @@ extern crate pretty_assertions;
 extern crate serde_derive;
 
 use oauth2::helpers::variant_name;
-use oauth2::{ResponseType as OAuth2ResponseType, StandardTokenInspectionResponse};
+use oauth2::{ResponseType as OAuth2ResponseType};
 use url::Url;
 
 use std::borrow::Cow;
@@ -590,7 +590,8 @@ pub use oauth2::{
     PkceCodeChallenge, PkceCodeChallengeMethod, PkceCodeVerifier, RedirectUrl, RefreshToken,
     RefreshTokenRequest, RequestTokenError, ResourceOwnerPassword, ResourceOwnerUsername, Scope,
     StandardErrorResponse, StandardTokenResponse, TokenResponse as OAuth2TokenResponse, TokenType,
-    TokenUrl,
+    TokenUrl, TokenIntrospectionResponse, IntrospectionRequest, IntrospectionUrl, RevocableToken, RevocationUrl,
+    RevocationRequest,
 };
 
 ///
@@ -709,7 +710,7 @@ pub enum AuthenticationFlow<RT: ResponseType> {
 
 /// OpenID Connect client.
 #[derive(Clone, Debug)]
-pub struct Client<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT>
+pub struct Client<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT, TIR, RT, TRE>
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
@@ -723,10 +724,13 @@ where
     TE: ErrorResponse,
     TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
     TT: TokenType + 'static,
+    TIR: TokenIntrospectionResponse<TT>,
+    RT: RevocableToken,
+    TRE: ErrorResponse,
 {
     // FIXME: Add support for OAuth 2 Token Introspection
     oauth2_client:
-        oauth2::Client<TE, TR, TT, StandardTokenInspectionResponse<EmptyExtraTokenFields, TT>>,
+        oauth2::Client<TE, TR, TT, TIR, RT, TRE>,
     client_id: ClientId,
     client_secret: Option<ClientSecret>,
     issuer: IssuerUrl,
@@ -735,8 +739,8 @@ where
     use_openid_scope: bool,
     _phantom: PhantomData<(AC, AD, GC, JE, P)>,
 }
-impl<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT>
-    Client<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT>
+impl<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT, TIR, RT, TRE>
+    Client<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT, TIR, RT, TRE>
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
@@ -750,6 +754,9 @@ where
     TE: ErrorResponse + 'static,
     TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
     TT: TokenType + 'static,
+    TIR: TokenIntrospectionResponse<TT>,
+    RT: RevocableToken,
+    TRE: ErrorResponse + 'static,
 {
     ///
     /// Initializes an OpenID Connect client.
@@ -786,8 +793,8 @@ where
     /// Use [`ProviderMetadata::discover`] or
     /// [`ProviderMetadata::discover_async`] to fetch the provider metadata.
     ///
-    pub fn from_provider_metadata<A, CA, CN, CT, G, JK, RM, RT, S>(
-        provider_metadata: ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RT, S>,
+    pub fn from_provider_metadata<A, CA, CN, CT, G, JK, RM, RT2, S>(
+        provider_metadata: ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RT2, S>,
         client_id: ClientId,
         client_secret: Option<ClientSecret>,
     ) -> Self
@@ -799,7 +806,7 @@ where
         G: GrantType,
         JK: JweKeyManagementAlgorithm,
         RM: ResponseMode,
-        RT: ResponseType,
+        RT2: ResponseType,
         S: SubjectIdentifierType,
     {
         Self::new(
@@ -833,6 +840,25 @@ where
         self
     }
 
+    ///
+    /// Sets the introspection URL for contacting the ([RFC 7662](https://tools.ietf.org/html/rfc7662))
+    /// introspection endpoint.
+    ///
+    pub fn set_introspection_url(mut self, introspection_url: IntrospectionUrl) -> Self {
+        self.oauth2_client = self.oauth2_client.set_introspection_url(introspection_url);
+        self
+    }
+
+    ///
+    /// Sets the revocation URL for contacting the revocation endpoint ([RFC 7009](https://tools.ietf.org/html/rfc7009)).
+    ///
+    /// See: [`revoke_token()`](Self::revoke_token())
+    ///
+    pub fn set_revocation_uri(mut self, revocation_uri: RevocationUrl) -> Self {
+        self.oauth2_client = self.oauth2_client.set_revocation_url(revocation_uri);
+        self
+    }
+        
     ///
     /// Enables the `openid` scope to be requested automatically.
     ///
@@ -902,15 +928,15 @@ where
     /// Similarly, callers should use a fresh, unpredictable `nonce` to help protect against ID
     /// token reuse and forgery.
     ///
-    pub fn authorize_url<NF, RT, SF>(
+    pub fn authorize_url<NF, RT2, SF>(
         &self,
-        authentication_flow: AuthenticationFlow<RT>,
+        authentication_flow: AuthenticationFlow<RT2>,
         state_fn: SF,
         nonce_fn: NF,
-    ) -> AuthorizationRequest<AD, P, RT>
+    ) -> AuthorizationRequest<AD, P, RT2>
     where
         NF: FnOnce() -> Nonce + 'static,
-        RT: ResponseType,
+        RT2: ResponseType,
         SF: FnOnce() -> CsrfToken + 'static,
     {
         let request = AuthorizationRequest {
@@ -1024,6 +1050,36 @@ where
                 expected_subject,
             ),
         })
+    }
+
+    ///
+    /// Creates a request builder for obtaining metadata about a previously received token.
+    ///
+    /// See https://tools.ietf.org/html/rfc7662
+    ///
+    pub fn introspect<'a>(
+        &'a self,
+        token: &'a AccessToken,
+    ) -> IntrospectionRequest<'a, TE, TIR, TT> {
+        self.oauth2_client.introspect(token)
+    }
+
+    ///
+    /// Creates a request builder for revoking a previously received token.
+    ///
+    /// Requires that [`set_revocation_url()`](Self::set_revocation_url()) have already been called to set the
+    /// revocation endpoint URL.
+    ///
+    /// Attempting to submit the generated request without calling [`set_revocation_url()`](Self::set_revocation_url())
+    /// first will result in an error.
+    ///
+    /// See https://tools.ietf.org/html/rfc7009
+    ///
+    pub fn revoke_token(
+        &self,
+        token: RT
+    ) -> RevocationRequest<RT, TRE> {
+        self.oauth2_client.revoke_token(token)
     }
 }
 
