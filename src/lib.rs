@@ -575,7 +575,7 @@ extern crate pretty_assertions;
 extern crate serde_derive;
 
 use oauth2::helpers::variant_name;
-use oauth2::{ResponseType as OAuth2ResponseType};
+use oauth2::ResponseType as OAuth2ResponseType;
 use url::Url;
 
 use std::borrow::Cow;
@@ -586,12 +586,12 @@ use std::time::Duration;
 pub use oauth2::{
     AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientCredentialsTokenRequest, ClientId,
     ClientSecret, CodeTokenRequest, CsrfToken, EmptyExtraTokenFields, ErrorResponse,
-    ErrorResponseType, ExtraTokenFields, HttpRequest, HttpResponse, PasswordTokenRequest,
-    PkceCodeChallenge, PkceCodeChallengeMethod, PkceCodeVerifier, RedirectUrl, RefreshToken,
-    RefreshTokenRequest, RequestTokenError, ResourceOwnerPassword, ResourceOwnerUsername, Scope,
-    StandardErrorResponse, StandardTokenResponse, TokenResponse as OAuth2TokenResponse, TokenType,
-    TokenUrl, TokenIntrospectionResponse, IntrospectionRequest, IntrospectionUrl, RevocableToken, RevocationUrl,
-    RevocationRequest,
+    ErrorResponseType, ExtraTokenFields, HttpRequest, HttpResponse, IntrospectionRequest,
+    IntrospectionUrl, PasswordTokenRequest, PkceCodeChallenge, PkceCodeChallengeMethod,
+    PkceCodeVerifier, RedirectUrl, RefreshToken, RefreshTokenRequest, RequestTokenError,
+    ResourceOwnerPassword, ResourceOwnerUsername, RevocableToken, RevocationRequest, RevocationUrl,
+    Scope, StandardErrorResponse, StandardTokenResponse, TokenIntrospectionResponse,
+    TokenResponse as OAuth2TokenResponse, TokenType, TokenUrl,
 };
 
 ///
@@ -729,8 +729,7 @@ where
     TRE: ErrorResponse,
 {
     // FIXME: Add support for OAuth 2 Token Introspection
-    oauth2_client:
-        oauth2::Client<TE, TR, TT, TIR, RT, TRE>,
+    oauth2_client: oauth2::Client<TE, TR, TT, TIR, RT, TRE>,
     client_id: ClientId,
     client_secret: Option<ClientSecret>,
     issuer: IssuerUrl,
@@ -794,7 +793,23 @@ where
     /// [`ProviderMetadata::discover_async`] to fetch the provider metadata.
     ///
     pub fn from_provider_metadata<A, CA, CN, CT, G, JK, RM, RT2, S>(
-        provider_metadata: ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RT2, S>,
+        provider_metadata: ProviderMetadata<
+            A,
+            AD,
+            CA,
+            CN,
+            CT,
+            G,
+            JE,
+            JK,
+            JS,
+            JT,
+            JU,
+            K,
+            RM,
+            RT2,
+            S,
+        >,
         client_id: ClientId,
         client_secret: Option<ClientSecret>,
     ) -> Self
@@ -858,7 +873,7 @@ where
         self.oauth2_client = self.oauth2_client.set_revocation_url(revocation_uri);
         self
     }
-        
+
     ///
     /// Enables the `openid` scope to be requested automatically.
     ///
@@ -1075,10 +1090,7 @@ where
     ///
     /// See https://tools.ietf.org/html/rfc7009
     ///
-    pub fn revoke_token(
-        &self,
-        token: RT
-    ) -> RevocationRequest<RT, TRE> {
+    pub fn revoke_token(&self, token: RT) -> RevocationRequest<RT, TRE> {
         self.oauth2_client.revoke_token(token)
     }
 }
