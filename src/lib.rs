@@ -792,7 +792,7 @@ where
     /// Use [`ProviderMetadata::discover`] or
     /// [`ProviderMetadata::discover_async`] to fetch the provider metadata.
     ///
-    pub fn from_provider_metadata<A, CA, CN, CT, G, JK, RM, RT2, S>(
+    pub fn from_provider_metadata<A, CA, CN, CT, G, JK, RM, RS, S>(
         provider_metadata: ProviderMetadata<
             A,
             AD,
@@ -807,7 +807,7 @@ where
             JU,
             K,
             RM,
-            RT2,
+            RS,
             S,
         >,
         client_id: ClientId,
@@ -821,7 +821,7 @@ where
         G: GrantType,
         JK: JweKeyManagementAlgorithm,
         RM: ResponseMode,
-        RT2: ResponseType,
+        RS: ResponseType,
         S: SubjectIdentifierType,
     {
         Self::new(
@@ -943,15 +943,15 @@ where
     /// Similarly, callers should use a fresh, unpredictable `nonce` to help protect against ID
     /// token reuse and forgery.
     ///
-    pub fn authorize_url<NF, RT2, SF>(
+    pub fn authorize_url<NF, RS, SF>(
         &self,
-        authentication_flow: AuthenticationFlow<RT2>,
+        authentication_flow: AuthenticationFlow<RS>,
         state_fn: SF,
         nonce_fn: NF,
-    ) -> AuthorizationRequest<AD, P, RT2>
+    ) -> AuthorizationRequest<AD, P, RS>
     where
         NF: FnOnce() -> Nonce + 'static,
-        RT2: ResponseType,
+        RS: ResponseType,
         SF: FnOnce() -> CsrfToken + 'static,
     {
         let request = AuthorizationRequest {
