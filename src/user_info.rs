@@ -29,7 +29,7 @@ use crate::{
 ///
 /// User info request.
 ///
-pub struct UserInfoRequest<JE, JS, JT, JU, K>
+pub struct UserInfoRequest<'a, JE, JS, JT, JU, K>
 where
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
@@ -37,12 +37,12 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
-    pub(super) url: UserInfoUrl,
+    pub(super) url: &'a UserInfoUrl,
     pub(super) access_token: AccessToken,
     pub(super) require_signed_response: bool,
     pub(super) signed_response_verifier: UserInfoVerifier<'static, JE, JS, JT, JU, K>,
 }
-impl<JE, JS, JT, JU, K> UserInfoRequest<JE, JS, JT, JU, K>
+impl<'a, JE, JS, JT, JU, K> UserInfoRequest<'a, JE, JS, JT, JU, K>
 where
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
@@ -477,13 +477,6 @@ where
     #[error("Other error: {0}")]
     Other(String),
 }
-
-///
-/// The OpenID Connect Provider has no associated user info endpoint.
-///
-#[derive(Debug, Error)]
-#[error("No user info endpoint specified")]
-pub struct NoUserInfoEndpoint;
 
 #[cfg(test)]
 mod tests {

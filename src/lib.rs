@@ -574,7 +574,7 @@ extern crate pretty_assertions;
 #[macro_use]
 extern crate serde_derive;
 
-use oauth2::helpers::variant_name;
+use oauth2::{ConfigurationError, helpers::variant_name};
 use oauth2::ResponseType as OAuth2ResponseType;
 use url::Url;
 
@@ -634,7 +634,7 @@ pub use types::{
     SubjectIdentifier, SubjectIdentifierType, ToSUrl,
 };
 pub use user_info::{
-    NoUserInfoEndpoint, UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoRequest,
+    UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoRequest,
     UserInfoUrl,
 };
 use verification::{AudiencesClaim, IssuerClaim};
@@ -1036,7 +1036,7 @@ where
     ///
     /// This function requires that this [`Client`] be configured with a user info endpoint,
     /// which is an optional feature for OpenID Connect Providers to implement. If this `Client`
-    /// does not know the provider's user info endpoint, it returns the [`NoUserInfoEndpoint`]
+    /// does not know the provider's user info endpoint, it returns the [`ConfigurationError`]
     /// error.
     ///
     /// To help protect against token substitution attacks, this function optionally allows clients
@@ -1049,13 +1049,12 @@ where
         &self,
         access_token: AccessToken,
         expected_subject: Option<SubjectIdentifier>,
-    ) -> Result<UserInfoRequest<JE, JS, JT, JU, K>, NoUserInfoEndpoint> {
+    ) -> Result<UserInfoRequest<JE, JS, JT, JU, K>, ConfigurationError> {
         Ok(UserInfoRequest {
             url: self
                 .userinfo_endpoint
                 .as_ref()
-                .ok_or(NoUserInfoEndpoint)?
-                .to_owned(),
+                .ok_or(ConfigurationError::MissingUrl("userinfo"))?,
             access_token,
             require_signed_response: false,
             signed_response_verifier: UserInfoVerifier::new(
@@ -1075,7 +1074,7 @@ where
     pub fn introspect<'a>(
         &'a self,
         token: &'a AccessToken,
-    ) -> IntrospectionRequest<'a, TE, TIR, TT> {
+    ) -> Result<IntrospectionRequest<'a, TE, TIR, TT>, ConfigurationError> {
         self.oauth2_client.introspect(token)
     }
 
@@ -1090,7 +1089,7 @@ where
     ///
     /// See https://tools.ietf.org/html/rfc7009
     ///
-    pub fn revoke_token(&self, token: RT) -> RevocationRequest<RT, TRE> {
+    pub fn revoke_token(&self, token: RT) -> Result<RevocationRequest<RT, TRE>, ConfigurationError> {
         self.oauth2_client.revoke_token(token)
     }
 }

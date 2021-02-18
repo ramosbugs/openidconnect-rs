@@ -27,7 +27,7 @@ thiserror = "1.0"
 http = "0.2"
 itertools = "0.9"
 log = "0.4"
-oauth2 = { version = "=4.0.0-alpha.4", default-features = false }
+oauth2 = { version = "=4.0.0-alpha.5", default-features = false }
 rand = "0.7"
 ring = "0.16"
 serde = "1.0"
