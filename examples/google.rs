@@ -21,10 +21,8 @@ use std::process::exit;
 
 use url::Url;
 
-use openidconnect::core::{
-    CoreClient, CoreIdTokenClaims, CoreIdTokenVerifier, CoreProviderMetadata, CoreResponseType,
-};
-use openidconnect::reqwest::http_client;
+use openidconnect::core::{CoreClient, CoreIdTokenClaims, CoreIdTokenVerifier, CoreResponseType};
+use openidconnect::{reqwest::http_client, RevocationUrl};
 use openidconnect::{
     AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce,
     OAuth2TokenResponse, RedirectUrl, Scope,
@@ -41,6 +39,41 @@ fn handle_error<T: std::error::Error>(fail: &T, msg: &'static str) {
     exit(1);
 }
 
+// Teach openidconnect-rs about the Google custom extension to the OpenID Discovery response
+// that we can use as the RFC 7009 OAuth 2.0 Token Revocation endpoint.
+use openidconnect::core::{
+    CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClientAuthMethod, CoreGrantType,
+    CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm,
+    CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm, CoreResponseMode, CoreRevocableToken,
+    CoreSubjectIdentifierType,
+};
+use openidconnect::{AdditionalProviderMetadata, ProviderMetadata};
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct RevocationEndpointProviderMetadata {
+    revocation_endpoint: String,
+}
+impl AdditionalProviderMetadata for RevocationEndpointProviderMetadata {}
+type GoogleProviderMetadata = ProviderMetadata<
+    RevocationEndpointProviderMetadata,
+    CoreAuthDisplay,
+    CoreClientAuthMethod,
+    CoreClaimName,
+    CoreClaimType,
+    CoreGrantType,
+    CoreJweContentEncryptionAlgorithm,
+    CoreJweKeyManagementAlgorithm,
+    CoreJwsSigningAlgorithm,
+    CoreJsonWebKeyType,
+    CoreJsonWebKeyUse,
+    CoreJsonWebKey,
+    CoreResponseMode,
+    CoreResponseType,
+    CoreSubjectIdentifierType,
+>;
+
 fn main() {
     env_logger::init();
 
@@ -55,11 +88,22 @@ fn main() {
         IssuerUrl::new("https://accounts.google.com".to_string()).expect("Invalid issuer URL");
 
     // Fetch Google's OpenID Connect discovery document.
-    let provider_metadata = CoreProviderMetadata::discover(&issuer_url, http_client)
+    // Note: if we don't care about token revocation we can simply use CoreProviderMetadata here
+    // instead of GoogleProviderMetadata.
+    let provider_metadata = GoogleProviderMetadata::discover(&issuer_url, http_client)
         .unwrap_or_else(|err| {
             handle_error(&err, "Failed to discover OpenID Provider");
             unreachable!();
         });
+
+    let revocation_endpoint = provider_metadata
+        .additional_metadata()
+        .revocation_endpoint
+        .clone();
+    println!(
+        "Discovered Google revocation endpoint: {}",
+        revocation_endpoint
+    );
 
     // Set up the config for the Google OAuth2 process.
     let client = CoreClient::from_provider_metadata(
@@ -71,6 +115,10 @@ fn main() {
     // See below for the server implementation.
     .set_redirect_uri(
         RedirectUrl::new("http://localhost:8080".to_string()).expect("Invalid redirect URL"),
+    )
+    // Google supports OAuth 2.0 Token Revocation (RFC-7009)
+    .set_revocation_uri(
+        RevocationUrl::new(revocation_endpoint).expect("Invalid revocation endpoint URL"),
     );
 
     // Generate the authorization URL to which we'll redirect the user.
@@ -148,7 +196,7 @@ fn main() {
                 .exchange_code(code)
                 .request(http_client)
                 .unwrap_or_else(|err| {
-                    handle_error(&err, "Failed to access token endpoint");
+                    handle_error(&err, "Failed to contact token endpoint");
                     unreachable!();
                 });
 
@@ -170,7 +218,22 @@ fn main() {
                 });
             println!("Google returned ID token: {:?}", id_token_claims);
 
-            // The server will terminate itself after collecting the first code.
+            // Revoke the obtained token
+            let token_to_revoke: CoreRevocableToken = match token_response.refresh_token() {
+                Some(token) => token.into(),
+                None => token_response.access_token().into(),
+            };
+
+            client
+                .revoke_token(token_to_revoke)
+                .unwrap()
+                .request(http_client)
+                .unwrap_or_else(|err| {
+                    handle_error(&err, "Failed to contact token revocation endpoint");
+                    unreachable!();
+                });
+
+            // The server will terminate itself after revoking the token.
             break;
         }
     }
