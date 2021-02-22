@@ -574,8 +574,8 @@ extern crate pretty_assertions;
 #[macro_use]
 extern crate serde_derive;
 
-use oauth2::{ConfigurationError, helpers::variant_name};
 use oauth2::ResponseType as OAuth2ResponseType;
+use oauth2::{helpers::variant_name, ConfigurationError};
 use url::Url;
 
 use std::borrow::Cow;
@@ -634,8 +634,7 @@ pub use types::{
     SubjectIdentifier, SubjectIdentifierType, ToSUrl,
 };
 pub use user_info::{
-    UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoRequest,
-    UserInfoUrl,
+    UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoRequest, UserInfoUrl,
 };
 use verification::{AudiencesClaim, IssuerClaim};
 pub use verification::{
@@ -793,23 +792,7 @@ where
     /// [`ProviderMetadata::discover_async`] to fetch the provider metadata.
     ///
     pub fn from_provider_metadata<A, CA, CN, CT, G, JK, RM, RS, S>(
-        provider_metadata: ProviderMetadata<
-            A,
-            AD,
-            CA,
-            CN,
-            CT,
-            G,
-            JE,
-            JK,
-            JS,
-            JT,
-            JU,
-            K,
-            RM,
-            RS,
-            S,
-        >,
+        provider_metadata: ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RS, S>,
         client_id: ClientId,
         client_secret: Option<ClientSecret>,
     ) -> Self
@@ -1089,7 +1072,10 @@ where
     ///
     /// See https://tools.ietf.org/html/rfc7009
     ///
-    pub fn revoke_token(&self, token: RT) -> Result<RevocationRequest<RT, TRE>, ConfigurationError> {
+    pub fn revoke_token(
+        &self,
+        token: RT,
+    ) -> Result<RevocationRequest<RT, TRE>, ConfigurationError> {
         self.oauth2_client.revoke_token(token)
     }
 }
