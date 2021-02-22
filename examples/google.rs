@@ -88,8 +88,16 @@ fn main() {
         IssuerUrl::new("https://accounts.google.com".to_string()).expect("Invalid issuer URL");
 
     // Fetch Google's OpenID Connect discovery document.
-    // Note: if we don't care about token revocation we can simply use CoreProviderMetadata here
-    // instead of GoogleProviderMetadata.
+    //
+    // Note: If we don't care about token revocation we can simply use CoreProviderMetadata here
+    // instead of GoogleProviderMetadata. If instead we wanted to optionally use the token
+    // revocation endpoint if it seems to be supported we could do something like this:
+    //   #[derive(Clone, Debug, Deserialize, Serialize)]
+    //   struct AllOtherProviderMetadata(HashMap<String, serde_json::Value>);
+    //   impl AdditionalClaims for AllOtherProviderMetadata {}
+    // And then test for the presence of "revocation_endpoint" in the map returned by a call to
+    // .additional_metadata().
+
     let provider_metadata = GoogleProviderMetadata::discover(&issuer_url, http_client)
         .unwrap_or_else(|err| {
             handle_error(&err, "Failed to discover OpenID Provider");
