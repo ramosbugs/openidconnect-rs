@@ -855,8 +855,8 @@ where
     ///
     /// Sets the the redirect URL used by the authorization endpoint.
     ///
-    pub fn set_redirect_uri(mut self, redirect_uri: RedirectUrl) -> Self {
-        self.oauth2_client = self.oauth2_client.set_redirect_url(redirect_uri);
+    pub fn set_redirect_uri(mut self, redirect_url: RedirectUrl) -> Self {
+        self.oauth2_client = self.oauth2_client.set_redirect_uri(redirect_url);
         self
     }
 
@@ -864,8 +864,8 @@ where
     /// Sets the introspection URL for contacting the ([RFC 7662](https://tools.ietf.org/html/rfc7662))
     /// introspection endpoint.
     ///
-    pub fn set_introspection_url(mut self, introspection_url: IntrospectionUrl) -> Self {
-        self.oauth2_client = self.oauth2_client.set_introspection_url(introspection_url);
+    pub fn set_introspection_uri(mut self, introspection_url: IntrospectionUrl) -> Self {
+        self.oauth2_client = self.oauth2_client.set_introspection_uri(introspection_url);
         self
     }
 
@@ -874,8 +874,8 @@ where
     ///
     /// See: [`revoke_token()`](Self::revoke_token())
     ///
-    pub fn set_revocation_uri(mut self, revocation_uri: RevocationUrl) -> Self {
-        self.oauth2_client = self.oauth2_client.set_revocation_url(revocation_uri);
+    pub fn set_revocation_uri(mut self, revocation_url: RevocationUrl) -> Self {
+        self.oauth2_client = self.oauth2_client.set_revocation_uri(revocation_url);
         self
     }
 
@@ -1275,8 +1275,8 @@ where
     ///
     /// Overrides the `redirect_url` to the one specified.
     ///
-    pub fn set_redirect_url(mut self, redirect_url: Cow<'a, RedirectUrl>) -> Self {
-        self.inner = self.inner.set_redirect_url(redirect_url);
+    pub fn set_redirect_uri(mut self, redirect_url: Cow<'a, RedirectUrl>) -> Self {
+        self.inner = self.inner.set_redirect_uri(redirect_url);
         self
     }
 
