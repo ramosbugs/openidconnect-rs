@@ -46,8 +46,9 @@ fn handle_error<T: std::error::Error>(fail: &T, msg: &'static str) {
     exit(1);
 }
 
-// Teach openidconnect-rs about the Google custom extension to the OpenID Discovery response
-// that we can use as the RFC 7009 OAuth 2.0 Token Revocation endpoint.
+// Teach openidconnect-rs about a Google custom extension to the OpenID Discovery response that we can use as the RFC
+// 7009 OAuth 2.0 Token Revocation endpoint. For more information about the Google specific Discovery response see the
+// Google OpenID Connect service documentation at: https://developers.google.com/identity/protocols/oauth2/openid-connect#discovery
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct RevocationEndpointProviderMetadata {
     revocation_endpoint: String,
