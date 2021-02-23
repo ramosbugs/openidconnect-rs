@@ -19,13 +19,20 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::process::exit;
 
+use serde::{Deserialize, Serialize};
 use url::Url;
 
-use openidconnect::core::{CoreClient, CoreIdTokenClaims, CoreIdTokenVerifier, CoreResponseType};
-use openidconnect::{reqwest::http_client, RevocationUrl};
+use openidconnect::core::{
+    CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClient, CoreClientAuthMethod, CoreGrantType,
+    CoreIdTokenClaims, CoreIdTokenVerifier, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse,
+    CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm,
+    CoreResponseMode, CoreResponseType, CoreRevocableToken, CoreSubjectIdentifierType,
+};
+use openidconnect::reqwest::http_client;
 use openidconnect::{
-    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce,
-    OAuth2TokenResponse, RedirectUrl, Scope,
+    AdditionalProviderMetadata, AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret,
+    CsrfToken, IssuerUrl, Nonce, OAuth2TokenResponse, ProviderMetadata, RedirectUrl, RevocationUrl,
+    Scope,
 };
 
 fn handle_error<T: std::error::Error>(fail: &T, msg: &'static str) {
@@ -41,16 +48,6 @@ fn handle_error<T: std::error::Error>(fail: &T, msg: &'static str) {
 
 // Teach openidconnect-rs about the Google custom extension to the OpenID Discovery response
 // that we can use as the RFC 7009 OAuth 2.0 Token Revocation endpoint.
-use openidconnect::core::{
-    CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClientAuthMethod, CoreGrantType,
-    CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm,
-    CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm, CoreResponseMode, CoreRevocableToken,
-    CoreSubjectIdentifierType,
-};
-use openidconnect::{AdditionalProviderMetadata, ProviderMetadata};
-
-use serde::{Deserialize, Serialize};
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct RevocationEndpointProviderMetadata {
     revocation_endpoint: String,
