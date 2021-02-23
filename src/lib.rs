@@ -585,13 +585,14 @@ use std::time::Duration;
 
 pub use oauth2::{
     AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientCredentialsTokenRequest, ClientId,
-    ClientSecret, CodeTokenRequest, CsrfToken, EmptyExtraTokenFields, ErrorResponse,
-    ErrorResponseType, ExtraTokenFields, HttpRequest, HttpResponse, IntrospectionRequest,
-    IntrospectionUrl, PasswordTokenRequest, PkceCodeChallenge, PkceCodeChallengeMethod,
-    PkceCodeVerifier, RedirectUrl, RefreshToken, RefreshTokenRequest, RequestTokenError,
-    ResourceOwnerPassword, ResourceOwnerUsername, RevocableToken, RevocationRequest, RevocationUrl,
-    Scope, StandardErrorResponse, StandardTokenResponse, TokenIntrospectionResponse,
-    TokenResponse as OAuth2TokenResponse, TokenType, TokenUrl,
+    ClientSecret, CodeTokenRequest, ConfigurationError, CsrfToken, EmptyExtraTokenFields,
+    ErrorResponse, ErrorResponseType, ExtraTokenFields, HttpRequest, HttpResponse,
+    IntrospectionRequest, IntrospectionUrl, PasswordTokenRequest, PkceCodeChallenge,
+    PkceCodeChallengeMethod, PkceCodeVerifier, RedirectUrl, RefreshToken, RefreshTokenRequest,
+    RequestTokenError, ResourceOwnerPassword, ResourceOwnerUsername, RevocableToken,
+    RevocationErrorResponseType, RevocationRequest, RevocationUrl, Scope, StandardErrorResponse,
+    StandardTokenResponse, TokenIntrospectionResponse, TokenResponse as OAuth2TokenResponse,
+    TokenType, TokenUrl,
 };
 
 ///
