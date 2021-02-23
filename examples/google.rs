@@ -234,7 +234,7 @@ fn main() {
 
             client
                 .revoke_token(token_to_revoke)
-                .unwrap()
+                .expect("no revocation_uri configured")
                 .request(http_client)
                 .unwrap_or_else(|err| {
                     handle_error(&err, "Failed to contact token revocation endpoint");
