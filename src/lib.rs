@@ -574,8 +574,8 @@ extern crate pretty_assertions;
 #[macro_use]
 extern crate serde_derive;
 
+use oauth2::helpers::variant_name;
 use oauth2::ResponseType as OAuth2ResponseType;
-use oauth2::{helpers::variant_name, ConfigurationError};
 use url::Url;
 
 use std::borrow::Cow;

@@ -6,7 +6,7 @@ pub use oauth2::basic::{
     BasicRequestTokenError as CoreRequestTokenError,
     BasicRevocationErrorResponse as CoreRevocationErrorResponse, BasicTokenType as CoreTokenType,
 };
-pub use oauth2::revocation::StandardRevocableToken as CoreRevocableToken;
+pub use oauth2::StandardRevocableToken as CoreRevocableToken;
 use oauth2::{
     EmptyExtraTokenFields, ErrorResponseType, ResponseType as OAuth2ResponseType,
     StandardErrorResponse, StandardTokenIntrospectionResponse, StandardTokenResponse,
