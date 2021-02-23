@@ -709,6 +709,28 @@ pub enum AuthenticationFlow<RT: ResponseType> {
 }
 
 /// OpenID Connect client.
+///
+/// # Error Types
+///
+/// To enable compile time verification that only the correct and complete set of errors for the `Client` function being
+/// invoked are exposed to the caller, the `Client` type is specialized on multiple implementations of the
+/// [`ErrorResponse`] trait. The exact [`ErrorResponse`] implementation returned varies by the RFC that the invoked
+/// `Client` function implements:
+///
+///   - Generic type `TE` (aka Token Error) for errors defined by [RFC 6749 OAuth 2.0 Authorization Framework](https://tools.ietf.org/html/rfc6749).
+///   - Generic type `TRE` (aka Token Revocation Error) for errors defined by [RFC 7009 OAuth 2.0 Token Revocation](https://tools.ietf.org/html/rfc7009).
+///
+/// For example when revoking a token, error code `unsupported_token_type` (from RFC 7009) may be returned:
+/// ```ignore
+/// let revocation_response = client
+///     .revoke_token(AccessToken::new("some token".to_string()).into())
+///     .request(...);
+///
+/// assert!(matches!(res, Err(
+///     RequestTokenError::ServerResponse(err)) if matches!(err.error(),
+///         RevocationErrorResponseType::UnsupportedTokenType)));
+/// ```
+///
 #[derive(Clone, Debug)]
 pub struct Client<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT, TIR, RT, TRE>
 where
