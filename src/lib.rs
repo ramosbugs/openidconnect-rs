@@ -750,7 +750,6 @@ where
     RT: RevocableToken,
     TRE: ErrorResponse,
 {
-    // FIXME: Add support for OAuth 2 Token Introspection
     oauth2_client: oauth2::Client<TE, TR, TT, TIR, RT, TRE>,
     client_id: ClientId,
     client_secret: Option<ClientSecret>,
