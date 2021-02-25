@@ -708,6 +708,7 @@ pub enum AuthenticationFlow<RT: ResponseType> {
     Hybrid(Vec<RT>),
 }
 
+///
 /// OpenID Connect client.
 ///
 /// # Error Types
