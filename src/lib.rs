@@ -1588,7 +1588,7 @@ mod tests {
             .add_auth_context_value(AuthenticationContextClass::new(
                 "urn:mace:incommon:iap:silver".to_string(),
             ))
-            .set_redirect_url(Cow::Owned(
+            .set_redirect_uri(Cow::Owned(
                 RedirectUrl::new("http://localhost:8888/alternative".to_string()).unwrap(),
             ))
             .url();
