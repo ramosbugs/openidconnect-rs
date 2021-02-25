@@ -591,8 +591,8 @@ pub use oauth2::{
     PkceCodeChallengeMethod, PkceCodeVerifier, RedirectUrl, RefreshToken, RefreshTokenRequest,
     RequestTokenError, ResourceOwnerPassword, ResourceOwnerUsername, RevocableToken,
     RevocationErrorResponseType, RevocationRequest, RevocationUrl, Scope, StandardErrorResponse,
-    StandardTokenResponse, TokenIntrospectionResponse, TokenResponse as OAuth2TokenResponse,
-    TokenType, TokenUrl,
+    StandardTokenIntrospectionResponse, StandardTokenResponse, TokenIntrospectionResponse,
+    TokenResponse as OAuth2TokenResponse, TokenType, TokenUrl,
 };
 
 ///
