@@ -25,7 +25,7 @@ API documentation and examples are available on [docs.rs](https://docs.rs/openid
     * Aggregated and distributed claims
     * Passing request parameters as JWTs
     * Verification of the `azp` claim (see [discussion](https://bitbucket.org/openid/connect/issues/973/))
-    * ECDSA-based ID token verification
+    * ECDSA-based ID token verification using the P-521 curve
     * JSON Web Encryption (JWE)
 * [OpenID Connect Discovery](https://openid.net/specs/openid-connect-discovery-1_0.html)
   * Supported features:
@@ -38,3 +38,5 @@ API documentation and examples are available on [docs.rs](https://docs.rs/openid
     * Client Registration endpoint
   * Unsupported features:
     * Client Configuration endpoint
+* [OAuth 2.0 Token Introspection](https://tools.ietf.org/html/rfc7662)
+* [OAuth 2.0 Token Revocation](https://tools.ietf.org/html/rfc7009)
