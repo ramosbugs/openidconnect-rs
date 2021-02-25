@@ -575,7 +575,7 @@ extern crate pretty_assertions;
 extern crate serde_derive;
 
 use oauth2::helpers::variant_name;
-use oauth2::{ResponseType as OAuth2ResponseType, StandardTokenInspectionResponse};
+use oauth2::ResponseType as OAuth2ResponseType;
 use url::Url;
 
 use std::borrow::Cow;
@@ -585,12 +585,14 @@ use std::time::Duration;
 
 pub use oauth2::{
     AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientCredentialsTokenRequest, ClientId,
-    ClientSecret, CodeTokenRequest, CsrfToken, EmptyExtraTokenFields, ErrorResponse,
-    ErrorResponseType, ExtraTokenFields, HttpRequest, HttpResponse, PasswordTokenRequest,
-    PkceCodeChallenge, PkceCodeChallengeMethod, PkceCodeVerifier, RedirectUrl, RefreshToken,
-    RefreshTokenRequest, RequestTokenError, ResourceOwnerPassword, ResourceOwnerUsername, Scope,
-    StandardErrorResponse, StandardTokenResponse, TokenResponse as OAuth2TokenResponse, TokenType,
-    TokenUrl,
+    ClientSecret, CodeTokenRequest, ConfigurationError, CsrfToken, EmptyExtraTokenFields,
+    ErrorResponse, ErrorResponseType, ExtraTokenFields, HttpRequest, HttpResponse,
+    IntrospectionRequest, IntrospectionUrl, PasswordTokenRequest, PkceCodeChallenge,
+    PkceCodeChallengeMethod, PkceCodeVerifier, RedirectUrl, RefreshToken, RefreshTokenRequest,
+    RequestTokenError, ResourceOwnerPassword, ResourceOwnerUsername, RevocableToken,
+    RevocationErrorResponseType, RevocationRequest, RevocationUrl, Scope, StandardErrorResponse,
+    StandardTokenResponse, TokenIntrospectionResponse, TokenResponse as OAuth2TokenResponse,
+    TokenType, TokenUrl,
 };
 
 ///
@@ -633,8 +635,7 @@ pub use types::{
     SubjectIdentifier, SubjectIdentifierType, ToSUrl,
 };
 pub use user_info::{
-    NoUserInfoEndpoint, UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoRequest,
-    UserInfoUrl,
+    UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoRequest, UserInfoUrl,
 };
 use verification::{AudiencesClaim, IssuerClaim};
 pub use verification::{
@@ -707,9 +708,71 @@ pub enum AuthenticationFlow<RT: ResponseType> {
     Hybrid(Vec<RT>),
 }
 
+///
 /// OpenID Connect client.
+///
+/// # Error Types
+///
+/// To enable compile time verification that only the correct and complete set of errors for the `Client` function being
+/// invoked are exposed to the caller, the `Client` type is specialized on multiple implementations of the
+/// [`ErrorResponse`] trait. The exact [`ErrorResponse`] implementation returned varies by the RFC that the invoked
+/// `Client` function implements:
+///
+///   - Generic type `TE` (aka Token Error) for errors defined by [RFC 6749 OAuth 2.0 Authorization Framework](https://tools.ietf.org/html/rfc6749).
+///   - Generic type `TRE` (aka Token Revocation Error) for errors defined by [RFC 7009 OAuth 2.0 Token Revocation](https://tools.ietf.org/html/rfc7009).
+///
+/// For example when revoking a token, error code `unsupported_token_type` (from RFC 7009) may be returned:
+/// ```rust
+/// # use thiserror::Error;
+/// # use http::status::StatusCode;
+/// # use http::header::{HeaderValue, CONTENT_TYPE};
+/// # use oauth2::*;
+/// # use openidconnect::{*, core::*};
+/// # let client = CoreClient::new(
+/// #     ClientId::new("aaa".to_string()),
+/// #     Some(ClientSecret::new("bbb".to_string())),
+/// #     IssuerUrl::new("https://example".to_string()).unwrap(),
+/// #     AuthUrl::new("https://example/authorize".to_string()).unwrap(),
+/// #     Some(TokenUrl::new("https://example/token".to_string()).unwrap()),
+/// #     None,
+/// #     JsonWebKeySet::default(),
+/// # )
+/// # .set_revocation_uri(RevocationUrl::new("https://revocation/url".to_string()).unwrap());
+/// #
+/// # #[derive(Debug, Error)]
+/// # enum FakeError {
+/// #     #[error("error")]
+/// #     Err,
+/// # }
+/// #
+/// # let http_client = |_| -> Result<HttpResponse, FakeError> {
+/// #     Ok(HttpResponse {
+/// #         status_code: StatusCode::BAD_REQUEST,
+/// #         headers: vec![(
+/// #             CONTENT_TYPE,
+/// #             HeaderValue::from_str("application/json").unwrap(),
+/// #         )]
+/// #         .into_iter()
+/// #         .collect(),
+/// #         body: "{\"error\": \"unsupported_token_type\", \"error_description\": \"stuff happened\", \
+/// #                \"error_uri\": \"https://errors\"}"
+/// #             .to_string()
+/// #             .into_bytes(),
+/// #     })
+/// # };
+/// #
+/// let res = client
+///     .revoke_token(AccessToken::new("some token".to_string()).into())
+///     .unwrap()
+///     .request(http_client);
+///
+/// assert!(matches!(res, Err(
+///     RequestTokenError::ServerResponse(err)) if matches!(err.error(),
+///         RevocationErrorResponseType::UnsupportedTokenType)));
+/// ```
+///
 #[derive(Clone, Debug)]
-pub struct Client<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT>
+pub struct Client<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT, TIR, RT, TRE>
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
@@ -723,10 +786,11 @@ where
     TE: ErrorResponse,
     TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
     TT: TokenType + 'static,
+    TIR: TokenIntrospectionResponse<TT>,
+    RT: RevocableToken,
+    TRE: ErrorResponse,
 {
-    // FIXME: Add support for OAuth 2 Token Introspection
-    oauth2_client:
-        oauth2::Client<TE, TR, TT, StandardTokenInspectionResponse<EmptyExtraTokenFields, TT>>,
+    oauth2_client: oauth2::Client<TE, TR, TT, TIR, RT, TRE>,
     client_id: ClientId,
     client_secret: Option<ClientSecret>,
     issuer: IssuerUrl,
@@ -735,8 +799,8 @@ where
     use_openid_scope: bool,
     _phantom: PhantomData<(AC, AD, GC, JE, P)>,
 }
-impl<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT>
-    Client<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT>
+impl<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT, TIR, RT, TRE>
+    Client<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT, TIR, RT, TRE>
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
@@ -750,6 +814,9 @@ where
     TE: ErrorResponse + 'static,
     TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
     TT: TokenType + 'static,
+    TIR: TokenIntrospectionResponse<TT>,
+    RT: RevocableToken,
+    TRE: ErrorResponse + 'static,
 {
     ///
     /// Initializes an OpenID Connect client.
@@ -786,8 +853,8 @@ where
     /// Use [`ProviderMetadata::discover`] or
     /// [`ProviderMetadata::discover_async`] to fetch the provider metadata.
     ///
-    pub fn from_provider_metadata<A, CA, CN, CT, G, JK, RM, RT, S>(
-        provider_metadata: ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RT, S>,
+    pub fn from_provider_metadata<A, CA, CN, CT, G, JK, RM, RS, S>(
+        provider_metadata: ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RS, S>,
         client_id: ClientId,
         client_secret: Option<ClientSecret>,
     ) -> Self
@@ -799,7 +866,7 @@ where
         G: GrantType,
         JK: JweKeyManagementAlgorithm,
         RM: ResponseMode,
-        RT: ResponseType,
+        RS: ResponseType,
         S: SubjectIdentifierType,
     {
         Self::new(
@@ -828,8 +895,27 @@ where
     ///
     /// Sets the the redirect URL used by the authorization endpoint.
     ///
-    pub fn set_redirect_uri(mut self, redirect_uri: RedirectUrl) -> Self {
-        self.oauth2_client = self.oauth2_client.set_redirect_url(redirect_uri);
+    pub fn set_redirect_uri(mut self, redirect_url: RedirectUrl) -> Self {
+        self.oauth2_client = self.oauth2_client.set_redirect_uri(redirect_url);
+        self
+    }
+
+    ///
+    /// Sets the introspection URL for contacting the ([RFC 7662](https://tools.ietf.org/html/rfc7662))
+    /// introspection endpoint.
+    ///
+    pub fn set_introspection_uri(mut self, introspection_url: IntrospectionUrl) -> Self {
+        self.oauth2_client = self.oauth2_client.set_introspection_uri(introspection_url);
+        self
+    }
+
+    ///
+    /// Sets the revocation URL for contacting the revocation endpoint ([RFC 7009](https://tools.ietf.org/html/rfc7009)).
+    ///
+    /// See: [`revoke_token()`](Self::revoke_token())
+    ///
+    pub fn set_revocation_uri(mut self, revocation_url: RevocationUrl) -> Self {
+        self.oauth2_client = self.oauth2_client.set_revocation_uri(revocation_url);
         self
     }
 
@@ -902,15 +988,15 @@ where
     /// Similarly, callers should use a fresh, unpredictable `nonce` to help protect against ID
     /// token reuse and forgery.
     ///
-    pub fn authorize_url<NF, RT, SF>(
+    pub fn authorize_url<NF, RS, SF>(
         &self,
-        authentication_flow: AuthenticationFlow<RT>,
+        authentication_flow: AuthenticationFlow<RS>,
         state_fn: SF,
         nonce_fn: NF,
-    ) -> AuthorizationRequest<AD, P, RT>
+    ) -> AuthorizationRequest<AD, P, RS>
     where
         NF: FnOnce() -> Nonce + 'static,
-        RT: ResponseType,
+        RS: ResponseType,
         SF: FnOnce() -> CsrfToken + 'static,
     {
         let request = AuthorizationRequest {
@@ -995,7 +1081,7 @@ where
     ///
     /// This function requires that this [`Client`] be configured with a user info endpoint,
     /// which is an optional feature for OpenID Connect Providers to implement. If this `Client`
-    /// does not know the provider's user info endpoint, it returns the [`NoUserInfoEndpoint`]
+    /// does not know the provider's user info endpoint, it returns the [`ConfigurationError`]
     /// error.
     ///
     /// To help protect against token substitution attacks, this function optionally allows clients
@@ -1008,13 +1094,12 @@ where
         &self,
         access_token: AccessToken,
         expected_subject: Option<SubjectIdentifier>,
-    ) -> Result<UserInfoRequest<JE, JS, JT, JU, K>, NoUserInfoEndpoint> {
+    ) -> Result<UserInfoRequest<JE, JS, JT, JU, K>, ConfigurationError> {
         Ok(UserInfoRequest {
             url: self
                 .userinfo_endpoint
                 .as_ref()
-                .ok_or(NoUserInfoEndpoint)?
-                .to_owned(),
+                .ok_or(ConfigurationError::MissingUrl("userinfo"))?,
             access_token,
             require_signed_response: false,
             signed_response_verifier: UserInfoVerifier::new(
@@ -1024,6 +1109,36 @@ where
                 expected_subject,
             ),
         })
+    }
+
+    ///
+    /// Creates a request builder for obtaining metadata about a previously received token.
+    ///
+    /// See https://tools.ietf.org/html/rfc7662
+    ///
+    pub fn introspect<'a>(
+        &'a self,
+        token: &'a AccessToken,
+    ) -> Result<IntrospectionRequest<'a, TE, TIR, TT>, ConfigurationError> {
+        self.oauth2_client.introspect(token)
+    }
+
+    ///
+    /// Creates a request builder for revoking a previously received token.
+    ///
+    /// Requires that [`set_revocation_url()`](Self::set_revocation_url()) have already been called to set the
+    /// revocation endpoint URL.
+    ///
+    /// Attempting to submit the generated request without calling [`set_revocation_url()`](Self::set_revocation_url())
+    /// first will result in an error.
+    ///
+    /// See https://tools.ietf.org/html/rfc7009
+    ///
+    pub fn revoke_token(
+        &self,
+        token: RT,
+    ) -> Result<RevocationRequest<RT, TRE>, ConfigurationError> {
+        self.oauth2_client.revoke_token(token)
     }
 }
 
@@ -1200,8 +1315,8 @@ where
     ///
     /// Overrides the `redirect_url` to the one specified.
     ///
-    pub fn set_redirect_url(mut self, redirect_url: Cow<'a, RedirectUrl>) -> Self {
-        self.inner = self.inner.set_redirect_url(redirect_url);
+    pub fn set_redirect_uri(mut self, redirect_url: Cow<'a, RedirectUrl>) -> Self {
+        self.inner = self.inner.set_redirect_uri(redirect_url);
         self
     }
 
@@ -1473,7 +1588,7 @@ mod tests {
             .add_auth_context_value(AuthenticationContextClass::new(
                 "urn:mace:incommon:iap:silver".to_string(),
             ))
-            .set_redirect_url(Cow::Owned(
+            .set_redirect_uri(Cow::Owned(
                 RedirectUrl::new("http://localhost:8888/alternative".to_string()).unwrap(),
             ))
             .url();

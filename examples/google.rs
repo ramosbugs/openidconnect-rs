@@ -19,15 +19,20 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::process::exit;
 
+use serde::{Deserialize, Serialize};
 use url::Url;
 
 use openidconnect::core::{
-    CoreClient, CoreIdTokenClaims, CoreIdTokenVerifier, CoreProviderMetadata, CoreResponseType,
+    CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClient, CoreClientAuthMethod, CoreGrantType,
+    CoreIdTokenClaims, CoreIdTokenVerifier, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse,
+    CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm,
+    CoreResponseMode, CoreResponseType, CoreRevocableToken, CoreSubjectIdentifierType,
 };
 use openidconnect::reqwest::http_client;
 use openidconnect::{
-    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce,
-    OAuth2TokenResponse, RedirectUrl, Scope,
+    AdditionalProviderMetadata, AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret,
+    CsrfToken, IssuerUrl, Nonce, OAuth2TokenResponse, ProviderMetadata, RedirectUrl, RevocationUrl,
+    Scope,
 };
 
 fn handle_error<T: std::error::Error>(fail: &T, msg: &'static str) {
@@ -40,6 +45,32 @@ fn handle_error<T: std::error::Error>(fail: &T, msg: &'static str) {
     println!("{}", err_msg);
     exit(1);
 }
+
+// Teach openidconnect-rs about a Google custom extension to the OpenID Discovery response that we can use as the RFC
+// 7009 OAuth 2.0 Token Revocation endpoint. For more information about the Google specific Discovery response see the
+// Google OpenID Connect service documentation at: https://developers.google.com/identity/protocols/oauth2/openid-connect#discovery
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct RevocationEndpointProviderMetadata {
+    revocation_endpoint: String,
+}
+impl AdditionalProviderMetadata for RevocationEndpointProviderMetadata {}
+type GoogleProviderMetadata = ProviderMetadata<
+    RevocationEndpointProviderMetadata,
+    CoreAuthDisplay,
+    CoreClientAuthMethod,
+    CoreClaimName,
+    CoreClaimType,
+    CoreGrantType,
+    CoreJweContentEncryptionAlgorithm,
+    CoreJweKeyManagementAlgorithm,
+    CoreJwsSigningAlgorithm,
+    CoreJsonWebKeyType,
+    CoreJsonWebKeyUse,
+    CoreJsonWebKey,
+    CoreResponseMode,
+    CoreResponseType,
+    CoreSubjectIdentifierType,
+>;
 
 fn main() {
     env_logger::init();
@@ -55,11 +86,30 @@ fn main() {
         IssuerUrl::new("https://accounts.google.com".to_string()).expect("Invalid issuer URL");
 
     // Fetch Google's OpenID Connect discovery document.
-    let provider_metadata = CoreProviderMetadata::discover(&issuer_url, http_client)
+    //
+    // Note: If we don't care about token revocation we can simply use CoreProviderMetadata here
+    // instead of GoogleProviderMetadata. If instead we wanted to optionally use the token
+    // revocation endpoint if it seems to be supported we could do something like this:
+    //   #[derive(Clone, Debug, Deserialize, Serialize)]
+    //   struct AllOtherProviderMetadata(HashMap<String, serde_json::Value>);
+    //   impl AdditionalClaims for AllOtherProviderMetadata {}
+    // And then test for the presence of "revocation_endpoint" in the map returned by a call to
+    // .additional_metadata().
+
+    let provider_metadata = GoogleProviderMetadata::discover(&issuer_url, http_client)
         .unwrap_or_else(|err| {
             handle_error(&err, "Failed to discover OpenID Provider");
             unreachable!();
         });
+
+    let revocation_endpoint = provider_metadata
+        .additional_metadata()
+        .revocation_endpoint
+        .clone();
+    println!(
+        "Discovered Google revocation endpoint: {}",
+        revocation_endpoint
+    );
 
     // Set up the config for the Google OAuth2 process.
     let client = CoreClient::from_provider_metadata(
@@ -71,6 +121,10 @@ fn main() {
     // See below for the server implementation.
     .set_redirect_uri(
         RedirectUrl::new("http://localhost:8080".to_string()).expect("Invalid redirect URL"),
+    )
+    // Google supports OAuth 2.0 Token Revocation (RFC-7009)
+    .set_revocation_uri(
+        RevocationUrl::new(revocation_endpoint).expect("Invalid revocation endpoint URL"),
     );
 
     // Generate the authorization URL to which we'll redirect the user.
@@ -148,7 +202,7 @@ fn main() {
                 .exchange_code(code)
                 .request(http_client)
                 .unwrap_or_else(|err| {
-                    handle_error(&err, "Failed to access token endpoint");
+                    handle_error(&err, "Failed to contact token endpoint");
                     unreachable!();
                 });
 
@@ -170,7 +224,22 @@ fn main() {
                 });
             println!("Google returned ID token: {:?}", id_token_claims);
 
-            // The server will terminate itself after collecting the first code.
+            // Revoke the obtained token
+            let token_to_revoke: CoreRevocableToken = match token_response.refresh_token() {
+                Some(token) => token.into(),
+                None => token_response.access_token().into(),
+            };
+
+            client
+                .revoke_token(token_to_revoke)
+                .expect("no revocation_uri configured")
+                .request(http_client)
+                .unwrap_or_else(|err| {
+                    handle_error(&err, "Failed to contact token revocation endpoint");
+                    unreachable!();
+                });
+
+            // The server will terminate itself after revoking the token.
             break;
         }
     }

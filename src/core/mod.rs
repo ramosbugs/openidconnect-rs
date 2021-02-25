@@ -3,12 +3,15 @@ use std::ops::Deref;
 
 pub use oauth2::basic::{
     BasicErrorResponseType as CoreErrorResponseType,
-    BasicRequestTokenError as CoreRequestTokenError, BasicTokenType as CoreTokenType,
+    BasicRequestTokenError as CoreRequestTokenError,
+    BasicRevocationErrorResponse as CoreRevocationErrorResponse, BasicTokenType as CoreTokenType,
 };
+pub use oauth2::StandardRevocableToken as CoreRevocableToken;
 use oauth2::{
     EmptyExtraTokenFields, ErrorResponseType, ResponseType as OAuth2ResponseType,
-    StandardErrorResponse, StandardTokenResponse,
+    StandardErrorResponse, StandardTokenIntrospectionResponse, StandardTokenResponse,
 };
+
 use serde::{Deserialize, Serialize};
 
 use crate::registration::{
@@ -36,6 +39,12 @@ mod crypto;
 mod jwk;
 
 ///
+/// OpenID Connect Core token introspection response.
+///
+pub type CoreTokenIntrospectionResponse =
+    StandardTokenIntrospectionResponse<EmptyExtraTokenFields, CoreTokenType>;
+
+///
 /// OpenID Connect Core authentication flows.
 ///
 pub type CoreAuthenticationFlow = AuthenticationFlow<CoreResponseType>;
@@ -56,6 +65,9 @@ pub type CoreClient = Client<
     StandardErrorResponse<CoreErrorResponseType>,
     CoreTokenResponse,
     CoreTokenType,
+    CoreTokenIntrospectionResponse,
+    CoreRevocableToken,
+    CoreRevocationErrorResponse,
 >;
 
 ///
