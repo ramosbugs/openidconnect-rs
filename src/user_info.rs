@@ -145,7 +145,7 @@ where
                 let jwt_str = String::from_utf8(http_response.body).map_err(|_| {
                     UserInfoError::Other("response body has invalid UTF-8 encoding".to_string())
                 })?;
-                serde_json::from_value::<UserInfoJsonWebToken<AC, GC, JE, JS, JT>>(
+                serde_path_to_error::deserialize::<_, UserInfoJsonWebToken<AC, GC, JE, JS, JT>>(
                     serde_json::Value::String(jwt_str),
                 )
                 .map_err(UserInfoError::Parse)?
@@ -230,8 +230,10 @@ where
     where
         RE: std::error::Error + 'static,
     {
-        let user_info = serde_json::from_slice::<UserInfoClaimsImpl<AC, GC>>(&user_info_json)
-            .map_err(UserInfoError::Parse)?;
+        let user_info = serde_path_to_error::deserialize::<_, UserInfoClaimsImpl<AC, GC>>(
+            &mut serde_json::Deserializer::from_slice(&user_info_json),
+        )
+        .map_err(UserInfoError::Parse)?;
 
         // This is the only verification we need to do for JSON-based user info claims, so don't
         // bother with the complexity of a separate verifier object.
@@ -459,7 +461,7 @@ where
     /// Failed to parse server response.
     ///
     #[error("Failed to parse server response")]
-    Parse(#[source] serde_json::Error),
+    Parse(#[source] serde_path_to_error::Error<serde_json::Error>),
     ///
     /// An error occurred while sending the request or receiving the response (e.g., network
     /// connectivity failed).

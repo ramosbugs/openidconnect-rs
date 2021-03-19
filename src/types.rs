@@ -817,7 +817,10 @@ where
                 )
             })?;
 
-        serde_json::from_slice(&http_response.body).map_err(DiscoveryError::Parse)
+        serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_slice(
+            &http_response.body,
+        ))
+        .map_err(DiscoveryError::Parse)
     }
 
     ///

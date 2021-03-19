@@ -574,12 +574,15 @@ where
         })?;
 
         if http_response.status_code == StatusCode::BAD_REQUEST {
-            let response_error: StandardErrorResponse<ET> =
-                serde_json::from_str(&response_body).map_err(ClientRegistrationError::Parse)?;
+            let response_error: StandardErrorResponse<ET> = serde_path_to_error::deserialize(
+                &mut serde_json::Deserializer::from_str(&response_body),
+            )
+            .map_err(ClientRegistrationError::Parse)?;
             return Err(ClientRegistrationError::ServerResponse(response_error));
         }
 
-        serde_json::from_str(&response_body).map_err(ClientRegistrationError::Parse)
+        serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_str(&response_body))
+            .map_err(ClientRegistrationError::Parse)
     }
 
     ///
@@ -867,7 +870,7 @@ where
     /// Failed to parse server response.
     ///
     #[error("Failed to parse server response")]
-    Parse(#[source] serde_json::Error),
+    Parse(#[source] serde_path_to_error::Error<serde_json::Error>),
     ///
     /// An error occurred while sending the request or receiving the response (e.g., network
     /// connectivity failed).

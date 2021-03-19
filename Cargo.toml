@@ -15,9 +15,11 @@ all-features = true
 maintenance = { status = "actively-developed" }
 
 [features]
-default = ["reqwest"]
+default = ["reqwest", "rustls-tls"]
 curl = ["oauth2/curl"]
 reqwest = ["oauth2/reqwest"]
+native-tls = ["oauth2/native-tls"]
+rustls-tls = ["oauth2/rustls-tls"]
 nightly = []
 
 [dependencies]
@@ -27,12 +29,13 @@ thiserror = "1.0"
 http = "0.2"
 itertools = "0.9"
 log = "0.4"
-oauth2 = { version = "=4.0.0-alpha.6", default-features = false }
+oauth2 = { version = "4.0.0-beta.1", default-features = false }
 rand = "0.7"
 ring = "0.16"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
+serde_path_to_error = "0.1"
 serde-value = "0.6"
 untrusted = "0.7"
 url = { version = "2.1", features = ["serde"] }

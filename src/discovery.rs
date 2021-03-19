@@ -396,8 +396,10 @@ where
             )
         })?;
 
-        let provider_metadata = serde_json::from_slice::<Self>(&discovery_response.body)
-            .map_err(DiscoveryError::Parse)?;
+        let provider_metadata = serde_path_to_error::deserialize::<_, Self>(
+            &mut serde_json::Deserializer::from_slice(&discovery_response.body),
+        )
+        .map_err(DiscoveryError::Parse)?;
 
         if provider_metadata.issuer() != issuer_url {
             Err(DiscoveryError::Validation(format!(
@@ -442,7 +444,7 @@ where
     /// Failed to parse server response.
     ///
     #[error("Failed to parse server response")]
-    Parse(#[source] serde_json::Error),
+    Parse(#[source] serde_path_to_error::Error<serde_json::Error>),
     ///
     /// An error occurred while sending the request or receiving the response (e.g., network
     /// connectivity failed).
