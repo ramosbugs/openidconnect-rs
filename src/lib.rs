@@ -19,24 +19,24 @@
 //!    * [OpenID Connect Discovery document](#openid-connect-discovery-document)
 //!    * [OpenID Connect Discovery JSON Web Key Set](#openid-connect-discovery-json-web-key-set)
 //!    * [OpenID Connect ID Token](#openid-connect-id-token)
-//!  * [Async/Await API](#asyncawait-api)
+//!  * [Asynchronous API](#asynchronous-api)
 //!
 //! # Importing `openidconnect`: selecting an HTTP client interface
 //!
 //! This library offers a flexible HTTP client interface with two modes:
 //!  * **Synchronous (blocking)**
-//!  * **Async/await**
+//!  * **Asynchronous**
 //!
 //! For the HTTP client modes described above, the following HTTP client implementations can be
 //! used:
 //!  * **[`reqwest`]**
 //!
-//!    The `reqwest` HTTP client supports both modes. By default, `reqwest` 0.10 is enabled,
-//!    which supports the synchronous and asynchronous `futures` 0.1 APIs.
+//!    The `reqwest` HTTP client supports both the synchronous and asynchronous modes and is enabled
+//!    by default.
 //!
 //!    Synchronous client: [`reqwest::http_client`]
 //!
-//!    Async/await `futures` 0.3 client: [`reqwest::async_http_client`]
+//!    Asynchronous client: [`reqwest::async_http_client`]
 //!
 //!  * **[`curl`]**
 //!
@@ -49,19 +49,21 @@
 //!
 //!    In addition to the clients above, users may define their own HTTP clients, which must accept
 //!    an [`HttpRequest`] and return an [`HttpResponse`] or error. Users writing their own clients
-//!    may wish to disable the default `reqwest` 0.10 dependency by specifying
-//!    `default-features = false` in `Cargo.toml`:
+//!    may wish to disable the default `reqwest` dependency by specifying
+//!    `default-features = false` in `Cargo.toml` (replacing `...` with the desired version of this
+//!    crate):
 //!    ```toml
-//!    openidconnect = { version = "1.0", default-features = false }
+//!    openidconnect = { version = "...", default-features = false }
 //!    ```
 //!
 //!    Synchronous HTTP clients should implement the following trait:
-//!    ```ignore
+//!    ```text,ignore
 //!    FnOnce(HttpRequest) -> Result<HttpResponse, RE>
 //!    where RE: std::error::Error + 'static
+//!    ```
 //!
-//!    Async/await `futures` 0.3 HTTP clients should implement the following trait:
-//!    ```ignore
+//!    Asynchronous HTTP clients should implement the following trait:
+//!    ```text,ignore
 //!    FnOnce(HttpRequest) -> F
 //!    where
 //!      F: Future<Output = Result<HttpResponse, RE>>,
@@ -446,7 +448,7 @@
 //! # }
 //! ```
 //!
-//! # Async/Await API
+//! # Asynchronous API
 //!
 //! An asynchronous API for async/await is also provided.
 //!
@@ -1126,10 +1128,10 @@ where
     ///
     /// Creates a request builder for revoking a previously received token.
     ///
-    /// Requires that [`set_revocation_url()`](Self::set_revocation_url()) have already been called to set the
+    /// Requires that [`set_revocation_uri()`](Self::set_revocation_uri()) have already been called to set the
     /// revocation endpoint URL.
     ///
-    /// Attempting to submit the generated request without calling [`set_revocation_url()`](Self::set_revocation_url())
+    /// Attempting to submit the generated request without calling [`set_revocation_uri()`](Self::set_revocation_uri())
     /// first will result in an error.
     ///
     /// See https://tools.ietf.org/html/rfc7009
