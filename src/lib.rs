@@ -576,7 +576,6 @@ extern crate pretty_assertions;
 #[macro_use]
 extern crate serde_derive;
 
-use oauth2::helpers::variant_name;
 use oauth2::ResponseType as OAuth2ResponseType;
 use url::Url;
 
@@ -1337,7 +1336,7 @@ where
                             core::CoreResponseType::Token,
                         ]
                         .iter()
-                        .map(variant_name)
+                        .map(|response_type| response_type.as_ref())
                         .collect::<Vec<_>>()
                         .join(" "),
                     )
@@ -1348,7 +1347,7 @@ where
             AuthenticationFlow::Hybrid(ref response_types) => OAuth2ResponseType::new(
                 response_types
                     .iter()
-                    .map(variant_name)
+                    .map(|response_type| response_type.as_ref())
                     .collect::<Vec<_>>()
                     .join(" "),
             ),
@@ -1479,6 +1478,47 @@ mod tests {
 
         assert_eq!(
             "https://example/authorize?response_type=code&client_id=aaa&\
+             state=CSRF123&scope=openid&nonce=NONCE456",
+            authorize_url.to_string()
+        );
+    }
+
+    #[test]
+    fn test_authorize_url_implicit_with_access_token() {
+        let client = new_client();
+
+        let (authorize_url, _, _) = client
+            .authorize_url(
+                AuthenticationFlow::<CoreResponseType>::Implicit(true),
+                || CsrfToken::new("CSRF123".to_string()),
+                || Nonce::new("NONCE456".to_string()),
+            )
+            .url();
+
+        assert_eq!(
+            "https://example/authorize?response_type=id_token+token&client_id=aaa&\
+             state=CSRF123&scope=openid&nonce=NONCE456",
+            authorize_url.to_string()
+        );
+    }
+
+    #[test]
+    fn test_authorize_url_hybrid() {
+        let client = new_client();
+
+        let (authorize_url, _, _) = client
+            .authorize_url(
+                AuthenticationFlow::Hybrid(vec![
+                    CoreResponseType::Code,
+                    CoreResponseType::Extension("other".to_string()),
+                ]),
+                || CsrfToken::new("CSRF123".to_string()),
+                || Nonce::new("NONCE456".to_string()),
+            )
+            .url();
+
+        assert_eq!(
+            "https://example/authorize?response_type=code+other&client_id=aaa&\
              state=CSRF123&scope=openid&nonce=NONCE456",
             authorize_url.to_string()
         );
