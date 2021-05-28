@@ -771,8 +771,10 @@ pub mod tests {
             .expect_err("deserialization should have failed");
 
             assert!(
-                format!("{}", err).contains(pattern),
-                format!("Error `{}` must contain string `{}`", err, pattern),
+                err.to_string().contains(pattern),
+                "Error `{}` must contain string `{}`",
+                err,
+                pattern,
             );
         }
 

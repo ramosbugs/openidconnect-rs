@@ -842,7 +842,7 @@ mod tests {
             .expect_err("signature verification should fail")
         {
             SignatureVerificationError::InvalidKey(_) => {}
-            other => panic!(format!("unexpected error: {:?}", other)),
+            other => panic!("unexpected error: {:?}", other),
         }
 
         // Wrong key usage
@@ -870,7 +870,7 @@ mod tests {
             .expect_err("signature verification should fail")
         {
             SignatureVerificationError::InvalidKey(_) => {}
-            other => panic!(format!("unexpected error: {:?}", other)),
+            other => panic!("unexpected error: {:?}", other),
         }
 
         // Key without usage specified should work
