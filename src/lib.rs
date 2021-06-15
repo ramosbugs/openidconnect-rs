@@ -935,7 +935,7 @@ where
     /// Disables the `openid` scope from being requested automatically.
     ///
     pub fn disable_openid_scope(mut self) -> Self {
-        self.use_openid_scope = true;
+        self.use_openid_scope = false;
         self
     }
 
