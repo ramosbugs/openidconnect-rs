@@ -71,9 +71,6 @@ jobs:
           cargo install --force cargo-audit
           cargo audit
 
-      - name: Check WASM build
-        run: cargo check --target wasm32-unknown-unknown
-
   coverage:
     runs-on: ubuntu-latest
     container:
