@@ -2,7 +2,7 @@
 
 [![crates.io](https://img.shields.io/crates/v/openidconnect.svg)](https://crates.io/crates/openidconnect)
 [![docs.rs](https://docs.rs/openidconnect/badge.svg)](https://docs.rs/openidconnect)
-[![Build Status](https://travis-ci.org/ramosbugs/openidconnect-rs.svg?branch=main)](https://travis-ci.org/ramosbugs/openidconnect-rs)
+[![Build Status](https://github.com/ramosbugs/openidconnect-rs/actions/workflows/main.yml/badge.svg)](https://github.com/ramosbugs/openidconnect-rs/actions/workflows/main.yml)
 [![codecov](https://codecov.io/gh/ramosbugs/openidconnect-rs/branch/main/graph/badge.svg)](https://codecov.io/gh/ramosbugs/openidconnect-rs)
 
 

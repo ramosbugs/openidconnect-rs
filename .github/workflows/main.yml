@@ -1,0 +1,90 @@
+name: CI
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the main branch
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run daily to catch breakages in new Rust versions as well as new cargo audit findings.
+    - cron: '0 16 * * *'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  test:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        rust:
+          - 1.45.0
+          - stable
+          - beta
+          - nightly
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+          override: true
+          components: clippy, rustfmt
+
+      # Newer dependency versions don't support rustc 1.45, so we use a Cargo.lock file for those
+      # builds.
+      - name: Use Rust 1.45 lockfile
+        if: ${{ matrix.rust == '1.45.0' }}
+        run: cp Cargo-1.45.lock Cargo.lock
+
+      - name: Run tests
+        run: cargo test --tests --examples
+      - name: Doc tests
+        run: cargo test --doc
+      - name: Test with all features enabled
+        run: cargo test --all-features
+
+      - name: Check fmt
+        if: ${{ matrix.rust == '1.45.0' }}
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        if: ${{ matrix.rust == '1.45.0' }}
+        run: cargo clippy --all --all-features -- --deny warnings
+
+      - name: Audit
+        if: ${{ matrix.rust == 'stable' }}
+        run: |
+          cargo install --force cargo-audit
+          cargo audit
+
+      - name: Check WASM build
+        run: cargo check --target wasm32-unknown-unknown
+
+  coverage:
+    runs-on: ubuntu-latest
+    container:
+      image: xd009642/tarpaulin:develop-nightly
+      options: --security-opt seccomp=unconfined
+    steps:
+      - uses: actions/checkout@v2
+      - name: Generate code coverage
+        run: |
+          cargo +nightly tarpaulin --verbose --all-features --timeout 120 --out Xml
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v1
+        with:
+          fail_ci_if_error: true
