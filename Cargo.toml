@@ -24,7 +24,8 @@ nightly = []
 
 [dependencies]
 base64 = "0.12"
-chrono = "0.4"
+# Disable 'time' dependency since it triggers RUSTSEC-2020-0071 and we don't need it.
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 thiserror = "1.0"
 http = "0.2"
 itertools = "0.9"
