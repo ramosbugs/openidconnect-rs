@@ -23,7 +23,7 @@ rustls-tls = ["oauth2/rustls-tls"]
 nightly = []
 
 [dependencies]
-base64 = "0.12"
+base64 = "0.13"
 # Disable 'time' dependency since it triggers RUSTSEC-2020-0071 and we don't need it.
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 thiserror = "1.0"
@@ -31,7 +31,7 @@ http = "0.2"
 itertools = "0.9"
 log = "0.4"
 oauth2 = { version = "4.1", default-features = false }
-rand = "0.7"
+rand = "0.8"
 ring = "0.16"
 serde = "1.0"
 serde_derive = "1.0"
