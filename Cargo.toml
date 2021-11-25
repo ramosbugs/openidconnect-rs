@@ -40,6 +40,7 @@ serde_path_to_error = "0.1"
 serde-value = "0.6"
 untrusted = "0.7"
 url = { version = "2.1", features = ["serde"] }
+num-bigint = "0.4.3"
 
 [dev-dependencies]
 color-backtrace = { version = "0.4" }

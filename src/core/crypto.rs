@@ -1,3 +1,4 @@
+use num_bigint::{BigInt, Sign};
 use ring::hmac;
 use ring::rand::SecureRandom;
 use ring::signature as ring_signature;
@@ -94,10 +95,16 @@ pub fn verify_rsa_signature(
     msg: &[u8],
     signature: &[u8],
 ) -> Result<(), SignatureVerificationError> {
-    let (n, e) = rsa_public_key(&key).map_err(SignatureVerificationError::InvalidKey)?;
+    let (n, e) = rsa_public_key(key).map_err(SignatureVerificationError::InvalidKey)?;
+    // let's n and e as a big integers to prevent issues with leading zeros
+    // according to https://datatracker.ietf.org/doc/html/rfc7518#section-6.3.1.1
+    // `n` is alwasy unsigned (hence has sign plus)
+
+    let n_bigint = BigInt::from_bytes_be(Sign::Plus, n.deref());
+    let e_bigint = BigInt::from_bytes_be(Sign::Plus, e.deref());
     let public_key = ring_signature::RsaPublicKeyComponents {
-        n: n.deref(),
-        e: e.deref(),
+        n: &n_bigint.to_bytes_be().1,
+        e: &e_bigint.to_bytes_be().1,
     };
 
     public_key
