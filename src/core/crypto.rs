@@ -1,3 +1,4 @@
+use num_bigint::{BigInt, Sign};
 use ring::hmac;
 use ring::rand::SecureRandom;
 use ring::signature as ring_signature;
@@ -94,10 +95,16 @@ pub fn verify_rsa_signature(
     msg: &[u8],
     signature: &[u8],
 ) -> Result<(), SignatureVerificationError> {
-    let (n, e) = rsa_public_key(&key).map_err(SignatureVerificationError::InvalidKey)?;
+    let (n, e) = rsa_public_key(key).map_err(SignatureVerificationError::InvalidKey)?;
+    // let's n and e as a big integers to prevent issues with leading zeros
+    // according to https://datatracker.ietf.org/doc/html/rfc7518#section-6.3.1.1
+    // `n` is alwasy unsigned (hence has sign plus)
+
+    let n_bigint = BigInt::from_bytes_be(Sign::Plus, n.deref());
+    let e_bigint = BigInt::from_bytes_be(Sign::Plus, e.deref());
     let public_key = ring_signature::RsaPublicKeyComponents {
-        n: n.deref(),
-        e: e.deref(),
+        n: &n_bigint.to_bytes_be().1,
+        e: &e_bigint.to_bytes_be().1,
     };
 
     public_key
@@ -130,4 +137,61 @@ pub fn verify_ec_signature(
     public_key
         .verify(msg, signature)
         .map_err(|_| SignatureVerificationError::CryptoError("EC Signature was wrong".to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ops::Deref;
+
+    use crate::{
+        core::{crypto::rsa_public_key, CoreJsonWebKey},
+        SignatureVerificationError,
+    };
+
+    #[test]
+    fn test_leading_zeros_are_parsed_correctly() {
+        // The message we signed
+        let msg = "THIS IS A SIGNATURE TEST";
+        let signature = base64::decode_config("bg0ohqKwYHAiODeG6qkJ-6IhodN7LGPxAh4hbWeIoBdSXrXMt8Ft8U0BV7vANPvF56h20XB9C0021x2kt7iAbMgPNcZ7LCuXMPPq04DrBpMHafH5BXBwnyDKJKrzDm5sfr6OgEkcxSLHaSJ6gTWQ3waPt6_SeH2-Fi74rg13MHyX-0iqz7bZveoBbGIs5yQCwvXgrDS9zW5LUwUHozHfE6FuSi_Z92ioXeu7FHHDg1KFfg3hs8ZLx4wAX15Vw2GCQOzvyNdbItxXRLnrN1NPqxFquVNo5RGlx6ihR1Jfe7y_n0NSR2q2TuU4cIwR0LRwEaANy5SDqtleQPrTEn8nGQ", base64::URL_SAFE_NO_PAD).unwrap();
+        // RSA pub key with leading 0
+        let key : CoreJsonWebKey = serde_json::from_value(serde_json::json!(
+            {
+            "kty": "RSA",
+            "e": "AQAB",
+            "use": "sig",
+            "kid": "TEST_KEY_ID",
+            "alg": "RS256",
+            "n": "AN0M6Y760b9Ok2PxDOps1TgSmiOaR9mLIfUHtZ_o-6JypOckGcl1CxrteyokOb3WyDsfIAN9fFNrycv5YoLKO7sh0IcfzNEXFgzK84HTBcGuqhN8NV98Z6N9EryUrgJYsJeVoPYm0MzkDe4NyWHhnq-9OyNCQzVELH0NhhViQqRyM92OPrJcQlk8s3ZvcgRmkd-rEtRua8SbS3GEvfvgweVy5-qcJCGoziKfx-IteMOm6yKoHvqisKb91N-qw_kSS4YQUx-DZVDo2g24F7VIbcYzJGUOU674HUF1j-wJyXzG3VV8lAXD8hABs5Lh87gr8_hIZD5gbYBJRObJk9XZbfk"
+            }
+        )).unwrap();
+
+        // Old way of verifying the jwt, take the modulus directly form the JWK
+        let (n, e) = rsa_public_key(&key)
+            .map_err(SignatureVerificationError::InvalidKey)
+            .unwrap();
+
+        let public_key = ring_signature::RsaPublicKeyComponents {
+            n: n.deref(),
+            e: e.deref(),
+        };
+        // This fails, since ring expects the keys to have no leading zeros
+        assert! {
+            public_key
+                .verify(
+                    &ring_signature::RSA_PKCS1_2048_8192_SHA256,
+                    msg.as_bytes(),
+                    &signature,
+                ).is_err()
+        };
+        // This should succeed as the function uses big-integers to actually harmonize parsing
+        assert! {
+            verify_rsa_signature(
+                &key,
+                &ring_signature::RSA_PKCS1_2048_8192_SHA256,
+                msg.as_bytes(),
+                &signature,
+            ).is_ok()
+        }
+    }
 }
