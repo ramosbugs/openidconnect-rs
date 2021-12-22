@@ -839,6 +839,24 @@ mod tests {
         assert_eq!(serialized_new_claims, claims_json);
     }
 
+    // See https://github.com/ramosbugs/openidconnect-rs/issues/23
+    #[test]
+    #[cfg(feature = "accept-rfc3339-timestamps")]
+    fn test_accept_rfc3339_timestamp() {
+        let claims: CoreIdTokenClaims = serde_json::from_str(
+            "{
+            \"iss\": \"https://server.example.com\",
+            \"sub\": \"24400320\",
+            \"aud\": \"s6BhdRkqt3\",
+            \"exp\": 1311281970,
+            \"iat\": 1311280970,
+            \"updated_at\": \"2021-12-22T02:10:37.000Z\"
+            }",
+        )
+        .expect("failed to deserialize");
+        assert_eq!(claims.updated_at(), Some(Utc.timestamp(1640139037, 0)));
+    }
+
     #[test]
     fn test_unknown_claims_serde() {
         let expected_serialized_claims = "{\
