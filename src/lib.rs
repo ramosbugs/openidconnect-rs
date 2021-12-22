@@ -608,6 +608,9 @@ pub use oauth2::curl;
 #[cfg(feature = "reqwest")]
 pub use oauth2::reqwest;
 
+#[cfg(feature = "ureq")]
+pub use oauth2::ureq;
+
 pub use claims::{
     AdditionalClaims, AddressClaim, EmptyAdditionalClaims, GenderClaim, StandardClaims,
 };
