@@ -438,16 +438,16 @@ macro_rules! deserialize_fields {
                 )
             );
         }
-        let seconds = $map.next_value::<Option<Seconds>>()?;
+        let seconds = $map.next_value::<Option<Timestamp>>()?;
         $field = seconds
-            .map(|sec| seconds_to_utc(&sec).map_err(|_| serde::de::Error::custom(
+            .map(|sec| timestamp_to_utc(&sec).map_err(|_| serde::de::Error::custom(
                 format!(
                     concat!(
                         "failed to parse `{}` as UTC datetime (in seconds) for key `",
                         stringify!($field),
                         "`"
                     ),
-                    *sec,
+                    sec,
                 )
             ))).transpose()?;
     };

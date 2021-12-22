@@ -8,8 +8,8 @@ use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
 
 use crate::helpers::FlattenFilter;
-use crate::types::helpers::{seconds_to_utc, split_language_tag_key, utc_to_seconds};
-use crate::types::{LocalizedClaim, Seconds};
+use crate::types::helpers::{split_language_tag_key, timestamp_to_utc, utc_to_seconds};
+use crate::types::{LocalizedClaim, Timestamp};
 use crate::{
     AddressCountry, AddressLocality, AddressPostalCode, AddressRegion, EndUserBirthday,
     EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName, EndUserName,
