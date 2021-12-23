@@ -942,9 +942,9 @@ mod tests {
     };
     use crate::jwt::tests::{TEST_RSA_PRIV_KEY, TEST_RSA_PUB_KEY};
     use crate::jwt::{JsonWebToken, JsonWebTokenJsonPayloadSerde};
-    use crate::types::helpers::seconds_to_utc;
+    use crate::types::helpers::timestamp_to_utc;
     use crate::types::Base64UrlEncodedBytes;
-    use crate::types::Seconds;
+    use crate::types::Timestamp;
     use crate::{
         AccessToken, Audience, AuthenticationContextClass, AuthorizationCode, EndUserName,
         IssuerUrl, JsonWebKeyId, Nonce, StandardClaims, UserInfoError,
@@ -1530,7 +1530,7 @@ mod tests {
                 CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
             )
             .set_time_fn(|| {
-                seconds_to_utc(&Seconds::new(
+                timestamp_to_utc(&Timestamp::Seconds(
                     mock_current_time.load(Ordering::Relaxed).into(),
                 ))
                 .unwrap()
@@ -1698,7 +1698,7 @@ mod tests {
                 .set_auth_time_verifier_fn(|auth_time| {
                     assert_eq!(
                         auth_time.unwrap(),
-                        seconds_to_utc(&Seconds::new(1544928548.into())).unwrap(),
+                        timestamp_to_utc(&Timestamp::Seconds(1544928548.into())).unwrap(),
                     );
                     Err("Invalid auth_time claim".to_string())
                 })
@@ -1745,7 +1745,7 @@ mod tests {
                 CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
             )
             .set_time_fn(|| {
-                seconds_to_utc(&Seconds::new(
+                timestamp_to_utc(&Timestamp::Seconds(
                     mock_current_time.load(Ordering::Relaxed).into(),
                 ))
                 .unwrap()
@@ -1779,7 +1779,7 @@ mod tests {
                 )
                 .allow_any_alg()
                 .set_time_fn(|| {
-                    seconds_to_utc(&Seconds::new(
+                    timestamp_to_utc(&Timestamp::Seconds(
                         mock_current_time.load(Ordering::Relaxed).into(),
                     ))
                     .unwrap()
@@ -1850,7 +1850,7 @@ mod tests {
             CoreJsonWebKeySet::new(vec![rsa_pub_key]),
         )
         .set_time_fn(|| {
-            seconds_to_utc(&Seconds::new(
+            timestamp_to_utc(&Timestamp::Seconds(
                 mock_current_time.load(Ordering::Relaxed).into(),
             ))
             .unwrap()

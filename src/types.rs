@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fmt::{Debug, Error as FormatterError, Formatter};
+use std::fmt::{Debug, Display, Error as FormatterError, Formatter};
 use std::future::Future;
 use std::hash::Hash;
 use std::iter::FromIterator;
@@ -998,13 +998,26 @@ impl<RT: ResponseType> Deref for ResponseTypes<RT> {
     }
 }
 
-new_type![
-    ///
-    /// Time interval in seconds.
-    ///
-    #[derive(Deserialize, Serialize)]
-    pub(crate) Seconds(serde_json::Number)
-];
+///
+/// Timestamp as seconds since the unix epoch, or optionally an ISO 8601 string.
+///
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub(crate) enum Timestamp {
+    Seconds(serde_json::Number),
+    #[cfg(feature = "accept-rfc3339-timestamps")]
+    Rfc3339(String),
+}
+
+impl Display for Timestamp {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), FormatterError> {
+        match self {
+            Timestamp::Seconds(seconds) => Display::fmt(seconds, f),
+            #[cfg(feature = "accept-rfc3339-timestamps")]
+            Timestamp::Rfc3339(iso) => Display::fmt(iso, f),
+        }
+    }
+}
 
 new_url_type![
     ///
@@ -1056,7 +1069,7 @@ pub(crate) mod helpers {
     use serde::{Deserialize, Deserializer, Serializer};
     use serde_json::{from_value, Value};
 
-    use super::{LanguageTag, Seconds};
+    use super::{LanguageTag, Timestamp};
 
     pub fn deserialize_string_or_vec<'de, T, D>(deserializer: D) -> Result<Vec<T>, D::Error>
     where
@@ -1146,29 +1159,38 @@ pub(crate) mod helpers {
         (field_name, language_tag)
     }
 
-    pub(crate) fn seconds_to_utc(seconds: &Seconds) -> Result<DateTime<Utc>, ()> {
-        let (secs, nsecs) = if seconds.is_i64() {
-            (seconds.as_i64().ok_or(())?, 0u32)
-        } else {
-            let secs_f64 = seconds.as_f64().ok_or(())?;
-            let secs = secs_f64.floor();
-            (
-                secs as i64,
-                ((secs_f64 - secs) * 1_000_000_000.).floor() as u32,
-            )
-        };
-        Utc.timestamp_opt(secs, nsecs).single().ok_or(())
+    pub(crate) fn timestamp_to_utc(timestamp: &Timestamp) -> Result<DateTime<Utc>, ()> {
+        match timestamp {
+            Timestamp::Seconds(seconds) => {
+                let (secs, nsecs) = if seconds.is_i64() {
+                    (seconds.as_i64().ok_or(())?, 0u32)
+                } else {
+                    let secs_f64 = seconds.as_f64().ok_or(())?;
+                    let secs = secs_f64.floor();
+                    (
+                        secs as i64,
+                        ((secs_f64 - secs) * 1_000_000_000.).floor() as u32,
+                    )
+                };
+                Utc.timestamp_opt(secs, nsecs).single().ok_or(())
+            }
+            #[cfg(feature = "accept-rfc3339-timestamps")]
+            Timestamp::Rfc3339(iso) => {
+                let datetime = DateTime::parse_from_rfc3339(iso).map_err(|_| ())?;
+                Ok(datetime.into())
+            }
+        }
     }
 
     // The spec is ambiguous about whether seconds should be expressed as integers, or
     // whether floating-point values are allowed. For compatibility with a wide range of
     // clients, we round down to the nearest second.
-    pub(crate) fn utc_to_seconds(utc: &DateTime<Utc>) -> Seconds {
-        Seconds::new(utc.timestamp().into())
+    pub(crate) fn utc_to_seconds(utc: &DateTime<Utc>) -> Timestamp {
+        Timestamp::Seconds(utc.timestamp().into())
     }
 
     pub mod serde_utc_seconds {
-        use crate::types::Seconds;
+        use crate::types::Timestamp;
         use chrono::{DateTime, Utc};
         use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -1176,11 +1198,11 @@ pub(crate) mod helpers {
         where
             D: Deserializer<'de>,
         {
-            let seconds: Seconds = Deserialize::deserialize(deserializer)?;
-            super::seconds_to_utc(&seconds).map_err(|_| {
+            let seconds: Timestamp = Deserialize::deserialize(deserializer)?;
+            super::timestamp_to_utc(&seconds).map_err(|_| {
                 serde::de::Error::custom(format!(
                     "failed to parse `{}` as UTC datetime (in seconds)",
-                    *seconds
+                    seconds
                 ))
             })
         }
@@ -1194,7 +1216,7 @@ pub(crate) mod helpers {
     }
 
     pub mod serde_utc_seconds_opt {
-        use crate::types::Seconds;
+        use crate::types::Timestamp;
         use chrono::{DateTime, Utc};
         use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -1202,13 +1224,13 @@ pub(crate) mod helpers {
         where
             D: Deserializer<'de>,
         {
-            let seconds: Option<Seconds> = Deserialize::deserialize(deserializer)?;
+            let seconds: Option<Timestamp> = Deserialize::deserialize(deserializer)?;
             seconds
                 .map(|sec| {
-                    super::seconds_to_utc(&sec).map_err(|_| {
+                    super::timestamp_to_utc(&sec).map_err(|_| {
                         serde::de::Error::custom(format!(
                             "failed to parse `{}` as UTC datetime (in seconds)",
-                            *sec
+                            sec
                         ))
                     })
                 })

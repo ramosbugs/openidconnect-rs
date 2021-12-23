@@ -20,6 +20,7 @@ curl = ["oauth2/curl"]
 reqwest = ["oauth2/reqwest"]
 native-tls = ["oauth2/native-tls"]
 rustls-tls = ["oauth2/rustls-tls"]
+accept-rfc3339-timestamps = []
 nightly = []
 
 [dependencies]
