@@ -18,6 +18,7 @@ maintenance = { status = "actively-developed" }
 default = ["reqwest", "rustls-tls"]
 curl = ["oauth2/curl"]
 reqwest = ["oauth2/reqwest"]
+ureq = ["oauth2/ureq"]
 native-tls = ["oauth2/native-tls"]
 rustls-tls = ["oauth2/rustls-tls"]
 accept-rfc3339-timestamps = []
