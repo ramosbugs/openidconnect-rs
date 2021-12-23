@@ -55,11 +55,7 @@ jobs:
       - name: Doc tests
         run: cargo test --doc
       - name: Test with all features enabled
-        if: ${{ matrix.rust != '1.45.0' }}
         run: cargo test --all-features
-      - name: Test with all features enabled (1.45.0)
-        if: ${{ matrix.rust == '1.45.0' }}
-        run: cargo test --features curl,reqwest,native-tls,rustls-tls
 
       - name: Check fmt
         if: ${{ matrix.rust == '1.45.0' }}
@@ -67,7 +63,7 @@ jobs:
 
       - name: Clippy
         if: ${{ matrix.rust == '1.45.0' }}
-        run: cargo clippy --all --features curl,reqwest,native-tls,rustls-tls -- --deny warnings
+        run: cargo clippy --all --all-features -- --deny warnings
 
       - name: Audit
         if: ${{ matrix.rust == 'stable' }}
