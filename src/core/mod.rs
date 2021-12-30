@@ -886,20 +886,56 @@ impl JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
     }
 
     fn hash_bytes(&self, bytes: &[u8]) -> Result<Vec<u8>, String> {
+        #[cfg(feature = "ring")]
         use ring::digest::{digest, SHA256, SHA384, SHA512};
+        #[cfg(feature = "rustcrypto")]
+        use sha2::{Digest, Sha256, Sha384, Sha512};
         Ok(match *self {
             CoreJwsSigningAlgorithm::HmacSha256
             | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256
             | CoreJwsSigningAlgorithm::RsaSsaPssSha256
-            | CoreJwsSigningAlgorithm::EcdsaP256Sha256 => digest(&SHA256, bytes).as_ref().to_vec(),
+            | CoreJwsSigningAlgorithm::EcdsaP256Sha256 => {
+                #[cfg(feature = "ring")]
+                {
+                    digest(&SHA256, bytes).as_ref().to_vec()
+                }
+                #[cfg(feature = "rustcrypto")]
+                {
+                    let mut hasher = Sha256::new();
+                    hasher.update(bytes);
+                    hasher.finalize().to_vec()
+                }
+            }
             CoreJwsSigningAlgorithm::HmacSha384
             | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384
             | CoreJwsSigningAlgorithm::RsaSsaPssSha384
-            | CoreJwsSigningAlgorithm::EcdsaP384Sha384 => digest(&SHA384, bytes).as_ref().to_vec(),
+            | CoreJwsSigningAlgorithm::EcdsaP384Sha384 => {
+                #[cfg(feature = "ring")]
+                {
+                    digest(&SHA384, bytes).as_ref().to_vec()
+                }
+                #[cfg(feature = "rustcrypto")]
+                {
+                    let mut hasher = Sha384::new();
+                    hasher.update(bytes);
+                    hasher.finalize().to_vec()
+                }
+            }
             CoreJwsSigningAlgorithm::HmacSha512
             | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512
             | CoreJwsSigningAlgorithm::RsaSsaPssSha512
-            | CoreJwsSigningAlgorithm::EcdsaP521Sha512 => digest(&SHA512, bytes).as_ref().to_vec(),
+            | CoreJwsSigningAlgorithm::EcdsaP521Sha512 => {
+                #[cfg(feature = "ring")]
+                {
+                    digest(&SHA512, bytes).as_ref().to_vec()
+                }
+                #[cfg(feature = "rustcrypto")]
+                {
+                    let mut hasher = Sha512::new();
+                    hasher.update(bytes);
+                    hasher.finalize().to_vec()
+                }
+            }
             CoreJwsSigningAlgorithm::None => {
                 return Err(
                     "signature algorithm `none` has no corresponding hash algorithm".to_string(),

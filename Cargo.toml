@@ -15,13 +15,14 @@ all-features = true
 maintenance = { status = "actively-developed" }
 
 [features]
-default = ["reqwest", "rustls-tls"]
+default = ["reqwest", "rustls-tls", "ring"]
 curl = ["oauth2/curl"]
 reqwest = ["oauth2/reqwest"]
 native-tls = ["oauth2/native-tls"]
 rustls-tls = ["oauth2/rustls-tls"]
 accept-rfc3339-timestamps = []
 nightly = []
+rustcrypto = ["rsa", "sha2", "hmac", "p256", "p384", "subtle", "dyn-clone"]
 
 [dependencies]
 base64 = "0.13"
@@ -33,7 +34,15 @@ itertools = "0.9"
 log = "0.4"
 oauth2 = { version = "4.1", default-features = false }
 rand = "0.8"
-ring = "0.16"
+ring = { version = "0.16", optional = true }
+# Using an old version as there are conflicts in the digest traits with p256 (even with 0.10)
+hmac = { version = "0.11", optional = true }
+rsa = { version = "0.5", features = ["alloc"], optional = true }
+sha2 = { version = "0.9", default-features = false, optional = true }
+p256 = { version = "0.9", optional = true }
+p384 = { version = "0.9", optional = true }
+subtle = { version = "2.4.1", optional = true }
+dyn-clone = { version = "1.0", optional = true }
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"

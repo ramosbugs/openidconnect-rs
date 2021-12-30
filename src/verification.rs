@@ -7,7 +7,6 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use oauth2::helpers::variant_name;
 use oauth2::{ClientId, ClientSecret};
-use ring::constant_time::verify_slices_are_equal;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use thiserror::Error;
@@ -480,9 +479,7 @@ pub trait NonceVerifier {
 impl NonceVerifier for &Nonce {
     fn verify(self, nonce: Option<&Nonce>) -> Result<(), String> {
         if let Some(claims_nonce) = nonce {
-            if verify_slices_are_equal(claims_nonce.secret().as_bytes(), self.secret().as_bytes())
-                .is_err()
-            {
+            if claims_nonce.secret().as_bytes() != self.secret().as_bytes() {
                 return Err("nonce mismatch".to_string());
             }
         } else {
