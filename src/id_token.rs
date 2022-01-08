@@ -1,10 +1,12 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use std::str::FromStr;
 
 use chrono::{DateTime, Utc};
 use oauth2::helpers::variant_name;
 use oauth2::ClientId;
 use serde::Serialize;
+use serde_json::Value;
 
 use crate::helpers::FilteredFlatten;
 use crate::jwt::JsonWebTokenAccess;
@@ -40,6 +42,21 @@ pub struct IdToken<
     #[serde(bound = "AC: AdditionalClaims")]
     JsonWebToken<JE, JS, JT, IdTokenClaims<AC, GC>, JsonWebTokenJsonPayloadSerde>,
 );
+
+impl<AC, GC, JE, JS, JT> FromStr for IdToken<AC, GC, JE, JS, JT>
+where
+    AC: AdditionalClaims,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+{
+    type Err = serde_json::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_json::from_value(Value::String(s.to_string()))
+    }
+}
+
 impl<AC, GC, JE, JS, JT> IdToken<AC, GC, JE, JS, JT>
 where
     AC: AdditionalClaims,
