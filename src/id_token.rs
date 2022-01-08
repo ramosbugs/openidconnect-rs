@@ -434,6 +434,7 @@ where
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::str::FromStr;
 
     use chrono::{TimeZone, Utc};
     use oauth2::basic::BasicTokenType;
@@ -456,12 +457,16 @@ mod tests {
 
     #[test]
     fn test_id_token() {
-        let id_token_str = "\"eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL3NlcnZlci5leGFtcGxlLmNvbSI\
-            sImF1ZCI6WyJzNkJoZFJrcXQzIl0sImV4cCI6MTMxMTI4MTk3MCwiaWF0IjoxMzExMjgwOTcwLCJzdWIiOiIyND\
-            QwMDMyMCIsInRmYV9tZXRob2QiOiJ1MmYifQ.aW52YWxpZF9zaWduYXR1cmU\"";
+        static ID_TOKEN: &str = concat!(
+            "eyJhbGciOiJSUzI1NiJ9.",
+            "eyJpc3MiOiJodHRwczovL3NlcnZlci5leGFtcGxlLmNvbSIsImF1ZCI6WyJzNkJoZ",
+            "FJrcXQzIl0sImV4cCI6MTMxMTI4MTk3MCwiaWF0IjoxMzExMjgwOTcwLCJzdWIiOi",
+            "IyNDQwMDMyMCIsInRmYV9tZXRob2QiOiJ1MmYifQ.",
+            "aW52YWxpZF9zaWduYXR1cmU"
+        );
 
-        let id_token =
-            serde_json::from_str::<CoreIdToken>(id_token_str).expect("failed to deserialize");
+        // `serde::Deserialize` implementation is tested within the `FromStr` implementation
+        let id_token = CoreIdToken::from_str(ID_TOKEN).expect("failed to parse id_token");
 
         let claims = id_token.0.unverified_payload_ref();
 
@@ -480,10 +485,12 @@ mod tests {
             SubjectIdentifier::new("24400320".to_string())
         );
 
-        assert_eq!(
-            serde_json::to_string(&id_token).expect("failed to serialize"),
-            id_token_str
-        );
+        // test `ToString` implemenation
+        assert_eq!(&id_token.to_string(), ID_TOKEN);
+
+        // test `serde::Serialize` implemenation too
+        let de = serde_json::to_string(&id_token).expect("failed to deserializee id token");
+        assert_eq!(de, format!("\"{}\"", ID_TOKEN));
     }
 
     #[test]
