@@ -126,11 +126,6 @@ where
         verifier.verified_claims(&self.0, nonce_verifier)
     }
 
-    /// Returns a reference to the token's claims **without performing any verification of the token's signature.**
-    pub fn insecure_unverified_claims<'a>(&'a self) -> &'a IdTokenClaims<AC, GC> {
-        self.0.unverified_payload_ref()
-    }
-
     ///
     /// Verifies and returns the ID token claims.
     ///
