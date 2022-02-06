@@ -40,6 +40,8 @@ jobs:
       - name: Print git branch name
         run: git rev-parse --abbrev-ref HEAD
 
+      - run: git show-ref | grep $(git rev-parse HEAD)
+
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
