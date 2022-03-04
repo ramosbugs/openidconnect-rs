@@ -1560,6 +1560,14 @@ mod tests {
                 }
             });
 
+            let insecure_verifier = CoreIdTokenVerifier::new_insecure_without_verification()
+                .set_time_fn(|| {
+                    timestamp_to_utc(&Timestamp::Seconds(
+                        mock_current_time.load(Ordering::Relaxed).into(),
+                    ))
+                    .unwrap()
+                });
+
             // This JWTs below have an issue time of 1544928549 and an expiration time of 1544932149.
 
             let test_jwt_without_nonce =
@@ -1729,14 +1737,29 @@ mod tests {
             public_client_verifier
                 .verified_claims(&test_jwt_with_nonce, |_: Option<&Nonce>| Ok(()))
                 .expect("verification should succeed");
+            insecure_verifier
+                .verified_claims(&test_jwt_with_nonce, |_: Option<&Nonce>| Ok(()))
+                .expect("verification should succeed");
 
             // Successful verification with nonce, acr, and auth_time specified (w/ expected Nonce)
             public_client_verifier
                 .verified_claims(&test_jwt_with_nonce, &valid_nonce)
                 .expect("verification should succeed");
+            insecure_verifier
+                .verified_claims(&test_jwt_with_nonce, &valid_nonce)
+                .expect("verification should succeed");
 
             // Successful verification with nonce, acr, and auth_time specified (w/ closure)
             public_client_verifier
+                .verified_claims(&test_jwt_with_nonce, |nonce: Option<&Nonce>| {
+                    if nonce.iter().any(|n| n.secret() == valid_nonce.secret()) {
+                        Ok(())
+                    } else {
+                        Err("invalid nonce".to_string())
+                    }
+                })
+                .expect("verification should succeed");
+            insecure_verifier
                 .verified_claims(&test_jwt_with_nonce, |nonce: Option<&Nonce>| {
                     if nonce.iter().any(|n| n.secret() == valid_nonce.secret()) {
                         Ok(())
@@ -1771,6 +1794,10 @@ mod tests {
                 Err(ClaimsVerificationError::SignatureVerification(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
             }
+            insecure_verifier
+                .clone()
+                .verified_claims(&test_jwt_hs256, &valid_nonce)
+                .expect("verification should succeed");
 
             // HS256 w/ set_allowed_algs
             private_client_verifier
