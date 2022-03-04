@@ -698,12 +698,14 @@ where
     registration_client_uri: Option<ClientConfigUrl>,
     #[serde(
         skip_serializing_if = "Option::is_none",
-        with = "serde_utc_seconds_opt"
+        with = "serde_utc_seconds_opt",
+        default
     )]
     client_id_issued_at: Option<DateTime<Utc>>,
     #[serde(
         skip_serializing_if = "Option::is_none",
-        with = "serde_utc_seconds_opt"
+        with = "serde_utc_seconds_opt",
+        default
     )]
     client_secret_expires_at: Option<DateTime<Utc>>,
     #[serde(bound = "AC: AdditionalClientMetadata", flatten)]
