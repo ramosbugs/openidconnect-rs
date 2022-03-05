@@ -553,6 +553,23 @@ where
     }
 
     ///
+    /// Initializes a no-op verifier that performs no signature, audience, or issuer verification.
+    /// The token's expiration time is still checked, and the token is otherwise required to conform to the expected format.
+    ///
+    pub fn new_insecure_without_verification() -> Self {
+        let empty_issuer = IssuerUrl::new("https://0.0.0.0".to_owned())
+            .expect("Creating empty issuer url mustn't fail");
+        Self::new_public_client(
+            ClientId::new(String::new()),
+            empty_issuer,
+            JsonWebKeySet::new(vec![]),
+        )
+        .insecure_disable_signature_check()
+        .require_audience_match(false)
+        .require_issuer_match(false)
+    }
+
+    ///
     /// Initializes a new verifier for a confidential client (i.e., one with a client secret).
     ///
     /// A confidential client verifier is required in order to verify ID tokens signed using a
@@ -1543,6 +1560,14 @@ mod tests {
                 }
             });
 
+            let insecure_verifier = CoreIdTokenVerifier::new_insecure_without_verification()
+                .set_time_fn(|| {
+                    timestamp_to_utc(&Timestamp::Seconds(
+                        mock_current_time.load(Ordering::Relaxed).into(),
+                    ))
+                    .unwrap()
+                });
+
             // This JWTs below have an issue time of 1544928549 and an expiration time of 1544932149.
 
             let test_jwt_without_nonce =
@@ -1712,14 +1737,29 @@ mod tests {
             public_client_verifier
                 .verified_claims(&test_jwt_with_nonce, |_: Option<&Nonce>| Ok(()))
                 .expect("verification should succeed");
+            insecure_verifier
+                .verified_claims(&test_jwt_with_nonce, |_: Option<&Nonce>| Ok(()))
+                .expect("verification should succeed");
 
             // Successful verification with nonce, acr, and auth_time specified (w/ expected Nonce)
             public_client_verifier
                 .verified_claims(&test_jwt_with_nonce, &valid_nonce)
                 .expect("verification should succeed");
+            insecure_verifier
+                .verified_claims(&test_jwt_with_nonce, &valid_nonce)
+                .expect("verification should succeed");
 
             // Successful verification with nonce, acr, and auth_time specified (w/ closure)
             public_client_verifier
+                .verified_claims(&test_jwt_with_nonce, |nonce: Option<&Nonce>| {
+                    if nonce.iter().any(|n| n.secret() == valid_nonce.secret()) {
+                        Ok(())
+                    } else {
+                        Err("invalid nonce".to_string())
+                    }
+                })
+                .expect("verification should succeed");
+            insecure_verifier
                 .verified_claims(&test_jwt_with_nonce, |nonce: Option<&Nonce>| {
                     if nonce.iter().any(|n| n.secret() == valid_nonce.secret()) {
                         Ok(())
@@ -1754,6 +1794,10 @@ mod tests {
                 Err(ClaimsVerificationError::SignatureVerification(_)) => {}
                 other => panic!("unexpected result: {:?}", other),
             }
+            insecure_verifier
+                .clone()
+                .verified_claims(&test_jwt_hs256, &valid_nonce)
+                .expect("verification should succeed");
 
             // HS256 w/ set_allowed_algs
             private_client_verifier
@@ -1844,18 +1888,26 @@ mod tests {
             .expect("deserialization failed");
 
         let mock_current_time = AtomicUsize::new(1544932148);
+        let time_fn = || {
+            timestamp_to_utc(&Timestamp::Seconds(
+                mock_current_time.load(Ordering::Relaxed).into(),
+            ))
+            .unwrap()
+        };
         let verifier = CoreIdTokenVerifier::new_public_client(
             client_id,
             issuer,
             CoreJsonWebKeySet::new(vec![rsa_pub_key]),
         )
-        .set_time_fn(|| {
-            timestamp_to_utc(&Timestamp::Seconds(
-                mock_current_time.load(Ordering::Relaxed).into(),
-            ))
-            .unwrap()
-        });
-        id_token.claims(&verifier, &nonce).unwrap();
+        .set_time_fn(time_fn);
+        let claims = id_token.claims(&verifier, &nonce).unwrap();
+        let unverified = id_token
+            .claims(
+                &CoreIdTokenVerifier::new_insecure_without_verification().set_time_fn(time_fn),
+                &nonce,
+            )
+            .unwrap();
+        assert_eq!(claims, unverified);
     }
 
     #[test]
