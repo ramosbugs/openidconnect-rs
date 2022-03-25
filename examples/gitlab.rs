@@ -100,106 +100,99 @@ fn main() {
         .add_scope(Scope::new("profile".to_string()))
         .url();
 
-    println!(
-        "Open this URL in your browser:\n{}\n",
-        authorize_url
-    );
+    println!("Open this URL in your browser:\n{}\n", authorize_url);
 
     // A very naive implementation of the redirect server.
     let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
-    for stream in listener.incoming() {
-        if let Ok(mut stream) = stream {
-            let code;
-            let state;
-            {
-                let mut reader = BufReader::new(&stream);
 
-                let mut request_line = String::new();
-                reader.read_line(&mut request_line).unwrap();
+    // Accept one connection
+    let (mut stream, _) = listener.accept().unwrap();
+    let code;
+    let state;
+    {
+        let mut reader = BufReader::new(&stream);
 
-                let redirect_url = request_line.split_whitespace().nth(1).unwrap();
-                let url = Url::parse(&("http://localhost".to_string() + redirect_url)).unwrap();
+        let mut request_line = String::new();
+        reader.read_line(&mut request_line).unwrap();
 
-                let code_pair = url
-                    .query_pairs()
-                    .find(|pair| {
-                        let &(ref key, _) = pair;
-                        key == "code"
-                    })
-                    .unwrap();
+        let redirect_url = request_line.split_whitespace().nth(1).unwrap();
+        let url = Url::parse(&("http://localhost".to_string() + redirect_url)).unwrap();
 
-                let (_, value) = code_pair;
-                code = AuthorizationCode::new(value.into_owned());
+        let code_pair = url
+            .query_pairs()
+            .find(|pair| {
+                let &(ref key, _) = pair;
+                key == "code"
+            })
+            .unwrap();
 
-                let state_pair = url
-                    .query_pairs()
-                    .find(|pair| {
-                        let &(ref key, _) = pair;
-                        key == "state"
-                    })
-                    .unwrap();
+        let (_, value) = code_pair;
+        code = AuthorizationCode::new(value.into_owned());
 
-                let (_, value) = state_pair;
-                state = CsrfToken::new(value.into_owned());
-            }
+        let state_pair = url
+            .query_pairs()
+            .find(|pair| {
+                let &(ref key, _) = pair;
+                key == "state"
+            })
+            .unwrap();
 
-            let message = "Go back to your terminal :)";
-            let response = format!(
-                "HTTP/1.1 200 OK\r\ncontent-length: {}\r\n\r\n{}",
-                message.len(),
-                message
-            );
-            stream.write_all(response.as_bytes()).unwrap();
-
-            println!("GitLab returned the following code:\n{}\n", code.secret());
-            println!(
-                "GitLab returned the following state:\n{} (expected `{}`)\n",
-                state.secret(),
-                csrf_state.secret()
-            );
-
-            // Exchange the code with a token.
-            let token_response = client
-                .exchange_code(code)
-                .request(http_client)
-                .unwrap_or_else(|err| {
-                    handle_error(&err, "Failed to contact token endpoint");
-                    unreachable!();
-                });
-
-            println!(
-                "GitLab returned access token:\n{}\n",
-                token_response.access_token().secret()
-            );
-            println!("GitLab returned scopes: {:?}", token_response.scopes());
-
-            let id_token_verifier: CoreIdTokenVerifier = client.id_token_verifier();
-            let id_token_claims: &CoreIdTokenClaims = token_response
-                .extra_fields()
-                .id_token()
-                .expect("Server did not return an ID token")
-                .claims(&id_token_verifier, &nonce)
-                .unwrap_or_else(|err| {
-                    handle_error(&err, "Failed to verify ID token");
-                    unreachable!();
-                });
-            println!("GitLab returned ID token: {:?}\n", id_token_claims);
-
-            let userinfo_claims: UserInfoClaims<GitLabClaims, CoreGenderClaim> = client
-                .user_info(token_response.access_token().to_owned(), None)
-                .unwrap_or_else(|err| {
-                    handle_error(&err, "No user info endpoint");
-                    unreachable!();
-                })
-                .request(http_client)
-                .unwrap_or_else(|err| {
-                    handle_error(&err, "Failed requesting user info");
-                    unreachable!();
-                });
-            println!("GitLab returned UserInfo: {:?}", userinfo_claims);
-
-            // The server will terminate itself
-            break;
-        }
+        let (_, value) = state_pair;
+        state = CsrfToken::new(value.into_owned());
     }
+
+    let message = "Go back to your terminal :)";
+    let response = format!(
+        "HTTP/1.1 200 OK\r\ncontent-length: {}\r\n\r\n{}",
+        message.len(),
+        message
+    );
+    stream.write_all(response.as_bytes()).unwrap();
+
+    println!("GitLab returned the following code:\n{}\n", code.secret());
+    println!(
+        "GitLab returned the following state:\n{} (expected `{}`)\n",
+        state.secret(),
+        csrf_state.secret()
+    );
+
+    // Exchange the code with a token.
+    let token_response = client
+        .exchange_code(code)
+        .request(http_client)
+        .unwrap_or_else(|err| {
+            handle_error(&err, "Failed to contact token endpoint");
+            unreachable!();
+        });
+
+    println!(
+        "GitLab returned access token:\n{}\n",
+        token_response.access_token().secret()
+    );
+    println!("GitLab returned scopes: {:?}", token_response.scopes());
+
+    let id_token_verifier: CoreIdTokenVerifier = client.id_token_verifier();
+    let id_token_claims: &CoreIdTokenClaims = token_response
+        .extra_fields()
+        .id_token()
+        .expect("Server did not return an ID token")
+        .claims(&id_token_verifier, &nonce)
+        .unwrap_or_else(|err| {
+            handle_error(&err, "Failed to verify ID token");
+            unreachable!();
+        });
+    println!("GitLab returned ID token: {:?}\n", id_token_claims);
+
+    let userinfo_claims: UserInfoClaims<GitLabClaims, CoreGenderClaim> = client
+        .user_info(token_response.access_token().to_owned(), None)
+        .unwrap_or_else(|err| {
+            handle_error(&err, "No user info endpoint");
+            unreachable!();
+        })
+        .request(http_client)
+        .unwrap_or_else(|err| {
+            handle_error(&err, "Failed requesting user info");
+            unreachable!();
+        });
+    println!("GitLab returned UserInfo: {:?}", userinfo_claims);
 }

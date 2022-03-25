@@ -139,108 +139,102 @@ fn main() {
         .add_scope(Scope::new("profile".to_string()))
         .url();
 
-    println!(
-        "Open this URL in your browser:\n{}\n",
-        authorize_url
-    );
+    println!("Open this URL in your browser:\n{}\n", authorize_url);
 
     // A very naive implementation of the redirect server.
     let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
-    for stream in listener.incoming() {
-        if let Ok(mut stream) = stream {
-            let code;
-            let state;
-            {
-                let mut reader = BufReader::new(&stream);
 
-                let mut request_line = String::new();
-                reader.read_line(&mut request_line).unwrap();
+    // Accept one connection
+    let (mut stream, _) = listener.accept().unwrap();
 
-                let redirect_url = request_line.split_whitespace().nth(1).unwrap();
-                let url = Url::parse(&("http://localhost".to_string() + redirect_url)).unwrap();
+    let code;
+    let state;
+    {
+        let mut reader = BufReader::new(&stream);
 
-                let code_pair = url
-                    .query_pairs()
-                    .find(|pair| {
-                        let &(ref key, _) = pair;
-                        key == "code"
-                    })
-                    .unwrap();
+        let mut request_line = String::new();
+        reader.read_line(&mut request_line).unwrap();
 
-                let (_, value) = code_pair;
-                code = AuthorizationCode::new(value.into_owned());
+        let redirect_url = request_line.split_whitespace().nth(1).unwrap();
+        let url = Url::parse(&("http://localhost".to_string() + redirect_url)).unwrap();
 
-                let state_pair = url
-                    .query_pairs()
-                    .find(|pair| {
-                        let &(ref key, _) = pair;
-                        key == "state"
-                    })
-                    .unwrap();
+        let code_pair = url
+            .query_pairs()
+            .find(|pair| {
+                let &(ref key, _) = pair;
+                key == "code"
+            })
+            .unwrap();
 
-                let (_, value) = state_pair;
-                state = CsrfToken::new(value.into_owned());
-            }
+        let (_, value) = code_pair;
+        code = AuthorizationCode::new(value.into_owned());
 
-            let message = "Go back to your terminal :)";
-            let response = format!(
-                "HTTP/1.1 200 OK\r\ncontent-length: {}\r\n\r\n{}",
-                message.len(),
-                message
-            );
-            stream.write_all(response.as_bytes()).unwrap();
+        let state_pair = url
+            .query_pairs()
+            .find(|pair| {
+                let &(ref key, _) = pair;
+                key == "state"
+            })
+            .unwrap();
 
-            println!("Google returned the following code:\n{}\n", code.secret());
-            println!(
-                "Google returned the following state:\n{} (expected `{}`)\n",
-                state.secret(),
-                csrf_state.secret()
-            );
-
-            // Exchange the code with a token.
-            let token_response = client
-                .exchange_code(code)
-                .request(http_client)
-                .unwrap_or_else(|err| {
-                    handle_error(&err, "Failed to contact token endpoint");
-                    unreachable!();
-                });
-
-            println!(
-                "Google returned access token:\n{}\n",
-                token_response.access_token().secret()
-            );
-            println!("Google returned scopes: {:?}", token_response.scopes());
-
-            let id_token_verifier: CoreIdTokenVerifier = client.id_token_verifier();
-            let id_token_claims: &CoreIdTokenClaims = token_response
-                .extra_fields()
-                .id_token()
-                .expect("Server did not return an ID token")
-                .claims(&id_token_verifier, &nonce)
-                .unwrap_or_else(|err| {
-                    handle_error(&err, "Failed to verify ID token");
-                    unreachable!();
-                });
-            println!("Google returned ID token: {:?}", id_token_claims);
-
-            // Revoke the obtained token
-            let token_to_revoke: CoreRevocableToken = match token_response.refresh_token() {
-                Some(token) => token.into(),
-                None => token_response.access_token().into(),
-            };
-
-            client
-                .revoke_token(token_to_revoke)
-                .expect("no revocation_uri configured")
-                .request(http_client)
-                .unwrap_or_else(|err| {
-                    handle_error(&err, "Failed to contact token revocation endpoint");
-                    unreachable!();
-                });
-
-            // The server will terminate itself after revoking the token.
-            break;
-        }
+        let (_, value) = state_pair;
+        state = CsrfToken::new(value.into_owned());
     }
+
+    let message = "Go back to your terminal :)";
+    let response = format!(
+        "HTTP/1.1 200 OK\r\ncontent-length: {}\r\n\r\n{}",
+        message.len(),
+        message
+    );
+    stream.write_all(response.as_bytes()).unwrap();
+
+    println!("Google returned the following code:\n{}\n", code.secret());
+    println!(
+        "Google returned the following state:\n{} (expected `{}`)\n",
+        state.secret(),
+        csrf_state.secret()
+    );
+
+    // Exchange the code with a token.
+    let token_response = client
+        .exchange_code(code)
+        .request(http_client)
+        .unwrap_or_else(|err| {
+            handle_error(&err, "Failed to contact token endpoint");
+            unreachable!();
+        });
+
+    println!(
+        "Google returned access token:\n{}\n",
+        token_response.access_token().secret()
+    );
+    println!("Google returned scopes: {:?}", token_response.scopes());
+
+    let id_token_verifier: CoreIdTokenVerifier = client.id_token_verifier();
+    let id_token_claims: &CoreIdTokenClaims = token_response
+        .extra_fields()
+        .id_token()
+        .expect("Server did not return an ID token")
+        .claims(&id_token_verifier, &nonce)
+        .unwrap_or_else(|err| {
+            handle_error(&err, "Failed to verify ID token");
+            unreachable!();
+        });
+    println!("Google returned ID token: {:?}", id_token_claims);
+
+    // Revoke the obtained token
+    let token_to_revoke: CoreRevocableToken = match token_response.refresh_token() {
+        Some(token) => token.into(),
+        None => token_response.access_token().into(),
+    };
+
+    client
+        .revoke_token(token_to_revoke)
+        .expect("no revocation_uri configured")
+        .request(http_client)
+        .unwrap_or_else(|err| {
+            handle_error(&err, "Failed to contact token revocation endpoint");
+            unreachable!();
+        });
 }
