@@ -112,7 +112,7 @@ where
                     cur_fail = cause.source();
                 }
                 error!("[{}] {}", get_test_id(), err_msg);
-                panic!(msg);
+                panic!("{}", msg);
             }
         }
     }
@@ -161,7 +161,7 @@ where
         .registration_endpoint()
         .expect("provider does not support dynamic registration");
     registration_request_post
-        .register(&registration_endpoint, http_client)
+        .register(registration_endpoint, http_client)
         .expect(&format!(
             "Failed to register client at {:?}",
             registration_endpoint

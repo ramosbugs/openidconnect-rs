@@ -511,11 +511,7 @@ where
             .map_err(ClientRegistrationError::Serialize)?
             .into_bytes();
 
-        let auth_header_opt = if let Some(initial_access_token) = self.initial_access_token() {
-            Some(auth_bearer(initial_access_token))
-        } else {
-            None
-        };
+        let auth_header_opt = self.initial_access_token().map(auth_bearer);
 
         let mut headers = HeaderMap::new();
         headers.append(ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON));
@@ -1076,7 +1072,7 @@ mod tests {
         assert_eq!(
             client_metadata.jwks(),
             Some(&JsonWebKeySet::new(vec![serde_json::from_str(
-                &TEST_RSA_PUB_KEY
+                TEST_RSA_PUB_KEY
             )
             .unwrap()],))
         );
@@ -1136,7 +1132,7 @@ mod tests {
             *client_metadata.default_max_age().unwrap(),
             Duration::from_secs(3600)
         );
-        assert_eq!(client_metadata.require_auth_time().unwrap(), true);
+        assert!(client_metadata.require_auth_time().unwrap());
         assert_eq!(
             *client_metadata.default_acr_values().unwrap(),
             vec![
@@ -1403,7 +1399,7 @@ mod tests {
         assert_eq!(
             registration_response.jwks(),
             Some(&JsonWebKeySet::new(vec![serde_json::from_str(
-                &TEST_RSA_PUB_KEY
+                TEST_RSA_PUB_KEY
             )
             .unwrap()],)),
         );
@@ -1481,7 +1477,7 @@ mod tests {
             *registration_response.default_max_age().unwrap(),
             Duration::from_secs(3600)
         );
-        assert_eq!(registration_response.require_auth_time().unwrap(), true);
+        assert!(registration_response.require_auth_time().unwrap());
         assert_eq!(
             *registration_response.default_acr_values().unwrap(),
             vec![

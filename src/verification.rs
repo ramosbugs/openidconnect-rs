@@ -765,9 +765,9 @@ where
         Ok(partially_verified_claims)
     }
 
-    fn verify_claims<'b, AC, GC, N>(
+    fn verify_claims<AC, GC, N>(
         &self,
-        partially_verified_claims: &'b IdTokenClaims<AC, GC>,
+        partially_verified_claims: &'_ IdTokenClaims<AC, GC>,
         nonce_verifier: N,
     ) -> Result<(), ClaimsVerificationError>
     where

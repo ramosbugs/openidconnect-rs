@@ -102,7 +102,7 @@ fn main() {
 
     println!(
         "Open this URL in your browser:\n{}\n",
-        authorize_url.to_string()
+        authorize_url
     );
 
     // A very naive implementation of the redirect server.

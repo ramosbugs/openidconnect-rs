@@ -194,29 +194,29 @@ where
     // When another struct (i.e., additional claims) is co-flattened with this one, only include
     // fields in that other struct which are not part of this struct.
     fn should_include(field_name: &str) -> bool {
-        match split_language_tag_key(field_name) {
+        !matches!(
+            split_language_tag_key(field_name),
             ("sub", None)
-            | ("name", _)
-            | ("given_name", _)
-            | ("family_name", _)
-            | ("middle_name", _)
-            | ("nickname", _)
-            | ("preferred_username", None)
-            | ("profile", _)
-            | ("picture", _)
-            | ("website", _)
-            | ("email", None)
-            | ("email_verified", None)
-            | ("gender", None)
-            | ("birthday", None)
-            | ("zoneinfo", None)
-            | ("locale", None)
-            | ("phone_number", None)
-            | ("phone_number_verified", None)
-            | ("address", None)
-            | ("updated_at", None) => false,
-            _ => true,
-        }
+                | ("name", _)
+                | ("given_name", _)
+                | ("family_name", _)
+                | ("middle_name", _)
+                | ("nickname", _)
+                | ("preferred_username", None)
+                | ("profile", _)
+                | ("picture", _)
+                | ("website", _)
+                | ("email", None)
+                | ("email_verified", None)
+                | ("gender", None)
+                | ("birthday", None)
+                | ("zoneinfo", None)
+                | ("locale", None)
+                | ("phone_number", None)
+                | ("phone_number_verified", None)
+                | ("address", None)
+                | ("updated_at", None)
+        )
     }
 }
 impl<'de, GC> Deserialize<'de> for StandardClaims<GC>
