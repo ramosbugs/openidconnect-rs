@@ -36,7 +36,7 @@ pub fn set_test_id(test_id: &'static str) {
 #[macro_export]
 macro_rules! log_error {
     ($($args:tt)+) => {
-        error!("[{}] {}", rp_common::get_test_id(), format!($($args)+));
+        error!("[{}] {}", rp_common::get_test_id(), format!($($args)+))
     }
 }
 #[macro_export]
