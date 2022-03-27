@@ -596,6 +596,12 @@ pub use oauth2::{
     TokenResponse as OAuth2TokenResponse, TokenType, TokenUrl,
 };
 
+#[cfg(feature = "backchannel-logout")]
+mod logout_token;
+#[cfg(feature = "backchannel-logout")]
+#[doc(inline)]
+pub use logout_token::*;
+
 ///
 /// Public re-exports of types used for HTTP client interfaces.
 ///
