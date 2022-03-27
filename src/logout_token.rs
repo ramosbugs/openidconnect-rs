@@ -292,7 +292,6 @@ mod tests {
         "#,
         )
         .unwrap();
-        println!("{:#?}", t.identifier());
         assert!(matches!(
             t.identifier(),
             Identifier::Both {
