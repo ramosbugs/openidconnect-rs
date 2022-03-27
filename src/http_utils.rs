@@ -10,6 +10,7 @@ pub const BEARER: &str = "Bearer";
 // The [essence](https://mimesniff.spec.whatwg.org/#mime-type-essence) is the <type>/<subtype>
 // representation.
 pub fn content_type_has_essence(content_type: &HeaderValue, expected_essence: &str) -> bool {
+    #[allow(clippy::or_fun_call)]
     content_type
         .to_str()
         .ok()
