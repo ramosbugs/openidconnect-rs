@@ -15,7 +15,7 @@ all-features = true
 maintenance = { status = "actively-developed" }
 
 [features]
-default = ["reqwest", "rustls-tls"]
+default = ["reqwest", "rustls-tls", "backchannel-logout"]
 curl = ["oauth2/curl"]
 reqwest = ["oauth2/reqwest"]
 ureq = ["oauth2/ureq"]
@@ -23,6 +23,7 @@ native-tls = ["oauth2/native-tls"]
 rustls-tls = ["oauth2/rustls-tls"]
 accept-rfc3339-timestamps = []
 nightly = []
+backchannel-logout = []
 
 [dependencies]
 base64 = "0.13"
