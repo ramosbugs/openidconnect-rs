@@ -597,7 +597,7 @@ pub use oauth2::{
 };
 
 #[cfg(feature = "backchannel-logout")]
-mod backchannel_logout;
+pub mod backchannel_logout;
 
 ///
 /// Public re-exports of types used for HTTP client interfaces.
