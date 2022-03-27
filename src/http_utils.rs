@@ -14,8 +14,7 @@ pub fn content_type_has_essence(content_type: &HeaderValue, expected_essence: &s
         .to_str()
         .ok()
         .filter(|ct| {
-            ct[..ct.find(';').unwrap_or(ct.len())].to_lowercase()
-                == expected_essence.to_lowercase()
+            ct[..ct.find(';').unwrap_or(ct.len())].to_lowercase() == expected_essence.to_lowercase()
         })
         .is_some()
 }
