@@ -211,9 +211,7 @@ impl<'de> Deserialize<'de> for Identifier {
 
 #[cfg(test)]
 mod tests {
-    use crate::Identifier;
-
-    use super::LogoutToken;
+    use super::{Identifier, LogoutToken};
 
     #[test]
     fn deserialize_only_sid() {
