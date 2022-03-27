@@ -134,7 +134,7 @@ fn rp_registration_dynamic() {
             "{}/{}/registration?client_id={}",
             CERTIFICATION_BASE_URL,
             RP_NAME,
-            registration_response.client_id().to_string()
+            **registration_response.client_id()
         ),
         registration_response
             .registration_client_uri()

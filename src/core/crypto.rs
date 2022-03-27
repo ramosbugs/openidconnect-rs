@@ -124,7 +124,7 @@ pub fn verify_ec_signature(
     msg: &[u8],
     signature: &[u8],
 ) -> Result<(), SignatureVerificationError> {
-    let (x, y, crv) = ec_public_key(&key).map_err(SignatureVerificationError::InvalidKey)?;
+    let (x, y, crv) = ec_public_key(key).map_err(SignatureVerificationError::InvalidKey)?;
     if *crv == CoreJsonCurveType::P521 {
         return Err(SignatureVerificationError::UnsupportedAlg(
             "P521".to_string(),

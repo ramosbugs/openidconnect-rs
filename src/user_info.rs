@@ -130,7 +130,7 @@ where
             .map(ToOwned::to_owned)
             .unwrap_or_else(|| HeaderValue::from_static(MIME_TYPE_JSON))
         {
-            ref content_type if content_type_has_essence(&content_type, MIME_TYPE_JSON) => {
+            ref content_type if content_type_has_essence(content_type, MIME_TYPE_JSON) => {
                 if self.require_signed_response {
                     return Err(UserInfoError::ClaimsVerification(
                         ClaimsVerificationError::NoSignature,
@@ -141,7 +141,7 @@ where
                     self.signed_response_verifier.expected_subject(),
                 )
             }
-            ref content_type if content_type_has_essence(&content_type, MIME_TYPE_JWT) => {
+            ref content_type if content_type_has_essence(content_type, MIME_TYPE_JWT) => {
                 let jwt_str = String::from_utf8(http_response.body).map_err(|_| {
                     UserInfoError::Other("response body has invalid UTF-8 encoding".to_string())
                 })?;
@@ -231,7 +231,7 @@ where
         RE: std::error::Error + 'static,
     {
         let user_info = serde_path_to_error::deserialize::<_, UserInfoClaimsImpl<AC, GC>>(
-            &mut serde_json::Deserializer::from_slice(&user_info_json),
+            &mut serde_json::Deserializer::from_slice(user_info_json),
         )
         .map_err(UserInfoError::Parse)?;
 

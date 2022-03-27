@@ -371,10 +371,7 @@ impl CoreRsaPrivateSigningKey {
     ///
     /// RFC 7468 Lax Parsing
     fn keep_char_in_lax_base64_parsing(input: char) -> bool {
-        match input {
-            ' ' | '\n' | '\t' | '\r' | '\x0b' | '\x0c' => false,
-            _ => true,
-        }
+        !matches!(input, ' ' | '\n' | '\t' | '\r' | '\x0b' | '\x0c')
     }
 }
 impl
@@ -503,18 +500,10 @@ pub enum CoreJsonWebKeyUse {
 }
 impl JsonWebKeyUse for CoreJsonWebKeyUse {
     fn allows_signature(&self) -> bool {
-        if let CoreJsonWebKeyUse::Signature = *self {
-            true
-        } else {
-            false
-        }
+        matches!(*self, CoreJsonWebKeyUse::Signature)
     }
     fn allows_encryption(&self) -> bool {
-        if let CoreJsonWebKeyUse::Encryption = *self {
-            true
-        } else {
-            false
-        }
+        matches!(*self, CoreJsonWebKeyUse::Encryption)
     }
 }
 
