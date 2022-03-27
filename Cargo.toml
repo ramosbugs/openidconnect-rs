@@ -27,7 +27,10 @@ nightly = []
 [dependencies]
 base64 = "0.13"
 # Disable 'time' dependency since it triggers RUSTSEC-2020-0071 and we don't need it.
-chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+chrono = { version = "0.4", default-features = false, features = [
+    "clock",
+    "std",
+] }
 thiserror = "1.0"
 http = "0.2"
 itertools = "0.9"
@@ -48,6 +51,9 @@ num-bigint = "0.4.3"
 color-backtrace = { version = "0.4" }
 env_logger = "0.7"
 pretty_assertions = "0.6"
-reqwest_ = { package = "reqwest", features = ["blocking", "rustls-tls"], version = "0.11", default-features = false }
+reqwest_ = { package = "reqwest", features = [
+    "blocking",
+    "rustls-tls",
+], version = "0.11", default-features = false }
 retry = "1.0"
 anyhow = "1.0"
