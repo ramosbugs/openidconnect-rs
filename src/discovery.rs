@@ -173,6 +173,13 @@ where
     #[serde(skip_serializing_if = "Option::is_none")]
     op_tos_uri: Option<OpTosUrl>,
 
+    // backchannel logout support
+    // see <https://openid.net/specs/openid-connect-backchannel-1_0.html#BCSupport>
+    #[serde(skip_serializing_if = "Option::is_none")]
+    backchannel_logout_supported: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    backchannel_logout_session_supported: Option<bool>,
+
     #[serde(bound(deserialize = "A: AdditionalProviderMetadata"), flatten)]
     additional_metadata: A,
 
@@ -247,6 +254,8 @@ where
             require_request_uri_registration: None,
             op_policy_uri: None,
             op_tos_uri: None,
+            backchannel_logout_supported: None,
+            backchannel_logout_session_supported: None,
             additional_metadata,
             _phantom_jt: PhantomData,
         }
@@ -302,6 +311,8 @@ where
             set_require_request_uri_registration -> require_request_uri_registration[Option<bool>],
             set_op_policy_uri -> op_policy_uri[Option<OpPolicyUrl>],
             set_op_tos_uri -> op_tos_uri[Option<OpTosUrl>],
+            set_backchannel_logout_supported -> backchannel_logout_supported[Option<bool>],
+            set_backchannel_logout_session_supported -> backchannel_logout_session_supported[Option<bool>],
         }
     ];
 
