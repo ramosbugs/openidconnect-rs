@@ -10,7 +10,7 @@ use serde::{de::Error, Deserialize};
 use crate::{
     types::helpers::{deserialize_string_or_vec, serde_utc_seconds},
     types::SessionIdentifier,
-    Audience, IssuerUrl, SubjectIdentifier,
+    Audience, IssuerUrl, JsonWebKeyId, SubjectIdentifier,
 };
 
 /// The Logout Token as defined in [section 2.4] of the [OpenID Connect Back-Channel Logout spec][1]
@@ -27,7 +27,7 @@ pub struct LogoutToken {
     iat: DateTime<Utc>,
     /// The unique identifier for this token. This can be used to detect
     /// replay attacks.
-    jti: String,
+    jti: JsonWebKeyId,
     identifier: Identifier,
     events: HashMap<String, serde_json::Value>,
 }
@@ -50,7 +50,7 @@ impl LogoutToken {
 
     /// The `jti` claim. It's the unique identifier for this token and can be
     /// used to detect replay attacks.
-    pub fn jti(&self) -> &str {
+    pub fn jti(&self) -> &JsonWebKeyId {
         &self.jti
     }
 
@@ -92,7 +92,7 @@ impl<'de> Deserialize<'de> for LogoutToken {
             iat: DateTime<Utc>,
             /// The unique identifier for this token. This can be used to detect
             /// replay attacks.
-            jti: String,
+            jti: JsonWebKeyId,
             #[serde(flatten)]
             identifier: Identifier,
             events: HashMap<String, serde_json::Value>,
