@@ -5,30 +5,58 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
-use serde::{de::Error, Deserialize};
+use serde::{de::Error, ser::SerializeMap, Deserialize, Serialize};
 
 use crate::{
     helpers::{FilteredFlatten, FlattenFilter},
+    jwt::{JsonWebToken, JsonWebTokenJsonPayloadSerde},
     types::helpers::{deserialize_string_or_vec, serde_utc_seconds},
     types::SessionIdentifier,
-    AdditionalClaims, Audience, IssuerUrl, JsonWebKeyId, SubjectIdentifier,
+    AdditionalClaims, Audience, IssuerUrl, JsonWebKeyId, JsonWebKeyType,
+    JweContentEncryptionAlgorithm, JwsSigningAlgorithm, SubjectIdentifier,
 };
 
-/// The Logout Token as defined in [section 2.4] of the [OpenID Connect Back-Channel Logout spec][1]
+/// Back-Channel Logout Token
+///
+/// Parses a JWT as a Logout Token as definied in [section 2.4]
 ///
 /// [section 2.4]: <https://openid.net/specs/openid-connect-backchannel-1_0.html#LogoutToken>
-/// [1]: <https://openid.net/specs/openid-connect-backchannel-1_0.html>
 #[derive(Debug, Clone, PartialEq)]
+pub struct LogoutToken<AC, JE, JS, JT>(
+    JsonWebToken<JE, JS, JT, LogoutTokenClaims<AC>, JsonWebTokenJsonPayloadSerde>,
+)
+where
+    AC: AdditionalClaims,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType;
+
+impl<AC, JE, JS, JT> LogoutToken<AC, JE, JS, JT>
+where
+    AC: AdditionalClaims,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+{
+    // TODO: implement signature verification & friends
+}
+
+/// The Logout Token Claims as defined in [section 2.4] of the [OpenID Connect Back-Channel Logout spec][1]
+///
+/// [1]: <https://openid.net/specs/openid-connect-backchannel-1_0.html>
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct LogoutTokenClaims<AC: AdditionalClaims> {
     /// The issuer of this token
     iss: IssuerUrl,
     /// The audience this token is intended for
     aud: Vec<Audience>,
     /// Time at which this token was issued
+    #[serde(with = "serde_utc_seconds")]
     iat: DateTime<Utc>,
     /// The unique identifier for this token. This can be used to detect
     /// replay attacks.
     jti: JsonWebKeyId,
+    #[serde(flatten)]
     identifier: LogoutIdentifier,
     events: HashMap<String, serde_json::Value>,
     additional_claims: FilteredFlatten<Self, AC>,
@@ -233,6 +261,26 @@ impl<'de> Deserialize<'de> for LogoutIdentifier {
     }
 }
 
+impl Serialize for LogoutIdentifier {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let len = self.session().is_some() as usize + self.subject().is_some() as usize;
+
+        let mut map = serializer.serialize_map(Some(len))?;
+
+        if let Some(s) = self.session() {
+            map.serialize_entry("sid", s)?;
+        }
+
+        if let Some(s) = self.subject() {
+            map.serialize_entry("sub", s)?;
+        }
+
+        map.end()
+    }
+}
 #[cfg(test)]
 mod tests {
     use crate::EmptyAdditionalClaims;
