@@ -8,17 +8,18 @@ use chrono::{DateTime, Utc};
 use serde::{de::Error, Deserialize};
 
 use crate::{
+    helpers::{FilteredFlatten, FlattenFilter},
     types::helpers::{deserialize_string_or_vec, serde_utc_seconds},
     types::SessionIdentifier,
-    Audience, IssuerUrl, JsonWebKeyId, SubjectIdentifier,
+    AdditionalClaims, Audience, IssuerUrl, JsonWebKeyId, SubjectIdentifier,
 };
 
 /// The Logout Token as defined in [section 2.4] of the [OpenID Connect Back-Channel Logout spec][1]
 ///
 /// [section 2.4]: <https://openid.net/specs/openid-connect-backchannel-1_0.html#LogoutToken>
 /// [1]: <https://openid.net/specs/openid-connect-backchannel-1_0.html>
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LogoutTokenClaims {
+#[derive(Debug, Clone, PartialEq)]
+pub struct LogoutTokenClaims<AC: AdditionalClaims> {
     /// The issuer of this token
     iss: IssuerUrl,
     /// The audience this token is intended for
@@ -30,9 +31,25 @@ pub struct LogoutTokenClaims {
     jti: JsonWebKeyId,
     identifier: LogoutIdentifier,
     events: HashMap<String, serde_json::Value>,
+    additional_claims: FilteredFlatten<Self, AC>,
 }
 
-impl LogoutTokenClaims {
+impl<AC> FlattenFilter for LogoutTokenClaims<AC>
+where
+    AC: AdditionalClaims,
+{
+    fn should_include(field_name: &str) -> bool {
+        !matches!(
+            field_name,
+            "iss" | "aud" | "iat" | "jti" | "sub" | "sid" | "events"
+        )
+    }
+}
+
+impl<AC> LogoutTokenClaims<AC>
+where
+    AC: AdditionalClaims,
+{
     /// The `iss` claim
     pub fn issuer(&self) -> &IssuerUrl {
         &self.iss
@@ -68,7 +85,10 @@ impl LogoutTokenClaims {
         &self.events
     }
 }
-impl<'de> Deserialize<'de> for LogoutTokenClaims {
+impl<'de, AC> Deserialize<'de> for LogoutTokenClaims<AC>
+where
+    AC: AdditionalClaims,
+{
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -81,7 +101,7 @@ impl<'de> Deserialize<'de> for LogoutTokenClaims {
         }
 
         #[derive(Deserialize)]
-        struct Repr {
+        struct Repr<AC: AdditionalClaims> {
             /// The issuer of this token
             iss: IssuerUrl,
             /// The audience this token is intended for
@@ -96,9 +116,12 @@ impl<'de> Deserialize<'de> for LogoutTokenClaims {
             #[serde(flatten)]
             identifier: LogoutIdentifier,
             events: HashMap<String, serde_json::Value>,
+            #[serde(bound = "AC: AdditionalClaims")]
+            #[serde(flatten)]
+            additional_claims: FilteredFlatten<LogoutTokenClaims<AC>, AC>,
         }
 
-        let token: Repr = serde_json::from_value(value).map_err(<D::Error as Error>::custom)?;
+        let token: Repr<AC> = serde_json::from_value(value).map_err(<D::Error as Error>::custom)?;
 
         token
             .events
@@ -118,6 +141,7 @@ impl<'de> Deserialize<'de> for LogoutTokenClaims {
             jti: token.jti,
             identifier: token.identifier,
             events: token.events,
+            additional_claims: token.additional_claims,
         })
     }
 }
@@ -211,11 +235,13 @@ impl<'de> Deserialize<'de> for LogoutIdentifier {
 
 #[cfg(test)]
 mod tests {
+    use crate::EmptyAdditionalClaims;
+
     use super::{LogoutIdentifier, LogoutTokenClaims};
 
     #[test]
     fn deserialize_only_sid() {
-        let t: LogoutTokenClaims = serde_json::from_str(
+        let t: LogoutTokenClaims<EmptyAdditionalClaims> = serde_json::from_str(
             r#"
             {
                 "iss": "https://server.example.com",
@@ -235,7 +261,7 @@ mod tests {
 
     #[test]
     fn deserialize_only_sub() {
-        let t: LogoutTokenClaims = serde_json::from_str(
+        let t: LogoutTokenClaims<EmptyAdditionalClaims> = serde_json::from_str(
             r#"
             {
                 "iss": "https://server.example.com",
@@ -256,7 +282,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn deserialize_missing_identifier() {
-        let _: LogoutTokenClaims = serde_json::from_str(
+        let _: LogoutTokenClaims<EmptyAdditionalClaims> = serde_json::from_str(
             r#"
             {
                 "iss": "https://server.example.com",
@@ -274,7 +300,7 @@ mod tests {
 
     #[test]
     fn deserialize_valid() {
-        let t: LogoutTokenClaims = serde_json::from_str(
+        let t: LogoutTokenClaims<EmptyAdditionalClaims> = serde_json::from_str(
             r#"
             {
                 "iss": "https://server.example.com",
@@ -302,7 +328,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn deserialize_events_empty() {
-        let _: LogoutTokenClaims = serde_json::from_str(
+        let _: LogoutTokenClaims<EmptyAdditionalClaims> = serde_json::from_str(
             r#"
             {
                 "iss": "https://server.example.com",
@@ -322,7 +348,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn deserialize_events_empty_array() {
-        let _: LogoutTokenClaims = serde_json::from_str(
+        let _: LogoutTokenClaims<EmptyAdditionalClaims> = serde_json::from_str(
             r#"
             {
                 "iss": "https://server.example.com",
@@ -341,7 +367,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn deserialize_events_missing() {
-        let _: LogoutTokenClaims = serde_json::from_str(
+        let _: LogoutTokenClaims<EmptyAdditionalClaims> = serde_json::from_str(
             r#"
             {
                 "iss": "https://server.example.com",
@@ -359,7 +385,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn deserialize_events_array() {
-        let _: LogoutTokenClaims = serde_json::from_str(
+        let _: LogoutTokenClaims<EmptyAdditionalClaims> = serde_json::from_str(
             r#"
             {
                 "iss": "https://server.example.com",
@@ -380,7 +406,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn deserialize_nonce() {
-        let _: LogoutTokenClaims = serde_json::from_str(
+        let _: LogoutTokenClaims<EmptyAdditionalClaims> = serde_json::from_str(
             r#"
             {
                 "iss": "https://server.example.com",
@@ -401,7 +427,7 @@ mod tests {
 
     #[test]
     fn deserialize_extra_field() {
-        let _: LogoutTokenClaims = serde_json::from_str(
+        let _: LogoutTokenClaims<EmptyAdditionalClaims> = serde_json::from_str(
             r#"
             {
                 "iss": "https://server.example.com",
@@ -423,7 +449,7 @@ mod tests {
 
     #[test]
     fn deserialize_multiple_events() {
-        let _: LogoutTokenClaims = serde_json::from_str(
+        let _: LogoutTokenClaims<EmptyAdditionalClaims> = serde_json::from_str(
             r#"
             {
                 "iss": "https://server.example.com",
@@ -444,7 +470,7 @@ mod tests {
 
     #[test]
     fn deserialize_multiple_events_extra_fields() {
-        let _: LogoutTokenClaims = serde_json::from_str(
+        let _: LogoutTokenClaims<EmptyAdditionalClaims> = serde_json::from_str(
             r#"
             {
                 "iss": "https://server.example.com",
