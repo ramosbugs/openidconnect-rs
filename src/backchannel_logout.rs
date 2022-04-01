@@ -28,7 +28,7 @@ pub struct LogoutToken {
     /// The unique identifier for this token. This can be used to detect
     /// replay attacks.
     jti: JsonWebKeyId,
-    identifier: Identifier,
+    identifier: LogoutIdentifier,
     events: HashMap<String, serde_json::Value>,
 }
 
@@ -57,7 +57,7 @@ impl LogoutToken {
     /// As per spec, a [`LogoutToken`] MUST either have the `sub`  or `sid`
     /// claim and MAY contain both. You can match the [`Identifier`] to detect
     /// which claims are present.
-    pub fn identifier(&self) -> &Identifier {
+    pub fn identifier(&self) -> &LogoutIdentifier {
         &self.identifier
     }
 
@@ -94,7 +94,7 @@ impl<'de> Deserialize<'de> for LogoutToken {
             /// replay attacks.
             jti: JsonWebKeyId,
             #[serde(flatten)]
-            identifier: Identifier,
+            identifier: LogoutIdentifier,
             events: HashMap<String, serde_json::Value>,
         }
 
@@ -125,7 +125,7 @@ impl<'de> Deserialize<'de> for LogoutToken {
 /// A [`LogoutToken`] MUST contain either a `sub` or a `sid` claim and MAY
 /// contain both. This enum represents these three possibilities.
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
-pub enum Identifier {
+pub enum LogoutIdentifier {
     /// Both, the `sid` and `sub` claims are present
     Both {
         /// The `sub` claim as in [`Identifier::Subject`]
@@ -139,7 +139,7 @@ pub enum Identifier {
     Subject(SubjectIdentifier),
 }
 
-impl Identifier {
+impl LogoutIdentifier {
     /// Directly return the [`SubjectIdentifier`] if the variant is either
     /// [`Identifier::Subject`] or [`Identifier::Both`]
     pub fn subject(&self) -> Option<&SubjectIdentifier> {
@@ -168,7 +168,7 @@ impl Identifier {
 }
 
 // serde does not have #[serde(flatten)] on enums with struct variants, so
-impl<'de> Deserialize<'de> for Identifier {
+impl<'de> Deserialize<'de> for LogoutIdentifier {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -197,13 +197,13 @@ impl<'de> Deserialize<'de> for Identifier {
         }
 
         Ok(match Either::deserialize(deserializer)? {
-            Either::Both(both) => Identifier::Both {
+            Either::Both(both) => LogoutIdentifier::Both {
                 subject: both.sub,
                 session: both.sid,
             },
             Either::Single(s) => match s {
-                SidOrSub::Subject(s) => Identifier::Subject(s),
-                SidOrSub::Session(s) => Identifier::Session(s),
+                SidOrSub::Subject(s) => LogoutIdentifier::Subject(s),
+                SidOrSub::Session(s) => LogoutIdentifier::Session(s),
             },
         })
     }
@@ -211,7 +211,7 @@ impl<'de> Deserialize<'de> for Identifier {
 
 #[cfg(test)]
 mod tests {
-    use super::{Identifier, LogoutToken};
+    use super::{LogoutIdentifier, LogoutToken};
 
     #[test]
     fn deserialize_only_sid() {
@@ -230,7 +230,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        assert!(matches!(t.identifier(), Identifier::Session(_)));
+        assert!(matches!(t.identifier(), LogoutIdentifier::Session(_)));
     }
 
     #[test]
@@ -250,7 +250,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        assert!(matches!(t.identifier(), Identifier::Subject(_)));
+        assert!(matches!(t.identifier(), LogoutIdentifier::Subject(_)));
     }
 
     #[test]
@@ -292,7 +292,7 @@ mod tests {
         .unwrap();
         assert!(matches!(
             t.identifier(),
-            Identifier::Both {
+            LogoutIdentifier::Both {
                 subject: _,
                 session: _
             }
