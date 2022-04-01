@@ -59,19 +59,7 @@ pub struct LogoutTokenClaims<AC: AdditionalClaims> {
     #[serde(flatten)]
     identifier: LogoutIdentifier,
     events: HashMap<String, serde_json::Value>,
-    additional_claims: FilteredFlatten<Self, AC>,
-}
-
-impl<AC> FlattenFilter for LogoutTokenClaims<AC>
-where
-    AC: AdditionalClaims,
-{
-    fn should_include(field_name: &str) -> bool {
-        !matches!(
-            field_name,
-            "iss" | "aud" | "iat" | "jti" | "sub" | "sid" | "events"
-        )
-    }
+    additional_claims: FilteredFlatten<LogoutIdentifier, AC>,
 }
 
 impl<AC> LogoutTokenClaims<AC>
@@ -146,7 +134,7 @@ where
             events: HashMap<String, serde_json::Value>,
             #[serde(bound = "AC: AdditionalClaims")]
             #[serde(flatten)]
-            additional_claims: FilteredFlatten<LogoutTokenClaims<AC>, AC>,
+            additional_claims: FilteredFlatten<LogoutIdentifier, AC>,
         }
 
         let token: Repr<AC> = serde_json::from_value(value).map_err(<D::Error as Error>::custom)?;
@@ -219,6 +207,11 @@ impl LogoutIdentifier {
     }
 }
 
+impl FlattenFilter for LogoutIdentifier {
+    fn should_include(field_name: &str) -> bool {
+        !matches!(field_name, "sub" | "sid")
+    }
+}
 // serde does not have #[serde(flatten)] on enums with struct variants, so
 impl<'de> Deserialize<'de> for LogoutIdentifier {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
