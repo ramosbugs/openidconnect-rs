@@ -43,7 +43,6 @@ serde_derive = "1.0"
 serde_json = "1.0"
 serde_path_to_error = "0.1"
 serde-value = "0.7"
-untrusted = "0.9"
 url = { version = "2.1", features = ["serde"] }
 num-bigint = "0.4.3"
 
