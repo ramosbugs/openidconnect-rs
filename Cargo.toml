@@ -33,7 +33,7 @@ chrono = { version = "0.4", default-features = false, features = [
 ] }
 thiserror = "1.0"
 http = "0.2"
-itertools = "0.9"
+itertools = "0.10"
 log = "0.4"
 oauth2 = { version = "4.1", default-features = false }
 rand = "0.8"
@@ -42,15 +42,14 @@ serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 serde_path_to_error = "0.1"
-serde-value = "0.6"
-untrusted = "0.7"
+serde-value = "0.7"
 url = { version = "2.1", features = ["serde"] }
 num-bigint = "0.4.3"
 
 [dev-dependencies]
-color-backtrace = { version = "0.4" }
-env_logger = "0.7"
-pretty_assertions = "0.6"
+color-backtrace = { version = "0.5" }
+env_logger = "0.9"
+pretty_assertions = "1.0"
 reqwest_ = { package = "reqwest", features = [
     "blocking",
     "rustls-tls",
