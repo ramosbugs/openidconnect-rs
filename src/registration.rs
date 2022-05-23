@@ -3,7 +3,6 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::time::Duration;
 
-use chrono::{DateTime, Utc};
 use http::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
 use http::method::Method;
 use http::status::StatusCode;
@@ -11,6 +10,7 @@ use serde::de::{Deserialize, DeserializeOwned, Deserializer, MapAccess, Visitor}
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
 use thiserror::Error;
+use time::OffsetDateTime;
 
 use super::http_utils::{auth_bearer, check_content_type, MIME_TYPE_JSON};
 use super::types::helpers::{serde_utc_seconds_opt, split_language_tag_key};
@@ -697,13 +697,13 @@ where
         with = "serde_utc_seconds_opt",
         default
     )]
-    client_id_issued_at: Option<DateTime<Utc>>,
+    client_id_issued_at: Option<OffsetDateTime>,
     #[serde(
         skip_serializing_if = "Option::is_none",
         with = "serde_utc_seconds_opt",
         default
     )]
-    client_secret_expires_at: Option<DateTime<Utc>>,
+    client_secret_expires_at: Option<OffsetDateTime>,
     #[serde(bound = "AC: AdditionalClientMetadata", flatten)]
     client_metadata: ClientMetadata<AC, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
 
@@ -775,8 +775,8 @@ where
             set_registration_access_token
               -> registration_access_token[Option<RegistrationAccessToken>],
             set_registration_client_uri -> registration_client_uri[Option<ClientConfigUrl>],
-            set_client_id_issued_at -> client_id_issued_at[Option<DateTime<Utc>>],
-            set_client_secret_expires_at -> client_secret_expires_at[Option<DateTime<Utc>>],
+            set_client_id_issued_at -> client_id_issued_at[Option<OffsetDateTime>],
+            set_client_secret_expires_at -> client_secret_expires_at[Option<OffsetDateTime>],
         }
     ];
 
@@ -896,9 +896,9 @@ where
 mod tests {
     use std::time::Duration;
 
-    use chrono::{TimeZone, Utc};
     use itertools::sorted;
     use oauth2::{ClientId, RedirectUrl};
+    use time::OffsetDateTime;
 
     use crate::core::{
         CoreApplicationType, CoreClientAuthMethod, CoreClientMetadata,
@@ -1279,12 +1279,12 @@ mod tests {
             ClientConfigUrl::new("https://example-provider.com/registration".to_string()).unwrap()
         );
         assert_eq!(
-            registration_response.client_id_issued_at().unwrap(),
-            Utc.timestamp(1523953306, 0)
+            *registration_response.client_id_issued_at().unwrap(),
+            OffsetDateTime::from_unix_timestamp(1523953306).unwrap()
         );
         assert_eq!(
-            registration_response.client_secret_expires_at().unwrap(),
-            Utc.timestamp(1526545306, 0)
+            *registration_response.client_secret_expires_at().unwrap(),
+            OffsetDateTime::from_unix_timestamp(1526545306).unwrap()
         );
         assert_eq!(
             *registration_response.redirect_uris(),

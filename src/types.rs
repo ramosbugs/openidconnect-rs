@@ -1064,10 +1064,10 @@ new_url_type![
 
 // FIXME: Add tests
 pub(crate) mod helpers {
-    use chrono::{DateTime, TimeZone, Utc};
     use serde::de::DeserializeOwned;
     use serde::{Deserialize, Deserializer, Serializer};
     use serde_json::{from_value, Value};
+    use time::OffsetDateTime;
 
     use super::{LanguageTag, Timestamp};
 
@@ -1159,24 +1159,14 @@ pub(crate) mod helpers {
         (field_name, language_tag)
     }
 
-    pub(crate) fn timestamp_to_utc(timestamp: &Timestamp) -> Result<DateTime<Utc>, ()> {
+    pub(crate) fn timestamp_to_utc(timestamp: &Timestamp) -> Result<OffsetDateTime, ()> {
         match timestamp {
             Timestamp::Seconds(seconds) => {
-                let (secs, nsecs) = if seconds.is_i64() {
-                    (seconds.as_i64().ok_or(())?, 0u32)
-                } else {
-                    let secs_f64 = seconds.as_f64().ok_or(())?;
-                    let secs = secs_f64.floor();
-                    (
-                        secs as i64,
-                        ((secs_f64 - secs) * 1_000_000_000.).floor() as u32,
-                    )
-                };
-                Utc.timestamp_opt(secs, nsecs).single().ok_or(())
+                OffsetDateTime::from_unix_timestamp(seconds.as_i64().ok_or(())?).map_err(|_| ())
             }
             #[cfg(feature = "accept-rfc3339-timestamps")]
             Timestamp::Rfc3339(iso) => {
-                let datetime = DateTime::parse_from_rfc3339(iso).map_err(|_| ())?;
+                let datetime = OffsetDateTime::parse(iso, &time::format_description::well_known::Rfc3339).map_err(|_| ())?;
                 Ok(datetime.into())
             }
         }
@@ -1185,16 +1175,16 @@ pub(crate) mod helpers {
     // The spec is ambiguous about whether seconds should be expressed as integers, or
     // whether floating-point values are allowed. For compatibility with a wide range of
     // clients, we round down to the nearest second.
-    pub(crate) fn utc_to_seconds(utc: &DateTime<Utc>) -> Timestamp {
-        Timestamp::Seconds(utc.timestamp().into())
+    pub(crate) fn utc_to_seconds(utc: &OffsetDateTime) -> Timestamp {
+        Timestamp::Seconds(utc.unix_timestamp().into())
     }
 
     pub mod serde_utc_seconds {
         use crate::types::Timestamp;
-        use chrono::{DateTime, Utc};
         use serde::{Deserialize, Deserializer, Serialize, Serializer};
+        use time::OffsetDateTime;
 
-        pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+        pub fn deserialize<'de, D>(deserializer: D) -> Result<OffsetDateTime, D::Error>
         where
             D: Deserializer<'de>,
         {
@@ -1207,7 +1197,7 @@ pub(crate) mod helpers {
             })
         }
 
-        pub fn serialize<S>(v: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
+        pub fn serialize<S>(v: &OffsetDateTime, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
         {
@@ -1217,10 +1207,10 @@ pub(crate) mod helpers {
 
     pub mod serde_utc_seconds_opt {
         use crate::types::Timestamp;
-        use chrono::{DateTime, Utc};
         use serde::{Deserialize, Deserializer, Serialize, Serializer};
+        use time::OffsetDateTime;
 
-        pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<DateTime<Utc>>, D::Error>
+        pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<OffsetDateTime>, D::Error>
         where
             D: Deserializer<'de>,
         {
@@ -1237,7 +1227,7 @@ pub(crate) mod helpers {
                 .transpose()
         }
 
-        pub fn serialize<S>(v: &Option<DateTime<Utc>>, serializer: S) -> Result<S::Ok, S::Error>
+        pub fn serialize<S>(v: &Option<OffsetDateTime>, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
         {

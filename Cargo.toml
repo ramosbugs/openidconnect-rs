@@ -26,11 +26,6 @@ nightly = []
 
 [dependencies]
 base64 = "0.13"
-# Disable 'time' dependency since it triggers RUSTSEC-2020-0071 and we don't need it.
-chrono = { version = "0.4", default-features = false, features = [
-    "clock",
-    "std",
-] }
 thiserror = "1.0"
 http = "0.2"
 itertools = "0.10"
@@ -43,6 +38,7 @@ serde_derive = "1.0"
 serde_json = "1.0"
 serde_path_to_error = "0.1"
 serde-value = "0.7"
+time = { version = "0.3", features = ["parsing", "std"] }
 url = { version = "2.1", features = ["serde"] }
 num-bigint = "0.4.3"
 

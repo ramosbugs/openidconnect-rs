@@ -362,7 +362,8 @@
 //! ### Example
 //!
 //! ```rust,no_run
-//! use chrono::{Duration, Utc};
+//! use std::time::Duration;
+//! use time::OffsetDateTime;
 //! use openidconnect::{
 //!     AccessToken,
 //!     Audience,
@@ -397,9 +398,9 @@
 //!         vec![Audience::new("client-id-123".to_string())],
 //!         // The ID token expiration is usually much shorter than that of the access or refresh
 //!         // tokens issued to clients.
-//!         Utc::now() + Duration::seconds(300),
+//!         OffsetDateTime::now_utc() + Duration::from_secs(300),
 //!         // The issue time is usually the current time.
-//!         Utc::now(),
+//!         OffsetDateTime::now_utc(),
 //!         // Set the standard claims defined by the OpenID Connect Core spec.
 //!         StandardClaims::new(
 //!             // Stable subject identifiers are recommended in place of e-mail addresses or other

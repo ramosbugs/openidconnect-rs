@@ -2,10 +2,10 @@ use std::fmt::{Debug, Formatter, Result as FormatterResult};
 use std::marker::PhantomData;
 use std::str;
 
-use chrono::{DateTime, Utc};
 use serde::de::{Deserialize, DeserializeOwned, Deserializer, MapAccess, Visitor};
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
+use time::OffsetDateTime;
 
 use crate::helpers::FlattenFilter;
 use crate::types::helpers::{split_language_tag_key, timestamp_to_utc, utc_to_seconds};
@@ -110,7 +110,7 @@ where
     pub(crate) phone_number: Option<EndUserPhoneNumber>,
     pub(crate) phone_number_verified: Option<bool>,
     pub(crate) address: Option<AddressClaim>,
-    pub(crate) updated_at: Option<DateTime<Utc>>,
+    pub(crate) updated_at: Option<OffsetDateTime>,
 }
 impl<GC> StandardClaims<GC>
 where
@@ -183,7 +183,7 @@ where
             set_phone_number -> phone_number[Option<EndUserPhoneNumber>],
             set_phone_number_verified -> phone_number_verified[Option<bool>],
             set_address -> address[Option<AddressClaim>],
-            set_updated_at -> updated_at[Option<DateTime<Utc>>],
+            set_updated_at -> updated_at[Option<OffsetDateTime>],
         }
     ];
 }

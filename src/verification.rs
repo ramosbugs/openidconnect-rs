@@ -4,13 +4,13 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use oauth2::helpers::variant_name;
 use oauth2::{ClientId, ClientSecret};
 use ring::constant_time::verify_slices_are_equal;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use thiserror::Error;
+use time::OffsetDateTime;
 
 use crate::jwt::{JsonWebToken, JsonWebTokenJsonPayloadSerde};
 use crate::user_info::UserInfoClaimsImpl;
@@ -516,10 +516,10 @@ where
         Arc<dyn Fn(Option<&AuthenticationContextClass>) -> Result<(), String> + 'a + Send + Sync>,
     #[allow(clippy::type_complexity)]
     auth_time_verifier_fn:
-        Arc<dyn Fn(Option<DateTime<Utc>>) -> Result<(), String> + 'a + Send + Sync>,
-    iat_verifier_fn: Arc<dyn Fn(DateTime<Utc>) -> Result<(), String> + 'a + Send + Sync>,
+        Arc<dyn Fn(Option<OffsetDateTime>) -> Result<(), String> + 'a + Send + Sync>,
+    iat_verifier_fn: Arc<dyn Fn(OffsetDateTime) -> Result<(), String> + 'a + Send + Sync>,
     jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>,
-    time_fn: Arc<dyn Fn() -> DateTime<Utc> + 'a + Send + Sync>,
+    time_fn: Arc<dyn Fn() -> OffsetDateTime + 'a + Send + Sync>,
 }
 impl<'a, JS, JT, JU, K> IdTokenVerifier<'a, JS, JT, JU, K>
 where
@@ -537,7 +537,7 @@ where
             iat_verifier_fn: Arc::new(|_| Ok(())),
             jwt_verifier,
             // By default, use the current system time.
-            time_fn: Arc::new(Utc::now),
+            time_fn: Arc::new(OffsetDateTime::now_utc),
         }
     }
 
@@ -629,7 +629,7 @@ where
     ///
     pub fn set_auth_time_verifier_fn<T>(mut self, auth_time_verifier_fn: T) -> Self
     where
-        T: Fn(Option<DateTime<Utc>>) -> Result<(), String> + 'a + Send + Sync,
+        T: Fn(Option<OffsetDateTime>) -> Result<(), String> + 'a + Send + Sync,
     {
         self.auth_time_verifier_fn = Arc::new(auth_time_verifier_fn);
         self
@@ -683,7 +683,7 @@ where
     ///
     pub fn set_time_fn<T>(mut self, time_fn: T) -> Self
     where
-        T: Fn() -> DateTime<Utc> + 'a + Send + Sync,
+        T: Fn() -> OffsetDateTime + 'a + Send + Sync,
     {
         self.time_fn = Arc::new(time_fn);
         self
@@ -697,7 +697,7 @@ where
     ///
     pub fn set_issue_time_verifier_fn<T>(mut self, iat_verifier_fn: T) -> Self
     where
-        T: Fn(DateTime<Utc>) -> Result<(), String> + 'a + Send + Sync,
+        T: Fn(OffsetDateTime) -> Result<(), String> + 'a + Send + Sync,
     {
         self.iat_verifier_fn = Arc::new(iat_verifier_fn);
         self
@@ -809,7 +809,7 @@ where
 
         // 9. The current time MUST be before the time represented by the exp Claim.
         let cur_time = (*self.time_fn)();
-        if cur_time >= partially_verified_claims.expiration() {
+        if cur_time >= *partially_verified_claims.expiration() {
             return Err(ClaimsVerificationError::Expired(format!(
                 "ID token expired at {} (current time is {})",
                 partially_verified_claims.expiration(),
@@ -820,7 +820,7 @@ where
         // 10. The iat Claim can be used to reject tokens that were issued too far away from the
         //     current time, limiting the amount of time that nonces need to be stored to prevent
         //     attacks. The acceptable range is Client specific.
-        (*self.iat_verifier_fn)(partially_verified_claims.issue_time())
+        (*self.iat_verifier_fn)(*partially_verified_claims.issue_time())
             .map_err(ClaimsVerificationError::Expired)?;
 
         // 11. If a nonce value was sent in the Authentication Request, a nonce Claim MUST be
@@ -841,7 +841,7 @@ where
         //     Claim or by using the max_age parameter, the Client SHOULD check the auth_time Claim
         //     value and request re-authentication if it determines too much time has elapsed since
         //     the last End-User authentication.
-        (*self.auth_time_verifier_fn)(partially_verified_claims.auth_time())
+        (*self.auth_time_verifier_fn)(partially_verified_claims.auth_time().cloned())
             .map_err(ClaimsVerificationError::InvalidAuthTime)?;
 
         Ok(())
@@ -944,8 +944,8 @@ where
 mod tests {
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-    use chrono::{TimeZone, Utc};
     use oauth2::{ClientId, ClientSecret};
+    use time::OffsetDateTime;
 
     use super::{
         AudiencesClaim, ClaimsVerificationError, IssuerClaim, JsonWebTokenHeader,
@@ -1855,14 +1855,16 @@ mod tests {
             CoreIdTokenClaims::new(
                 issuer.clone(),
                 vec![Audience::new((*client_id).clone())],
-                Utc.timestamp(1544932149, 0),
-                Utc.timestamp(1544928549, 0),
+                OffsetDateTime::from_unix_timestamp(1544932149).unwrap(),
+                OffsetDateTime::from_unix_timestamp(1544928549).unwrap(),
                 StandardClaims::new(SubjectIdentifier::new("subject".to_string())),
                 Default::default(),
             )
             .set_nonce(Some(nonce.clone()))
             .set_auth_context_ref(Some(AuthenticationContextClass::new("the_acr".to_string())))
-            .set_auth_time(Some(Utc.timestamp(1544928548, 0))),
+            .set_auth_time(Some(
+                OffsetDateTime::from_unix_timestamp(1544928548).unwrap(),
+            )),
             &rsa_priv_key,
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
             Some(&AccessToken::new("the_access_token".to_string())),
@@ -2066,7 +2068,7 @@ mod tests {
                 phone_number: None,
                 phone_number_verified: None,
                 address: None,
-                updated_at: Some(Utc.timestamp(1544928548, 0)),
+                updated_at: Some(OffsetDateTime::from_unix_timestamp(1544928548).unwrap()),
             },
             Default::default(),
         );

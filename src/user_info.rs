@@ -2,12 +2,12 @@ use std::future::Future;
 use std::ops::Deref;
 use std::str;
 
-use chrono::{DateTime, Utc};
 use http::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
 use http::method::Method;
 use http::status::StatusCode;
 use oauth2::AccessToken;
 use thiserror::Error;
+use time::OffsetDateTime;
 use url::Url;
 
 use crate::helpers::FilteredFlatten;
@@ -296,7 +296,7 @@ where
             set_phone_number -> phone_number[Option<EndUserPhoneNumber>],
             set_phone_number_verified -> phone_number_verified[Option<bool>],
             set_address -> address[Option<AddressClaim>],
-            set_updated_at -> updated_at[Option<DateTime<Utc>>],
+            set_updated_at -> updated_at[Option<OffsetDateTime>],
         }
     ];
 

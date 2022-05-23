@@ -2,11 +2,11 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::str::FromStr;
 
-use chrono::{DateTime, Utc};
 use oauth2::helpers::variant_name;
 use oauth2::ClientId;
 use serde::Serialize;
 use serde_json::Value;
+use time::OffsetDateTime;
 
 use crate::helpers::FilteredFlatten;
 use crate::jwt::JsonWebTokenAccess;
@@ -198,15 +198,15 @@ where
     )]
     audiences: Vec<Audience>,
     #[serde(rename = "exp", with = "serde_utc_seconds")]
-    expiration: DateTime<Utc>,
+    expiration: OffsetDateTime,
     #[serde(rename = "iat", with = "serde_utc_seconds")]
-    issue_time: DateTime<Utc>,
+    issue_time: OffsetDateTime,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
         with = "serde_utc_seconds_opt"
     )]
-    auth_time: Option<DateTime<Utc>>,
+    auth_time: Option<OffsetDateTime>,
     #[serde(skip_serializing_if = "Option::is_none")]
     nonce: Option<Nonce>,
     #[serde(rename = "acr", skip_serializing_if = "Option::is_none")]
@@ -239,8 +239,8 @@ where
     pub fn new(
         issuer: IssuerUrl,
         audiences: Vec<Audience>,
-        expiration: DateTime<Utc>,
-        issue_time: DateTime<Utc>,
+        expiration: OffsetDateTime,
+        issue_time: OffsetDateTime,
         standard_claims: StandardClaims<GC>,
         additional_claims: AC,
     ) -> Self {
@@ -265,9 +265,9 @@ where
         pub self [self] ["claim"] {
             set_issuer -> issuer[IssuerUrl] ["iss"],
             set_audiences -> audiences[Vec<Audience>] ["aud"],
-            set_expiration -> expiration[DateTime<Utc>] ["exp"],
-            set_issue_time -> issue_time[DateTime<Utc>] ["iat"],
-            set_auth_time -> auth_time[Option<DateTime<Utc>>],
+            set_expiration -> expiration[OffsetDateTime] ["exp"],
+            set_issue_time -> issue_time[OffsetDateTime] ["iat"],
+            set_auth_time -> auth_time[Option<OffsetDateTime>],
             set_nonce -> nonce[Option<Nonce>],
             set_auth_context_ref -> auth_context_ref[Option<AuthenticationContextClass>] ["acr"],
             set_auth_method_refs -> auth_method_refs[Option<Vec<AuthenticationMethodReference>>] ["amr"],
@@ -313,7 +313,7 @@ where
             set_phone_number -> phone_number[Option<EndUserPhoneNumber>],
             set_phone_number_verified -> phone_number_verified[Option<bool>],
             set_address -> address[Option<AddressClaim>],
-            set_updated_at -> updated_at[Option<DateTime<Utc>>],
+            set_updated_at -> updated_at[Option<OffsetDateTime>],
         }
     ];
 
@@ -436,9 +436,9 @@ mod tests {
     use std::collections::HashMap;
     use std::str::FromStr;
 
-    use chrono::{TimeZone, Utc};
     use oauth2::basic::BasicTokenType;
     use oauth2::{ClientId, TokenResponse};
+    use time::OffsetDateTime;
     use url::Url;
 
     use crate::claims::{AdditionalClaims, EmptyAdditionalClaims, StandardClaims};
@@ -478,8 +478,14 @@ mod tests {
             *claims.audiences(),
             vec![Audience::new("s6BhdRkqt3".to_string())]
         );
-        assert_eq!(claims.expiration(), Utc.timestamp(1311281970, 0));
-        assert_eq!(claims.issue_time(), Utc.timestamp(1311280970, 0));
+        assert_eq!(
+            *claims.expiration(),
+            OffsetDateTime::from_unix_timestamp(1311281970).unwrap()
+        );
+        assert_eq!(
+            *claims.issue_time(),
+            OffsetDateTime::from_unix_timestamp(1311280970).unwrap()
+        );
         assert_eq!(
             *claims.subject(),
             SubjectIdentifier::new("24400320".to_string())
@@ -519,8 +525,14 @@ mod tests {
             *claims.audiences(),
             vec![Audience::new("s6BhdRkqt3".to_string())]
         );
-        assert_eq!(claims.expiration(), Utc.timestamp(1311281970, 0));
-        assert_eq!(claims.issue_time(), Utc.timestamp(1311280970, 0));
+        assert_eq!(
+            *claims.expiration(),
+            OffsetDateTime::from_unix_timestamp(1311281970).unwrap()
+        );
+        assert_eq!(
+            *claims.issue_time(),
+            OffsetDateTime::from_unix_timestamp(1311280970).unwrap()
+        );
         assert_eq!(
             *claims.subject(),
             SubjectIdentifier::new("24400320".to_string())
@@ -537,8 +549,8 @@ mod tests {
         let new_claims = CoreIdTokenClaims::new(
             IssuerUrl::new("https://server.example.com".to_string()).unwrap(),
             vec![Audience::new("s6BhdRkqt3".to_string())],
-            Utc.timestamp(1311281970, 0),
-            Utc.timestamp(1311280970, 0),
+            OffsetDateTime::from_unix_timestamp(1311281970).unwrap(),
+            OffsetDateTime::from_unix_timestamp(1311280970).unwrap(),
             StandardClaims::new(SubjectIdentifier::new("24400320".to_string())),
             EmptyAdditionalClaims {},
         );
@@ -661,8 +673,8 @@ mod tests {
         let new_claims = CoreIdTokenClaims::new(
             IssuerUrl::new("https://server.example.com".to_string()).unwrap(),
             vec![Audience::new("s6BhdRkqt3".to_string())],
-            Utc.timestamp(1311281970, 0),
-            Utc.timestamp(1311280970, 0),
+            OffsetDateTime::from_unix_timestamp(1311281970).unwrap(),
+            OffsetDateTime::from_unix_timestamp(1311280970).unwrap(),
             StandardClaims {
                 sub: SubjectIdentifier::new("24400320".to_string()),
                 name: Some(
@@ -789,11 +801,13 @@ mod tests {
                     postal_code: Some(AddressPostalCode::new("90210".to_string())),
                     country: Some(AddressCountry::new("US".to_string())),
                 }),
-                updated_at: Some(Utc.timestamp(1311283970, 0)),
+                updated_at: Some(OffsetDateTime::from_unix_timestamp(1311283970).unwrap()),
             },
             EmptyAdditionalClaims {},
         )
-        .set_auth_time(Some(Utc.timestamp(1311282970, 0)))
+        .set_auth_time(Some(
+            OffsetDateTime::from_unix_timestamp(1311282970).unwrap(),
+        ))
         .set_nonce(Some(Nonce::new("Zm9vYmFy".to_string())))
         .set_auth_context_ref(Some(AuthenticationContextClass::new(
             "urn:mace:incommon:iap:silver".to_string(),
@@ -878,7 +892,7 @@ mod tests {
             }",
         )
         .expect("failed to deserialize");
-        assert_eq!(claims.updated_at(), Some(Utc.timestamp(1640139037, 0)));
+        assert_eq!(claims.updated_at(), Some(&OffsetDateTime::from_unix_timestamp(1640139037).unwrap()));
     }
 
     #[test]
