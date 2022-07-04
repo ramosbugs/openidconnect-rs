@@ -889,7 +889,10 @@ where
     /// server.
     ///
     /// The default is to use HTTP Basic authentication, as recommended in
-    /// [Section 2.3.1 of RFC 6749](https://tools.ietf.org/html/rfc6749#section-2.3.1).
+    /// [Section 2.3.1 of RFC 6749](https://tools.ietf.org/html/rfc6749#section-2.3.1). Note that
+    /// if a client secret is omitted (i.e., `client_secret` is set to `None` when calling
+    /// [`Client::new`]), [`AuthType::RequestBody`] is used regardless of the `auth_type` passed to
+    /// this function.
     ///
     pub fn set_auth_type(mut self, auth_type: AuthType) -> Self {
         self.oauth2_client = self.oauth2_client.set_auth_type(auth_type);
