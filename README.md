@@ -40,3 +40,8 @@ API documentation and examples are available on [docs.rs](https://docs.rs/openid
     * Client Configuration endpoint
 * [OAuth 2.0 Token Introspection](https://tools.ietf.org/html/rfc7662)
 * [OAuth 2.0 Token Revocation](https://tools.ietf.org/html/rfc7009)
+
+# Sponsorship
+
+This project is sponsored by [Unflakable](https://unflakable.com), a service for tracking and
+quarantining flaky tests.
