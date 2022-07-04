@@ -813,6 +813,7 @@ mod tests {
         let claims: CoreIdTokenClaims =
             serde_json::from_str(claims_json).expect("failed to deserialize");
         assert_eq!(claims, new_claims);
+        assert_eq!(claims.issuer(), new_claims.issuer());
         assert_eq!(claims.issuer().url(), new_claims.issuer().url());
         assert_eq!(claims.audiences(), new_claims.audiences());
         assert_eq!(claims.expiration(), new_claims.expiration());

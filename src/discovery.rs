@@ -404,8 +404,8 @@ where
         if provider_metadata.issuer() != issuer_url {
             Err(DiscoveryError::Validation(format!(
                 "unexpected issuer URI `{}` (expected `{}`)",
-                provider_metadata.issuer().url(),
-                issuer_url.url()
+                provider_metadata.issuer().as_str(),
+                issuer_url.as_str()
             )))
         } else {
             Ok(provider_metadata)
