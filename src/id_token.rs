@@ -485,10 +485,10 @@ mod tests {
             SubjectIdentifier::new("24400320".to_string())
         );
 
-        // test `ToString` implemenation
+        // test `ToString` implementation
         assert_eq!(&id_token.to_string(), ID_TOKEN);
 
-        // test `serde::Serialize` implemenation too
+        // test `serde::Serialize` implementation too
         let de = serde_json::to_string(&id_token).expect("failed to deserializee id token");
         assert_eq!(de, format!("\"{}\"", ID_TOKEN));
     }

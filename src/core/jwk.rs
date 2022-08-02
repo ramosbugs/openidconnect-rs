@@ -356,7 +356,7 @@ impl CoreRsaPrivateSigningKey {
     }
 
     /// Filters characters from the base64 input string.
-    /// Charcters are specified according to lax base64 parsing.
+    /// Characters are specified according to lax base64 parsing.
     ///
     /// RFC 7468 Lax Parsing
     fn lax_base64_parsing(input: &str) -> String {

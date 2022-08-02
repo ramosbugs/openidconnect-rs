@@ -375,7 +375,7 @@ pub trait ResponseMode: Debug + DeserializeOwned + Serialize + 'static {}
 pub trait ResponseType: AsRef<str> + Debug + DeserializeOwned + Serialize + 'static {
     ///
     /// Converts this OpenID Connect response type to an [`oauth2::ResponseType`] used by the
-    /// underyling [`oauth2`] crate.
+    /// underlying [`oauth2`] crate.
     ///
     fn to_oauth2(&self) -> oauth2::ResponseType;
 }
