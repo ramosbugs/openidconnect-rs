@@ -72,7 +72,7 @@ where
     registration_endpoint: Option<RegistrationUrl>,
     #[serde(skip_serializing_if = "Option::is_none")]
     scopes_supported: Option<Vec<Scope>>,
-    #[serde(bound(deserialize = "RT: ResponseType"))]
+    #[serde(bound(deserialize = "RT: ResponseType"), default = "Vec::new")]
     response_types_supported: Vec<ResponseTypes<RT>>,
     #[serde(
         bound(deserialize = "RM: ResponseMode"),
@@ -86,9 +86,9 @@ where
     grant_types_supported: Option<Vec<G>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     acr_values_supported: Option<Vec<AuthenticationContextClass>>,
-    #[serde(bound(deserialize = "S: SubjectIdentifierType"))]
+    #[serde(bound(deserialize = "S: SubjectIdentifierType"), default = "Vec::new")]
     subject_types_supported: Vec<S>,
-    #[serde(bound(deserialize = "JS: JwsSigningAlgorithm<JT>"))]
+    #[serde(bound(deserialize = "JS: JwsSigningAlgorithm<JT>"), default = "Vec::new")]
     id_token_signing_alg_values_supported: Vec<JS>,
     #[serde(
         bound(deserialize = "JK: JweKeyManagementAlgorithm"),
