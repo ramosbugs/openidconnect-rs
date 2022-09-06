@@ -22,6 +22,7 @@ ureq = ["oauth2/ureq"]
 native-tls = ["oauth2/native-tls"]
 rustls-tls = ["oauth2/rustls-tls"]
 accept-rfc3339-timestamps = []
+accept-string-booleans = []
 nightly = []
 
 [dependencies]

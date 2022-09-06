@@ -1019,6 +1019,25 @@ impl Display for Timestamp {
     }
 }
 
+///
+/// Newtype around a bool, optionally supporting string values.
+///
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(transparent)]
+pub(crate) struct Boolean(
+    #[cfg_attr(
+        feature = "accept-string-booleans",
+        serde(deserialize_with = "helpers::serde_string_bool::deserialize")
+    )]
+    pub bool,
+);
+
+impl Display for Boolean {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), FormatterError> {
+        Display::fmt(&self.0, f)
+    }
+}
+
 new_url_type![
     ///
     /// URL for retrieving redirect URIs that should receive identical pairwise subject identifiers.
@@ -1189,6 +1208,45 @@ pub(crate) mod helpers {
         Timestamp::Seconds(utc.timestamp().into())
     }
 
+    // Some providers return boolean values as strings. Provide support for
+    // parsing using stdlib.
+    #[cfg(feature = "accept-string-booleans")]
+    pub mod serde_string_bool {
+        use serde::{de, Deserializer};
+
+        use std::fmt;
+
+        pub fn deserialize<'de, D>(deserializer: D) -> Result<bool, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            struct BooleanLikeVisitor;
+
+            impl<'de> de::Visitor<'de> for BooleanLikeVisitor {
+                type Value = bool;
+
+                fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                    formatter.write_str("A boolean-like value")
+                }
+
+                fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+                where
+                    E: de::Error,
+                {
+                    Ok(v)
+                }
+
+                fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                where
+                    E: de::Error,
+                {
+                    v.parse().map_err(E::custom)
+                }
+            }
+            deserializer.deserialize_any(BooleanLikeVisitor)
+        }
+    }
+
     pub mod serde_utc_seconds {
         use crate::types::Timestamp;
         use chrono::{DateTime, Utc};
@@ -1281,6 +1339,7 @@ mod serde_base64url_byte_array {
 #[cfg(test)]
 mod tests {
     use super::IssuerUrl;
+    use crate::types::Boolean;
 
     #[test]
     fn test_issuer_url_append() {
@@ -1338,5 +1397,19 @@ mod tests {
                 .unwrap(),
             "\"http://example.com\"",
         );
+    }
+
+    #[cfg(feature = "accept-string-booleans")]
+    #[test]
+    fn test_string_bool_parse() {
+        fn test_case(input: &str, expect: bool) {
+            let value: Boolean = serde_json::from_str(input).unwrap();
+            assert_eq!(value.0, expect);
+        }
+        test_case("true", true);
+        test_case("false", false);
+        test_case("\"true\"", true);
+        test_case("\"false\"", false);
+        assert!(serde_json::from_str::<Boolean>("\"maybe\"").is_err());
     }
 }
