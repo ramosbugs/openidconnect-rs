@@ -740,7 +740,6 @@ pub enum AuthenticationFlow<RT: ResponseType> {
 /// #     Some(TokenUrl::new("https://example/token".to_string()).unwrap()),
 /// #     None,
 /// #     JsonWebKeySet::default(),
-/// #     vec![],
 /// # )
 /// # .set_revocation_uri(RevocationUrl::new("https://revocation/url".to_string()).unwrap());
 /// #
@@ -835,6 +834,38 @@ where
         token_url: Option<TokenUrl>,
         userinfo_endpoint: Option<UserInfoUrl>,
         jwks: JsonWebKeySet<JS, JT, JU, K>,
+    ) -> Self {
+        Client {
+            oauth2_client: oauth2::Client::new(
+                client_id.clone(),
+                client_secret.clone(),
+                auth_url,
+                token_url,
+            ),
+            client_id,
+            client_secret,
+            issuer,
+            userinfo_endpoint,
+            jwks,
+           id_token_signing_algs: vec![],
+            use_openid_scope: true,
+            _phantom: PhantomData,
+        }
+    }
+
+    ///
+    /// Initializes an OpenID Connect client with predefined algorithms.
+    /// <br>
+    /// **LEAVE THIS PRIVATE UNTIL ALL ALGORITHMS FROM DISCOVERY ARE IMPLEMENTED**
+    ///
+    fn new_algs(
+        client_id: ClientId,
+        client_secret: Option<ClientSecret>,
+        issuer: IssuerUrl,
+        auth_url: AuthUrl,
+        token_url: Option<TokenUrl>,
+        userinfo_endpoint: Option<UserInfoUrl>,
+        jwks: JsonWebKeySet<JS, JT, JU, K>,
         id_token_signing_algs: Vec<JS>,
     ) -> Self {
         Client {
@@ -877,7 +908,7 @@ where
         RS: ResponseType,
         S: SubjectIdentifierType,
     {
-        Self::new(
+        Self::new_algs(
             client_id,
             client_secret,
             provider_metadata.issuer().clone(),
@@ -956,22 +987,22 @@ where
     /// Returns an ID token verifier for use with the [`IdToken::claims`] method.
     ///
     pub fn id_token_verifier(&self) -> IdTokenVerifier<JS, JT, JU, K> {
-        if let Some(ref client_secret) = self.client_secret {
+       let verifier = if let Some(ref client_secret) = self.client_secret {
             IdTokenVerifier::new_confidential_client(
                 self.client_id.clone(),
                 client_secret.clone(),
                 self.issuer.clone(),
                 self.jwks.clone(),
-                self.id_token_signing_algs.clone(),
             )
         } else {
             IdTokenVerifier::new_public_client(
                 self.client_id.clone(),
                 self.issuer.clone(),
                 self.jwks.clone(),
-                self.id_token_signing_algs.clone(),
             )
-        }
+        };
+
+        verifier.set_allowed_algs(self.id_token_signing_algs.clone())
     }
 
     ///
@@ -1476,7 +1507,6 @@ mod tests {
             Some(TokenUrl::new("https://example/token".to_string()).unwrap()),
             None,
             JsonWebKeySet::default(),
-            vec![],
         )
     }
 

@@ -548,13 +548,8 @@ where
         client_id: ClientId,
         issuer: IssuerUrl,
         signature_keys: JsonWebKeySet<JS, JT, JU, K>,
-        id_token_signing_algs: Vec<JS>,
     ) -> Self {
-        let mut verifier = JwtClaimsVerifier::new(client_id, issuer, signature_keys);
-        if !id_token_signing_algs.is_empty() {
-            verifier = verifier.set_allowed_algs(id_token_signing_algs);
-        }
-        Self::new(verifier)
+        Self::new(JwtClaimsVerifier::new(client_id, issuer, signature_keys))
     }
 
     ///
@@ -568,7 +563,6 @@ where
             ClientId::new(String::new()),
             empty_issuer,
             JsonWebKeySet::new(vec![]),
-            vec![],
         )
         .insecure_disable_signature_check()
         .require_audience_match(false)
@@ -587,16 +581,11 @@ where
         client_secret: ClientSecret,
         issuer: IssuerUrl,
         signature_keys: JsonWebKeySet<JS, JT, JU, K>,
-        id_token_signing_algs: Vec<JS>,
     ) -> Self {
-        let mut verifier = JwtClaimsVerifier::new(client_id, issuer, signature_keys)
-            .set_client_secret(client_secret);
-
-        if !id_token_signing_algs.is_empty() {
-            verifier = verifier.set_allowed_algs(id_token_signing_algs);
-        }
-
-        Self::new(verifier)
+        Self::new(
+            JwtClaimsVerifier::new(client_id, issuer, signature_keys)
+                .set_client_secret(client_secret),
+        )
     }
 
     ///
@@ -1556,7 +1545,6 @@ mod tests {
                 client_id.clone(),
                 issuer.clone(),
                 CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
-                vec![],
             )
             .set_time_fn(|| {
                 timestamp_to_utc(&Timestamp::Seconds(
@@ -1795,7 +1783,6 @@ mod tests {
                 ClientSecret::new("my_secret".to_string()),
                 issuer.clone(),
                 CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
-                vec![],
             )
             .set_time_fn(|| {
                 timestamp_to_utc(&Timestamp::Seconds(
@@ -1833,7 +1820,6 @@ mod tests {
                     ClientSecret::new("other_secret".to_string()),
                     issuer,
                     CoreJsonWebKeySet::new(vec![rsa_key]),
-                    vec![],
                 )
                 .allow_any_alg()
                 .set_time_fn(|| {
@@ -1912,7 +1898,6 @@ mod tests {
             client_id,
             issuer,
             CoreJsonWebKeySet::new(vec![rsa_pub_key]),
-            vec![],
         )
         .set_time_fn(time_fn);
         let claims = id_token.claims(&verifier, &nonce).unwrap();
