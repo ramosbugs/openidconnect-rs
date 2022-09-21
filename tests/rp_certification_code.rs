@@ -184,13 +184,14 @@ impl TestState {
 
     pub fn id_token_verifier(&self, jwks: CoreJsonWebKeySet) -> CoreIdTokenVerifier {
         CoreIdTokenVerifier::new_confidential_client(
-            self.registration_response.client_id().clone(),
-            self.registration_response
-                .client_secret()
-                .expect("no client_secret")
-                .clone(),
-            self.provider_metadata.issuer().clone(),
-            jwks,
+          self.registration_response.client_id().clone(),
+          self.registration_response
+              .client_secret()
+              .expect("no client_secret")
+              .clone(),
+          self.provider_metadata.issuer().clone(),
+          jwks,
+          vec![],
         )
     }
 

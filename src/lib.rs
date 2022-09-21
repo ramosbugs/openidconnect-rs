@@ -740,6 +740,7 @@ pub enum AuthenticationFlow<RT: ResponseType> {
 /// #     Some(TokenUrl::new("https://example/token".to_string()).unwrap()),
 /// #     None,
 /// #     JsonWebKeySet::default(),
+/// #     vec![],
 /// # )
 /// # .set_revocation_uri(RevocationUrl::new("https://revocation/url".to_string()).unwrap());
 /// #
@@ -800,6 +801,7 @@ where
     issuer: IssuerUrl,
     userinfo_endpoint: Option<UserInfoUrl>,
     jwks: JsonWebKeySet<JS, JT, JU, K>,
+    id_token_signing_algs: Vec<JS>,
     use_openid_scope: bool,
     _phantom: PhantomData<(AC, AD, GC, JE, P)>,
 }
@@ -833,6 +835,7 @@ where
         token_url: Option<TokenUrl>,
         userinfo_endpoint: Option<UserInfoUrl>,
         jwks: JsonWebKeySet<JS, JT, JU, K>,
+        id_token_signing_algs: Vec<JS>,
     ) -> Self {
         Client {
             oauth2_client: oauth2::Client::new(
@@ -846,6 +849,7 @@ where
             issuer,
             userinfo_endpoint,
             jwks,
+            id_token_signing_algs,
             use_openid_scope: true,
             _phantom: PhantomData,
         }
@@ -881,6 +885,9 @@ where
             provider_metadata.token_endpoint().cloned(),
             provider_metadata.userinfo_endpoint().cloned(),
             provider_metadata.jwks().to_owned(),
+            provider_metadata
+                .id_token_signing_alg_values_supported()
+                .to_owned(),
         )
     }
 
@@ -955,12 +962,14 @@ where
                 client_secret.clone(),
                 self.issuer.clone(),
                 self.jwks.clone(),
+                self.id_token_signing_algs.clone(),
             )
         } else {
             IdTokenVerifier::new_public_client(
                 self.client_id.clone(),
                 self.issuer.clone(),
                 self.jwks.clone(),
+                self.id_token_signing_algs.clone(),
             )
         }
     }
@@ -1467,6 +1476,7 @@ mod tests {
             Some(TokenUrl::new("https://example/token".to_string()).unwrap()),
             None,
             JsonWebKeySet::default(),
+            vec![],
         )
     }
 
