@@ -825,6 +825,8 @@ where
 {
     ///
     /// Initializes an OpenID Connect client.
+    /// If you need to configure the algorithms used for signing, ...,
+    /// do this directly on the respected components. (e.g. IdTokenVerifier)
     ///
     pub fn new(
         client_id: ClientId,
@@ -847,40 +849,7 @@ where
             issuer,
             userinfo_endpoint,
             jwks,
-           id_token_signing_algs: vec![],
-            use_openid_scope: true,
-            _phantom: PhantomData,
-        }
-    }
-
-    ///
-    /// Initializes an OpenID Connect client with predefined algorithms.
-    /// <br>
-    /// **LEAVE THIS PRIVATE UNTIL ALL ALGORITHMS FROM DISCOVERY ARE IMPLEMENTED**
-    ///
-    fn new_algs(
-        client_id: ClientId,
-        client_secret: Option<ClientSecret>,
-        issuer: IssuerUrl,
-        auth_url: AuthUrl,
-        token_url: Option<TokenUrl>,
-        userinfo_endpoint: Option<UserInfoUrl>,
-        jwks: JsonWebKeySet<JS, JT, JU, K>,
-        id_token_signing_algs: Vec<JS>,
-    ) -> Self {
-        Client {
-            oauth2_client: oauth2::Client::new(
-                client_id.clone(),
-                client_secret.clone(),
-                auth_url,
-                token_url,
-            ),
-            client_id,
-            client_secret,
-            issuer,
-            userinfo_endpoint,
-            jwks,
-            id_token_signing_algs,
+            id_token_signing_algs: vec![],
             use_openid_scope: true,
             _phantom: PhantomData,
         }
@@ -908,18 +877,24 @@ where
         RS: ResponseType,
         S: SubjectIdentifierType,
     {
-        Self::new_algs(
+        Client {
+            oauth2_client: oauth2::Client::new(
+                client_id.clone(),
+                client_secret.clone(),
+                provider_metadata.authorization_endpoint().clone(),
+                provider_metadata.token_endpoint().cloned(),
+            ),
             client_id,
             client_secret,
-            provider_metadata.issuer().clone(),
-            provider_metadata.authorization_endpoint().clone(),
-            provider_metadata.token_endpoint().cloned(),
-            provider_metadata.userinfo_endpoint().cloned(),
-            provider_metadata.jwks().to_owned(),
-            provider_metadata
+            issuer: provider_metadata.issuer().clone(),
+            userinfo_endpoint: provider_metadata.userinfo_endpoint().cloned(),
+            jwks: provider_metadata.jwks().to_owned(),
+            id_token_signing_algs: provider_metadata
                 .id_token_signing_alg_values_supported()
                 .to_owned(),
-        )
+            use_openid_scope: true,
+            _phantom: PhantomData,
+        }
     }
 
     ///
@@ -987,7 +962,7 @@ where
     /// Returns an ID token verifier for use with the [`IdToken::claims`] method.
     ///
     pub fn id_token_verifier(&self) -> IdTokenVerifier<JS, JT, JU, K> {
-       let verifier = if let Some(ref client_secret) = self.client_secret {
+        let verifier = if let Some(ref client_secret) = self.client_secret {
             IdTokenVerifier::new_confidential_client(
                 self.client_id.clone(),
                 client_secret.clone(),
