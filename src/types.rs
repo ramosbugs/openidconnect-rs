@@ -1399,6 +1399,14 @@ mod tests {
         );
     }
 
+    #[test]
+    fn issuer_url_equality() {
+        let issuer_url_1 = IssuerUrl::new("http://example.com".to_string()).unwrap();
+        // Note the deliberate trailing slash in the following URL
+        let issuer_url_2 = IssuerUrl::new("http://example.com/".to_string()).unwrap();
+        assert_eq!(issuer_url_1, issuer_url_2);
+    }
+
     #[cfg(feature = "accept-string-booleans")]
     #[test]
     fn test_string_bool_parse() {

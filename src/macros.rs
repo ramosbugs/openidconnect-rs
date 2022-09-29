@@ -390,7 +390,7 @@ macro_rules! new_url_type {
         }
         impl PartialEq for $name {
             fn eq(&self, other: &$name) -> bool {
-                self.1 == other.1
+                self.0 == other.0
             }
         }
         impl Eq for $name {}
