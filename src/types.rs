@@ -11,7 +11,6 @@ use http::method::Method;
 use http::status::StatusCode;
 use oauth2::helpers::deserialize_space_delimited_vec;
 use rand::{thread_rng, Rng};
-use ring::constant_time;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use thiserror::Error;
@@ -919,8 +918,11 @@ new_secret_type![
 ];
 impl PartialEq for Nonce {
     fn eq(&self, other: &Self) -> bool {
-        constant_time::verify_slices_are_equal(self.secret().as_bytes(), other.secret().as_bytes())
-            .is_ok()
+        use subtle::ConstantTimeEq;
+        self.secret()
+            .as_bytes()
+            .ct_eq(other.secret().as_bytes())
+            .into()
     }
 }
 
