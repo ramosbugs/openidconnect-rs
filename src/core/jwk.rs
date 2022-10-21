@@ -484,19 +484,41 @@ impl JsonCurveType for CoreJsonWebKeyType {}
 ///
 /// Usage restriction for a JSON Web key.
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum CoreJsonWebKeyUse {
     ///
     /// Key may be used for digital signatures.
     ///
-    #[serde(rename = "sig")]
     Signature,
+
     ///
     /// Key may be used for encryption.
     ///
-    #[serde(rename = "enc")]
     Encryption,
+
+    ///
+    /// Fallback case for other key uses not understood by this library.
+    ///
+    Other(String),
+}
+impl CoreJsonWebKeyUse {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "sig" => Self::Signature,
+            "enc" => Self::Encryption,
+            other => Self::Other(other.to_string()),
+        }
+    }
+}
+impl AsRef<str> for CoreJsonWebKeyUse {
+    fn as_ref(&self) -> &str {
+        match self {
+            CoreJsonWebKeyUse::Signature => "sig",
+            CoreJsonWebKeyUse::Encryption => "enc",
+            CoreJsonWebKeyUse::Other(other) => other.as_str(),
+        }
+    }
 }
 impl JsonWebKeyUse for CoreJsonWebKeyUse {
     fn allows_signature(&self) -> bool {
@@ -506,6 +528,11 @@ impl JsonWebKeyUse for CoreJsonWebKeyUse {
         matches!(*self, CoreJsonWebKeyUse::Encryption)
     }
 }
+// FIXME: Once https://github.com/serde-rs/serde/issues/912 is resolved, use #[serde(other)] instead
+// of custom serializer/deserializers. Right now this isn't possible because serde(other) only
+// supports unit variants.
+deserialize_from_str!(CoreJsonWebKeyUse);
+serialize_as_str!(CoreJsonWebKeyUse);
 
 #[cfg(test)]
 mod tests {
