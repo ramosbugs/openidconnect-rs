@@ -497,6 +497,11 @@ pub enum CoreJsonWebKeyUse {
     ///
     #[serde(rename = "enc")]
     Encryption,
+    ///
+    /// Key has some other use we don't know how to make use of.
+    ///
+    #[serde(other)]
+    Unknown,
 }
 impl JsonWebKeyUse for CoreJsonWebKeyUse {
     fn allows_signature(&self) -> bool {
