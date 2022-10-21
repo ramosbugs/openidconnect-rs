@@ -1339,7 +1339,6 @@ mod serde_base64url_byte_array {
 #[cfg(test)]
 mod tests {
     use super::IssuerUrl;
-    use crate::types::Boolean;
 
     #[test]
     fn test_issuer_url_append() {
@@ -1402,6 +1401,8 @@ mod tests {
     #[cfg(feature = "accept-string-booleans")]
     #[test]
     fn test_string_bool_parse() {
+        use crate::types::Boolean;
+
         fn test_case(input: &str, expect: bool) {
             let value: Boolean = serde_json::from_str(input).unwrap();
             assert_eq!(value.0, expect);
