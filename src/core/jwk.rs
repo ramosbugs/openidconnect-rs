@@ -323,7 +323,7 @@ const RSA_FOOTER: &str = "-----END RSA PRIVATE KEY-----";
 ///
 pub struct CoreRsaPrivateSigningKey {
     key_pair: ring_signature::RsaKeyPair,
-    rng: Box<dyn rand::SecureRandom>,
+    rng: Box<dyn rand::SecureRandom + Send>,
     kid: Option<JsonWebKeyId>,
 }
 impl CoreRsaPrivateSigningKey {
@@ -336,7 +336,7 @@ impl CoreRsaPrivateSigningKey {
 
     pub(crate) fn from_pem_internal(
         pem: &str,
-        rng: Box<dyn rand::SecureRandom>,
+        rng: Box<dyn rand::SecureRandom + Send>,
         kid: Option<JsonWebKeyId>,
     ) -> Result<Self, String> {
         let trimmed_pem = pem.trim();
