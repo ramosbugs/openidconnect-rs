@@ -6,7 +6,7 @@ use ring::signature as ring_signature;
 use crate::types::Base64UrlEncodedBytes;
 use crate::{JsonWebKey, SignatureVerificationError, SigningError};
 
-use super::{jwk::CoreJsonCurveType, CoreJsonWebKey, CoreJsonWebKeyType};
+use super::super::{jwk::CoreJsonCurveType, CoreJsonWebKey, CoreJsonWebKeyType};
 
 use std::ops::Deref;
 

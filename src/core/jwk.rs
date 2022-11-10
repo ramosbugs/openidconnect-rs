@@ -3,6 +3,7 @@ use ring::hmac;
 use ring::rand;
 use ring::signature as ring_signature;
 use ring::signature::KeyPair;
+use std::marker::PhantomData;
 
 use crate::types::Base64UrlEncodedBytes;
 use crate::types::{helpers::deserialize_option_or_none, JsonCurveType};
@@ -321,12 +322,13 @@ const RSA_FOOTER: &str = "-----END RSA PRIVATE KEY-----";
 /// This key can be used for signing messages, or converted to a `CoreJsonWebKey` for verifying
 /// them.
 ///
-pub struct CoreRsaPrivateSigningKey {
+pub struct CoreRsaPrivateSigningKey<B: crypto::Backend = crypto::Ring> {
     key_pair: ring_signature::RsaKeyPair,
     rng: Box<dyn rand::SecureRandom + Send>,
     kid: Option<JsonWebKeyId>,
+    _marker: PhantomData<B>,
 }
-impl CoreRsaPrivateSigningKey {
+impl<B: crypto::Backend> CoreRsaPrivateSigningKey<B> {
     ///
     /// Converts an RSA private key (in PEM format) to a JWK representing its public key.
     ///
@@ -352,7 +354,12 @@ impl CoreRsaPrivateSigningKey {
             .map_err(|_| "Failed to decode RSA private key body as base64".to_string())?;
 
         let key_pair = ring_signature::RsaKeyPair::from_der(&der).map_err(|err| err.to_string())?;
-        Ok(Self { key_pair, rng, kid })
+        Ok(Self {
+            key_pair,
+            rng,
+            kid,
+            _marker: Default::default(),
+        })
     }
 
     /// Filters characters from the base64 input string.
@@ -374,13 +381,13 @@ impl CoreRsaPrivateSigningKey {
         !matches!(input, ' ' | '\n' | '\t' | '\r' | '\x0b' | '\x0c')
     }
 }
-impl
+impl<B: crypto::Backend>
     PrivateSigningKey<
         CoreJwsSigningAlgorithm,
         CoreJsonWebKeyType,
         CoreJsonWebKeyUse,
         CoreJsonWebKey,
-    > for CoreRsaPrivateSigningKey
+    > for CoreRsaPrivateSigningKey<B>
 {
     fn sign(
         &self,
@@ -401,7 +408,7 @@ impl
             }
         };
 
-        crypto::sign_rsa(&self.key_pair, padding_alg, self.rng.as_ref(), msg)
+        B::sign_rsa(&self.key_pair, padding_alg, self.rng.as_ref(), msg)
     }
 
     fn as_verification_key(&self) -> CoreJsonWebKey {
