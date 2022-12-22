@@ -26,10 +26,10 @@ jobs:
       fail-fast: false
       matrix:
         rust_os:
-          - { rust: 1.45.0, os: ubuntu-20.04 }
-          - { rust: stable, os: ubuntu-latest }
-          - { rust: beta, os: ubuntu-latest }
-          - { rust: nightly, os: ubuntu-latest }
+          - { rust: 1.57.0, os: ubuntu-22.04 }
+          - { rust: stable, os: ubuntu-22.04 }
+          - { rust: beta, os: ubuntu-22.04 }
+          - { rust: nightly, os: ubuntu-22.04 }
 
     env:
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
@@ -51,11 +51,11 @@ jobs:
           override: true
           components: clippy, rustfmt
 
-      # Newer dependency versions don't support rustc 1.45, so we use a Cargo.lock file for those
+      # Newer dependency versions may not support rustc 1.57, so we use a Cargo.lock file for those
       # builds.
-      - name: Use Rust 1.45 lockfile
-        if: ${{ matrix.rust_os.rust == '1.45.0' }}
-        run: cp Cargo-1.45.lock Cargo.lock
+      - name: Use Rust 1.57 lockfile
+        if: ${{ matrix.rust_os.rust == '1.57.0' }}
+        run: cp Cargo-1.57.lock Cargo.lock
 
       - name: Run tests
         run: cargo test --tests --examples
@@ -65,11 +65,11 @@ jobs:
         run: cargo test --all-features
 
       - name: Check fmt
-        if: ${{ matrix.rust_os.rust == '1.45.0' }}
+        if: ${{ matrix.rust_os.rust == '1.57.0' }}
         run: cargo fmt --all -- --check
 
       - name: Clippy
-        if: ${{ matrix.rust_os.rust == '1.45.0' }}
+        if: ${{ matrix.rust_os.rust == '1.57.0' }}
         run: cargo clippy --all --all-features -- --deny warnings
 
       - name: Audit
