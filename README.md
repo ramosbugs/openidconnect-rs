@@ -10,6 +10,14 @@ Connect protocol.
 
 API documentation and examples are available on [docs.rs](https://docs.rs/openidconnect).
 
+## Minimum Supported Rust Version (MSRV)
+
+The MSRV for 2.x releases of this crate is Rust 1.45. The upcoming release of 3.0.0 is expected
+to target Rust 1.57 or later. Beginning with 3.0.0, this crate will maintain a policy of supporting
+Rust releases going back at least 6 months. Changes that break compatibility with Rust releases
+older than 6 months will no longer be considered SemVer breaking changes and will not result in a
+new major version number for this crate.
+
 ## Standards
 
 * [OpenID Connect Core](https://openid.net/specs/openid-connect-core-1_0.html)
