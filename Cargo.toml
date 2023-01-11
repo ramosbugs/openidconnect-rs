@@ -52,7 +52,6 @@ serde_plain = "1.0"
 serde_with = "1.13"
 serde-value = "0.7"
 url = { version = "2.1", features = ["serde"] }
-num-bigint = "0.4.3"
 subtle = "2.4"
 
 [dev-dependencies]
