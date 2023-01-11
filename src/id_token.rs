@@ -3,7 +3,6 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 
 use chrono::{DateTime, Utc};
-use oauth2::helpers::variant_name;
 use oauth2::ClientId;
 use serde::Serialize;
 use serde_json::Value;
@@ -145,13 +144,19 @@ where
     ///
     /// Returns the [`JwsSigningAlgorithm`] used to sign this ID token.
     ///
-    /// This function returns an error if the signing algorithm is unsupported.
+    /// This function returns an error if the token is unsigned or utilizes JSON Web Encryption
+    /// (JWE).
     ///
     pub fn signing_alg(&self) -> Result<JS, SigningError> {
         match self.0.unverified_header().alg {
             JsonWebTokenAlgorithm::Signature(ref signing_alg, _) => Ok(signing_alg.clone()),
             JsonWebTokenAlgorithm::Encryption(ref other) => Err(SigningError::UnsupportedAlg(
-                variant_name(other).to_string(),
+                serde_plain::to_string(other).unwrap_or_else(|err| {
+                    panic!(format!(
+                        "encryption alg {:?} failed to serialize to a string: {}",
+                        other, err
+                    ))
+                }),
             )),
             JsonWebTokenAlgorithm::None => Err(SigningError::UnsupportedAlg("none".to_string())),
         }
