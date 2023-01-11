@@ -404,7 +404,9 @@ impl
     }
 }
 
-pub trait RngClone: dyn_clone::DynClone + rand::RngCore + rand::CryptoRng {}
+/// Trait used to allow testing with an alternative RNG.
+/// Clone is necessary to get a mutable version of the RNG.
+pub(crate) trait RngClone: dyn_clone::DynClone + rand::RngCore + rand::CryptoRng {}
 dyn_clone::clone_trait_object!(RngClone);
 impl<T> RngClone for T where T: rand::RngCore + rand::CryptoRng + Clone {}
 
