@@ -1,4 +1,3 @@
-use oauth2::helpers::variant_name;
 use ring::hmac;
 use ring::rand;
 use ring::signature as ring_signature;
@@ -250,7 +249,12 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
                 }
             }
             ref other => Err(SignatureVerificationError::UnsupportedAlg(
-                variant_name(other).to_string(),
+                serde_plain::to_string(other).unwrap_or_else(|err| {
+                    panic!(
+                        "signature alg {:?} failed to serialize to a string: {}",
+                        other, err
+                    )
+                }),
             )),
         }
     }
@@ -298,7 +302,12 @@ impl
             CoreJwsSigningAlgorithm::HmacSha512 => hmac::HMAC_SHA512,
             ref other => {
                 return Err(SigningError::UnsupportedAlg(
-                    variant_name(other).to_string(),
+                    serde_plain::to_string(other).unwrap_or_else(|err| {
+                        panic!(
+                            "signature alg {:?} failed to serialize to a string: {}",
+                            other, err
+                        )
+                    }),
                 ))
             }
         };
@@ -396,7 +405,12 @@ impl
             CoreJwsSigningAlgorithm::RsaSsaPssSha512 => &ring_signature::RSA_PSS_SHA512,
             ref other => {
                 return Err(SigningError::UnsupportedAlg(
-                    variant_name(other).to_string(),
+                    serde_plain::to_string(other).unwrap_or_else(|err| {
+                        panic!(
+                            "signature alg {:?} failed to serialize to a string: {}",
+                            other, err
+                        )
+                    }),
                 ))
             }
         };
