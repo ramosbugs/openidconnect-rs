@@ -550,6 +550,7 @@ serialize_as_str!(CoreJsonWebKeyUse);
 
 #[cfg(test)]
 mod tests {
+    use crate::core::CoreJsonWebKeySet;
     use ring::test::rand::FixedByteRandom;
 
     use crate::jwt::tests::{TEST_EC_PUB_KEY_P256, TEST_EC_PUB_KEY_P384, TEST_RSA_PUB_KEY};
@@ -1286,5 +1287,60 @@ mod tests {
             .unwrap();
 
         assert_ne!(sig1, sig2);
+    }
+
+    // Tests that JsonWebKeySet ignores unsupported keys during deserialization so that clients can
+    // use providers that include unsupported keys as long as they only use supported ones to sign
+    // payloads.
+    #[test]
+    fn test_jwks_unsupported_key() {
+        let jwks_json = "{
+            \"keys\": [
+                {
+                    \"kty\": \"RSA\",
+                    \"use\": \"sig\",
+                    \"kid\": \"2011-04-29\",
+                    \"n\": \"0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhD\
+                             R1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6C\
+                             f0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1\
+                             n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1\
+                             jF44-csFCur-kEgU8awapJzKnqDKgw\",
+                    \"e\": \"AQAB\"
+                },
+                {
+                    \"kty\": \"MAGIC\",
+                    \"use\": \"sig\",
+                    \"kid\": \"2040-01-01\",
+                    \"magic\": \"magic\"
+                },
+                {
+                    \"kty\": \"EC\",
+                    \"use\": \"sig\",
+                    \"kid\": \"2011-05-01\",
+                    \"crv\": \"P-256\",
+                    \"x\": \"kXCGZIr3oI6sKbnT6rRsIdxFXw3_VbLk_cveajgqXk8\",
+                    \"y\": \"StDvKIgXqAxJ6DuebREh-1vgvZRW3dfrOxSIKzBtRI0\"
+                }
+            ]
+        }";
+        let jwks = serde_json::from_str::<CoreJsonWebKeySet>(jwks_json)
+            .expect("deserialization should succeed");
+
+        assert_eq!(jwks.keys().len(), 2);
+
+        assert_eq!(jwks.keys()[0].kty, CoreJsonWebKeyType::RSA);
+        assert_eq!(jwks.keys()[0].use_, Some(CoreJsonWebKeyUse::Signature));
+        assert_eq!(
+            jwks.keys()[0].kid,
+            Some(JsonWebKeyId::new("2011-04-29".to_string()))
+        );
+
+        assert_eq!(jwks.keys()[1].kty, CoreJsonWebKeyType::EllipticCurve);
+        assert_eq!(jwks.keys()[1].use_, Some(CoreJsonWebKeyUse::Signature));
+        assert_eq!(
+            jwks.keys()[1].kid,
+            Some(JsonWebKeyId::new("2011-05-01".to_string()))
+        );
+        assert_eq!(jwks.keys()[1].crv, Some(CoreJsonCurveType::P256));
     }
 }
