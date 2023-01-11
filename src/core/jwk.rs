@@ -404,9 +404,6 @@ impl
     }
 }
 
-const RSA_HEADER: &str = "-----BEGIN RSA PRIVATE KEY-----";
-const RSA_FOOTER: &str = "-----END RSA PRIVATE KEY-----";
-
 pub trait RngClone: dyn_clone::DynClone + rand::RngCore + rand::CryptoRng {}
 dyn_clone::clone_trait_object!(RngClone);
 impl<T> RngClone for T where T: rand::RngCore + rand::CryptoRng + Clone {}
@@ -435,12 +432,6 @@ impl CoreRsaPrivateSigningKey {
         rng: Box<dyn RngClone>,
         kid: Option<JsonWebKeyId>,
     ) -> Result<Self, String> {
-        let trimmed_pem = pem.trim();
-        if !trimmed_pem.starts_with(RSA_HEADER) {
-            return Err(format!("RSA private key must begin with {}", RSA_HEADER));
-        } else if !trimmed_pem.ends_with(RSA_FOOTER) {
-            return Err(format!("RSA private key must end with {}", RSA_FOOTER));
-        }
         let key_pair = rsa::RsaPrivateKey::from_pkcs1_pem(pem).map_err(|err| err.to_string())?;
         Ok(Self { key_pair, rng, kid })
     }
