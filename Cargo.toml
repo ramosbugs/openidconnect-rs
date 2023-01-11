@@ -1,6 +1,6 @@
 [package]
 name = "openidconnect"
-version = "2.4.1"
+version = "2.5.0"
 authors = ["David A. Ramos <ramos@cs.stanford.edu>"]
 description = "OpenID Connect library"
 license = "MIT"
@@ -44,6 +44,7 @@ serde_derive = "1.0"
 serde_json = "1.0"
 serde_path_to_error = "0.1"
 serde_plain = "1.0"
+serde_with = "1.13"
 serde-value = "0.7"
 url = { version = "2.1", features = ["serde"] }
 num-bigint = "0.4.3"

@@ -12,7 +12,8 @@ use http::status::StatusCode;
 use oauth2::helpers::deserialize_space_delimited_vec;
 use rand::{thread_rng, Rng};
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, VecSkipError};
 use thiserror::Error;
 use url::Url;
 
@@ -709,6 +710,7 @@ new_type![
 ///
 /// JSON Web Key Set.
 ///
+#[serde_as]
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 pub struct JsonWebKeySet<JS, JT, JU, K>
 where
@@ -719,11 +721,10 @@ where
 {
     // FIXME: write a test that ensures duplicate object member names cause an error
     // (see https://tools.ietf.org/html/rfc7517#section-5)
-    // FIXME: add a deserializer that optionally ignores invalid keys rather than failing. That way,
-    // clients can function using the keys that they do understand, which is fine if they only ever
-    // get JWTs signed with those keys. See what other places we might want to be more tolerant of
-    // deserialization errors.
     #[serde(bound = "K: JsonWebKey<JS, JT, JU>")]
+    // Ignores invalid keys rather than failing. That way, clients can function using the keys that
+    // they do understand, which is fine if they only ever get JWTs signed with those keys.
+    #[serde_as(as = "VecSkipError<_>")]
     keys: Vec<K>,
     #[serde(skip)]
     _phantom: PhantomData<(JS, JT, JU)>,
