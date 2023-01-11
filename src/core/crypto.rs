@@ -68,7 +68,7 @@ pub fn verify_rsa_signature(
     let n_bigint = rsa::BigUint::from_bytes_be(n.deref());
     let e_bigint = rsa::BigUint::from_bytes_be(e.deref());
     let public_key = rsa::RsaPublicKey::new(n_bigint, e_bigint)
-        .map_err(|e| SignatureVerificationError::InvalidKey(format!("{}", e)))?;
+        .map_err(|e| SignatureVerificationError::InvalidKey(e.to_string()))?;
 
     public_key
         .verify(padding, msg, signature)
@@ -100,7 +100,7 @@ pub fn verify_ec_signature(
     match *crv {
         CoreJsonCurveType::P256 => {
             let public_key = p256::ecdsa::VerifyingKey::from_sec1_bytes(&pk)
-                .map_err(|e| SignatureVerificationError::InvalidKey(format!("{}", e)))?;
+                .map_err(|e| SignatureVerificationError::InvalidKey(e.to_string()))?;
             public_key
                 .verify(
                     msg,
@@ -114,7 +114,7 @@ pub fn verify_ec_signature(
         }
         CoreJsonCurveType::P384 => {
             let public_key = p384::ecdsa::VerifyingKey::from_sec1_bytes(&pk)
-                .map_err(|e| SignatureVerificationError::InvalidKey(format!("{}", e)))?;
+                .map_err(|e| SignatureVerificationError::InvalidKey(e.to_string()))?;
             public_key
                 .verify(
                     msg,
