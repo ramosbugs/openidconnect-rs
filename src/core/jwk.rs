@@ -386,16 +386,14 @@ impl
                 let result = mac.finalize();
                 Ok(result.into_bytes().as_slice().to_vec())
             }
-            ref other => {
-                return Err(SigningError::UnsupportedAlg(
-                    serde_plain::to_string(other).unwrap_or_else(|err| {
-                        panic!(
-                            "signature alg {:?} failed to serialize to a string: {}",
-                            other, err
-                        )
-                    }),
-                ))
-            }
+            ref other => Err(SigningError::UnsupportedAlg(
+                serde_plain::to_string(other).unwrap_or_else(|err| {
+                    panic!(
+                        "signature alg {:?} failed to serialize to a string: {}",
+                        other, err
+                    )
+                }),
+            )),
         }
     }
 
