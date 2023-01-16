@@ -1,46 +1,9 @@
-use num_bigint::{BigInt, Sign};
-use ring::hmac;
-use ring::rand::SecureRandom;
-use ring::signature as ring_signature;
-
 use crate::types::Base64UrlEncodedBytes;
-use crate::{JsonWebKey, SignatureVerificationError, SigningError};
+use crate::{JsonWebKey, SignatureVerificationError};
 
 use super::{jwk::CoreJsonCurveType, CoreJsonWebKey, CoreJsonWebKeyType};
 
 use std::ops::Deref;
-
-pub fn sign_hmac(key: &[u8], hmac_alg: hmac::Algorithm, msg: &[u8]) -> hmac::Tag {
-    let signing_key = hmac::Key::new(hmac_alg, key);
-    hmac::sign(&signing_key, msg)
-}
-
-pub fn verify_hmac(
-    key: &CoreJsonWebKey,
-    hmac_alg: hmac::Algorithm,
-    msg: &[u8],
-    signature: &[u8],
-) -> Result<(), SignatureVerificationError> {
-    let k = key.k.as_ref().ok_or_else(|| {
-        SignatureVerificationError::InvalidKey("Symmetric key `k` is missing".to_string())
-    })?;
-    let verification_key = hmac::Key::new(hmac_alg, k);
-    hmac::verify(&verification_key, msg, signature)
-        .map_err(|_| SignatureVerificationError::CryptoError("bad HMAC".to_string()))
-}
-
-pub fn sign_rsa(
-    key: &ring_signature::RsaKeyPair,
-    padding_alg: &'static dyn ring_signature::RsaEncoding,
-    rng: &dyn SecureRandom,
-    msg: &[u8],
-) -> Result<Vec<u8>, SigningError> {
-    let sig_len = key.public_modulus_len();
-    let mut sig = vec![0; sig_len];
-    key.sign(padding_alg, rng, msg, &mut sig)
-        .map_err(|_| SigningError::CryptoError)?;
-    Ok(sig)
-}
 
 fn rsa_public_key(
     key: &CoreJsonWebKey,
@@ -91,24 +54,24 @@ fn ec_public_key(
 
 pub fn verify_rsa_signature(
     key: &CoreJsonWebKey,
-    params: &ring_signature::RsaParameters,
+    padding: rsa::PaddingScheme,
     msg: &[u8],
     signature: &[u8],
 ) -> Result<(), SignatureVerificationError> {
+    use rsa::PublicKey;
+
     let (n, e) = rsa_public_key(key).map_err(SignatureVerificationError::InvalidKey)?;
     // let's n and e as a big integers to prevent issues with leading zeros
     // according to https://datatracker.ietf.org/doc/html/rfc7518#section-6.3.1.1
     // `n` is always unsigned (hence has sign plus)
 
-    let n_bigint = BigInt::from_bytes_be(Sign::Plus, n.deref());
-    let e_bigint = BigInt::from_bytes_be(Sign::Plus, e.deref());
-    let public_key = ring_signature::RsaPublicKeyComponents {
-        n: &n_bigint.to_bytes_be().1,
-        e: &e_bigint.to_bytes_be().1,
-    };
+    let n_bigint = rsa::BigUint::from_bytes_be(n.deref());
+    let e_bigint = rsa::BigUint::from_bytes_be(e.deref());
+    let public_key = rsa::RsaPublicKey::new(n_bigint, e_bigint)
+        .map_err(|e| SignatureVerificationError::InvalidKey(e.to_string()))?;
 
     public_key
-        .verify(params, msg, signature)
+        .verify(padding, msg, signature)
         .map_err(|_| SignatureVerificationError::CryptoError("bad signature".to_string()))
 }
 /// According to RFC5480, Section-2.2 implementations of Elliptic Curve Cryptography MUST support the uncompressed form.
@@ -120,34 +83,56 @@ pub fn verify_rsa_signature(
 
 pub fn verify_ec_signature(
     key: &CoreJsonWebKey,
-    params: &'static ring_signature::EcdsaVerificationAlgorithm,
     msg: &[u8],
     signature: &[u8],
 ) -> Result<(), SignatureVerificationError> {
+    use p256::ecdsa::signature::{Signature, Verifier};
+
     let (x, y, crv) = ec_public_key(key).map_err(SignatureVerificationError::InvalidKey)?;
-    if *crv == CoreJsonCurveType::P521 {
-        return Err(SignatureVerificationError::UnsupportedAlg(
-            "P521".to_string(),
-        ));
-    }
     let mut pk = vec![0x04];
     pk.extend(x.deref());
     pk.extend(y.deref());
-    let public_key = ring_signature::UnparsedPublicKey::new(params, pk);
-    public_key
-        .verify(msg, signature)
-        .map_err(|_| SignatureVerificationError::CryptoError("EC Signature was wrong".to_string()))
+    match *crv {
+        CoreJsonCurveType::P256 => {
+            let public_key = p256::ecdsa::VerifyingKey::from_sec1_bytes(&pk)
+                .map_err(|e| SignatureVerificationError::InvalidKey(e.to_string()))?;
+            public_key
+                .verify(
+                    msg,
+                    &p256::ecdsa::Signature::from_bytes(signature).map_err(|_| {
+                        SignatureVerificationError::CryptoError("Invalid signature".to_string())
+                    })?,
+                )
+                .map_err(|_| {
+                    SignatureVerificationError::CryptoError("EC Signature was wrong".to_string())
+                })
+        }
+        CoreJsonCurveType::P384 => {
+            let public_key = p384::ecdsa::VerifyingKey::from_sec1_bytes(&pk)
+                .map_err(|e| SignatureVerificationError::InvalidKey(e.to_string()))?;
+            public_key
+                .verify(
+                    msg,
+                    &p384::ecdsa::Signature::from_bytes(signature).map_err(|_| {
+                        SignatureVerificationError::CryptoError("Invalid signature".to_string())
+                    })?,
+                )
+                .map_err(|_| {
+                    SignatureVerificationError::CryptoError("EC Signature was wrong".to_string())
+                })
+        }
+        CoreJsonCurveType::P521 => Err(SignatureVerificationError::UnsupportedAlg(
+            "P521".to_string(),
+        )),
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::ops::Deref;
+    use sha2::Digest;
 
-    use crate::{
-        core::{crypto::rsa_public_key, CoreJsonWebKey},
-        SignatureVerificationError,
-    };
+    use crate::core::CoreJsonWebKey;
 
     #[test]
     fn test_leading_zeros_are_parsed_correctly() {
@@ -166,30 +151,14 @@ mod tests {
             }
         )).unwrap();
 
-        // Old way of verifying the jwt, take the modulus directly form the JWK
-        let (n, e) = rsa_public_key(&key)
-            .map_err(SignatureVerificationError::InvalidKey)
-            .unwrap();
-
-        let public_key = ring_signature::RsaPublicKeyComponents {
-            n: n.deref(),
-            e: e.deref(),
-        };
-        // This fails, since ring expects the keys to have no leading zeros
-        assert! {
-            public_key
-                .verify(
-                    &ring_signature::RSA_PKCS1_2048_8192_SHA256,
-                    msg.as_bytes(),
-                    &signature,
-                ).is_err()
-        };
-        // This should succeed as the function uses big-integers to actually harmonize parsing
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(msg);
+        let hash = hasher.finalize().to_vec();
         assert! {
             verify_rsa_signature(
                 &key,
-                &ring_signature::RSA_PKCS1_2048_8192_SHA256,
-                msg.as_bytes(),
+                rsa::PaddingScheme::new_pkcs1v15_sign::<sha2::Sha256>(),
+                &hash,
                 &signature,
             ).is_ok()
         }
