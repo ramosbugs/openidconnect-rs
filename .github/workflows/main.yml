@@ -50,6 +50,7 @@ jobs:
           toolchain: ${{ matrix.rust_os.rust }}
           override: true
           components: clippy, rustfmt
+          target: wasm32-unknown-unknown
 
       # Newer dependency versions may not support rustc 1.57, so we use a Cargo.lock file for those
       # builds.
@@ -80,6 +81,9 @@ jobs:
           # on the system's local time zone, only UTC. See:
           # https://github.com/chronotope/chrono/issues/499#issuecomment-946388161
           cargo audit --ignore RUSTSEC-2020-0159
+
+      - name: Check WASM build
+        run: cargo check --target wasm32-unknown-unknown
 
   coverage:
     runs-on: ubuntu-latest
