@@ -496,7 +496,7 @@ mod tests {
     #[test]
     fn test_additional_claims() {
         let claims = UserInfoClaims::<TestClaims, CoreGenderClaim>::from_json::<
-            crate::reqwest::HttpClientError,
+            crate::reqwest::AsyncHttpClientError,
         >(
             "{
                 \"iss\": \"https://server.example.com\",
@@ -519,15 +519,18 @@ mod tests {
              }",
         );
 
-        UserInfoClaims::<TestClaims, CoreGenderClaim>::from_json::<crate::reqwest::HttpClientError>(
+        UserInfoClaims::<TestClaims, CoreGenderClaim>::from_json::<
+            crate::reqwest::AsyncHttpClientError,
+        >(
             "{
                 \"iss\": \"https://server.example.com\",
                 \"sub\": \"24400320\",
                 \"aud\": [\"s6BhdRkqt3\"]
-            }".as_bytes(),
+            }"
+            .as_bytes(),
             None,
         )
-            .expect_err("missing claim should fail to deserialize");
+        .expect_err("missing claim should fail to deserialize");
     }
 
     #[derive(Debug, Deserialize, Serialize)]
@@ -537,7 +540,7 @@ mod tests {
     #[test]
     fn test_catch_all_additional_claims() {
         let claims = UserInfoClaims::<AllOtherClaims, CoreGenderClaim>::from_json::<
-            crate::reqwest::HttpClientError,
+            crate::reqwest::AsyncHttpClientError,
         >(
             "{
                 \"iss\": \"https://server.example.com\",

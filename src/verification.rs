@@ -1945,7 +1945,7 @@ mod tests {
 
         // JSON response (default args)
         assert_eq!(
-            CoreUserInfoClaims::from_json::<crate::reqwest::HttpClientError>(
+            CoreUserInfoClaims::from_json::<crate::reqwest::AsyncHttpClientError>(
                 json_claims.as_bytes(),
                 Some(&sub)
             )
@@ -1958,7 +1958,7 @@ mod tests {
         );
 
         // Invalid subject
-        match CoreUserInfoClaims::from_json::<crate::reqwest::HttpClientError>(
+        match CoreUserInfoClaims::from_json::<crate::reqwest::AsyncHttpClientError>(
             json_claims.as_bytes(),
             Some(&SubjectIdentifier::new("wrong_subject".to_string())),
         ) {

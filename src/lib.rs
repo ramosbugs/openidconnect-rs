@@ -602,8 +602,11 @@ pub use oauth2::{
 pub use oauth2::http;
 pub use oauth2::url;
 
-#[cfg(feature = "curl")]
+#[cfg(all(feature = "curl", not(target_arch = "wasm32")))]
 pub use oauth2::curl;
+
+#[cfg(all(feature = "curl", target_arch = "wasm32"))]
+compile_error!("wasm32 is not supported with the `curl` feature. Use the `reqwest` backend or a custom backend for wasm32 support");
 
 #[cfg(feature = "reqwest")]
 pub use oauth2::reqwest;
