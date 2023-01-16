@@ -416,7 +416,7 @@ impl<T> RngClone for T where T: rand::RngCore + rand::CryptoRng + Clone {}
 ///
 pub struct CoreRsaPrivateSigningKey {
     key_pair: rsa::RsaPrivateKey,
-    rng: Box<dyn RngClone>,
+    rng: Box<dyn RngClone + Send + Sync>,
     kid: Option<JsonWebKeyId>,
 }
 impl CoreRsaPrivateSigningKey {
@@ -429,7 +429,7 @@ impl CoreRsaPrivateSigningKey {
 
     pub(crate) fn from_pem_internal(
         pem: &str,
-        rng: Box<dyn RngClone>,
+        rng: Box<dyn RngClone + Send + Sync>,
         kid: Option<JsonWebKeyId>,
     ) -> Result<Self, String> {
         let key_pair = rsa::RsaPrivateKey::from_pkcs1_pem(pem).map_err(|err| err.to_string())?;
