@@ -58,7 +58,7 @@ mod test {
 
         let id_token: CoreIdToken = IdToken::from_str(&google_id_token).unwrap();
 
-        let claims = id_token.claims(&client.id_token_verifier(), |_: Option<&Nonce>| Ok(()));
+        let claims = id_token.claims(&client.id_token_verifier().allow_any_algs(), |_: Option<&Nonce>| Ok(()));
 
         match claims {
             Ok(claims) => println!(
