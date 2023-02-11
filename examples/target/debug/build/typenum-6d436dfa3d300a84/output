@@ -1,2 +1,0 @@
-cargo:rustc-env=TYPENUM_BUILD_CONSTS=/Users/sugih/rust/openidconnect-rs/examples/target/debug/build/typenum-6d436dfa3d300a84/out/consts.rs
-cargo:rustc-env=TYPENUM_BUILD_OP=/Users/sugih/rust/openidconnect-rs/examples/target/debug/build/typenum-6d436dfa3d300a84/out/op.rs
