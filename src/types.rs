@@ -721,7 +721,7 @@ where
 {
     // FIXME: write a test that ensures duplicate object member names cause an error
     // (see https://tools.ietf.org/html/rfc7517#section-5)
-    #[serde(bound = "K: JsonWebKey<JS, JT, JU>")]
+    #[serde(bound = "K: JsonWebKey<JS, JT, JU>", default = "Vec::new")]
     // Ignores invalid keys rather than failing. That way, clients can function using the keys that
     // they do understand, which is fine if they only ever get JWTs signed with those keys.
     #[serde_as(as = "VecSkipError<_>")]
