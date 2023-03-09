@@ -825,9 +825,6 @@ where
 {
     ///
     /// Initializes an OpenID Connect client.
-    /// WARNING: does not restrict id token signing algorithms,
-    /// either set_allowed_algs on the IdTokenVerifier or 
-    /// use from_provider_metadata instead
     ///
     pub fn new(
         client_id: ClientId,
