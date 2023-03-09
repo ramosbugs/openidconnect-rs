@@ -800,7 +800,7 @@ where
     issuer: IssuerUrl,
     userinfo_endpoint: Option<UserInfoUrl>,
     jwks: JsonWebKeySet<JS, JT, JU, K>,
-    id_token_signing_algs: Vec<JS>,
+    id_token_signing_algs: Option<Vec<JS>>,
     use_openid_scope: bool,
     _phantom: PhantomData<(AC, AD, GC, JE, P)>,
 }
@@ -825,8 +825,6 @@ where
 {
     ///
     /// Initializes an OpenID Connect client.
-    /// If you need to configure the algorithms used for signing, ...,
-    /// do this directly on the respected components. (e.g. IdTokenVerifier)
     ///
     pub fn new(
         client_id: ClientId,
@@ -849,7 +847,7 @@ where
             issuer,
             userinfo_endpoint,
             jwks,
-            id_token_signing_algs: vec![],
+            id_token_signing_algs: None,
             use_openid_scope: true,
             _phantom: PhantomData,
         }
@@ -889,9 +887,11 @@ where
             issuer: provider_metadata.issuer().clone(),
             userinfo_endpoint: provider_metadata.userinfo_endpoint().cloned(),
             jwks: provider_metadata.jwks().to_owned(),
-            id_token_signing_algs: provider_metadata
-                .id_token_signing_alg_values_supported()
-                .to_owned(),
+            id_token_signing_algs: Some(
+                provider_metadata
+                    .id_token_signing_alg_values_supported()
+                    .to_owned(),
+            ),
             use_openid_scope: true,
             _phantom: PhantomData,
         }
@@ -977,7 +977,11 @@ where
             )
         };
 
-        verifier.set_allowed_algs(self.id_token_signing_algs.clone())
+        if let Some(id_token_signing_algs) = self.id_token_signing_algs.clone() {
+            verifier.set_allowed_algs(id_token_signing_algs)
+        } else {
+            verifier
+        }
     }
 
     ///
