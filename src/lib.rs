@@ -1207,6 +1207,17 @@ where
     }
 
     ///
+    /// Appends a collection of scopes to the authorization URL.
+    ///
+    pub fn add_scopes<I>(mut self, scopes: I) -> Self
+    where
+        I: IntoIterator<Item = Scope>,
+    {
+        self.inner = self.inner.add_scopes(scopes);
+        self
+    }
+
+    ///
     /// Appends an extra param to the authorization URL.
     ///
     /// This method allows extensions to be used without direct support from
@@ -1602,7 +1613,7 @@ mod tests {
         .unwrap();
 
         let (authorize_url, _, _) = client
-            .authorize_url(flow, new_csrf, new_nonce)
+            .authorize_url(flow.clone(), new_csrf, new_nonce)
             .add_scope(Scope::new("email".to_string()))
             .set_display(CoreAuthDisplay::Touch)
             .set_id_token_hint(&id_token)
@@ -1622,6 +1633,38 @@ mod tests {
             format!(
                 "https://example/authorize?response_type=code&client_id=aaa&state=CSRF123&\
                  redirect_uri=http%3A%2F%2Flocalhost%3A8888%2F&scope=openid+email&foo=bar&\
+                 nonce=NONCE456&acr_values=urn%3Amace%3Aincommon%3Aiap%3Asilver&display=touch&\
+                 id_token_hint={}&login_hint=foo%40bar.com&\
+                 max_age=1800&prompt=login+consent&ui_locales=fr-CA+fr+en",
+                serialized_jwt
+            ),
+            authorize_url.to_string()
+        );
+
+        let (authorize_url, _, _) = client
+            .authorize_url(flow.clone(), new_csrf, new_nonce)
+            .add_scopes(vec![
+                Scope::new("email".to_string()),
+                Scope::new("profile".to_string()),
+            ])
+            .set_display(CoreAuthDisplay::Touch)
+            .set_id_token_hint(&id_token)
+            .set_login_hint(LoginHint::new("foo@bar.com".to_string()))
+            .add_prompt(CoreAuthPrompt::Login)
+            .add_prompt(CoreAuthPrompt::Consent)
+            .set_max_age(Duration::from_secs(1800))
+            .add_ui_locale(LanguageTag::new("fr-CA".to_string()))
+            .add_ui_locale(LanguageTag::new("fr".to_string()))
+            .add_ui_locale(LanguageTag::new("en".to_string()))
+            .add_auth_context_value(AuthenticationContextClass::new(
+                "urn:mace:incommon:iap:silver".to_string(),
+            ))
+            .add_extra_param("foo", "bar")
+            .url();
+        assert_eq!(
+            format!(
+                "https://example/authorize?response_type=code&client_id=aaa&state=CSRF123&\
+                 redirect_uri=http%3A%2F%2Flocalhost%3A8888%2F&scope=openid+email+profile&foo=bar&\
                  nonce=NONCE456&acr_values=urn%3Amace%3Aincommon%3Aiap%3Asilver&display=touch&\
                  id_token_hint={}&login_hint=foo%40bar.com&\
                  max_age=1800&prompt=login+consent&ui_locales=fr-CA+fr+en",
