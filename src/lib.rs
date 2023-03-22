@@ -1211,7 +1211,7 @@ where
     ///
     pub fn add_scopes<I>(mut self, scopes: I) -> Self
     where
-        I : IntoIterator<Item = Scope>,
+        I: IntoIterator<Item = Scope>,
     {
         self.inner = self.inner.add_scopes(scopes);
         self
@@ -1643,7 +1643,10 @@ mod tests {
 
         let (authorize_url, _, _) = client
             .authorize_url(flow.clone(), new_csrf, new_nonce)
-            .add_scopes(vec![Scope::new("email".to_string()),Scope::new("profile".to_string())])
+            .add_scopes(vec![
+                Scope::new("email".to_string()),
+                Scope::new("profile".to_string()),
+            ])
             .set_display(CoreAuthDisplay::Touch)
             .set_id_token_hint(&id_token)
             .set_login_hint(LoginHint::new("foo@bar.com".to_string()))
