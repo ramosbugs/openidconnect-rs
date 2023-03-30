@@ -608,6 +608,24 @@ mod tests {
     }
 
     #[test]
+    fn test_claims_with_nulls_serde() {
+        // "name" is localized and was failing to deserialize before from `null`
+        let claims: CoreIdTokenClaims = serde_json::from_str(
+            "{
+            \"iss\": \"https://server.example.com\",
+            \"sub\": \"24400320\",
+            \"aud\": \"s6BhdRkqt3\",
+            \"email\": null,
+            \"name\": null,
+            \"exp\": 1311281970,
+            \"iat\": 1311280970
+            }",
+        )
+        .expect("failed to deserialize");
+        assert_eq!(claims.email(), None);
+    }
+
+    #[test]
     fn test_complete_claims_serde() {
         let claims_json = "{\
                            \"iss\":\"https://server.example.com\",\

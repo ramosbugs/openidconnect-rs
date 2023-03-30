@@ -401,12 +401,12 @@ macro_rules! deserialize_fields {
     (@field_str Option(Seconds($field:ident))) => { stringify![$field] };
     (@field_str Option(DateTime(Seconds($field:ident)))) => { stringify![$field] };
     (@field_str Option($field:ident)) => { stringify![$field] };
-    (@field_str LanguageTag($field:ident)) => { stringify![$field] };
+    (@field_str Option(LanguageTag($field:ident))) => { stringify![$field] };
     (@field_str $field:ident) => { stringify![$field] };
     (@let_none Option(Seconds($field:ident))) => { let mut $field = None; };
     (@let_none Option(DateTime(Seconds($field:ident)))) => { let mut $field = None; };
     (@let_none Option($field:ident)) => { let mut $field = None; };
-    (@let_none LanguageTag($field:ident)) => { let mut $field = None; };
+    (@let_none Option(LanguageTag($field:ident))) => { let mut $field = None; };
     (@let_none $field:ident) => { let mut $field = None; };
     (@case $map:ident $key:ident $language_tag_opt:ident Option(Seconds($field:ident))) => {
         if $field.is_some() {
@@ -466,20 +466,23 @@ macro_rules! deserialize_fields {
         }
         $field = $map.next_value()?;
     };
-    (@case $map:ident $key:ident $language_tag_opt:ident LanguageTag($field:ident)) => {
-        let localized_claim =
-            if let Some(ref mut localized_claim) = $field {
-                localized_claim
-            } else {
-                let new = LocalizedClaim::new();
-                $field = Some(new);
-                $field.as_mut().unwrap()
-            };
-        if localized_claim.contains_key($language_tag_opt.as_ref()) {
-            return Err(serde::de::Error::custom(format!("duplicate field `{}`", $key)));
+    (@case $map:ident $key:ident $language_tag_opt:ident Option(LanguageTag($field:ident))) => {
+        if let Some(value) = $map.next_value::<Option<_>>()? {
+            let localized_claim =
+                if let Some(ref mut localized_claim) = $field {
+                    localized_claim
+                } else {
+                    let new = LocalizedClaim::new();
+                    $field = Some(new);
+                    $field.as_mut().unwrap()
+                };
+            if localized_claim.contains_key($language_tag_opt.as_ref()) {
+                return Err(serde::de::Error::custom(format!("duplicate field `{}`", $key)));
+            }
+            localized_claim.insert($language_tag_opt, value);
+        } else {
+            $field = None;
         }
-
-        localized_claim.insert($language_tag_opt, $map.next_value()?);
     };
     (@case $map:ident $key:ident $language_tag_opt:ident $field:ident) => {
         if $field.is_some() {
@@ -524,7 +527,7 @@ macro_rules! deserialize_fields {
         ]
     };
     (@struct_recurs [$($struct_type:tt)+] {
-        $($name:ident: $e:expr),* => [LanguageTag($field_new:ident)] $([$($entry:tt)+])*
+        $($name:ident: $e:expr),* => [Option(LanguageTag($field_new:ident))] $([$($entry:tt)+])*
     }) => {
         deserialize_fields![
             @struct_recurs [$($struct_type)+] {
