@@ -323,7 +323,7 @@ where
     ) -> Result<Self, DiscoveryError<RE>>
     where
         F: Future<Output = Result<HttpResponse, RE>>,
-        HC: Fn(HttpRequest) -> F + 'static,
+        HC: Fn(HttpRequest) -> F,
         RE: std::error::Error + 'static,
     {
         let discovery_url = issuer_url
