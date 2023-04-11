@@ -37,18 +37,22 @@ pub struct IdToken<
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
+    JK: JsonWebKey<JS, JT, JU>,
+    JU: JsonWebKeyUse,
 >(
     #[serde(bound = "AC: AdditionalClaims")]
-    JsonWebToken<JE, JS, JT, IdTokenClaims<AC, GC>, JsonWebTokenJsonPayloadSerde>,
+    JsonWebToken<JE, JS, JT, JK, JU, IdTokenClaims<AC, GC>, JsonWebTokenJsonPayloadSerde>,
 );
 
-impl<AC, GC, JE, JS, JT> FromStr for IdToken<AC, GC, JE, JS, JT>
+impl<AC, GC, JE, JS, JT, JK, JU> FromStr for IdToken<AC, GC, JE, JS, JT, JK, JU>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
+    JK: JsonWebKey<JS, JT, JU>,
+    JU: JsonWebKeyUse,
 {
     type Err = serde_json::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -56,13 +60,15 @@ where
     }
 }
 
-impl<AC, GC, JE, JS, JT> IdToken<AC, GC, JE, JS, JT>
+impl<AC, GC, JE, JS, JT, JK, JU> IdToken<AC, GC, JE, JS, JT, JK, JU>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
+    JK: JsonWebKey<JS, JT, JU>,
+    JU: JsonWebKeyUse,
 {
     ///
     /// Initializes an ID token with the specified claims, signed using the given signing key and
@@ -72,7 +78,7 @@ where
     /// `c_hash` claims using the given signing algorithm, respectively. Otherwise, those claims are
     /// unchanged from the values specified in `claims`.
     ///
-    pub fn new<JU, K, S>(
+    pub fn new<K, S>(
         claims: IdTokenClaims<AC, GC>,
         signing_key: &S,
         alg: JS,
@@ -112,14 +118,12 @@ where
     ///
     /// Verifies and returns a reference to the ID token claims.
     ///
-    pub fn claims<'a, JU, K, N>(
+    pub fn claims<'a, N>(
         &'a self,
-        verifier: &IdTokenVerifier<JS, JT, JU, K>,
+        verifier: &IdTokenVerifier<JS, JT, JU, JK>,
         nonce_verifier: N,
     ) -> Result<&'a IdTokenClaims<AC, GC>, ClaimsVerificationError>
     where
-        JU: JsonWebKeyUse,
-        K: JsonWebKey<JS, JT, JU>,
         N: NonceVerifier,
     {
         verifier.verified_claims(&self.0, nonce_verifier)
@@ -128,14 +132,12 @@ where
     ///
     /// Verifies and returns the ID token claims.
     ///
-    pub fn into_claims<JU, K, N>(
+    pub fn into_claims<N>(
         self,
-        verifier: &IdTokenVerifier<JS, JT, JU, K>,
+        verifier: &IdTokenVerifier<JS, JT, JU, JK>,
         nonce_verifier: N,
     ) -> Result<IdTokenClaims<AC, GC>, ClaimsVerificationError>
     where
-        JU: JsonWebKeyUse,
-        K: JsonWebKey<JS, JT, JU>,
         N: NonceVerifier,
     {
         verifier.verified_claims_owned(self.0, nonce_verifier)
@@ -162,13 +164,15 @@ where
         }
     }
 }
-impl<AC, GC, JE, JS, JT> ToString for IdToken<AC, GC, JE, JS, JT>
+impl<AC, GC, JE, JS, JT, JK, JU> ToString for IdToken<AC, GC, JE, JS, JT, JK, JU>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
+    JK: JsonWebKey<JS, JT, JU>,
+    JU: JsonWebKeyUse,
 {
     fn to_string(&self) -> String {
         serde_json::to_value(&self)
@@ -376,7 +380,7 @@ where
 /// Extends the base OAuth2 token response with an ID token.
 ///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct IdTokenFields<AC, EF, GC, JE, JS, JT>
+pub struct IdTokenFields<AC, EF, GC, JE, JS, JT, JK, JU>
 where
     AC: AdditionalClaims,
     EF: ExtraTokenFields,
@@ -384,15 +388,17 @@ where
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
+    JK: JsonWebKey<JS, JT, JU>,
+    JU: JsonWebKeyUse,
 {
     #[serde(bound = "AC: AdditionalClaims")]
-    id_token: Option<IdToken<AC, GC, JE, JS, JT>>,
+    id_token: Option<IdToken<AC, GC, JE, JS, JT, JK, JU>>,
     #[serde(bound = "EF: ExtraTokenFields", flatten)]
     extra_fields: EF,
     #[serde(skip)]
     _phantom: PhantomData<JT>,
 }
-impl<AC, EF, GC, JE, JS, JT> IdTokenFields<AC, EF, GC, JE, JS, JT>
+impl<AC, EF, GC, JE, JS, JT, JK, JU> IdTokenFields<AC, EF, GC, JE, JS, JT, JK, JU>
 where
     AC: AdditionalClaims,
     EF: ExtraTokenFields,
@@ -400,11 +406,13 @@ where
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
+    JK: JsonWebKey<JS, JT, JU>,
+    JU: JsonWebKeyUse,
 {
     ///
     /// Initializes new ID token fields containing the specified [`IdToken`] and extra fields.
     ///
-    pub fn new(id_token: Option<IdToken<AC, GC, JE, JS, JT>>, extra_fields: EF) -> Self {
+    pub fn new(id_token: Option<IdToken<AC, GC, JE, JS, JT, JK, JU>>, extra_fields: EF) -> Self {
         Self {
             id_token,
             extra_fields,
@@ -415,7 +423,7 @@ where
     ///
     /// Returns the [`IdToken`] contained in the OAuth2 token response.
     ///
-    pub fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS, JT>> {
+    pub fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS, JT, JK, JU>> {
         self.id_token.as_ref()
     }
     ///
@@ -425,7 +433,7 @@ where
         &self.extra_fields
     }
 }
-impl<AC, EF, GC, JE, JS, JT> ExtraTokenFields for IdTokenFields<AC, EF, GC, JE, JS, JT>
+impl<AC, EF, GC, JE, JS, JT, JK, JU> ExtraTokenFields for IdTokenFields<AC, EF, GC, JE, JS, JT, JK, JU>
 where
     AC: AdditionalClaims,
     EF: ExtraTokenFields,
@@ -433,6 +441,8 @@ where
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
+    JK: JsonWebKey<JS, JT, JU>,
+    JU: JsonWebKeyUse,
 {
 }
 

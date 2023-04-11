@@ -59,8 +59,8 @@ pub type CoreClient = Client<
     CoreJweContentEncryptionAlgorithm,
     CoreJwsSigningAlgorithm,
     CoreJsonWebKeyType,
-    CoreJsonWebKeyUse,
     CoreJsonWebKey,
+    CoreJsonWebKeyUse,
     CoreAuthPrompt,
     StandardErrorResponse<CoreErrorResponseType>,
     CoreTokenResponse,
@@ -136,6 +136,8 @@ pub type CoreIdToken = IdToken<
     CoreJweContentEncryptionAlgorithm,
     CoreJwsSigningAlgorithm,
     CoreJsonWebKeyType,
+    CoreJsonWebKey,
+    CoreJsonWebKeyUse
 >;
 
 ///
@@ -153,6 +155,8 @@ pub type CoreIdTokenFields = IdTokenFields<
     CoreJweContentEncryptionAlgorithm,
     CoreJwsSigningAlgorithm,
     CoreJsonWebKeyType,
+    CoreJsonWebKey,
+    CoreJsonWebKeyUse
 >;
 
 ///
@@ -212,6 +216,8 @@ pub type CoreUserInfoJsonWebToken = UserInfoJsonWebToken<
     CoreJweContentEncryptionAlgorithm,
     CoreJwsSigningAlgorithm,
     CoreJsonWebKeyType,
+    CoreJsonWebKey,
+    CoreJsonWebKeyUse
 >;
 
 ///

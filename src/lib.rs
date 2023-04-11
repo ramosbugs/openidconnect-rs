@@ -576,6 +576,7 @@ extern crate pretty_assertions;
 #[macro_use]
 extern crate serde_derive;
 
+use chrono::{serde::ts_seconds, DateTime, Utc};
 use oauth2::ResponseType as OAuth2ResponseType;
 use url::Url;
 
@@ -779,7 +780,7 @@ pub enum AuthenticationFlow<RT: ResponseType> {
 /// ```
 ///
 #[derive(Clone, Debug)]
-pub struct Client<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT, TIR, RT, TRE>
+pub struct Client<AC, AD, GC, JE, JS, JT, JK, JU, P, TE, TR, TT, TIR, RT, TRE>
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
@@ -787,11 +788,11 @@ where
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
+    JK: JsonWebKey<JS, JT, JU>,
     JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
     P: AuthPrompt,
     TE: ErrorResponse,
-    TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
+    TR: TokenResponse<AC, GC, JE, JS, JT, JK, JU, TT>,
     TT: TokenType + 'static,
     TIR: TokenIntrospectionResponse<TT>,
     RT: RevocableToken,
@@ -802,13 +803,13 @@ where
     client_secret: Option<ClientSecret>,
     issuer: IssuerUrl,
     userinfo_endpoint: Option<UserInfoUrl>,
-    jwks: JsonWebKeySet<JS, JT, JU, K>,
+    jwks: JsonWebKeySet<JS, JT, JU, JK>,
     id_token_signing_algs: Option<Vec<JS>>,
     use_openid_scope: bool,
-    _phantom: PhantomData<(AC, AD, GC, JE, P)>,
+    _phantom: PhantomData<(AC, AD, GC, JE, JK, P)>,
 }
-impl<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT, TIR, RT, TRE>
-    Client<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT, TIR, RT, TRE>
+impl<AC, AD, GC, JE, JS, JT, JK, JU, P, TE, TR, TT, TIR, RT, TRE>
+    Client<AC, AD, GC, JE, JS, JT, JK, JU, P, TE, TR, TT, TIR, RT, TRE>
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
@@ -816,11 +817,11 @@ where
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
+    JK: JsonWebKey<JS, JT, JU>,
     JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
     P: AuthPrompt,
     TE: ErrorResponse + 'static,
-    TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
+    TR: TokenResponse<AC, GC, JE, JS, JT, JK, JU, TT>,
     TT: TokenType + 'static,
     TIR: TokenIntrospectionResponse<TT>,
     RT: RevocableToken,
@@ -836,7 +837,7 @@ where
         auth_url: AuthUrl,
         token_url: Option<TokenUrl>,
         userinfo_endpoint: Option<UserInfoUrl>,
-        jwks: JsonWebKeySet<JS, JT, JU, K>,
+        jwks: JsonWebKeySet<JS, JT, JU, JK>,
     ) -> Self {
         Client {
             oauth2_client: oauth2::Client::new(
@@ -862,8 +863,8 @@ where
     /// Use [`ProviderMetadata::discover`] or
     /// [`ProviderMetadata::discover_async`] to fetch the provider metadata.
     ///
-    pub fn from_provider_metadata<A, CA, CN, CT, G, JK, RM, RS, S>(
-        provider_metadata: ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RS, S>,
+    pub fn from_provider_metadata<A, CA, CN, CT, G, JA, RM, RS, S>(
+        provider_metadata: ProviderMetadata<A, AD, CA, CN, CT, G, JE, JA, JS, JT, JU, JK, RM, RS, S>,
         client_id: ClientId,
         client_secret: Option<ClientSecret>,
     ) -> Self
@@ -873,7 +874,7 @@ where
         CN: ClaimName,
         CT: ClaimType,
         G: GrantType,
-        JK: JweKeyManagementAlgorithm,
+        JA: JweKeyManagementAlgorithm,
         RM: ResponseMode,
         RS: ResponseType,
         S: SubjectIdentifierType,
@@ -964,7 +965,7 @@ where
     ///
     /// Returns an ID token verifier for use with the [`IdToken::claims`] method.
     ///
-    pub fn id_token_verifier(&self) -> IdTokenVerifier<JS, JT, JU, K> {
+    pub fn id_token_verifier(&self) -> IdTokenVerifier<JS, JT, JU, JK> {
         let verifier = if let Some(ref client_secret) = self.client_secret {
             IdTokenVerifier::new_confidential_client(
                 self.client_id.clone(),
@@ -1049,6 +1050,53 @@ where
     }
 
     ///
+    /// Creates a base64-encoded DPoP Proof JWT for use in a DPoP header.
+    /// 
+    /// See https://datatracker.ietf.org/doc/html/draft-ietf-oauth-dpop
+    ///
+    /// jti nonce and iat timestamp may be omitted and will then be generated
+    /// as a random 96 bit nonce using rand::thread_rng and a timestamp using chrono's UTC now(), respectively.
+    ///
+    /// Note that this crate will not automatically use this DPoP header in requests issued by it.
+    /// The DPoP header can still be attached to HTTP requests issued by this crate however,
+    /// by creating a wrapper around the HTTP request function passed to `request`/`request_async` and setting the header there.
+    ///
+    pub fn dpop_proof<SK>(
+        &self,
+        htu: String,
+        htm: String,
+        jti: Option<String>,
+        iat: Option<DateTime<Utc>>,
+        key: &SK,
+        alg: &JS,
+    ) -> Result<String, JsonWebTokenError>
+    where
+        SK: PrivateSigningKey<JS, JT, JU, JK>,
+    {
+        #[derive(Serialize, Deserialize, Debug)]
+        struct Payload {
+            htu: String,
+            htm: String,
+            jti: String,
+            #[serde(with = "ts_seconds")]
+            iat: DateTime<Utc>,
+        }
+        let jti = jti.unwrap_or({
+            use rand::{thread_rng, Rng};
+            let random_bytes: Vec<u8> = (0..12).map(|_| thread_rng().gen::<u8>()).collect();
+            base64::encode_config(&random_bytes, base64::URL_SAFE_NO_PAD)
+        });
+        let iat = iat.unwrap_or(Utc::now());
+        let jwt: JsonWebToken<JE, _, _, _, _, _, crate::jwt::JsonWebTokenJsonPayloadSerde> =
+            JsonWebToken::new_dpop(Payload { htu, htm, jti, iat }, key, alg)?;
+        let dpop_string = serde_json::to_string(&jwt)
+            .unwrap()
+            .trim_matches('\"')
+            .into();
+            Ok(dpop_string)
+    }
+
+    ///
     /// Creates a request builder for exchanging an authorization code for an access token.
     ///
     /// Acquires ownership of the `code` because authorization codes may only be used once to
@@ -1123,7 +1171,7 @@ where
         &self,
         access_token: AccessToken,
         expected_subject: Option<SubjectIdentifier>,
-    ) -> Result<UserInfoRequest<JE, JS, JT, JU, K>, ConfigurationError> {
+    ) -> Result<UserInfoRequest<JE, JS, JT, JU, JK>, ConfigurationError> {
         Ok(UserInfoRequest {
             url: self
                 .userinfo_endpoint
@@ -1296,9 +1344,9 @@ where
     /// [`AuthorizationRequest::add_prompt`]), it but may be provided for any authorization
     /// request.
     ///
-    pub fn set_id_token_hint<AC, GC, JE, JS, JT>(
+    pub fn set_id_token_hint<AC, GC, JE, JS, JT, JK, JU>(
         mut self,
-        id_token_hint: &'a IdToken<AC, GC, JE, JS, JT>,
+        id_token_hint: &'a IdToken<AC, GC, JE, JS, JT, JK, JU>,
     ) -> Self
     where
         AC: AdditionalClaims,
@@ -1306,6 +1354,8 @@ where
         JE: JweContentEncryptionAlgorithm<JT>,
         JS: JwsSigningAlgorithm<JT>,
         JT: JsonWebKeyType,
+        JK: JsonWebKey<JS, JT, JU>,
+        JU: JsonWebKeyUse,
     {
         self.id_token_hint = Some(id_token_hint.to_string());
         self
@@ -1430,13 +1480,15 @@ where
 ///
 /// Extends the base OAuth2 token response with an ID token.
 ///
-pub trait TokenResponse<AC, GC, JE, JS, JT, TT>: OAuth2TokenResponse<TT>
+pub trait TokenResponse<AC, GC, JE, JS, JT, JK, JU, TT>: OAuth2TokenResponse<TT>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
+    JK: JsonWebKey<JS, JT, JU>,
+    JU: JsonWebKeyUse,
     TT: TokenType,
 {
     ///
@@ -1445,11 +1497,11 @@ where
     /// OpenID Connect authorization servers should always return this field, but it is optional
     /// to allow for interoperability with authorization servers that only support OAuth2.
     ///
-    fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS, JT>>;
+    fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS, JT, JK, JU>>;
 }
 
-impl<AC, EF, GC, JE, JS, JT, TT> TokenResponse<AC, GC, JE, JS, JT, TT>
-    for StandardTokenResponse<IdTokenFields<AC, EF, GC, JE, JS, JT>, TT>
+impl<AC, EF, GC, JE, JS, JT, JK, JU, TT> TokenResponse<AC, GC, JE, JS, JT, JK, JU, TT>
+    for StandardTokenResponse<IdTokenFields<AC, EF, GC, JE, JS, JT, JK, JU>, TT>
 where
     AC: AdditionalClaims,
     EF: ExtraTokenFields,
@@ -1457,9 +1509,11 @@ where
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
+    JK: JsonWebKey<JS, JT, JU>,
+    JU: JsonWebKeyUse,
     TT: TokenType,
 {
-    fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS, JT>> {
+    fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS, JT, JK, JU>> {
         self.extra_fields().id_token()
     }
 }
