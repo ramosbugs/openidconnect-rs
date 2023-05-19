@@ -546,6 +546,13 @@ new_type![
     ClientContactEmail(String)
 ];
 
+new_url_type![
+    ///
+    /// URL for the OpenID end session endpoint
+    ///
+    EndSessionUrl
+];
+
 new_type![
     ///
     /// End user's birthday, represented as an

@@ -13,10 +13,10 @@ use thiserror::Error;
 
 use super::http_utils::{check_content_type, MIME_TYPE_JSON};
 use super::types::{
-    AuthDisplay, AuthenticationContextClass, ClaimName, ClaimType, ClientAuthMethod, GrantType,
-    IssuerUrl, JsonWebKey, JsonWebKeySet, JsonWebKeySetUrl, JsonWebKeyType, JsonWebKeyUse,
-    JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag,
-    OpPolicyUrl, OpTosUrl, RegistrationUrl, ResponseMode, ResponseType, ResponseTypes,
+    AuthDisplay, AuthenticationContextClass, ClaimName, ClaimType, ClientAuthMethod, EndSessionUrl,
+    GrantType, IssuerUrl, JsonWebKey, JsonWebKeySet, JsonWebKeySetUrl, JsonWebKeyType,
+    JsonWebKeyUse, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm,
+    LanguageTag, OpPolicyUrl, OpTosUrl, RegistrationUrl, ResponseMode, ResponseType, ResponseTypes,
     ServiceDocUrl, SubjectIdentifierType,
 };
 use super::{HttpRequest, HttpResponse, UserInfoUrl, CONFIG_URL_SUFFIX};
@@ -65,6 +65,7 @@ where
     authorization_endpoint: AuthUrl,
     token_endpoint: Option<TokenUrl>,
     userinfo_endpoint: Option<UserInfoUrl>,
+    end_session_endpoint: Option<EndSessionUrl>,
     jwks_uri: JsonWebKeySetUrl,
     #[serde(default = "JsonWebKeySet::default", skip)]
     jwks: JsonWebKeySet<JS, JT, JU, K>,
@@ -196,6 +197,7 @@ where
             authorization_endpoint,
             token_endpoint: None,
             userinfo_endpoint: None,
+            end_session_endpoint: None,
             jwks_uri,
             jwks: JsonWebKeySet::new(Vec::new()),
             registration_endpoint: None,
@@ -239,6 +241,7 @@ where
             set_authorization_endpoint -> authorization_endpoint[AuthUrl],
             set_token_endpoint -> token_endpoint[Option<TokenUrl>],
             set_userinfo_endpoint -> userinfo_endpoint[Option<UserInfoUrl>],
+            set_end_session_endpoint -> end_session_endpoint[Option<EndSessionUrl>],
             set_jwks_uri -> jwks_uri[JsonWebKeySetUrl],
             set_jwks -> jwks[JsonWebKeySet<JS, JT, JU, K>],
             set_registration_endpoint -> registration_endpoint[Option<RegistrationUrl>],
