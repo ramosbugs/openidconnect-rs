@@ -11,6 +11,13 @@ use serde::Serialize;
 use serde_with::{serde_as, skip_serializing_none, VecSkipError};
 use thiserror::Error;
 
+use crate::core::{
+    CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClientAuthMethod, CoreGrantType,
+    CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm,
+    CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm, CoreResponseMode, CoreResponseType,
+    CoreSubjectIdentifierType,
+};
+
 use super::http_utils::{check_content_type, MIME_TYPE_JSON};
 use super::types::{
     AuthDisplay, AuthenticationContextClass, ClaimName, ClaimType, ClientAuthMethod, EndSessionUrl,
@@ -65,7 +72,6 @@ where
     authorization_endpoint: AuthUrl,
     token_endpoint: Option<TokenUrl>,
     userinfo_endpoint: Option<UserInfoUrl>,
-    end_session_endpoint: Option<EndSessionUrl>,
     jwks_uri: JsonWebKeySetUrl,
     #[serde(default = "JsonWebKeySet::default", skip)]
     jwks: JsonWebKeySet<JS, JT, JU, K>,
@@ -197,7 +203,6 @@ where
             authorization_endpoint,
             token_endpoint: None,
             userinfo_endpoint: None,
-            end_session_endpoint: None,
             jwks_uri,
             jwks: JsonWebKeySet::new(Vec::new()),
             registration_endpoint: None,
@@ -241,7 +246,6 @@ where
             set_authorization_endpoint -> authorization_endpoint[AuthUrl],
             set_token_endpoint -> token_endpoint[Option<TokenUrl>],
             set_userinfo_endpoint -> userinfo_endpoint[Option<UserInfoUrl>],
-            set_end_session_endpoint -> end_session_endpoint[Option<EndSessionUrl>],
             set_jwks_uri -> jwks_uri[JsonWebKeySetUrl],
             set_jwks -> jwks[JsonWebKeySet<JS, JT, JU, K>],
             set_registration_endpoint -> registration_endpoint[Option<RegistrationUrl>],
@@ -451,6 +455,39 @@ where
     #[error("Validation error: {0}")]
     Validation(String),
 }
+
+#[non_exhaustive]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct LogoutProviderMetadata<A>
+where
+    A: AdditionalProviderMetadata,
+{
+    pub end_session_endpoint: Option<EndSessionUrl>,
+    #[serde(bound = "A: AdditionalProviderMetadata", flatten)]
+    pub additional_metadata: A,
+}
+impl<A> AdditionalProviderMetadata for LogoutProviderMetadata<A> where A: AdditionalProviderMetadata {}
+
+///
+/// Addition metadata for providers implementing OpenID Connect RP-Initiated Logout 1.0.
+///
+pub type ProviderMetadataWithLogout = ProviderMetadata<
+    LogoutProviderMetadata<EmptyAdditionalProviderMetadata>,
+    CoreAuthDisplay,
+    CoreClientAuthMethod,
+    CoreClaimName,
+    CoreClaimType,
+    CoreGrantType,
+    CoreJweContentEncryptionAlgorithm,
+    CoreJweKeyManagementAlgorithm,
+    CoreJwsSigningAlgorithm,
+    CoreJsonWebKeyType,
+    CoreJsonWebKeyUse,
+    CoreJsonWebKey,
+    CoreResponseMode,
+    CoreResponseType,
+    CoreSubjectIdentifierType,
+>;
 
 #[cfg(test)]
 mod tests {

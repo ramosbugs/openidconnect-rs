@@ -890,6 +890,16 @@ new_secret_type![
     LoginHint(String)
 ];
 
+new_secret_type![
+    ///
+    /// Hint about the login identifier the End-User might use to log in.
+    ///
+    /// The use of this parameter is left to the OpenID Connect Provider's discretion.
+    ///
+    #[derive(Clone, Deserialize, Serialize)]
+    LogoutHint(String)
+];
+
 new_url_type![
     ///
     /// URL that references a logo for the Client application.
