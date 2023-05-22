@@ -577,8 +577,6 @@ extern crate pretty_assertions;
 extern crate serde_derive;
 
 use oauth2::ResponseType as OAuth2ResponseType;
-use serde::Serializer;
-use types::LogoutHint;
 use url::Url;
 
 use std::borrow::Cow;
@@ -621,12 +619,12 @@ pub use claims::{
 };
 pub use discovery::{
     AdditionalProviderMetadata, DiscoveryError, EmptyAdditionalProviderMetadata, ProviderMetadata,
-    ProviderMetadataWithLogout,
 };
 pub use id_token::IdTokenFields;
 pub use id_token::{IdToken, IdTokenClaims};
 pub use jwt::JsonWebTokenError;
 use jwt::{JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenHeader};
+pub use logout::{LogoutProviderMetadata, LogoutRequest, ProviderMetadataWithLogout};
 // Flatten the module hierarchy involving types. They're only separated to improve code
 // organization.
 pub use types::{
@@ -670,6 +668,7 @@ mod claims;
 mod discovery;
 mod helpers;
 mod id_token;
+mod logout;
 pub(crate) mod types;
 mod user_info;
 mod verification;
@@ -1476,122 +1475,6 @@ where
         .map(AsRef::as_ref)
         .collect::<Vec<_>>()
         .join(" ")
-}
-
-fn serialize_with_join_vec<T, S>(value: &[T], serializer: S) -> Result<S::Ok, S::Error>
-where
-    T: AsRef<str>,
-    S: Serializer,
-{
-    serializer.serialize_str(&join_vec(value))
-}
-
-///
-/// A request to the end session endpoint.
-///
-pub struct LogoutRequest {
-    end_session_endpoint: EndSessionUrl,
-    parameters: LogoutRequestParameters,
-}
-
-#[derive(Serialize, Default)]
-struct LogoutRequestParameters {
-    id_token_hint: Option<String>,
-    logout_hint: Option<LogoutHint>,
-    client_id: Option<ClientId>,
-    post_logout_redirect_uri: Option<RedirectUrl>,
-    state: Option<CsrfToken>,
-    #[serde(serialize_with = "serialize_with_join_vec")]
-    ui_locales: Vec<LanguageTag>,
-}
-
-impl From<EndSessionUrl> for LogoutRequest {
-    fn from(value: EndSessionUrl) -> Self {
-        LogoutRequest {
-            end_session_endpoint: value,
-            parameters: Default::default(),
-        }
-    }
-}
-
-impl LogoutRequest {
-    ///
-    /// Provides an ID token previously issued by this OpenID Connect Provider as a hint about
-    /// the user's identity.
-    ///
-    pub fn set_id_token_hint<AC, GC, JE, JS, JT>(
-        mut self,
-        id_token_hint: &IdToken<AC, GC, JE, JS, JT>,
-    ) -> Self
-    where
-        AC: AdditionalClaims,
-        GC: GenderClaim,
-        JE: JweContentEncryptionAlgorithm<JT>,
-        JS: JwsSigningAlgorithm<JT>,
-        JT: JsonWebKeyType,
-    {
-        self.parameters.id_token_hint = Some(id_token_hint.to_string());
-        self
-    }
-
-    ///
-    /// Provides the OpenID Connect Provider with a hint about the user's identity.
-    ///
-    /// The nature of this hint is specific to each provider.
-    ///
-    pub fn set_logout_hint(mut self, logout_hint: LogoutHint) -> Self {
-        self.parameters.logout_hint = Some(logout_hint);
-        self
-    }
-
-    ///
-    /// Provides the OpenID Connect Provider with the client identifier.
-    ///
-    /// When both this and `id_token_hint` are set, the provider must verify that
-    /// this client id matches the one used when the ID token was issued.
-    ///
-    pub fn set_client_id(mut self, client_id: ClientId) -> Self {
-        self.parameters.client_id = Some(client_id);
-        self
-    }
-
-    ///
-    /// Provides the OpenID Connect Provider with a URI to redirect to after
-    /// the logout has been performed.
-    ///
-    pub fn set_redirect_uri(mut self, redirect_uri: RedirectUrl) -> Self {
-        self.parameters.post_logout_redirect_uri = Some(redirect_uri);
-        self
-    }
-
-    ///
-    /// Specify an opaque value that the OpenID Connect Provider should pass back
-    /// to your application using the state parameter when redirecting to redirect_uri.
-    ///
-    pub fn set_state(mut self, state: CsrfToken) -> Self {
-        self.parameters.state = Some(state);
-        self
-    }
-
-    ///
-    /// Requests the preferred languages for the user interface presented by the OpenID Connect
-    /// Provider.
-    ///
-    /// Languages should be added in order of preference.
-    ///
-    pub fn add_ui_locale(mut self, ui_locale: LanguageTag) -> Self {
-        self.parameters.ui_locales.push(ui_locale);
-        self
-    }
-
-    ///
-    /// Returns the full logout URL
-    ///
-    pub fn url(self) -> Url {
-        let mut url = self.end_session_endpoint.url().to_owned();
-        url.set_query(serde_urlencoded::to_string(self.parameters).ok().as_deref());
-        url
-    }
 }
 
 #[cfg(test)]
