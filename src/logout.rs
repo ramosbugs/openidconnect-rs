@@ -9,6 +9,7 @@ use crate::{
         CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm, CoreResponseMode, CoreResponseType,
         CoreSubjectIdentifierType,
     },
+    join_vec,
     types::{LogoutHint, PostLogoutRedirectUrl},
     AdditionalClaims, AdditionalProviderMetadata, EmptyAdditionalProviderMetadata, EndSessionUrl,
     GenderClaim, IdToken, JsonWebKeyType, JweContentEncryptionAlgorithm, JwsSigningAlgorithm,
@@ -183,7 +184,159 @@ impl LogoutRequest {
             add_pair!(client_id, client_id.as_str());
             add_pair!(post_logout_redirect_uri, post_logout_redirect_uri.as_str());
             add_pair!(state, state.secret());
+
+            if !self.parameters.ui_locales.is_empty() {
+                query.append_pair("ui_locales", &join_vec(&self.parameters.ui_locales));
+            }
         }
+
+        if url.query() == Some("") {
+            url.set_query(None);
+        }
+
         url
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use oauth2::{AuthUrl, ClientId, CsrfToken};
+    use url::Url;
+
+    use crate::{
+        core::{
+            CoreGenderClaim, CoreJsonWebKeyType, CoreJweContentEncryptionAlgorithm,
+            CoreJwsSigningAlgorithm,
+        },
+        types::{LogoutHint, PostLogoutRedirectUrl},
+        EmptyAdditionalClaims, EndSessionUrl, IdToken, IssuerUrl, JsonWebKeySetUrl, LanguageTag,
+        LogoutProviderMetadata, LogoutRequest, ProviderMetadataWithLogout,
+    };
+
+    #[test]
+    fn test_end_session_endpoint_deserialization() {
+        // Fetched from: https://rp.certification.openid.net:8080/openidconnect-rs/
+        //     rp-response_type-code/.well-known/openid-configuration
+        // But pared down
+        let json_response = "{\
+            \"issuer\":\"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\",\
+            \"authorization_endpoint\":\"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/authorization\",\
+            \"jwks_uri\":\"https://rp.certification.openid.net:8080/static/jwks_3INbZl52IrrPCp2j.json\",\
+            \"response_types_supported\":[],\
+            \"subject_types_supported\":[],\
+            \"id_token_signing_alg_values_supported\": [],\
+            \"end_session_endpoint\":\"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/end_session\",\
+            \"version\":\"3.0\"}";
+
+        dbg!(json_response);
+
+        let new_provider_metadata = ProviderMetadataWithLogout::new(
+            IssuerUrl::new(
+                "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code"
+                    .to_string(),
+            )
+            .unwrap(),
+            AuthUrl::new(
+                "https://rp.certification.openid.net:8080/openidconnect-rs/\
+                 rp-response_type-code/authorization"
+                    .to_string(),
+            )
+            .unwrap(),
+            JsonWebKeySetUrl::new(
+                "https://rp.certification.openid.net:8080/static/jwks_3INbZl52IrrPCp2j.json"
+                    .to_string(),
+            )
+            .unwrap(),
+            vec![],
+            vec![],
+            vec![],
+            LogoutProviderMetadata {
+                end_session_endpoint: Some(EndSessionUrl::new(
+                    "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/end_session"
+                        .to_string()
+                ).unwrap()),
+                additional_metadata: Default::default(),
+            },
+        );
+
+        let provider_metadata: ProviderMetadataWithLogout =
+            serde_json::from_str(json_response).unwrap();
+        assert_eq!(provider_metadata, new_provider_metadata);
+
+        assert_eq!(
+            Some(EndSessionUrl::new(
+                "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/end_session"
+                    .to_string()
+            ).unwrap()),
+            provider_metadata.additional_metadata().end_session_endpoint
+        );
+    }
+
+    #[test]
+    fn test_logout_request_with_no_parameters() {
+        let endpoint = EndSessionUrl::new(
+            "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/end_session"
+                .to_string()
+        ).unwrap();
+
+        let logout_url = LogoutRequest::from(endpoint).http_get_url();
+
+        assert_eq!(
+            Url::parse(
+                "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/end_session"
+            ).unwrap(),
+            logout_url
+        );
+    }
+
+    #[test]
+    fn test_logout_request_with_all_parameters() {
+        let endpoint = EndSessionUrl::new(
+            "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/end_session"
+                .to_string()
+        ).unwrap();
+
+        let logout_url = LogoutRequest::from(endpoint)
+            .set_id_token_hint(
+                &IdToken::<
+                    EmptyAdditionalClaims,
+                    CoreGenderClaim,
+                    CoreJweContentEncryptionAlgorithm,
+                    CoreJwsSigningAlgorithm,
+                    CoreJsonWebKeyType,
+                >::from_str(
+                    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwcz\
+                    ovL3JwLmNlcnRpZmljYXRpb24ub3BlbmlkLm5ldDo4MDgwLyIsImV4c\
+                    CI6MTUxNjIzOTAyMiwiaWF0IjoxNTE2MjM5MDIyLCJzdWIiOiJhc2Rm\
+                    In0.cPwX6csO2uBEOZLVAGR7x5rHLRfD36MHpPy3JTk6orM",
+                )
+                .unwrap(),
+            )
+            .set_logout_hint(LogoutHint::new("johndoe".to_string()))
+            .set_client_id(ClientId::new("asdf".to_string()))
+            .set_post_logout_redirect_uri(
+                PostLogoutRedirectUrl::new("https://localhost:8000/".to_string()).unwrap(),
+            )
+            .set_state(CsrfToken::new("asdf".to_string()))
+            .add_ui_locale(LanguageTag::new("en-US".to_string()))
+            .add_ui_locale(LanguageTag::new("fr-FR".to_string()))
+            .http_get_url();
+
+        assert_eq!(
+            Url::parse(
+                "https://rp.certification.openid.net:8080/openidconnect-rs\
+                /rp-response_type-code/end_session?id_token_hint=eyJhbGciO\
+                iJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL3JwLmNlcn\
+                RpZmljYXRpb24ub3BlbmlkLm5ldDo4MDgwLyIsImV4cCI6MTUxNjIzOTAy\
+                MiwiaWF0IjoxNTE2MjM5MDIyLCJzdWIiOiJhc2RmIn0.cPwX6csO2uBEOZ\
+                LVAGR7x5rHLRfD36MHpPy3JTk6orM&logout_hint=johndoe&client_i\
+                d=asdf&post_logout_redirect_uri=https%3A%2F%2Flocalhost%3A\
+                8000%2F&state=asdf&ui_locales=en-US+fr-FR"
+            )
+            .unwrap(),
+            logout_url
+        );
     }
 }
