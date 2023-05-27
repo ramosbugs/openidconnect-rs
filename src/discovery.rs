@@ -668,7 +668,6 @@ mod tests {
             "\"end_session_endpoint\":\"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/end_session\",\
             \"version\":\"3.0\""
         );
-        dbg!(&json_response);
 
         let all_signing_algs = vec![
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,

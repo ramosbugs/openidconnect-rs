@@ -230,8 +230,6 @@ mod tests {
             \"end_session_endpoint\":\"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/end_session\",\
             \"version\":\"3.0\"}";
 
-        dbg!(json_response);
-
         let new_provider_metadata = ProviderMetadataWithLogout::new(
             IssuerUrl::new(
                 "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code"
