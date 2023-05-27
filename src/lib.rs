@@ -624,17 +624,18 @@ pub use id_token::IdTokenFields;
 pub use id_token::{IdToken, IdTokenClaims};
 pub use jwt::JsonWebTokenError;
 use jwt::{JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenHeader};
+pub use logout::{LogoutProviderMetadata, LogoutRequest, ProviderMetadataWithLogout};
 // Flatten the module hierarchy involving types. They're only separated to improve code
 // organization.
 pub use types::{
     AccessTokenHash, AddressCountry, AddressLocality, AddressPostalCode, AddressRegion,
     ApplicationType, Audience, AuthDisplay, AuthPrompt, AuthenticationContextClass,
     AuthenticationMethodReference, AuthorizationCodeHash, ClaimName, ClaimType, ClientAuthMethod,
-    ClientConfigUrl, ClientContactEmail, ClientName, ClientUrl, EndUserBirthday, EndUserEmail,
-    EndUserFamilyName, EndUserGivenName, EndUserMiddleName, EndUserName, EndUserNickname,
-    EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone, EndUserUsername,
-    EndUserWebsiteUrl, FormattedAddress, GrantType, InitiateLoginUrl, IssuerUrl, JsonWebKey,
-    JsonWebKeyId, JsonWebKeySet, JsonWebKeySetUrl, JsonWebKeyType, JsonWebKeyUse,
+    ClientConfigUrl, ClientContactEmail, ClientName, ClientUrl, EndSessionUrl, EndUserBirthday,
+    EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName, EndUserName,
+    EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone,
+    EndUserUsername, EndUserWebsiteUrl, FormattedAddress, GrantType, InitiateLoginUrl, IssuerUrl,
+    JsonWebKey, JsonWebKeyId, JsonWebKeySet, JsonWebKeySetUrl, JsonWebKeyType, JsonWebKeyUse,
     JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag,
     LocalizedClaim, LoginHint, LogoUrl, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl, PrivateSigningKey,
     RegistrationAccessToken, RegistrationUrl, RequestUrl, ResponseMode, ResponseType,
@@ -667,6 +668,7 @@ mod claims;
 mod discovery;
 mod helpers;
 mod id_token;
+mod logout;
 pub(crate) mod types;
 mod user_info;
 mod verification;

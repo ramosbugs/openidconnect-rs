@@ -546,6 +546,14 @@ new_type![
     ClientContactEmail(String)
 ];
 
+new_url_type![
+    ///
+    /// URL for the [OpenID Connect RP-Initiated Logout 1.0](
+    /// https://openid.net/specs/openid-connect-rpinitiated-1_0.html) end session endpoint.
+    ///
+    EndSessionUrl
+];
+
 new_type![
     ///
     /// End user's birthday, represented as an
@@ -883,6 +891,16 @@ new_secret_type![
     LoginHint(String)
 ];
 
+new_secret_type![
+    ///
+    /// Hint about the logout identifier the End-User might use to log out.
+    ///
+    /// The use of this parameter is left to the OpenID Connect Provider's discretion.
+    ///
+    #[derive(Clone, Deserialize, Serialize)]
+    LogoutHint(String)
+];
+
 new_url_type![
     ///
     /// URL that references a logo for the Client application.
@@ -946,6 +964,15 @@ new_url_type![
     /// URL providing a client application's data usage policy.
     ///
     PolicyUrl
+];
+
+new_url_type![
+    ///
+    /// The post logout redirect URL, which should be passed to the end session endpoint
+    /// of providers implementing [OpenID Connect RP-Initiated Logout 1.0](
+    /// https://openid.net/specs/openid-connect-rpinitiated-1_0.html).
+    ///
+    PostLogoutRedirectUrl
 ];
 
 new_secret_type![
