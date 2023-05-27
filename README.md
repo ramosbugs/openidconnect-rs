@@ -12,7 +12,7 @@ API documentation and examples are available on [docs.rs](https://docs.rs/openid
 
 ## Minimum Supported Rust Version (MSRV)
 
-The MSRV for *3.0.y* releases of this crate is Rust **1.57**.
+The MSRV for *3.0.y to 3.1.y* releases of this crate is Rust **1.57**.
 
 The MSRV for *2.x.y* releases of this crate is Rust 1.45.
 
