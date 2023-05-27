@@ -49,6 +49,7 @@ new major version number for this crate.
     * Client Registration endpoint
   * Unsupported features:
     * Client Configuration endpoint
+* [OpenID Connect RP-Initiated Logout](https://openid.net/specs/openid-connect-rpinitiated-1_0.html)
 * [OAuth 2.0 Token Introspection](https://tools.ietf.org/html/rfc7662)
 * [OAuth 2.0 Token Revocation](https://tools.ietf.org/html/rfc7009)
 
