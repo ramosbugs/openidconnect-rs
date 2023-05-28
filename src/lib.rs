@@ -637,10 +637,10 @@ pub use types::{
     EndUserUsername, EndUserWebsiteUrl, FormattedAddress, GrantType, InitiateLoginUrl, IssuerUrl,
     JsonWebKey, JsonWebKeyId, JsonWebKeySet, JsonWebKeySetUrl, JsonWebKeyType, JsonWebKeyUse,
     JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag,
-    LocalizedClaim, LoginHint, LogoUrl, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl, PrivateSigningKey,
-    RegistrationAccessToken, RegistrationUrl, RequestUrl, ResponseMode, ResponseType,
-    ResponseTypes, SectorIdentifierUrl, ServiceDocUrl, SigningError, StreetAddress,
-    SubjectIdentifier, SubjectIdentifierType, ToSUrl,
+    LocalizedClaim, LoginHint, LogoUrl, LogoutHint, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl,
+    PostLogoutRedirectUrl, PrivateSigningKey, RegistrationAccessToken, RegistrationUrl, RequestUrl,
+    ResponseMode, ResponseType, ResponseTypes, SectorIdentifierUrl, ServiceDocUrl, SigningError,
+    StreetAddress, SubjectIdentifier, SubjectIdentifierType, ToSUrl,
 };
 pub use user_info::{
     UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoRequest, UserInfoUrl,
