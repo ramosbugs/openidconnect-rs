@@ -6,6 +6,10 @@ pub use oauth2::basic::{
     BasicRequestTokenError as CoreRequestTokenError,
     BasicRevocationErrorResponse as CoreRevocationErrorResponse, BasicTokenType as CoreTokenType,
 };
+
+use oauth2::devicecode::{DeviceAuthorizationResponse, EmptyExtraDeviceAuthorizationFields};
+pub use oauth2::DeviceAuthorizationUrl as CoreDeviceAuthorizationUrl;
+
 pub use oauth2::StandardRevocableToken as CoreRevocableToken;
 use oauth2::{
     EmptyExtraTokenFields, ErrorResponseType, ResponseType as OAuth2ResponseType,
@@ -37,6 +41,12 @@ mod crypto;
 
 // Private purely for organizational reasons; exported publicly above.
 mod jwk;
+
+///
+/// OpenID Connect Core device authorization response.
+///
+pub type CoreDeviceAuthorizationResponse =
+    DeviceAuthorizationResponse<EmptyExtraDeviceAuthorizationFields>;
 
 ///
 /// OpenID Connect Core token introspection response.

@@ -576,7 +576,9 @@ extern crate pretty_assertions;
 #[macro_use]
 extern crate serde_derive;
 
+pub use oauth2::devicecode::{DeviceAuthorizationResponse, EmptyExtraDeviceAuthorizationFields};
 use oauth2::ResponseType as OAuth2ResponseType;
+pub use oauth2::{DeviceAccessTokenRequest, DeviceAuthorizationRequest};
 use url::Url;
 
 use std::borrow::Cow;
@@ -586,9 +588,9 @@ use std::time::Duration;
 
 pub use oauth2::{
     AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientCredentialsTokenRequest, ClientId,
-    ClientSecret, CodeTokenRequest, ConfigurationError, CsrfToken, EmptyExtraTokenFields,
-    ErrorResponse, ErrorResponseType, ExtraTokenFields, HttpRequest, HttpResponse,
-    IntrospectionRequest, IntrospectionUrl, PasswordTokenRequest, PkceCodeChallenge,
+    ClientSecret, CodeTokenRequest, ConfigurationError, CsrfToken, DeviceAuthorizationUrl,
+    EmptyExtraTokenFields, ErrorResponse, ErrorResponseType, ExtraTokenFields, HttpRequest,
+    HttpResponse, IntrospectionRequest, IntrospectionUrl, PasswordTokenRequest, PkceCodeChallenge,
     PkceCodeChallengeMethod, PkceCodeVerifier, RedirectUrl, RefreshToken, RefreshTokenRequest,
     RequestTokenError, ResourceOwnerPassword, ResourceOwnerUsername, RevocableToken,
     RevocationErrorResponseType, RevocationRequest, RevocationUrl, Scope, StandardErrorResponse,
@@ -945,6 +947,19 @@ where
     }
 
     ///
+    /// Sets the device authorization URL for contacting the device authorization endpoint ([RFC 8628](https://tools.ietf.org/html/rfc8628)).
+    ///
+    pub fn set_device_authorization_uri(
+        mut self,
+        device_authorization_url: DeviceAuthorizationUrl,
+    ) -> Self {
+        self.oauth2_client = self
+            .oauth2_client
+            .set_device_authorization_url(device_authorization_url);
+        self
+    }
+
+    ///
     /// Enables the `openid` scope to be requested automatically.
     ///
     /// This scope is requested by default, so this function is only useful after previous calls to
@@ -1060,6 +1075,42 @@ where
     ///
     pub fn exchange_code(&self, code: AuthorizationCode) -> CodeTokenRequest<TE, TR, TT> {
         self.oauth2_client.exchange_code(code)
+    }
+
+    ///
+    /// Creates a request builder for exchanging a device code for an access token.
+    ///
+    /// See https://tools.ietf.org/html/rfc8628#section-3.4
+    ///
+    pub fn exchange_device_code(
+        &self,
+    ) -> Result<DeviceAuthorizationRequest<TE>, ConfigurationError> {
+        let request = self.oauth2_client.exchange_device_code();
+        if self.use_openid_scope {
+            Ok(request?.add_scope(Scope::new(OPENID_SCOPE.to_string())))
+        } else {
+            request
+        }
+    }
+
+    ///
+    /// Creates a request builder for exchanging a device code for an access token.
+    /// This method is similar to [`exchange_device_code`][Client::exchange_device_code] but
+    /// allows the caller to specify additional parameters to be sent to the authorization server.
+    /// This is useful for providers that require additional parameters to be sent in the request
+    /// body.
+    ///
+    /// See https://tools.ietf.org/html/rfc8628#section-3.4
+    ///
+    pub fn exchange_device_token<'a, 'b, 'c>(
+        &'a self,
+        auth_response: &'b DeviceAuthorizationResponse<EmptyExtraDeviceAuthorizationFields>,
+    ) -> DeviceAccessTokenRequest<'b, 'c, TR, TT, EmptyExtraDeviceAuthorizationFields>
+    where
+        'a: 'b,
+    {
+        self.oauth2_client
+            .exchange_device_access_token(auth_response)
     }
 
     ///
