@@ -1015,7 +1015,7 @@ pub struct ResponseTypes<RT: ResponseType>(
 );
 impl<RT: ResponseType> ResponseTypes<RT> {
     ///
-    /// Create a new ResponseTypes<RT> to wrap the given Vec<RT>.
+    /// Create a new [`ResponseTypes<RT>`] to wrap the given [`Vec<RT>`].
     ///
     pub fn new(s: Vec<RT>) -> Self {
         ResponseTypes::<RT>(s)

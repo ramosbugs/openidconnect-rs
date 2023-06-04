@@ -43,7 +43,7 @@ impl<A> AdditionalProviderMetadata for LogoutProviderMetadata<A> where A: Additi
 ///
 /// Provider metadata returned by [OpenID Connect Discovery](
 /// https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata)
-/// that returns [`openidconnect::ProviderMetadata::additional_metadata`] for providers
+/// that returns [`ProviderMetadata::additional_metadata`] for providers
 /// implementing [OpenID Connect RP-Initiated Logout 1.0](
 /// https://openid.net/specs/openid-connect-rpinitiated-1_0.html).
 ///

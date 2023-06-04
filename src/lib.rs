@@ -1072,7 +1072,7 @@ where
     /// Acquires ownership of the `code` because authorization codes may only be used once to
     /// retrieve an access token from the authorization server.
     ///
-    /// See https://tools.ietf.org/html/rfc6749#section-4.1.3
+    /// See <https://tools.ietf.org/html/rfc6749#section-4.1.3>
     ///
     pub fn exchange_code(&self, code: AuthorizationCode) -> CodeTokenRequest<TE, TR, TT> {
         self.oauth2_client.exchange_code(code)
@@ -1114,7 +1114,7 @@ where
     ///
     /// Creates a request builder for exchanging a refresh token for an access token.
     ///
-    /// See https://tools.ietf.org/html/rfc6749#section-6
+    /// See <https://tools.ietf.org/html/rfc6749#section-6>
     ///
     pub fn exchange_refresh_token<'a, 'b>(
         &'a self,
@@ -1129,7 +1129,7 @@ where
     ///
     /// Creates a request builder for exchanging credentials for an access token.
     ///
-    /// See https://tools.ietf.org/html/rfc6749#section-6
+    /// See <https://tools.ietf.org/html/rfc6749#section-6>
     ///
     pub fn exchange_password<'a, 'b>(
         &'a self,
@@ -1145,7 +1145,7 @@ where
     ///
     /// Creates a request builder for exchanging client credentials for an access token.
     ///
-    /// See https://tools.ietf.org/html/rfc6749#section-4.4
+    /// See <https://tools.ietf.org/html/rfc6749#section-4.4>
     ///
     pub fn exchange_client_credentials<'a, 'b>(
         &'a self,
@@ -1194,7 +1194,7 @@ where
     ///
     /// Creates a request builder for obtaining metadata about a previously received token.
     ///
-    /// See https://tools.ietf.org/html/rfc7662
+    /// See <https://tools.ietf.org/html/rfc7662>
     ///
     pub fn introspect<'a>(
         &'a self,
@@ -1212,7 +1212,7 @@ where
     /// Attempting to submit the generated request without calling [`set_revocation_uri()`](Self::set_revocation_uri())
     /// first will result in an error.
     ///
-    /// See https://tools.ietf.org/html/rfc7009
+    /// See <https://tools.ietf.org/html/rfc7009>
     ///
     pub fn revoke_token(
         &self,
