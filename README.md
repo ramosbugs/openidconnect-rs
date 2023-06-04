@@ -52,6 +52,7 @@ new major version number for this crate.
 * [OpenID Connect RP-Initiated Logout](https://openid.net/specs/openid-connect-rpinitiated-1_0.html)
 * [OAuth 2.0 Token Introspection](https://tools.ietf.org/html/rfc7662)
 * [OAuth 2.0 Token Revocation](https://tools.ietf.org/html/rfc7009)
+* [OAuth 2.0 Device Authorization Grant](https://www.rfc-editor.org/rfc/rfc8628)
 
 ## Sponsorship
 
