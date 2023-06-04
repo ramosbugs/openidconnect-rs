@@ -8,8 +8,6 @@ pub use oauth2::basic::{
 };
 
 use oauth2::devicecode::{DeviceAuthorizationResponse, EmptyExtraDeviceAuthorizationFields};
-pub use oauth2::DeviceAuthorizationUrl as CoreDeviceAuthorizationUrl;
-
 pub use oauth2::StandardRevocableToken as CoreRevocableToken;
 use oauth2::{
     EmptyExtraTokenFields, ErrorResponseType, ResponseType as OAuth2ResponseType,
@@ -43,7 +41,7 @@ mod crypto;
 mod jwk;
 
 ///
-/// OpenID Connect Core device authorization response.
+/// Standard implementation of DeviceAuthorizationResponse which throws away extra received response fields.
 ///
 pub type CoreDeviceAuthorizationResponse =
     DeviceAuthorizationResponse<EmptyExtraDeviceAuthorizationFields>;

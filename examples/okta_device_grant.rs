@@ -17,14 +17,13 @@
 
 use openidconnect::core::{
     CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClient, CoreClientAuthMethod,
-    CoreDeviceAuthorizationResponse, CoreDeviceAuthorizationUrl, CoreGrantType, CoreJsonWebKey,
-    CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm,
-    CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm, CoreResponseMode, CoreResponseType,
-    CoreSubjectIdentifierType,
+    CoreDeviceAuthorizationResponse, CoreGrantType, CoreJsonWebKey, CoreJsonWebKeyType,
+    CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm,
+    CoreJwsSigningAlgorithm, CoreResponseMode, CoreResponseType, CoreSubjectIdentifierType,
 };
 use openidconnect::{
-    AdditionalProviderMetadata, AuthType, ClientId, ClientSecret, IssuerUrl, ProviderMetadata,
-    Scope,
+    AdditionalProviderMetadata, AuthType, ClientId, ClientSecret, DeviceAuthorizationUrl,
+    IssuerUrl, ProviderMetadata, Scope,
 };
 use std::env;
 
@@ -37,7 +36,7 @@ use std::process::exit;
 // Obtain the device_authorization_url from the OIDC metadata provider.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct DeviceEndpointProviderMetadata {
-    device_authorization_endpoint: CoreDeviceAuthorizationUrl,
+    device_authorization_endpoint: DeviceAuthorizationUrl,
 }
 impl AdditionalProviderMetadata for DeviceEndpointProviderMetadata {}
 type DeviceProviderMetadata = ProviderMetadata<
@@ -97,7 +96,7 @@ fn main() -> Result<(), anyhow::Error> {
         .device_authorization_endpoint
         .clone();
 
-    // Set up the config for the Okta devuce authorization process.
+    // Set up the config for the Okta device authorization process.
     let client =
         CoreClient::from_provider_metadata(provider_metadata, client_id, Some(client_secret))
             .set_device_authorization_uri(device_authorization_endpoint)
@@ -114,17 +113,13 @@ fn main() -> Result<(), anyhow::Error> {
     // Display the URL and user-code.
     println!(
         "Open this URL in your browser:\n{}\nand enter the code: {}",
-        details
-            .verification_uri_complete()
-            .unwrap()
-            .secret()
-            .to_string(),
-        details.user_code().secret().to_string()
+        details.verification_uri_complete().unwrap().secret(),
+        details.user_code().secret()
     );
 
     // Now poll for the token
     let token = client
-        .exchange_device_token(&details)
+        .exchange_device_access_token(&details)
         .request(http_client, std::thread::sleep, None)
         .expect("Failed to get token");
 

@@ -576,9 +576,12 @@ extern crate pretty_assertions;
 #[macro_use]
 extern crate serde_derive;
 
-pub use oauth2::devicecode::{DeviceAuthorizationResponse, EmptyExtraDeviceAuthorizationFields};
+pub use oauth2::devicecode::{
+    DeviceAuthorizationResponse, DeviceCodeErrorResponse, DeviceCodeErrorResponseType,
+    EmptyExtraDeviceAuthorizationFields, ExtraDeviceAuthorizationFields,
+};
 use oauth2::ResponseType as OAuth2ResponseType;
-pub use oauth2::{DeviceAccessTokenRequest, DeviceAuthorizationRequest};
+pub use oauth2::{DeviceAccessTokenRequest, DeviceAuthorizationRequest, DeviceCode};
 use url::Url;
 
 use std::borrow::Cow;
@@ -1078,9 +1081,9 @@ where
     }
 
     ///
-    /// Creates a request builder for exchanging a device code for an access token.
+    /// Creates a request builder for device authorization.
     ///
-    /// See https://tools.ietf.org/html/rfc8628#section-3.4
+    /// See <https://tools.ietf.org/html/rfc8628#section-3.4>
     ///
     pub fn exchange_device_code(
         &self,
@@ -1095,19 +1098,16 @@ where
 
     ///
     /// Creates a request builder for exchanging a device code for an access token.
-    /// This method is similar to [`exchange_device_code`][Client::exchange_device_code] but
-    /// allows the caller to specify additional parameters to be sent to the authorization server.
-    /// This is useful for providers that require additional parameters to be sent in the request
-    /// body.
     ///
-    /// See https://tools.ietf.org/html/rfc8628#section-3.4
+    /// See <https://tools.ietf.org/html/rfc8628#section-3.4>
     ///
-    pub fn exchange_device_token<'a, 'b, 'c>(
+    pub fn exchange_device_access_token<'a, 'b, 'c, EF>(
         &'a self,
-        auth_response: &'b DeviceAuthorizationResponse<EmptyExtraDeviceAuthorizationFields>,
-    ) -> DeviceAccessTokenRequest<'b, 'c, TR, TT, EmptyExtraDeviceAuthorizationFields>
+        auth_response: &'b DeviceAuthorizationResponse<EF>,
+    ) -> DeviceAccessTokenRequest<'b, 'c, TR, TT, EF>
     where
         'a: 'b,
+        EF: ExtraDeviceAuthorizationFields,
     {
         self.oauth2_client
             .exchange_device_access_token(auth_response)
