@@ -576,12 +576,7 @@ extern crate pretty_assertions;
 #[macro_use]
 extern crate serde_derive;
 
-pub use oauth2::devicecode::{
-    DeviceAuthorizationResponse, DeviceCodeErrorResponse, DeviceCodeErrorResponseType,
-    EmptyExtraDeviceAuthorizationFields, ExtraDeviceAuthorizationFields,
-};
 use oauth2::ResponseType as OAuth2ResponseType;
-pub use oauth2::{DeviceAccessTokenRequest, DeviceAuthorizationRequest, DeviceCode};
 use url::Url;
 
 use std::borrow::Cow;
@@ -591,14 +586,17 @@ use std::time::Duration;
 
 pub use oauth2::{
     AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientCredentialsTokenRequest, ClientId,
-    ClientSecret, CodeTokenRequest, ConfigurationError, CsrfToken, DeviceAuthorizationUrl,
-    EmptyExtraTokenFields, ErrorResponse, ErrorResponseType, ExtraTokenFields, HttpRequest,
-    HttpResponse, IntrospectionRequest, IntrospectionUrl, PasswordTokenRequest, PkceCodeChallenge,
+    ClientSecret, CodeTokenRequest, ConfigurationError, CsrfToken, DeviceAccessTokenRequest,
+    DeviceAuthorizationRequest, DeviceAuthorizationResponse, DeviceAuthorizationUrl, DeviceCode,
+    DeviceCodeErrorResponse, DeviceCodeErrorResponseType, EmptyExtraDeviceAuthorizationFields,
+    EmptyExtraTokenFields, EndUserVerificationUrl, ErrorResponse, ErrorResponseType,
+    ExtraDeviceAuthorizationFields, ExtraTokenFields, HttpRequest, HttpResponse,
+    IntrospectionRequest, IntrospectionUrl, PasswordTokenRequest, PkceCodeChallenge,
     PkceCodeChallengeMethod, PkceCodeVerifier, RedirectUrl, RefreshToken, RefreshTokenRequest,
     RequestTokenError, ResourceOwnerPassword, ResourceOwnerUsername, RevocableToken,
     RevocationErrorResponseType, RevocationRequest, RevocationUrl, Scope, StandardErrorResponse,
     StandardTokenIntrospectionResponse, StandardTokenResponse, TokenIntrospectionResponse,
-    TokenResponse as OAuth2TokenResponse, TokenType, TokenUrl,
+    TokenResponse as OAuth2TokenResponse, TokenType, TokenUrl, UserCode, VerificationUriComplete,
 };
 
 ///
