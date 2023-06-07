@@ -115,12 +115,12 @@ pub enum SignatureVerificationError {
 
 // This struct is intentionally private.
 #[derive(Clone)]
-struct JwtClaimsVerifier<'a, JS, JT, JU, K>
+struct JwtClaimsVerifier<'a, JS, JT, JU, JK>
 where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    JK: JsonWebKey<JS, JT, JU>,
 {
     allowed_algs: Option<HashSet<JS>>,
     aud_match_required: bool,
@@ -130,19 +130,20 @@ where
     issuer: IssuerUrl,
     is_signature_check_enabled: bool,
     other_aud_verifier_fn: Arc<dyn Fn(&Audience) -> bool + 'a + Send + Sync>,
-    signature_keys: JsonWebKeySet<JS, JT, JU, K>,
+    signature_keys: JsonWebKeySet<JS, JT, JU, JK>,
+    _phantom_jk: PhantomData<JK>
 }
-impl<'a, JS, JT, JU, K> JwtClaimsVerifier<'a, JS, JT, JU, K>
+impl<'a, JS, JT, JU, JK> JwtClaimsVerifier<'a, JS, JT, JU, JK>
 where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    JK: JsonWebKey<JS, JT, JU>,
 {
     pub fn new(
         client_id: ClientId,
         issuer: IssuerUrl,
-        signature_keys: JsonWebKeySet<JS, JT, JU, K>,
+        signature_keys: JsonWebKeySet<JS, JT, JU, JK>,
     ) -> Self {
         JwtClaimsVerifier {
             allowed_algs: Some([JS::rsa_sha_256()].iter().cloned().collect()),
@@ -157,6 +158,7 @@ where
             // to this relying party.
             other_aud_verifier_fn: Arc::new(|_| false),
             signature_keys,
+            _phantom_jk: PhantomData
         }
     }
 
@@ -201,7 +203,7 @@ where
     }
 
     fn validate_jose_header<JE>(
-        jose_header: &JsonWebTokenHeader<JE, JS, JT>,
+        jose_header: &JsonWebTokenHeader<JE, JS, JT, JK, JU>,
     ) -> Result<(), ClaimsVerificationError>
     where
         JE: JweContentEncryptionAlgorithm<JT>,
@@ -245,7 +247,7 @@ where
 
     pub fn verified_claims<A, C, JE, T>(&self, jwt: A) -> Result<T, ClaimsVerificationError>
     where
-        A: JsonWebTokenAccess<JE, JS, JT, C, ReturnType = T>,
+        A: JsonWebTokenAccess<JE, JS, JT, JK, JU, C, ReturnType = T>,
         C: AudiencesClaim + Debug + DeserializeOwned + IssuerClaim + Serialize,
         JE: JweContentEncryptionAlgorithm<JT>,
         T: AudiencesClaim + IssuerClaim,
@@ -400,7 +402,7 @@ where
             //    is unspecified if the aud is multi-valued or if an azp value is present that
             //    is different than the aud value.
             if let Some(ref client_secret) = self.client_secret {
-                let key = K::new_symmetric(client_secret.secret().clone().into_bytes());
+                let key = JK::new_symmetric(client_secret.secret().clone().into_bytes());
                 return jwt
                     .payload(&signature_alg, &key)
                     .map_err(ClaimsVerificationError::SignatureVerification);
@@ -437,7 +439,7 @@ where
                         // is acceptable), or the 'kid' matches the key's ID.
                         (jose_header.kid.is_none() ||
                             jose_header.kid.as_ref() == key.key_id()))
-                .collect::<Vec<&K>>()
+                .collect::<Vec<&JK>>()
         };
         if public_keys.is_empty() {
             return Err(ClaimsVerificationError::SignatureVerification(
@@ -517,12 +519,12 @@ where
 /// ID token verifier.
 ///
 #[derive(Clone)]
-pub struct IdTokenVerifier<'a, JS, JT, JU, K>
+pub struct IdTokenVerifier<'a, JS, JT, JU, JK>
 where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    JK: JsonWebKey<JS, JT, JU>,
 {
     acr_verifier_fn:
         Arc<dyn Fn(Option<&AuthenticationContextClass>) -> Result<(), String> + 'a + Send + Sync>,
@@ -530,17 +532,17 @@ where
     auth_time_verifier_fn:
         Arc<dyn Fn(Option<DateTime<Utc>>) -> Result<(), String> + 'a + Send + Sync>,
     iat_verifier_fn: Arc<dyn Fn(DateTime<Utc>) -> Result<(), String> + 'a + Send + Sync>,
-    jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>,
+    jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, JK>,
     time_fn: Arc<dyn Fn() -> DateTime<Utc> + 'a + Send + Sync>,
 }
-impl<'a, JS, JT, JU, K> IdTokenVerifier<'a, JS, JT, JU, K>
+impl<'a, JS, JT, JU, JK> IdTokenVerifier<'a, JS, JT, JU, JK>
 where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    JK: JsonWebKey<JS, JT, JU>,
 {
-    fn new(jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>) -> Self {
+    fn new(jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, JK>) -> Self {
         IdTokenVerifier {
             // By default, accept authorization context reference (acr claim).
             acr_verifier_fn: Arc::new(|_| Ok(())),
@@ -559,7 +561,7 @@ where
     pub fn new_public_client(
         client_id: ClientId,
         issuer: IssuerUrl,
-        signature_keys: JsonWebKeySet<JS, JT, JU, K>,
+        signature_keys: JsonWebKeySet<JS, JT, JU, JK>,
     ) -> Self {
         Self::new(JwtClaimsVerifier::new(client_id, issuer, signature_keys))
     }
@@ -592,7 +594,7 @@ where
         client_id: ClientId,
         client_secret: ClientSecret,
         issuer: IssuerUrl,
-        signature_keys: JsonWebKeySet<JS, JT, JU, K>,
+        signature_keys: JsonWebKeySet<JS, JT, JU, JK>,
     ) -> Self {
         Self::new(
             JwtClaimsVerifier::new(client_id, issuer, signature_keys)
@@ -737,7 +739,7 @@ where
 
     pub(super) fn verified_claims<'b, AC, GC, JE, N>(
         &self,
-        jwt: &'b JsonWebToken<JE, JS, JT, IdTokenClaims<AC, GC>, JsonWebTokenJsonPayloadSerde>,
+        jwt: &'b JsonWebToken<JE, JS, JT, JK, JU, IdTokenClaims<AC, GC>, JsonWebTokenJsonPayloadSerde>,
         nonce_verifier: N,
     ) -> Result<&'b IdTokenClaims<AC, GC>, ClaimsVerificationError>
     where
@@ -758,7 +760,7 @@ where
 
     pub(super) fn verified_claims_owned<AC, GC, JE, N>(
         &self,
-        jwt: JsonWebToken<JE, JS, JT, IdTokenClaims<AC, GC>, JsonWebTokenJsonPayloadSerde>,
+        jwt: JsonWebToken<JE, JS, JT, JK, JU, IdTokenClaims<AC, GC>, JsonWebTokenJsonPayloadSerde>,
         nonce_verifier: N,
     ) -> Result<IdTokenClaims<AC, GC>, ClaimsVerificationError>
     where
@@ -864,25 +866,25 @@ where
 /// User info verifier.
 ///
 #[derive(Clone)]
-pub struct UserInfoVerifier<'a, JE, JS, JT, JU, K>
+pub struct UserInfoVerifier<'a, JE, JS, JT, JU, JK>
 where
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    JK: JsonWebKey<JS, JT, JU>,
 {
-    jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, K>,
+    jwt_verifier: JwtClaimsVerifier<'a, JS, JT, JU, JK>,
     expected_subject: Option<SubjectIdentifier>,
     _phantom: PhantomData<JE>,
 }
-impl<'a, JE, JS, JT, JU, K> UserInfoVerifier<'a, JE, JS, JT, JU, K>
+impl<'a, JE, JS, JT, JU, JK> UserInfoVerifier<'a, JE, JS, JT, JU, JK>
 where
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    JK: JsonWebKey<JS, JT, JU>,
 {
     ///
     /// Instantiates a user info verifier.
@@ -890,7 +892,7 @@ where
     pub fn new(
         client_id: ClientId,
         issuer: IssuerUrl,
-        signature_keys: JsonWebKeySet<JS, JT, JU, K>,
+        signature_keys: JsonWebKeySet<JS, JT, JU, JK>,
         expected_subject: Option<SubjectIdentifier>,
     ) -> Self {
         UserInfoVerifier {
@@ -926,6 +928,8 @@ where
             JE,
             JS,
             JT,
+            JK,
+            JU,
             UserInfoClaimsImpl<AC, GC>,
             JsonWebTokenJsonPayloadSerde,
         >,
@@ -983,6 +987,8 @@ mod tests {
         CoreJweContentEncryptionAlgorithm,
         CoreJwsSigningAlgorithm,
         CoreJsonWebKeyType,
+        CoreJsonWebKey,
+        CoreJsonWebKeyUse,
     >;
 
     type CoreJwtClaimsVerifier<'a> = JwtClaimsVerifier<
@@ -1072,6 +1078,8 @@ mod tests {
         CoreJweContentEncryptionAlgorithm,
         CoreJwsSigningAlgorithm,
         CoreJsonWebKeyType,
+        CoreJsonWebKey,
+        CoreJsonWebKeyUse,
         TestClaims,
         JsonWebTokenJsonPayloadSerde,
     >;
@@ -1538,6 +1546,8 @@ mod tests {
         CoreJweContentEncryptionAlgorithm,
         CoreJwsSigningAlgorithm,
         CoreJsonWebKeyType,
+        CoreJsonWebKey,
+        CoreJsonWebKeyUse,
         CoreIdTokenClaims,
         JsonWebTokenJsonPayloadSerde,
     >;

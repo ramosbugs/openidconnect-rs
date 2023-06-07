@@ -29,26 +29,26 @@ use crate::{
 ///
 /// User info request.
 ///
-pub struct UserInfoRequest<'a, JE, JS, JT, JU, K>
+pub struct UserInfoRequest<'a, JE, JS, JT, JU, JK>
 where
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    JK: JsonWebKey<JS, JT, JU>,
 {
     pub(super) url: &'a UserInfoUrl,
     pub(super) access_token: AccessToken,
     pub(super) require_signed_response: bool,
-    pub(super) signed_response_verifier: UserInfoVerifier<'static, JE, JS, JT, JU, K>,
+    pub(super) signed_response_verifier: UserInfoVerifier<'static, JE, JS, JT, JU, JK>,
 }
-impl<'a, JE, JS, JT, JU, K> UserInfoRequest<'a, JE, JS, JT, JU, K>
+impl<'a, JE, JS, JT, JU, JK> UserInfoRequest<'a, JE, JS, JT, JU, JK>
 where
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    JK: JsonWebKey<JS, JT, JU>,
 {
     ///
     /// Submits this request to the associated user info endpoint using the specified synchronous
@@ -145,7 +145,7 @@ where
                 let jwt_str = String::from_utf8(http_response.body).map_err(|_| {
                     UserInfoError::Other("response body has invalid UTF-8 encoding".to_string())
                 })?;
-                serde_path_to_error::deserialize::<_, UserInfoJsonWebToken<AC, GC, JE, JS, JT>>(
+                serde_path_to_error::deserialize::<_, UserInfoJsonWebToken<AC, GC, JE, JS, JT, JK, JU>>(
                     serde_json::Value::String(jwt_str),
                 )
                 .map_err(UserInfoError::Parse)?
@@ -392,31 +392,33 @@ pub struct UserInfoJsonWebToken<
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
+    JK: JsonWebKey<JS, JT, JU>,
+    JU: JsonWebKeyUse,
 >(
     #[serde(bound = "AC: AdditionalClaims")]
-    JsonWebToken<JE, JS, JT, UserInfoClaimsImpl<AC, GC>, JsonWebTokenJsonPayloadSerde>,
+    JsonWebToken<JE, JS, JT, JK, JU, UserInfoClaimsImpl<AC, GC>, JsonWebTokenJsonPayloadSerde>,
 );
-impl<AC, GC, JE, JS, JT> UserInfoJsonWebToken<AC, GC, JE, JS, JT>
+impl<AC, GC, JE, JS, JT, JK, JU> UserInfoJsonWebToken<AC, GC, JE, JS, JT, JK, JU>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
     JE: JweContentEncryptionAlgorithm<JT>,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
+    JK: JsonWebKey<JS, JT, JU>,
+    JU: JsonWebKeyUse,
 {
     ///
     /// Initializes a new signed JWT containing the specified claims, signed with the specified key
     /// and signing algorithm.
     ///
-    pub fn new<JU, K, S>(
+    pub fn new<S>(
         claims: UserInfoClaims<AC, GC>,
         signing_key: &S,
         alg: JS,
     ) -> Result<Self, JsonWebTokenError>
     where
-        JU: JsonWebKeyUse,
-        K: JsonWebKey<JS, JT, JU>,
-        S: PrivateSigningKey<JS, JT, JU, K>,
+        S: PrivateSigningKey<JS, JT, JU, JK>,
     {
         Ok(Self(JsonWebToken::new(claims.0, signing_key, &alg)?))
     }
@@ -424,13 +426,10 @@ where
     ///
     /// Verifies and returns the user info claims.
     ///
-    pub fn claims<JU, K>(
+    pub fn claims(
         self,
-        verifier: &UserInfoVerifier<JE, JS, JT, JU, K>,
+        verifier: &UserInfoVerifier<JE, JS, JT, JU, JK>,
     ) -> Result<UserInfoClaims<AC, GC>, ClaimsVerificationError>
-    where
-        JU: JsonWebKeyUse,
-        K: JsonWebKey<JS, JT, JU>,
     {
         Ok(UserInfoClaims(verifier.verified_claims(self.0)?))
     }

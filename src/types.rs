@@ -211,7 +211,7 @@ pub enum SigningError {
 ///
 /// JSON Web Key.
 ///
-pub trait JsonWebKey<JS, JT, JU>: Clone + Debug + DeserializeOwned + Serialize + 'static
+pub trait JsonWebKey<JS, JT, JU>: Clone + Debug + Default + DeserializeOwned + Serialize + 'static
 where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,

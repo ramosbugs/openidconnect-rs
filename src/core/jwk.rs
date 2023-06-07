@@ -20,7 +20,7 @@ use super::{crypto, CoreJwsSigningAlgorithm};
 ///
 /// Public or symmetric key expressed as a JSON Web Key.
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct CoreJsonWebKey {
     pub(crate) kty: CoreJsonWebKeyType,
     #[serde(rename = "use", skip_serializing_if = "Option::is_none")]
@@ -544,7 +544,7 @@ impl
 ///
 /// Type of JSON Web Key.
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[non_exhaustive]
 pub enum CoreJsonWebKeyType {
     ///
@@ -557,6 +557,7 @@ pub enum CoreJsonWebKeyType {
     ///
     /// RSA key.
     ///
+    #[default]
     #[serde(rename = "RSA")]
     RSA,
     ///

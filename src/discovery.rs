@@ -43,7 +43,7 @@ impl AdditionalProviderMetadata for EmptyAdditionalProviderMetadata {}
 #[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[allow(clippy::type_complexity)]
-pub struct ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RT, S>
+pub struct ProviderMetadata<A, AD, CA, CN, CT, G, JE, JA, JS, JT, JU, JK, RM, RT, S>
 where
     A: AdditionalProviderMetadata,
     AD: AuthDisplay,
@@ -52,11 +52,11 @@ where
     CT: ClaimType,
     G: GrantType,
     JE: JweContentEncryptionAlgorithm<JT>,
-    JK: JweKeyManagementAlgorithm,
+    JA: JweKeyManagementAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    JK: JsonWebKey<JS, JT, JU>,
     RM: ResponseMode,
     RT: ResponseType,
     S: SubjectIdentifierType,
@@ -67,7 +67,7 @@ where
     userinfo_endpoint: Option<UserInfoUrl>,
     jwks_uri: JsonWebKeySetUrl,
     #[serde(default = "JsonWebKeySet::default", skip)]
-    jwks: JsonWebKeySet<JS, JT, JU, K>,
+    jwks: JsonWebKeySet<JS, JT, JU, JK>,
     registration_endpoint: Option<RegistrationUrl>,
     scopes_supported: Option<Vec<Scope>>,
     #[serde(bound(deserialize = "RT: ResponseType"))]
@@ -83,11 +83,11 @@ where
     #[serde_as(as = "VecSkipError<_>")]
     id_token_signing_alg_values_supported: Vec<JS>,
     #[serde(
-        bound(deserialize = "JK: JweKeyManagementAlgorithm"),
+        bound(deserialize = "JA: JweKeyManagementAlgorithm"),
         default = "Option::default"
     )]
     #[serde_as(as = "Option<VecSkipError<_>>")]
-    id_token_encryption_alg_values_supported: Option<Vec<JK>>,
+    id_token_encryption_alg_values_supported: Option<Vec<JA>>,
     #[serde(
         bound(deserialize = "JE: JweContentEncryptionAlgorithm<JT>"),
         default = "Option::default"
@@ -101,11 +101,11 @@ where
     #[serde_as(as = "Option<VecSkipError<_>>")]
     userinfo_signing_alg_values_supported: Option<Vec<JS>>,
     #[serde(
-        bound(deserialize = "JK: JweKeyManagementAlgorithm"),
+        bound(deserialize = "JA: JweKeyManagementAlgorithm"),
         default = "Option::default"
     )]
     #[serde_as(as = "Option<VecSkipError<_>>")]
-    userinfo_encryption_alg_values_supported: Option<Vec<JK>>,
+    userinfo_encryption_alg_values_supported: Option<Vec<JA>>,
     #[serde(
         bound(deserialize = "JE: JweContentEncryptionAlgorithm<JT>"),
         default = "Option::default"
@@ -119,11 +119,11 @@ where
     #[serde_as(as = "Option<VecSkipError<_>>")]
     request_object_signing_alg_values_supported: Option<Vec<JS>>,
     #[serde(
-        bound(deserialize = "JK: JweKeyManagementAlgorithm"),
+        bound(deserialize = "JA: JweKeyManagementAlgorithm"),
         default = "Option::default"
     )]
     #[serde_as(as = "Option<VecSkipError<_>>")]
-    request_object_encryption_alg_values_supported: Option<Vec<JK>>,
+    request_object_encryption_alg_values_supported: Option<Vec<JA>>,
     #[serde(
         bound(deserialize = "JE: JweContentEncryptionAlgorithm<JT>"),
         default = "Option::default"
@@ -160,8 +160,8 @@ where
     #[serde(skip)]
     _phantom_jt: PhantomData<JT>,
 }
-impl<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RT, S>
-    ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RT, S>
+impl<A, AD, CA, CN, CT, G, JE, JA, JS, JT, JU, JK, RM, RT, S>
+    ProviderMetadata<A, AD, CA, CN, CT, G, JE, JA, JS, JT, JU, JK, RM, RT, S>
 where
     A: AdditionalProviderMetadata,
     AD: AuthDisplay,
@@ -170,11 +170,11 @@ where
     CT: ClaimType,
     G: GrantType,
     JE: JweContentEncryptionAlgorithm<JT>,
-    JK: JweKeyManagementAlgorithm,
+    JA: JweKeyManagementAlgorithm,
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    JK: JsonWebKey<JS, JT, JU>,
     RM: ResponseMode,
     RT: ResponseType,
     S: SubjectIdentifierType,
@@ -240,7 +240,7 @@ where
             set_token_endpoint -> token_endpoint[Option<TokenUrl>],
             set_userinfo_endpoint -> userinfo_endpoint[Option<UserInfoUrl>],
             set_jwks_uri -> jwks_uri[JsonWebKeySetUrl],
-            set_jwks -> jwks[JsonWebKeySet<JS, JT, JU, K>],
+            set_jwks -> jwks[JsonWebKeySet<JS, JT, JU, JK>],
             set_registration_endpoint -> registration_endpoint[Option<RegistrationUrl>],
             set_scopes_supported -> scopes_supported[Option<Vec<Scope>>],
             set_response_types_supported -> response_types_supported[Vec<ResponseTypes<RT>>],
@@ -252,19 +252,19 @@ where
             set_id_token_signing_alg_values_supported
                 -> id_token_signing_alg_values_supported[Vec<JS>],
             set_id_token_encryption_alg_values_supported
-                -> id_token_encryption_alg_values_supported[Option<Vec<JK>>],
+                -> id_token_encryption_alg_values_supported[Option<Vec<JA>>],
             set_id_token_encryption_enc_values_supported
                 -> id_token_encryption_enc_values_supported[Option<Vec<JE>>],
             set_userinfo_signing_alg_values_supported
                 -> userinfo_signing_alg_values_supported[Option<Vec<JS>>],
             set_userinfo_encryption_alg_values_supported
-                -> userinfo_encryption_alg_values_supported[Option<Vec<JK>>],
+                -> userinfo_encryption_alg_values_supported[Option<Vec<JA>>],
             set_userinfo_encryption_enc_values_supported
                 -> userinfo_encryption_enc_values_supported[Option<Vec<JE>>],
             set_request_object_signing_alg_values_supported
                 -> request_object_signing_alg_values_supported[Option<Vec<JS>>],
             set_request_object_encryption_alg_values_supported
-                -> request_object_encryption_alg_values_supported[Option<Vec<JK>>],
+                -> request_object_encryption_alg_values_supported[Option<Vec<JA>>],
             set_request_object_encryption_enc_values_supported
                 -> request_object_encryption_enc_values_supported[Option<Vec<JE>>],
             set_token_endpoint_auth_methods_supported
