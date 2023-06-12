@@ -332,6 +332,11 @@ macro_rules! new_url_type {
                 &self.1
             }
         }
+        impl From<Url> for $name {
+            fn from(value: Url) -> Self {
+                Self::from_url(value)
+            }
+        }
         impl ::std::fmt::Debug for $name {
             fn fmt(&self, f: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
                 let mut debug_trait_builder = f.debug_tuple(stringify!($name));
