@@ -84,7 +84,7 @@ pub fn verify_ec_signature(
     msg: &[u8],
     signature: &[u8],
 ) -> Result<(), SignatureVerificationError> {
-    use p256::ecdsa::signature::{Signature, Verifier};
+    use p256::ecdsa::signature::Verifier;
 
     let (x, y, crv) = ec_public_key(key).map_err(SignatureVerificationError::InvalidKey)?;
     let mut pk = vec![0x04];
@@ -97,7 +97,7 @@ pub fn verify_ec_signature(
             public_key
                 .verify(
                     msg,
-                    &p256::ecdsa::Signature::from_bytes(signature).map_err(|_| {
+                    &p256::ecdsa::Signature::from_slice(signature).map_err(|_| {
                         SignatureVerificationError::CryptoError("Invalid signature".to_string())
                     })?,
                 )
@@ -111,7 +111,7 @@ pub fn verify_ec_signature(
             public_key
                 .verify(
                     msg,
-                    &p384::ecdsa::Signature::from_bytes(signature).map_err(|_| {
+                    &p384::ecdsa::Signature::from_slice(signature).map_err(|_| {
                         SignatureVerificationError::CryptoError("Invalid signature".to_string())
                     })?,
                 )
