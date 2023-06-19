@@ -182,7 +182,7 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
                 };
                 crypto::verify_rsa_signature(
                     self,
-                    rsa::PaddingScheme::new_pkcs1v15_sign::<sha2::Sha256>(),
+                    rsa::Pkcs1v15Sign::new::<sha2::Sha256>(),
                     message,
                     signature,
                 )
@@ -195,7 +195,7 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
                 };
                 crypto::verify_rsa_signature(
                     self,
-                    rsa::PaddingScheme::new_pkcs1v15_sign::<sha2::Sha384>(),
+                    rsa::Pkcs1v15Sign::new::<sha2::Sha384>(),
                     message,
                     signature,
                 )
@@ -208,7 +208,7 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
                 };
                 crypto::verify_rsa_signature(
                     self,
-                    rsa::PaddingScheme::new_pkcs1v15_sign::<sha2::Sha512>(),
+                    rsa::Pkcs1v15Sign::new::<sha2::Sha512>(),
                     message,
                     signature,
                 )
@@ -221,7 +221,7 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
                 };
                 crypto::verify_rsa_signature(
                     self,
-                    rsa::PaddingScheme::new_pss::<sha2::Sha256>(),
+                    rsa::Pss::new::<sha2::Sha256>(),
                     message,
                     signature,
                 )
@@ -234,7 +234,7 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
                 };
                 crypto::verify_rsa_signature(
                     self,
-                    rsa::PaddingScheme::new_pss::<sha2::Sha384>(),
+                    rsa::Pss::new::<sha2::Sha384>(),
                     message,
                     signature,
                 )
@@ -247,7 +247,7 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
                 };
                 crypto::verify_rsa_signature(
                     self,
-                    rsa::PaddingScheme::new_pss::<sha2::Sha512>(),
+                    rsa::Pss::new::<sha2::Sha512>(),
                     message,
                     signature,
                 )
@@ -449,82 +449,99 @@ impl
         signature_alg: &CoreJwsSigningAlgorithm,
         msg: &[u8],
     ) -> Result<Vec<u8>, SigningError> {
-        let (padding_alg, hash) = match *signature_alg {
+        match *signature_alg {
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256 => {
                 let mut hasher = sha2::Sha256::new();
                 hasher.update(msg);
                 let hash = hasher.finalize().to_vec();
-                (
-                    rsa::PaddingScheme::new_pkcs1v15_sign::<sha2::Sha256>(),
-                    hash,
-                )
+
+                self.key_pair
+                    .sign_with_rng(
+                        &mut dyn_clone::clone_box(&self.rng),
+                        rsa::Pkcs1v15Sign::new::<sha2::Sha256>(),
+                        &hash,
+                    )
+                    .map_err(|_| SigningError::CryptoError)
             }
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384 => {
                 let mut hasher = sha2::Sha384::new();
                 hasher.update(msg);
                 let hash = hasher.finalize().to_vec();
-                (
-                    rsa::PaddingScheme::new_pkcs1v15_sign::<sha2::Sha384>(),
-                    hash,
-                )
+
+                self.key_pair
+                    .sign_with_rng(
+                        &mut dyn_clone::clone_box(&self.rng),
+                        rsa::Pkcs1v15Sign::new::<sha2::Sha384>(),
+                        &hash,
+                    )
+                    .map_err(|_| SigningError::CryptoError)
             }
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512 => {
                 let mut hasher = sha2::Sha512::new();
                 hasher.update(msg);
                 let hash = hasher.finalize().to_vec();
-                (
-                    rsa::PaddingScheme::new_pkcs1v15_sign::<sha2::Sha512>(),
-                    hash,
-                )
+
+                self.key_pair
+                    .sign_with_rng(
+                        &mut dyn_clone::clone_box(&self.rng),
+                        rsa::Pkcs1v15Sign::new::<sha2::Sha512>(),
+                        &hash,
+                    )
+                    .map_err(|_| SigningError::CryptoError)
             }
             CoreJwsSigningAlgorithm::RsaSsaPssSha256 => {
                 let mut hasher = sha2::Sha256::new();
                 hasher.update(msg);
                 let hash = hasher.finalize().to_vec();
-                (
-                    rsa::PaddingScheme::new_pss_with_salt::<sha2::Sha256>(hash.len()),
-                    hash,
-                )
+
+                self.key_pair
+                    .sign_with_rng(
+                        &mut dyn_clone::clone_box(&self.rng),
+                        rsa::Pss::new_with_salt::<sha2::Sha256>(hash.len()),
+                        &hash,
+                    )
+                    .map_err(|_| SigningError::CryptoError)
             }
             CoreJwsSigningAlgorithm::RsaSsaPssSha384 => {
                 let mut hasher = sha2::Sha384::new();
                 hasher.update(msg);
                 let hash = hasher.finalize().to_vec();
-                (
-                    rsa::PaddingScheme::new_pss_with_salt::<sha2::Sha384>(hash.len()),
-                    hash,
-                )
+
+                self.key_pair
+                    .sign_with_rng(
+                        &mut dyn_clone::clone_box(&self.rng),
+                        rsa::Pss::new_with_salt::<sha2::Sha384>(hash.len()),
+                        &hash,
+                    )
+                    .map_err(|_| SigningError::CryptoError)
             }
             CoreJwsSigningAlgorithm::RsaSsaPssSha512 => {
                 let mut hasher = sha2::Sha512::new();
                 hasher.update(msg);
                 let hash = hasher.finalize().to_vec();
-                (
-                    rsa::PaddingScheme::new_pss_with_salt::<sha2::Sha512>(hash.len()),
-                    hash,
-                )
-            }
-            ref other => {
-                return Err(SigningError::UnsupportedAlg(
-                    serde_plain::to_string(other).unwrap_or_else(|err| {
-                        panic!(
-                            "signature alg {:?} failed to serialize to a string: {}",
-                            other, err
-                        )
-                    }),
-                ))
-            }
-        };
 
-        let sig = self
-            .key_pair
-            .sign_blinded(&mut dyn_clone::clone_box(&self.rng), padding_alg, &hash)
-            .map_err(|_| SigningError::CryptoError)?;
-        Ok(sig)
+                self.key_pair
+                    .sign_with_rng(
+                        &mut dyn_clone::clone_box(&self.rng),
+                        rsa::Pss::new_with_salt::<sha2::Sha512>(hash.len()),
+                        &hash,
+                    )
+                    .map_err(|_| SigningError::CryptoError)
+            }
+            ref other => Err(SigningError::UnsupportedAlg(
+                serde_plain::to_string(other).unwrap_or_else(|err| {
+                    panic!(
+                        "signature alg {:?} failed to serialize to a string: {}",
+                        other, err
+                    )
+                }),
+            )),
+        }
     }
 
     fn as_verification_key(&self) -> CoreJsonWebKey {
-        use rsa::PublicKeyParts;
+        use rsa::traits::PublicKeyParts;
+
         let public_key = self.key_pair.to_public_key();
         CoreJsonWebKey {
             kty: CoreJsonWebKeyType::RSA,

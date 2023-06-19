@@ -54,12 +54,10 @@ fn ec_public_key(
 
 pub fn verify_rsa_signature(
     key: &CoreJsonWebKey,
-    padding: rsa::PaddingScheme,
+    padding: impl rsa::traits::SignatureScheme,
     msg: &[u8],
     signature: &[u8],
 ) -> Result<(), SignatureVerificationError> {
-    use rsa::PublicKey;
-
     let (n, e) = rsa_public_key(key).map_err(SignatureVerificationError::InvalidKey)?;
     // let's n and e as a big integers to prevent issues with leading zeros
     // according to https://datatracker.ietf.org/doc/html/rfc7518#section-6.3.1.1
@@ -157,7 +155,7 @@ mod tests {
         assert! {
             verify_rsa_signature(
                 &key,
-                rsa::PaddingScheme::new_pkcs1v15_sign::<sha2::Sha256>(),
+                rsa::Pkcs1v15Sign::new::<sha2::Sha256>(),
                 &hash,
                 &signature,
             ).is_ok()
