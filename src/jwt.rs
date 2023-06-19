@@ -232,11 +232,11 @@ where
 
         let header_json =
             serde_json::to_string(&header).map_err(JsonWebTokenError::SerializationError)?;
-        let header_base64 = base64::encode_config(&header_json, base64::URL_SAFE_NO_PAD);
+        let header_base64 = base64::encode_config(header_json, base64::URL_SAFE_NO_PAD);
 
         let serialized_payload =
             S::serialize(&payload).map_err(JsonWebTokenError::SerializationError)?;
-        let payload_base64 = base64::encode_config(&serialized_payload, base64::URL_SAFE_NO_PAD);
+        let payload_base64 = base64::encode_config(serialized_payload, base64::URL_SAFE_NO_PAD);
 
         let signing_input = format!("{}.{}", header_base64, payload_base64);
 
@@ -717,7 +717,7 @@ pub mod tests {
         )
         .unwrap();
         assert_eq!(
-            serde_json::to_value(&new_jwt).expect("failed to serialize"),
+            serde_json::to_value(new_jwt).expect("failed to serialize"),
             serde_json::Value::String(TEST_JWT.to_string())
         );
     }

@@ -2102,7 +2102,7 @@ mod tests {
              ZD4A4aIn0K7z5J9RvrR3L7DWnc3fJQ0VU2v5QLePyqNWnFxks5eyl8Ios8JrZhwr4Q8GES8Q4Iw8Sz6W9vYpHK\
              2r1YdaACMM4g_TTtV91lpjn-Li2-HxW9NERdLvYvF6HwGIwbss26trp2yjNTARlxBUT6LR7y82oPIJKXIKL1GD\
              YeSLeErhb6oTQ0a5gQ",
-            serde_json::to_value(&claims_jwt).unwrap().as_str().unwrap()
+            serde_json::to_value(claims_jwt).unwrap().as_str().unwrap()
         );
     }
 }
