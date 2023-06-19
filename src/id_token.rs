@@ -483,8 +483,18 @@ mod tests {
             *claims.audiences(),
             vec![Audience::new("s6BhdRkqt3".to_string())]
         );
-        assert_eq!(claims.expiration(), Utc.timestamp(1311281970, 0));
-        assert_eq!(claims.issue_time(), Utc.timestamp(1311280970, 0));
+        assert_eq!(
+            claims.expiration(),
+            Utc.timestamp_opt(1311281970, 0)
+                .single()
+                .expect("valid timestamp")
+        );
+        assert_eq!(
+            claims.issue_time(),
+            Utc.timestamp_opt(1311280970, 0)
+                .single()
+                .expect("valid timestamp")
+        );
         assert_eq!(
             *claims.subject(),
             SubjectIdentifier::new("24400320".to_string())
@@ -524,8 +534,18 @@ mod tests {
             *claims.audiences(),
             vec![Audience::new("s6BhdRkqt3".to_string())]
         );
-        assert_eq!(claims.expiration(), Utc.timestamp(1311281970, 0));
-        assert_eq!(claims.issue_time(), Utc.timestamp(1311280970, 0));
+        assert_eq!(
+            claims.expiration(),
+            Utc.timestamp_opt(1311281970, 0)
+                .single()
+                .expect("valid timestamp")
+        );
+        assert_eq!(
+            claims.issue_time(),
+            Utc.timestamp_opt(1311280970, 0)
+                .single()
+                .expect("valid timestamp")
+        );
         assert_eq!(
             *claims.subject(),
             SubjectIdentifier::new("24400320".to_string())
@@ -542,8 +562,12 @@ mod tests {
         let new_claims = CoreIdTokenClaims::new(
             IssuerUrl::new("https://server.example.com".to_string()).unwrap(),
             vec![Audience::new("s6BhdRkqt3".to_string())],
-            Utc.timestamp(1311281970, 0),
-            Utc.timestamp(1311280970, 0),
+            Utc.timestamp_opt(1311281970, 0)
+                .single()
+                .expect("valid timestamp"),
+            Utc.timestamp_opt(1311280970, 0)
+                .single()
+                .expect("valid timestamp"),
             StandardClaims::new(SubjectIdentifier::new("24400320".to_string())),
             EmptyAdditionalClaims {},
         );
@@ -666,8 +690,12 @@ mod tests {
         let new_claims = CoreIdTokenClaims::new(
             IssuerUrl::new("https://server.example.com".to_string()).unwrap(),
             vec![Audience::new("s6BhdRkqt3".to_string())],
-            Utc.timestamp(1311281970, 0),
-            Utc.timestamp(1311280970, 0),
+            Utc.timestamp_opt(1311281970, 0)
+                .single()
+                .expect("valid timestamp"),
+            Utc.timestamp_opt(1311280970, 0)
+                .single()
+                .expect("valid timestamp"),
             StandardClaims {
                 sub: SubjectIdentifier::new("24400320".to_string()),
                 name: Some(
@@ -794,11 +822,19 @@ mod tests {
                     postal_code: Some(AddressPostalCode::new("90210".to_string())),
                     country: Some(AddressCountry::new("US".to_string())),
                 }),
-                updated_at: Some(Utc.timestamp(1311283970, 0)),
+                updated_at: Some(
+                    Utc.timestamp_opt(1311283970, 0)
+                        .single()
+                        .expect("valid timestamp"),
+                ),
             },
             EmptyAdditionalClaims {},
         )
-        .set_auth_time(Some(Utc.timestamp(1311282970, 0)))
+        .set_auth_time(Some(
+            Utc.timestamp_opt(1311282970, 0)
+                .single()
+                .expect("valid timestamp"),
+        ))
         .set_nonce(Some(Nonce::new("Zm9vYmFy".to_string())))
         .set_auth_context_ref(Some(AuthenticationContextClass::new(
             "urn:mace:incommon:iap:silver".to_string(),
@@ -884,7 +920,14 @@ mod tests {
             }",
         )
         .expect("failed to deserialize");
-        assert_eq!(claims.updated_at(), Some(Utc.timestamp(1640139037, 0)));
+        assert_eq!(
+            claims.updated_at(),
+            Some(
+                Utc.timestamp_opt(1640139037, 0)
+                    .single()
+                    .expect("valid timestamp")
+            )
+        );
     }
 
     #[test]
