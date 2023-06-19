@@ -52,7 +52,7 @@ serde_path_to_error = "0.1"
 serde_plain = "1.0"
 serde_with = "3"
 serde-value = "0.7"
-url = { version = "2.1", features = ["serde"] }
+url = { version = "2.4", features = ["serde"] }
 subtle = "2.4"
 
 [dev-dependencies]
