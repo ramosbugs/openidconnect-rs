@@ -1,12 +1,13 @@
 [package]
 name = "openidconnect"
-version = "3.2.1"
+version = "3.3.0"
 authors = ["David A. Ramos <ramos@cs.stanford.edu>"]
 description = "OpenID Connect library"
 license = "MIT"
 repository = "https://github.com/ramosbugs/openidconnect-rs"
 edition = "2021"
 readme = "README.md"
+rust-version = "1.65"
 
 [package.metadata.docs.rs]
 all-features = true

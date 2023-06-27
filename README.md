@@ -12,14 +12,17 @@ API documentation and examples are available on [docs.rs](https://docs.rs/openid
 
 ## Minimum Supported Rust Version (MSRV)
 
-The MSRV for *3.0.y to 3.1.y* releases of this crate is Rust **1.57**.
+The MSRV for *3.3* and newer releases of this crate is Rust **1.65**.
 
-The MSRV for *2.x.y* releases of this crate is Rust 1.45.
+The MSRV for *3.0* to *3.2* releases of this crate is Rust **1.57**.
+
+The MSRV for *2.x* releases of this crate is Rust 1.45.
 
 Since the 3.0.0 release, this crate maintains a policy of supporting
 Rust releases going back at least 6 months. Changes that break compatibility with Rust releases
 older than 6 months will no longer be considered SemVer breaking changes and will not result in a
-new major version number for this crate.
+new major version number for this crate. MSRV changes will coincide with minor version updates
+and will not happen in patch releases.
 
 ## Standards
 

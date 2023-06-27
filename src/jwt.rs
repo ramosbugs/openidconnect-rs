@@ -22,7 +22,7 @@ new_type![
     JsonWebTokenType(String)
 ];
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum JsonWebTokenAlgorithm<JE, JS, JT>
 where
@@ -95,7 +95,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct JsonWebTokenHeader<JE, JS, JT>
 where
     JE: JweContentEncryptionAlgorithm<JT>,
@@ -133,7 +133,7 @@ where
     fn serialize(payload: &P) -> Result<String, serde_json::Error>;
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct JsonWebTokenJsonPayloadSerde;
 impl<P> JsonWebTokenPayloadSerde<P> for JsonWebTokenJsonPayloadSerde
 where
@@ -192,7 +192,7 @@ pub enum JsonWebTokenError {
     SigningError(#[source] SigningError),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct JsonWebToken<JE, JS, JT, P, S>
 where
     JE: JweContentEncryptionAlgorithm<JT>,

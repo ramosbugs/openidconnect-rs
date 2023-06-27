@@ -30,7 +30,7 @@ pub(crate) trait IssuerClaim {
 ///
 /// Error verifying claims.
 ///
-#[derive(Clone, Debug, Error, PartialEq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ClaimsVerificationError {
     /// Claims have expired.
@@ -71,7 +71,7 @@ pub enum ClaimsVerificationError {
 ///
 /// Error verifying claims signature.
 ///
-#[derive(Clone, Debug, Error, PartialEq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SignatureVerificationError {
     /// More than one key matches the supplied key constraints (e.g., key ID).

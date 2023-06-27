@@ -22,7 +22,7 @@ use crate::{
 ///
 #[non_exhaustive]
 #[skip_serializing_none]
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct LogoutProviderMetadata<A>
 where
     A: AdditionalProviderMetadata,

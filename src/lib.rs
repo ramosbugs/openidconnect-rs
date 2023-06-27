@@ -689,7 +689,7 @@ const OPENID_SCOPE: &str = "openid";
 /// Authentication flow, which determines how the Authorization Server returns the OpenID Connect
 /// ID token and OAuth2 access token to the Relying Party.
 ///
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum AuthenticationFlow<RT: ResponseType> {
     ///
@@ -1693,7 +1693,7 @@ mod tests {
         );
 
         let (authorize_url, _, _) = client
-            .authorize_url(flow.clone(), new_csrf, new_nonce)
+            .authorize_url(flow, new_csrf, new_nonce)
             .add_scopes(vec![
                 Scope::new("email".to_string()),
                 Scope::new("profile".to_string()),

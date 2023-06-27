@@ -26,7 +26,7 @@ jobs:
       fail-fast: false
       matrix:
         rust_os:
-          - { rust: 1.57.0, os: ubuntu-22.04 }
+          - { rust: 1.65.0, os: ubuntu-22.04 }
           - { rust: stable, os: ubuntu-22.04 }
           - { rust: beta, os: ubuntu-22.04 }
           - { rust: nightly, os: ubuntu-22.04 }
@@ -52,12 +52,12 @@ jobs:
           components: clippy, rustfmt
           target: wasm32-unknown-unknown
 
-      # Newer dependency versions may not support rustc 1.57, so we use a Cargo.lock file for those
+      # Newer dependency versions may not support rustc 1.65, so we use a Cargo.lock file for those
       # builds.
-      - name: Use Rust 1.57 lockfile
-        if: ${{ matrix.rust_os.rust == '1.57.0' }}
+      - name: Use Rust 1.65 lockfile
+        if: ${{ matrix.rust_os.rust == '1.65.0' }}
         run: |
-          cp Cargo-1.57.lock Cargo.lock
+          cp Cargo-1.65.lock Cargo.lock
           echo "CARGO_LOCKED=--locked" >> $GITHUB_ENV
 
       - name: Run tests
@@ -68,11 +68,11 @@ jobs:
         run: cargo ${CARGO_LOCKED} test --all-features
 
       - name: Check fmt
-        if: ${{ matrix.rust_os.rust == '1.57.0' }}
+        if: ${{ matrix.rust_os.rust == '1.65.0' }}
         run: cargo ${CARGO_LOCKED} fmt --all -- --check
 
       - name: Clippy
-        if: ${{ matrix.rust_os.rust == '1.57.0' }}
+        if: ${{ matrix.rust_os.rust == '1.65.0' }}
         run: cargo ${CARGO_LOCKED} clippy --all --all-features -- --deny warnings
 
       - name: Audit
@@ -90,7 +90,7 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     container:
-      image: xd009642/tarpaulin:0.21.0
+      image: xd009642/tarpaulin:0.26.0
       options: --security-opt seccomp=unconfined
     steps:
       - uses: actions/checkout@v2

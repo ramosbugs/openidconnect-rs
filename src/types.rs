@@ -30,7 +30,7 @@ use super::{
 /// This structure associates one more `Option<LanguageTag>` locales with the corresponding
 /// claims values.
 ///
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LocalizedClaim<T>(HashMap<LanguageTag, T>, Option<T>);
 impl<T> LocalizedClaim<T> {
     ///
@@ -194,7 +194,7 @@ pub trait GrantType: Debug + DeserializeOwned + Serialize + 'static {}
 ///
 /// Error signing a message.
 ///
-#[derive(Clone, Debug, Error, PartialEq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SigningError {
     /// Failed to sign the message using the given key and parameters.
@@ -719,7 +719,7 @@ new_type![
 /// JSON Web Key Set.
 ///
 #[serde_as]
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct JsonWebKeySet<JS, JT, JU, K>
 where
     JS: JwsSigningAlgorithm<JT>,
@@ -1005,7 +1005,7 @@ new_url_type![
 ///     http://openid.net/specs/oauth-v2-multiple-response-types-1_0.html#ResponseTypesAndModes)
 /// for further details.
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ResponseTypes<RT: ResponseType>(
     #[serde(
         deserialize_with = "deserialize_space_delimited_vec",

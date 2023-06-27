@@ -31,7 +31,7 @@ pub trait AdditionalProviderMetadata: Clone + Debug + DeserializeOwned + Seriali
 ///
 /// Empty (default) extra [`ProviderMetadata`] fields.
 ///
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct EmptyAdditionalProviderMetadata {}
 impl AdditionalProviderMetadata for EmptyAdditionalProviderMetadata {}
 
@@ -41,7 +41,7 @@ impl AdditionalProviderMetadata for EmptyAdditionalProviderMetadata {}
 ///
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[allow(clippy::type_complexity)]
 pub struct ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RT, S>
 where

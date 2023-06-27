@@ -20,7 +20,7 @@ use super::{crypto, CoreJwsSigningAlgorithm};
 ///
 /// Public or symmetric key expressed as a JSON Web Key.
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct CoreJsonWebKey {
     pub(crate) kty: CoreJsonWebKeyType,
     #[serde(rename = "use", skip_serializing_if = "Option::is_none")]
@@ -544,7 +544,7 @@ impl
 ///
 /// Type of JSON Web Key.
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[non_exhaustive]
 pub enum CoreJsonWebKeyType {
     ///
@@ -570,7 +570,7 @@ impl JsonWebKeyType for CoreJsonWebKeyType {}
 ///
 /// Type of EC-Curve
 ///
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[non_exhaustive]
 pub enum CoreJsonCurveType {
     ///
@@ -594,7 +594,7 @@ impl JsonCurveType for CoreJsonWebKeyType {}
 ///
 /// Usage restriction for a JSON Web key.
 ///
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum CoreJsonWebKeyUse {
     ///

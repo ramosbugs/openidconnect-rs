@@ -171,7 +171,7 @@ where
     JT: JsonWebKeyType,
 {
     fn to_string(&self) -> String {
-        serde_json::to_value(&self)
+        serde_json::to_value(self)
             // This should never arise, since we're just asking serde_json to serialize the
             // signing input concatenated with the signature, both of which are precomputed.
             .expect("ID token serialization failed")

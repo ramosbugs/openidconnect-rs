@@ -77,9 +77,7 @@ fn main() -> Result<(), anyhow::Error> {
         env::var("CLIENT_SECRET").expect("Missing the CLIENT_SECRET environment variable."),
     );
     let issuer_url = IssuerUrl::new(
-        env::var("ISSUER_URL")
-            .expect("Missing the ISSUER_URL environment variable.")
-            .to_string(),
+        env::var("ISSUER_URL").expect("Missing the ISSUER_URL environment variable."),
     )
     .expect("Invalid issuer URL");
 

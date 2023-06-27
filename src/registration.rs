@@ -37,7 +37,7 @@ pub trait AdditionalClientMetadata: Debug + DeserializeOwned + Serialize {}
 ///
 /// Empty (default) extra [`ClientMetadata`] fields.
 ///
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct EmptyAdditionalClientMetadata {}
 impl AdditionalClientMetadata for EmptyAdditionalClientMetadata {}
 
@@ -661,7 +661,7 @@ pub trait AdditionalClientRegistrationResponse: Debug + DeserializeOwned + Seria
 ///
 /// Empty (default) extra [`ClientRegistrationResponse`] fields.
 ///
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct EmptyAdditionalClientRegistrationResponse {}
 impl AdditionalClientRegistrationResponse for EmptyAdditionalClientRegistrationResponse {}
 

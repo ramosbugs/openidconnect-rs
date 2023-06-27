@@ -26,7 +26,7 @@ pub trait AdditionalClaims: Debug + DeserializeOwned + Serialize + 'static {}
 ///
 /// No additional claims.
 ///
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 // In order to support serde flatten, this must be an empty struct rather than an empty
 // tuple struct.
 pub struct EmptyAdditionalClaims {}
@@ -35,7 +35,7 @@ impl AdditionalClaims for EmptyAdditionalClaims {}
 ///
 /// Address claims.
 ///
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct AddressClaim {
     ///
     /// Full mailing address, formatted for display or use on a mailing label.
@@ -86,7 +86,7 @@ pub trait GenderClaim: Clone + Debug + DeserializeOwned + Serialize + 'static {}
 ///
 /// Standard Claims defined by OpenID Connect Core.
 ///
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StandardClaims<GC>
 where
     GC: GenderClaim,
