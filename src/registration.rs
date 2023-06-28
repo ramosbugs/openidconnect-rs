@@ -1280,11 +1280,15 @@ mod tests {
         );
         assert_eq!(
             registration_response.client_id_issued_at().unwrap(),
-            Utc.timestamp(1523953306, 0)
+            Utc.timestamp_opt(1523953306, 0)
+                .single()
+                .expect("valid timestamp")
         );
         assert_eq!(
             registration_response.client_secret_expires_at().unwrap(),
-            Utc.timestamp(1526545306, 0)
+            Utc.timestamp_opt(1526545306, 0)
+                .single()
+                .expect("valid timestamp")
         );
         assert_eq!(
             *registration_response.redirect_uris(),

@@ -1867,14 +1867,22 @@ mod tests {
             CoreIdTokenClaims::new(
                 issuer.clone(),
                 vec![Audience::new((*client_id).clone())],
-                Utc.timestamp(1544932149, 0),
-                Utc.timestamp(1544928549, 0),
+                Utc.timestamp_opt(1544932149, 0)
+                    .single()
+                    .expect("valid timestamp"),
+                Utc.timestamp_opt(1544928549, 0)
+                    .single()
+                    .expect("valid timestamp"),
                 StandardClaims::new(SubjectIdentifier::new("subject".to_string())),
                 Default::default(),
             )
             .set_nonce(Some(nonce.clone()))
             .set_auth_context_ref(Some(AuthenticationContextClass::new("the_acr".to_string())))
-            .set_auth_time(Some(Utc.timestamp(1544928548, 0))),
+            .set_auth_time(Some(
+                Utc.timestamp_opt(1544928548, 0)
+                    .single()
+                    .expect("valid timestamp"),
+            )),
             &rsa_priv_key,
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
             Some(&AccessToken::new("the_access_token".to_string())),
@@ -2078,7 +2086,11 @@ mod tests {
                 phone_number: None,
                 phone_number_verified: None,
                 address: None,
-                updated_at: Some(Utc.timestamp(1544928548, 0)),
+                updated_at: Some(
+                    Utc.timestamp_opt(1544928548, 0)
+                        .single()
+                        .expect("valid timestamp"),
+                ),
             },
             Default::default(),
         );
@@ -2102,7 +2114,7 @@ mod tests {
              ZD4A4aIn0K7z5J9RvrR3L7DWnc3fJQ0VU2v5QLePyqNWnFxks5eyl8Ios8JrZhwr4Q8GES8Q4Iw8Sz6W9vYpHK\
              2r1YdaACMM4g_TTtV91lpjn-Li2-HxW9NERdLvYvF6HwGIwbss26trp2yjNTARlxBUT6LR7y82oPIJKXIKL1GD\
              YeSLeErhb6oTQ0a5gQ",
-            serde_json::to_value(&claims_jwt).unwrap().as_str().unwrap()
+            serde_json::to_value(claims_jwt).unwrap().as_str().unwrap()
         );
     }
 }
