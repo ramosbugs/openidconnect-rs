@@ -105,6 +105,7 @@ where
     pub(crate) email_verified: Option<bool>,
     pub(crate) gender: Option<GC>,
     pub(crate) birthday: Option<EndUserBirthday>,
+    pub(crate) birthdate: Option<EndUserBirthday>,
     pub(crate) zoneinfo: Option<EndUserTimezone>,
     pub(crate) locale: Option<LanguageTag>,
     pub(crate) phone_number: Option<EndUserPhoneNumber>,
@@ -137,6 +138,7 @@ where
             email_verified: None,
             gender: None,
             birthday: None,
+            birthdate: None,
             zoneinfo: None,
             locale: None,
             phone_number: None,
@@ -178,6 +180,7 @@ where
             set_email_verified -> email_verified[Option<bool>],
             set_gender -> gender[Option<GC>],
             set_birthday -> birthday[Option<EndUserBirthday>],
+            set_birthdate -> birthdate[Option<EndUserBirthday>],
             set_zoneinfo -> zoneinfo[Option<EndUserTimezone>],
             set_locale -> locale[Option<LanguageTag>],
             set_phone_number -> phone_number[Option<EndUserPhoneNumber>],
@@ -210,6 +213,7 @@ where
                 | ("email_verified", None)
                 | ("gender", None)
                 | ("birthday", None)
+                | ("birthdate", None)
                 | ("zoneinfo", None)
                 | ("locale", None)
                 | ("phone_number", None)
@@ -261,6 +265,7 @@ where
                         [Option(Boolean(email_verified))]
                         [Option(gender)]
                         [Option(birthday)]
+                        [Option(birthdate)]
                         [Option(zoneinfo)]
                         [Option(locale)]
                         [Option(phone_number)]
@@ -299,6 +304,7 @@ where
                 [Option(email_verified)]
                 [Option(gender)]
                 [Option(birthday)]
+                [Option(birthdate)]
                 [Option(zoneinfo)]
                 [Option(locale)]
                 [Option(phone_number)]
