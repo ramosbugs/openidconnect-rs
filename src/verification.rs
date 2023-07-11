@@ -2081,6 +2081,7 @@ mod tests {
                 email_verified: None,
                 gender: None,
                 birthday: None,
+                birthdate: None,
                 zoneinfo: None,
                 locale: None,
                 phone_number: None,

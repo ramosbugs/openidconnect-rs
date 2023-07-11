@@ -313,6 +313,7 @@ where
             set_email_verified -> email_verified[Option<bool>],
             set_gender -> gender[Option<GC>],
             set_birthday -> birthday[Option<EndUserBirthday>],
+            set_birthdate -> birthdate[Option<EndUserBirthday>],
             set_zoneinfo -> zoneinfo[Option<EndUserTimezone>],
             set_locale -> locale[Option<LanguageTag>],
             set_phone_number -> phone_number[Option<EndUserPhoneNumber>],
@@ -621,6 +622,7 @@ mod tests {
         assert_eq!(claims.email_verified(), None);
         assert_eq!(claims.gender(), None);
         assert_eq!(claims.birthday(), None);
+        assert_eq!(claims.birthdate(), None);
         assert_eq!(claims.zoneinfo(), None);
         assert_eq!(claims.locale(), None);
         assert_eq!(claims.phone_number(), None);
@@ -672,6 +674,7 @@ mod tests {
                            \"email_verified\":true,\
                            \"gender\":\"male\",\
                            \"birthday\":\"1956-05-12\",\
+                           \"birthdate\":\"1956-07-12\",\
                            \"zoneinfo\":\"America/Los_Angeles\",\
                            \"locale\":\"en-US\",\
                            \"phone_number\":\"+1 (555) 555-5555\",\
@@ -808,6 +811,7 @@ mod tests {
                 email_verified: Some(true),
                 gender: Some(CoreGenderClaim::new("male".to_string())),
                 birthday: Some(EndUserBirthday::new("1956-05-12".to_string())),
+                birthdate: Some(EndUserBirthday::new("1956-07-12".to_string())),
                 zoneinfo: Some(EndUserTimezone::new("America/Los_Angeles".to_string())),
                 locale: Some(LanguageTag::new("en-US".to_string())),
                 phone_number: Some(EndUserPhoneNumber::new("+1 (555) 555-5555".to_string())),
@@ -885,6 +889,7 @@ mod tests {
         assert_eq!(claims.email_verified(), new_claims.email_verified());
         assert_eq!(claims.gender(), new_claims.gender());
         assert_eq!(claims.birthday(), new_claims.birthday());
+        assert_eq!(claims.birthdate(), new_claims.birthdate());
         assert_eq!(claims.zoneinfo(), new_claims.zoneinfo());
         assert_eq!(claims.locale(), new_claims.locale());
         assert_eq!(claims.phone_number(), new_claims.phone_number(),);

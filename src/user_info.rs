@@ -291,6 +291,7 @@ where
             set_email_verified -> email_verified[Option<bool>],
             set_gender -> gender[Option<GC>],
             set_birthday -> birthday[Option<EndUserBirthday>],
+            set_birthdate -> birthdate[Option<EndUserBirthday>],
             set_zoneinfo -> zoneinfo[Option<EndUserTimezone>],
             set_locale -> locale[Option<LanguageTag>],
             set_phone_number -> phone_number[Option<EndUserPhoneNumber>],
