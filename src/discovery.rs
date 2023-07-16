@@ -316,9 +316,14 @@ where
     ///
     /// Asynchronously fetches the OpenID Connect Discovery document and associated JSON Web Key Set
     /// from the OpenID Connect Provider.
+    /// It supports providing a custom expected issuer for IdPs that do not return exactly the same.
+    /// For instance, discovering Microsoft's OIDC configuration with the `common` tenant id at
+    /// https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration
+    /// will declare an issuer `https://login.microsoftonline.com/{tenantid}/v2.0`
     ///
-    pub async fn discover_async<F, HC, RE>(
-        issuer_url: IssuerUrl,
+    pub async fn discover_advanced_async<F, HC, RE>(
+        issuer_url: &IssuerUrl,
+        expected_issuer_url: &IssuerUrl,
         http_client: HC,
     ) -> Result<Self, DiscoveryError<RE>>
     where
@@ -333,7 +338,9 @@ where
         let provider_metadata = http_client(Self::discovery_request(discovery_url))
             .await
             .map_err(DiscoveryError::Request)
-            .and_then(|http_response| Self::discovery_response(&issuer_url, http_response))?;
+            .and_then(|http_response| {
+                Self::discovery_response(expected_issuer_url, http_response)
+            })?;
 
         JsonWebKeySet::fetch_async(provider_metadata.jwks_uri(), http_client)
             .await
@@ -341,6 +348,22 @@ where
                 jwks,
                 ..provider_metadata
             })
+    }
+
+    ///
+    /// Asynchronously fetches the OpenID Connect Discovery document and associated JSON Web Key Set
+    /// from the OpenID Connect Provider.
+    ///
+    pub async fn discover_async<F, HC, RE>(
+        issuer_url: IssuerUrl,
+        http_client: HC,
+    ) -> Result<Self, DiscoveryError<RE>>
+    where
+        F: Future<Output = Result<HttpResponse, RE>>,
+        HC: Fn(HttpRequest) -> F,
+        RE: std::error::Error + 'static,
+    {
+        Self::discover_advanced_async(&issuer_url, &issuer_url, http_client).await
     }
 
     fn discovery_request(discovery_url: url::Url) -> HttpRequest {
@@ -355,7 +378,7 @@ where
     }
 
     fn discovery_response<RE>(
-        issuer_url: &IssuerUrl,
+        expected_issuer_url: &IssuerUrl,
         discovery_response: HttpResponse,
     ) -> Result<Self, DiscoveryError<RE>>
     where
@@ -382,11 +405,11 @@ where
         )
         .map_err(DiscoveryError::Parse)?;
 
-        if provider_metadata.issuer() != issuer_url {
+        if provider_metadata.issuer() != expected_issuer_url {
             Err(DiscoveryError::Validation(format!(
                 "unexpected issuer URI `{}` (expected `{}`)",
                 provider_metadata.issuer().as_str(),
-                issuer_url.as_str()
+                expected_issuer_url.as_str()
             )))
         } else {
             Ok(provider_metadata)

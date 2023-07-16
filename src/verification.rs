@@ -128,6 +128,7 @@ where
     client_secret: Option<ClientSecret>,
     iss_required: bool,
     issuer: IssuerUrl,
+    other_issuer_verifier_fn: Arc<dyn Fn(&IssuerUrl) -> bool + 'a + Send + Sync>,
     is_signature_check_enabled: bool,
     other_aud_verifier_fn: Arc<dyn Fn(&Audience) -> bool + 'a + Send + Sync>,
     signature_keys: JsonWebKeySet<JS, JT, JU, K>,
@@ -151,6 +152,8 @@ where
             client_secret: None,
             iss_required: true,
             issuer,
+            // Secure default: reject all other issuers.
+            other_issuer_verifier_fn: Arc::new(|_| false),
             is_signature_check_enabled: true,
             // Secure default: reject all other audiences as untrusted, since any other audience
             // can potentially impersonate the user when by sending its copy of these claims
@@ -167,6 +170,14 @@ where
 
     pub fn require_issuer_match(mut self, iss_required: bool) -> Self {
         self.iss_required = iss_required;
+        self
+    }
+
+    pub fn set_other_issuer_verifier_fn<T>(mut self, other_issuer_verifier_fn: T) -> Self
+    where
+        T: Fn(&IssuerUrl) -> bool + 'a + Send + Sync,
+    {
+        self.other_issuer_verifier_fn = Arc::new(other_issuer_verifier_fn);
         self
     }
 
@@ -280,7 +291,7 @@ where
             let unverified_claims = jwt.unverified_payload_ref();
             if self.iss_required {
                 if let Some(issuer) = unverified_claims.issuer() {
-                    if *issuer != self.issuer {
+                    if *issuer != self.issuer && !(self.other_issuer_verifier_fn)(issuer) {
                         return Err(ClaimsVerificationError::InvalidIssuer(format!(
                             "expected `{}` (found `{}`)",
                             *self.issuer, **issuer
@@ -677,6 +688,36 @@ where
     ///
     pub fn require_issuer_match(mut self, iss_required: bool) -> Self {
         self.jwt_verifier = self.jwt_verifier.require_issuer_match(iss_required);
+        self
+    }
+
+    ///
+    /// Specifies a function for verifying the issuer claim in case it doesn't match exactly the
+    /// expected issuer. The default implementation rejects all other issuers.
+    ///
+    /// The function should return `true` if the issuer is trusted, or `false` otherwise.
+    ///
+    /// [Section 3.1.3.7](https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation)
+    /// states that *"The Issuer Identifier for the OpenID Provider (which is typically obtained
+    /// during Discovery) MUST exactly match the value of the iss (issuer) Claim."*
+    ///
+    /// Thus, *this function is only needed when the IdP doesn't comply with this requirement!*
+    ///
+    /// Example: Discovering Microsoft's OIDC configuration with the `common` tenant id at
+    /// https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration
+    /// will declare an issuer `https://login.microsoftonline.com/{tenantid}/v2.0` while returning
+    /// the actual tenant ID of the user being authenticated (not `common` !) interpolated for
+    /// `{tenantid}` in the `iss` claim, e.g. (fictitious tenant)
+    /// https://login.microsoftonline.com/a4ed8e24-23a7-11ee-977f-d7ef594af8a1/v2.0
+    ///
+    ///
+    pub fn set_other_issuer_verifier_fn<T>(mut self, other_issuer_verifier_fn: T) -> Self
+    where
+        T: Fn(&IssuerUrl) -> bool + 'a + Send + Sync,
+    {
+        self.jwt_verifier = self
+            .jwt_verifier
+            .set_other_issuer_verifier_fn(other_issuer_verifier_fn);
         self
     }
 
