@@ -32,6 +32,7 @@ base64 = "0.13"
 chrono = { version = "0.4", default-features = false, features = [
     "clock",
     "std",
+    "wasmbind"
 ] }
 thiserror = "1.0"
 http = "0.2"
