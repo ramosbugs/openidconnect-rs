@@ -855,6 +855,11 @@ pub enum CoreJwsSigningAlgorithm {
     #[serde(rename = "PS512")]
     RsaSsaPssSha512,
     ///
+    /// EdDSA signature using Ed25519 curve 
+    ///
+    #[serde(rename = "Ed25519")]
+    EdDsaEd25519,
+    ///
     /// No digital signature or MAC performed.
     ///
     /// # Security Warning
@@ -883,6 +888,7 @@ impl JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
             CoreJwsSigningAlgorithm::EcdsaP256Sha256
             | CoreJwsSigningAlgorithm::EcdsaP384Sha384
             | CoreJwsSigningAlgorithm::EcdsaP521Sha512 => Some(CoreJsonWebKeyType::EllipticCurve),
+            CoreJwsSigningAlgorithm::EdDsaEd25519 => Some(CoreJsonWebKeyType::OctetKeyPair),
             CoreJwsSigningAlgorithm::None => None,
         }
     }
@@ -919,6 +925,11 @@ impl JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
                 let mut hasher = Sha512::new();
                 hasher.update(bytes);
                 hasher.finalize().to_vec()
+            }
+            CoreJwsSigningAlgorithm::EdDsaEd25519 => {
+                return Err(
+                    "signature algorithm `Ed25519` has no corresponding hash algorithm".to_string(),
+                );
             }
             CoreJwsSigningAlgorithm::None => {
                 return Err(
