@@ -55,6 +55,7 @@ serde_with = "3"
 serde-value = "0.7"
 url = { version = "2.4", features = ["serde"] }
 subtle = "2.4"
+ed25519-dalek = "2.0.0"
 
 [dev-dependencies]
 color-backtrace = { version = "0.5" }
