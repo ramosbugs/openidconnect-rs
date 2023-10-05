@@ -934,6 +934,29 @@ impl JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
 }
 
 ///
+/// JWK allowed algorithm "alg" field, [Section 4.4 of RFC 7517](https://www.rfc-editor.org/rfc/rfc7517#section-4.4)
+///
+/// All JSON Web Algorithms listed in [RFC 7518](https://www.rfc-editor.org/rfc/rfc7518) can be encoded by this enum.
+///
+/// There are a few caveats, which can be deduced from [the "Algorithm Usage Location(s)" part of Section 7.1.1](https://www.rfc-editor.org/rfc/rfc7518#section-7.1.1):
+///  - According to the specification, algorithms might have multiple purposes (like both JWE and JWS).
+///    No such algorithm is currently listed, but it if were to happen, the current flattened enum approach would stop working
+///  - According to the specification, algorithms which aren't used for JWE nor JWS may be added to the list.
+///    No such algorithm is currently listed.
+/// According to the "Algorithm Usage Location(s)" section of  https://www.rfc-editor.org/rfc/rfc7518#section-7.1.1
+///
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum CoreJwkAlgorithm {
+    /// This JWK is intended for JWE key management
+    JWEKeyManagement(CoreJweKeyManagementAlgorithm),
+    /// This JWK is intended for JWE content encryption
+    JWEContentEncryption(CoreJweContentEncryptionAlgorithm),
+    /// This JWK is intended for JWS signing
+    JWS(CoreJwsSigningAlgorithm),
+}
+
+///
 /// OpenID Connect Core authentication error response types.
 ///
 /// This type represents errors returned in a redirect from the Authorization Endpoint to the
@@ -1207,7 +1230,7 @@ impl ResponseMode for CoreResponseMode {}
 /// OpenID Connect Core response type.
 ///
 /// Informs the Authorization Server of the desired authorization processing flow, including what
-/// parameters are returned from the endpoints used.  
+/// parameters are returned from the endpoints used.
 ///
 /// This type represents a single Response Type. Multiple Response Types are represented via the
 /// `ResponseTypes` type, which wraps a `Vec<ResponseType>`.

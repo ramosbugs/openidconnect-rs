@@ -234,6 +234,12 @@ where
     fn key_use(&self) -> Option<&JU>;
 
     ///
+    /// Returns the algorithm (e.g. ES512) this key must be used with, or `None` if no algorithm
+    /// constraint was specified.
+    ///
+    fn check_compatibility(&self, signing_algorithm: &JS) -> Result<(), &'static str>;
+
+    ///
     /// Initializes a new symmetric key or shared signing secret from the specified raw bytes.
     ///
     fn new_symmetric(key: Vec<u8>) -> Self;
@@ -752,6 +758,24 @@ where
             keys,
             _phantom: PhantomData,
         }
+    }
+
+    ///
+    /// Return a list of suitable keys, given a key id an signature algorithm
+    ///
+    pub fn filter_keys(&self, key_id: &Option<JsonWebKeyId>, signature_alg: &JS) -> Vec<&K> {
+        self.keys()
+        .iter()
+        .filter(|key|
+            // Either the JWT doesn't include a 'kid' (in which case any 'kid'
+            // is acceptable), or the 'kid' matches the key's ID.
+            if key_id.is_some() && key_id.as_ref() != key.key_id() {
+                false
+            } else {
+                key.check_compatibility(signature_alg).is_ok()
+            }
+        )
+        .collect()
     }
 
     ///

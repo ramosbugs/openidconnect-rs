@@ -420,24 +420,8 @@ where
 
         // See if any key has a matching key ID (if supplied) and compatible type.
         let public_keys = {
-            let jose_header = jwt.unverified_header();
-            self.signature_keys
-                .keys()
-                .iter()
-                .filter(|key|
-                    // The key must be of the type expected for this signature algorithm.
-                    Some(key.key_type()) == signature_alg.key_type().as_ref() &&
-                        // Either the key hasn't specified it's allowed usage (in which case
-                        // any usage is acceptable), or the key supports signing.
-                        (key.key_use().is_none() ||
-                            key.key_use().iter().any(
-                                |key_use| key_use.allows_signature()
-                            )) &&
-                        // Either the JWT doesn't include a 'kid' (in which case any 'kid'
-                        // is acceptable), or the 'kid' matches the key's ID.
-                        (jose_header.kid.is_none() ||
-                            jose_header.kid.as_ref() == key.key_id()))
-                .collect::<Vec<&K>>()
+            let key_id = &jwt.unverified_header().kid;
+            self.signature_keys.filter_keys(key_id, &signature_alg)
         };
         if public_keys.is_empty() {
             return Err(ClaimsVerificationError::SignatureVerification(
@@ -1417,6 +1401,7 @@ mod tests {
                 x: None,
                 y: None,
                 d: None,
+                alg: None,
             }]),
         )
         .verified_claims(valid_rs256_jwt.clone())
@@ -1442,6 +1427,7 @@ mod tests {
                 x: None,
                 y: None,
                 d: None,
+                alg: None,
             }]),
         )
         .verified_claims(valid_rs256_jwt.clone())
