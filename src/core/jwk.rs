@@ -774,6 +774,30 @@ mod tests {
     }
 
     #[test]
+    fn test_core_jwk_deserialization_ed() {
+        let json =  "{
+            \"alg\": \"Ed25519\",
+            \"crv\": \"Ed25519\",
+            \"kty\": \"OKP\",
+            \"use\": \"sig\",
+            \"x\": \"vZ3CX884r0qNJ18pgXUTvFufK3ZmDzQfvMROJz6CLBc\"
+        }";
+
+        let key: CoreJsonWebKey = serde_json::from_str(json).expect("deserialization failed");
+        assert_eq!(key.kty, CoreJsonWebKeyType::OctetKeyPair);
+        assert_eq!(key.use_, Some(CoreJsonWebKeyUse::Signature));
+        assert_eq!(key.crv, Some(CoreJsonCurveType::Ed25519));
+        assert_eq!(
+            key.x,
+            Some(Base64UrlEncodedBytes::new(vec![
+                0xBD, 0x9D, 0xC2, 0x5F, 0xCF, 0x38, 0xAF, 0x4A, 0x8D, 0x27, 0x5F, 0x29, 0x81, 0x75,
+                0x13, 0xBC, 0x5B, 0x9F, 0x2B, 0x76, 0x66, 0x0F, 0x34, 0x1F, 0xBC, 0xC4, 0x4E, 0x27,
+                0x3E, 0x82, 0x2C, 0x17
+            ]))
+        );
+    }
+
+    #[test]
     fn test_core_jwk_deserialization_symmetric() {
         let json = "{\
             \"kty\":\"oct\",
