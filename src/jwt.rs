@@ -500,6 +500,14 @@ pub mod tests {
             \"e\": \"AQAB\"
         }";
 
+    pub const TEST_ED_PUB_KEY_ED25519: &str = r#"{
+        "kty": "OKP",
+        "use": "sig",
+        "alg": "Ed25519",
+        "crv": "Ed25519",
+        "x": "sfliRRhciU_d5qsuC5Vcydi-t8bRfxTg_4qulVatW4A"
+    }"#;
+
     pub const TEST_EC_PUB_KEY_P256: &str = r#"{
         "kty": "EC",
         "kid": "bilbo.baggins@hobbiton.example",
