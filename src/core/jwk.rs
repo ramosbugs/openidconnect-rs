@@ -125,6 +125,30 @@ impl CoreJsonWebKey {
             d: None,
         }
     }
+
+    /// Instantiate a new ED public key from the raw x (`x`) part of the curve,
+    /// along with an optional (but recommended) key ID.
+    ///
+    /// The key ID is used for matching signed JSON Web Tokens with the keys used for verifying
+    /// their signatures.
+    pub fn new_okp(
+        x: Vec<u8>,
+        crv: CoreJsonCurveType,
+        kid: Option<JsonWebKeyId>
+    ) -> Self {
+        Self {
+            kty: CoreJsonWebKeyType::OctetKeyPair,
+            use_: Some(CoreJsonWebKeyUse::Signature),
+            kid,
+            n: None,
+            e: None,
+            k: None,
+            crv: Some(crv),
+            x: Some(Base64UrlEncodedBytes::new(x)),
+            y: None,
+            d: None,
+        }
+    }
 }
 impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> for CoreJsonWebKey {
     fn key_id(&self) -> Option<&JsonWebKeyId> {
