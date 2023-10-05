@@ -315,6 +315,15 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
                     ))
                 }
             }
+            CoreJwsSigningAlgorithm::EdDsaEd25519 => {
+                if matches!(self.crv, Some(CoreJsonCurveType::Ed25519)) {
+                    crypto::verify_ed_signature(self, message, signature)
+                } else {
+                    Err(SignatureVerificationError::InvalidKey(
+                        "Key uses different CRV than JWT".to_string(),
+                    ))
+                }
+            }
             ref other => Err(SignatureVerificationError::UnsupportedAlg(
                 serde_plain::to_string(other).unwrap_or_else(|err| {
                     panic!(
@@ -577,6 +586,11 @@ pub enum CoreJsonWebKeyType {
     #[serde(rename = "RSA")]
     RSA,
     ///
+    /// EdDSA key.
+    ///
+    #[serde(rename = "OKP")]
+    OctetKeyPair,
+    ///
     /// Symmetric key.
     ///
     #[serde(rename = "oct")]
@@ -605,6 +619,11 @@ pub enum CoreJsonCurveType {
     ///
     #[serde(rename = "P-521")]
     P521,
+    ///
+    /// Ed25519 Curve
+    ///
+    #[serde(rename = "Ed25519")]
+    Ed25519,
 }
 impl JsonCurveType for CoreJsonWebKeyType {}
 
@@ -668,7 +687,7 @@ mod tests {
     use rand::{CryptoRng, RngCore};
     use rsa::rand_core;
 
-    use crate::jwt::tests::{TEST_EC_PUB_KEY_P256, TEST_EC_PUB_KEY_P384, TEST_RSA_PUB_KEY};
+    use crate::jwt::tests::{TEST_EC_PUB_KEY_P256, TEST_EC_PUB_KEY_P384, TEST_RSA_PUB_KEY, TEST_ED_PUB_KEY_ED25519};
     use crate::types::Base64UrlEncodedBytes;
     use crate::types::{JsonWebKey, JsonWebKeyId};
     use crate::verification::SignatureVerificationError;
@@ -838,6 +857,21 @@ mod tests {
             &signature,
         )
         .expect_err("signature verification should fail");
+    }
+
+    #[test]
+    fn test_eddsa_verification() {
+        let key_ed25519: CoreJsonWebKey =
+            serde_json::from_str(TEST_ED_PUB_KEY_ED25519).expect("deserialization failed");
+        let pkcs1_signing_input = "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiSldUIn0.eyJpc3MiOiJqb2UifQ";
+        let signature_ed25519 = "Augr7UH6hUbWVN0PHqSD5U0bb8y9UOw_eef09ZS5d5haUar_qAto8gyLJxUhNF5wHPoXhdvSGowkPvjiKsEsCQ";
+
+        verify_signature(
+            &key_ed25519,
+            &CoreJwsSigningAlgorithm::EdDsaEd25519,
+            pkcs1_signing_input,
+            signature_ed25519
+        );
     }
 
     #[test]
