@@ -662,6 +662,9 @@ mod macros;
 /// Baseline OpenID Connect implementation and types.
 pub mod core;
 
+#[cfg(feature = "backchannel-logout")]
+pub mod backchannel_logout;
+
 /// OpenID Connect Dynamic Client Registration.
 pub mod registration;
 
