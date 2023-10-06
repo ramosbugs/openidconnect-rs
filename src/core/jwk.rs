@@ -914,12 +914,34 @@ mod tests {
         let pkcs1_signing_input = "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiSldUIn0.eyJpc3MiOiJqb2UifQ";
         let signature_ed25519 = "Augr7UH6hUbWVN0PHqSD5U0bb8y9UOw_eef09ZS5d5haUar_qAto8gyLJxUhNF5wHPoXhdvSGowkPvjiKsEsCQ";
 
+        let signature_ed25519_other = "xb4NH-q33sCaRXf1ZhnzQxd4o5ZkBWKd9vGibacqPMAblW_mIJLm9kGerqHX08SPoeDY-dYUmZQz9ls6csfvAw";
+        let signature_ed448 = "xxXVMyaYYePdGfMOdU0nENuc70pKwP3vJuc_jBA0rCW-RtbvBLSsc0D9iCPzhrPmQ2X1nTjPkGiAXJ0_NslDBvy3sHu88N64YhnnYBWwwHttBU0jijn_ikbBUHzUwzGuasRFb1ESG_PwedhEcMi-YAwA";
+
+        // test ed25519
         verify_signature(
             &key_ed25519,
             &CoreJwsSigningAlgorithm::EdDsaEd25519,
             pkcs1_signing_input,
             signature_ed25519
         );
+
+        // signature from ed448 variant
+        key_ed25519
+            .verify_signature(
+                &CoreJwsSigningAlgorithm::EdDsaEd25519,
+                pkcs1_signing_input.as_bytes(),
+                &base64::decode_config(signature_ed448, crate::core::base64_url_safe_no_pad()).unwrap().as_slice()
+            )
+            .expect_err("verification should fail");
+
+        // different signature
+        key_ed25519
+            .verify_signature(
+                &CoreJwsSigningAlgorithm::EdDsaEd25519,
+                pkcs1_signing_input.as_bytes(),
+                &base64::decode_config(signature_ed25519_other, crate::core::base64_url_safe_no_pad()).unwrap().as_slice()
+            )
+            .expect_err("verification should fail");
     }
 
     #[test]
