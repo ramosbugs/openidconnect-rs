@@ -1015,12 +1015,35 @@ mod tests {
                 .expect("failed to base64url decode");
         key.verify_signature(alg, signing_input.as_bytes(), &signature)
             .expect("signature verification failed");
-        key.verify_signature(
-            alg,
-            (signing_input.to_string() + "foobar").as_bytes(),
-            &signature,
-        )
-        .expect_err("signature verification should fail");
+        match key
+            .verify_signature(
+                alg,
+                (signing_input.to_string() + "foobar").as_bytes(),
+                &signature,
+            )
+            .expect_err("signature verification should fail")
+        {
+            SignatureVerificationError::CryptoError(_) => {}
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    fn verify_invalid_signature(
+        key: &CoreJsonWebKey,
+        alg: &CoreJwsSigningAlgorithm,
+        signing_input: &str,
+        signature_base64: &str,
+    ) {
+        let signature =
+            base64::decode_config(signature_base64, crate::core::base64_url_safe_no_pad())
+                .expect("failed to base64url decode");
+        match key
+            .verify_signature(alg, signing_input.as_bytes(), &signature)
+            .expect_err("signature verification should fail")
+        {
+            SignatureVerificationError::CryptoError(_) => {}
+            other => panic!("unexpected error: {:?}", other),
+        }
     }
 
     #[test]
@@ -1103,13 +1126,12 @@ mod tests {
             }
         }
         // suppose we have alg specified correctly, but the signature given is actually a p384
-        key_p256
-            .verify_signature(
-                &CoreJwsSigningAlgorithm::EcdsaP256Sha256,
-                pkcs1_signing_input.as_bytes(),
-                signature_p384.as_bytes(),
-            )
-            .expect_err("verification should fail");
+        verify_invalid_signature(
+            &key_p256,
+            &CoreJwsSigningAlgorithm::EcdsaP256Sha256,
+            pkcs1_signing_input,
+            signature_p384,
+        );
 
         //test p384
         verify_signature(
@@ -1120,13 +1142,12 @@ mod tests {
         );
 
         // suppose we have alg specified correctly, but the signature given is actually a p256
-        key_p384
-            .verify_signature(
-                &CoreJwsSigningAlgorithm::EcdsaP384Sha384,
-                pkcs1_signing_input.as_bytes(),
-                signature_p256.as_bytes(),
-            )
-            .expect_err("verification should fail");
+        verify_invalid_signature(
+            &key_p384,
+            &CoreJwsSigningAlgorithm::EcdsaP384Sha384,
+            pkcs1_signing_input,
+            signature_p256,
+        );
 
         //wrong algo should fail before ring validation
         if let Some(err) = key_p384
