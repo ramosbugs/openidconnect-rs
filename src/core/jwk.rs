@@ -440,7 +440,7 @@ impl
 ///
 /// Variants of EdDSA Key.
 ///
-pub enum EdDsaVariant {
+pub enum CoreEdDsaKeyVariant {
     ///
     /// Ed25519 Variant
     /// 
@@ -448,14 +448,14 @@ pub enum EdDsaVariant {
 }
 
 struct EdDsaSigningKey {
-    variant: EdDsaVariant,
+    variant: CoreEdDsaKeyVariant,
     ed25519: Option<ed25519_dalek::SigningKey>,
 }
 
 impl EdDsaSigningKey {
-    fn from_pem(pem: &str, variant: EdDsaVariant) -> Result<Self, String> {
+    fn from_pem(pem: &str, variant: CoreEdDsaKeyVariant) -> Result<Self, String> {
         match variant {
-            EdDsaVariant::Ed25519 => Ok(Self {
+            CoreEdDsaKeyVariant::Ed25519 => Ok(Self {
                 variant,
                 ed25519: Some(ed25519_dalek::SigningKey::from_pkcs8_pem(pem).map_err(|err| err.to_string())?),
             })
@@ -464,7 +464,7 @@ impl EdDsaSigningKey {
 
     fn public_part(&self) -> Vec<u8> {
         match self.variant {
-            EdDsaVariant::Ed25519 => {
+            CoreEdDsaKeyVariant::Ed25519 => {
                 self.ed25519
                     .as_ref()
                     .expect("fail to refer to Ed25519 signing key")
@@ -477,7 +477,7 @@ impl EdDsaSigningKey {
 
     fn sign(&self, message: &[u8]) -> Vec<u8> {
         match self.variant {
-            EdDsaVariant::Ed25519 => {
+            CoreEdDsaKeyVariant::Ed25519 => {
                 let key = self.ed25519.as_ref().expect("fail to refer to Ed25519 signing key");
 
                 let signature = key.sign(message);
@@ -502,9 +502,9 @@ impl CoreEdDsaPrivateSigningKey {
     ///
     /// Converts an EdDSA private key (in PEM format) to a JWK representing its public key.
     ///
-    pub fn from_pem(pem: &str, kid: Option<JsonWebKeyId>, variant: EdDsaVariant) -> Result<Self, String> {
+    pub fn from_pem(pem: &str, kid: Option<JsonWebKeyId>, variant: CoreEdDsaKeyVariant) -> Result<Self, String> {
         match variant {
-            EdDsaVariant::Ed25519 => Ok(Self {
+            CoreEdDsaKeyVariant::Ed25519 => Ok(Self {
                 kid,
                 key_pair: EdDsaSigningKey::from_pem(pem, variant)?,
             })
@@ -834,7 +834,7 @@ mod tests {
 
     use super::{
         CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse,
-        CoreJwsSigningAlgorithm, CoreRsaPrivateSigningKey, PrivateSigningKey, CoreEdDsaPrivateSigningKey, EdDsaVariant,
+        CoreJwsSigningAlgorithm, CoreRsaPrivateSigningKey, PrivateSigningKey, CoreEdDsaPrivateSigningKey, CoreEdDsaKeyVariant,
     };
     use super::{CoreJsonCurveType, SigningError};
 
@@ -1529,7 +1529,7 @@ mod tests {
         let private_key = CoreEdDsaPrivateSigningKey::from_pem(
             TEST_ED25519_KEY,
             Some(JsonWebKeyId::new("test_key".to_string())),
-            EdDsaVariant::Ed25519,
+            CoreEdDsaKeyVariant::Ed25519,
         )
         .unwrap();
 
