@@ -482,11 +482,20 @@ impl EdDsaSigningKey {
     }
 }
 
+///
+/// EdDSA Private Key.
+///
+/// This key can be used for signing messages, or converted to a `CoreJsonWebKey` for verifying
+/// them.
+///
 pub struct CoreEdDsaPrivateSigningKey {
     kid: Option<JsonWebKeyId>,
     key_pair: EdDsaSigningKey,
 }
 impl CoreEdDsaPrivateSigningKey {
+    ///
+    /// Converts an EdDSA private key (in PEM format) to a JWK representing its public key.
+    ///
     pub fn from_pem(pem: &str, kid: Option<JsonWebKeyId>, variant: EdDsaVariant) -> Result<Self, String> {
         match variant {
             EdDsaVariant::Ed25519 => Ok(Self {
