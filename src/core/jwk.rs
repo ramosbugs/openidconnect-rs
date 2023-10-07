@@ -1065,22 +1065,20 @@ mod tests {
         );
 
         // signature from ed448 variant
-        key_ed25519
-            .verify_signature(
-                &CoreJwsSigningAlgorithm::EdDsaEd25519,
-                pkcs1_signing_input.as_bytes(),
-                &base64::decode_config(signature_ed448, crate::core::base64_url_safe_no_pad()).unwrap().as_slice()
-            )
-            .expect_err("verification should fail");
+        verify_invalid_signature(
+            &key_ed25519,
+            &CoreJwsSigningAlgorithm::EdDsaEd25519,
+            pkcs1_signing_input,
+            signature_ed448
+        );
 
         // different signature
-        key_ed25519
-            .verify_signature(
-                &CoreJwsSigningAlgorithm::EdDsaEd25519,
-                pkcs1_signing_input.as_bytes(),
-                &base64::decode_config(signature_ed25519_other, crate::core::base64_url_safe_no_pad()).unwrap().as_slice()
-            )
-            .expect_err("verification should fail");
+        verify_invalid_signature(
+            &key_ed25519,
+            &CoreJwsSigningAlgorithm::EdDsaEd25519,
+            pkcs1_signing_input,
+            signature_ed25519_other
+        );
     }
 
     #[test]
