@@ -437,7 +437,13 @@ impl
     }
 }
 
+///
+/// Variants of EdDSA Key.
+///
 pub enum EdDsaVariant {
+    ///
+    /// Ed25519 Variant
+    /// 
     Ed25519,
 }
 
