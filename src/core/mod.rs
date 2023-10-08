@@ -33,7 +33,7 @@ use super::AuthenticationFlow;
 
 pub use self::jwk::{
     CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreRsaPrivateSigningKey,
-    CoreEdDsaKeyVariant, CoreEdDsaPrivateSigningKey
+    CoreEdDsaPrivateSigningKey
 };
 
 mod crypto;
