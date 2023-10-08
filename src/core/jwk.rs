@@ -128,7 +128,7 @@ impl CoreJsonWebKey {
         }
     }
 
-    /// Instantiate a new ED public key from the raw x (`x`) part of the curve,
+    /// Instantiate a new Octet Key-Pair public key from the raw x (`x`) part of the curve,
     /// along with an optional (but recommended) key ID.
     ///
     /// The key ID is used for matching signed JSON Web Tokens with the keys used for verifying
