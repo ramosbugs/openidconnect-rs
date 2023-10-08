@@ -62,7 +62,7 @@ fn ed_public_key(
     String,
 > {
     if *key.key_type() != CoreJsonWebKeyType::OctetKeyPair {
-        Err("ED key required".to_string())
+        Err("OKP key required".to_string())
     } else {
         let x = key
             .x
@@ -146,7 +146,7 @@ pub fn verify_ec_signature(
         CoreJsonCurveType::P521 => Err(SignatureVerificationError::UnsupportedAlg(
             "P521".to_string(),
         )),
-        _ => Err(SignatureVerificationError::InvalidKey("Invalid key".to_string()))
+        _ => Err(SignatureVerificationError::InvalidKey(format!("unrecognized curve `{crv:?}`")))
     }
 }
 
@@ -168,14 +168,14 @@ pub fn verify_ed_signature(
                 .verify(
                     msg,
                     &ed25519_dalek::Signature::from_slice(signature).map_err(|_| {
-                        SignatureVerificationError::CryptoError("Invalid signature".to_string())
+                        SignatureVerificationError::CryptoError("invalid signature".to_string())
                     })?
                 )
                 .map_err(|_| {
-                    SignatureVerificationError::CryptoError("ED Signature was wrong".to_string())
+                    SignatureVerificationError::CryptoError("incorrect EdDSA signature".to_string())
                 })
         }
-        _ => Err(SignatureVerificationError::InvalidKey("Invalid key".to_string()))
+        _ => Err(SignatureVerificationError::InvalidKey(format!("unrecognized curve `{crv:?}`")))
     }
 }
 
