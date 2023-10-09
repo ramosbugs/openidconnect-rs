@@ -33,7 +33,7 @@ pub struct CoreJsonWebKey {
     pub(crate) kid: Option<JsonWebKeyId>,
 
     /// The algorithm intended to be used with this key (https://www.rfc-editor.org/rfc/rfc7517#section-4.4)
-    /// It can either be an algorithm inteded for use with JWS or JWE, or something different.
+    /// It can either be an algorithm intended for use with JWS or JWE, or something different.
     #[cfg(feature = "jwk-alg")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) alg: Option<
@@ -1133,11 +1133,11 @@ mod tests {
 
     #[test]
     fn test_hmac_sha256_verification() {
+        // the original spec example also has alg=HS256, which was removed to test other signing algorithms
         let key_json = "{
             \"kty\": \"oct\",
             \"kid\": \"018c0ae5-4d9b-471b-bfd6-eef314bc7037\",
             \"use\": \"sig\",
-            \"alg\": \"HS256\",
             \"k\": \"hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg\"
         }";
 
@@ -1155,6 +1155,21 @@ mod tests {
             &CoreJwsSigningAlgorithm::HmacSha256,
             signing_input,
             "s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0",
+        );
+
+        verify_signature(
+            &key,
+            &CoreJwsSigningAlgorithm::HmacSha384,
+            signing_input,
+            "O1jhTTHkuaiubwDZoIBLv6zjEarXHc22NNu05IdYh_yzIKGYXJQcaI2WnF4BCq7j",
+        );
+
+        verify_signature(
+            &key,
+            &CoreJwsSigningAlgorithm::HmacSha512,
+            signing_input,
+            "rdWYqzXuAJp4OW-exqIwrO8HJJQDYu0_fkTIUBHmyHMFJ0pVe7fjP7QtE7BaX-7FN5\
+             YiyiM11MwIEAxzxBj6qw",
         );
     }
 
@@ -1562,18 +1577,29 @@ mod tests {
         }";
         let jwks = serde_json::from_str::<CoreJsonWebKeySet>(jwks_json)
             .expect("deserialization should succeed");
+        assert_eq!(jwks.keys().len(), 2);
 
-        let keys = jwks.filter_keys(
-            &Some(JsonWebKeyId::new("2011-04-29".to_string())),
-            &CoreJwsSigningAlgorithm::RsaSsaPssSha384,
-        );
-        assert_eq!(keys.len(), 1);
-        assert_eq!(
-            keys[0].alg,
-            Some(crate::jwt::JsonWebTokenAlgorithm::Signature(
-                CoreJwsSigningAlgorithm::RsaSsaPssSha384,
-                std::marker::PhantomData
-            ))
-        );
+        {
+            let keys = jwks.filter_keys(
+                &Some(JsonWebKeyId::new("2011-04-29".to_string())),
+                &CoreJwsSigningAlgorithm::RsaSsaPssSha384,
+            );
+            assert_eq!(keys.len(), 1);
+            assert_eq!(
+                keys[0].alg,
+                Some(crate::jwt::JsonWebTokenAlgorithm::Signature(
+                    CoreJwsSigningAlgorithm::RsaSsaPssSha384,
+                    std::marker::PhantomData
+                ))
+            );
+        }
+
+        {
+            let keys = jwks.filter_keys(
+                &Some(JsonWebKeyId::new("2011-04-29".to_string())),
+                &CoreJwsSigningAlgorithm::RsaSsaPssSha512,
+            );
+            assert_eq!(keys.len(), 0);
+        }
     }
 }

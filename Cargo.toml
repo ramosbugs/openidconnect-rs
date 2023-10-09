@@ -25,6 +25,8 @@ rustls-tls = ["oauth2/rustls-tls"]
 accept-rfc3339-timestamps = []
 accept-string-booleans = []
 nightly = []
+# TODO: remove this feature gate on the next major release
+# see https://github.com/ramosbugs/openidconnect-rs/pull/131#discussion_r1349786021
 jwk-alg = []
 
 [dependencies]

@@ -237,6 +237,8 @@ where
     /// Returns the algorithm (e.g. ES512) this key must be used with, or `Unspecified` if
     /// no algorithm constraint was given, or unsupported if the algorithm is not for signing.
     ///
+    /// It's not sufficient to tell whether a key can be used for signing, as key use also has to be validated.
+    ///
     #[cfg(feature = "jwk-alg")]
     fn signing_alg(&self) -> JsonWebKeyAlgorithm<&JS>;
 
@@ -259,10 +261,16 @@ where
     ) -> Result<(), SignatureVerificationError>;
 }
 
-#[cfg(feature = "jwk-alg")]
-pub enum JsonWebKeyAlgorithm<A> {
+///
+/// Encodes a JWK key's alg field compatibility with either signing or encryption operations.
+///
+#[derive(Debug)]
+pub enum JsonWebKeyAlgorithm<A: Debug> {
+    /// the alg field allows this kind of operation to be performed with this algorithm only
     Algorithm(A),
+    /// there is no alg field
     Unspecified,
+    /// the alg field's algorithm is incompatible with this kind of operation
     Unsupported,
 }
 

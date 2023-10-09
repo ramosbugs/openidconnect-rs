@@ -933,7 +933,6 @@ impl JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
     }
 }
 
-
 ///
 /// OpenID Connect Core authentication error response types.
 ///
