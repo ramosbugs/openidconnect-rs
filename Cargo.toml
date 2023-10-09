@@ -25,6 +25,7 @@ rustls-tls = ["oauth2/rustls-tls"]
 accept-rfc3339-timestamps = []
 accept-string-booleans = []
 nightly = []
+jwk-alg = []
 
 [dependencies]
 base64 = "0.13"

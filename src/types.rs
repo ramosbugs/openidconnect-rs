@@ -234,10 +234,11 @@ where
     fn key_use(&self) -> Option<&JU>;
 
     ///
-    /// Returns the algorithm (e.g. ES512) this key must be used with, or `None` if no algorithm
-    /// constraint was specified.
+    /// Returns the algorithm (e.g. ES512) this key must be used with, or `Unspecified` if
+    /// no algorithm constraint was given, or unsupported if the algorithm is not for signing.
     ///
-    fn check_compatibility(&self, signing_algorithm: &JS) -> Result<(), &'static str>;
+    #[cfg(feature = "jwk-alg")]
+    fn signing_alg(&self) -> JsonWebKeyAlgorithm<&JS>;
 
     ///
     /// Initializes a new symmetric key or shared signing secret from the specified raw bytes.
@@ -256,6 +257,13 @@ where
         message: &[u8],
         signature: &[u8],
     ) -> Result<(), SignatureVerificationError>;
+}
+
+#[cfg(feature = "jwk-alg")]
+pub enum JsonWebKeyAlgorithm<A> {
+    Algorithm(A),
+    Unspecified,
+    Unsupported,
 }
 
 ///
@@ -743,6 +751,45 @@ where
     #[serde(skip)]
     _phantom: PhantomData<(JS, JT, JU)>,
 }
+
+///
+/// Checks whether a JWK key can be used with a given signing algorithm.
+///
+pub(crate) fn check_key_compatibility<JS, JT, JU, K>(
+    key: &K,
+    signing_algorithm: &JS,
+) -> Result<(), &'static str>
+where
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+{
+    // if this key isn't suitable for signing
+    if let Some(use_) = key.key_use() {
+        if !use_.allows_signature() {
+            return Err("key usage not permitted for digital signatures");
+        }
+    }
+
+    // if this key doesn't have the right key type
+    if signing_algorithm.key_type().as_ref() != Some(key.key_type()) {
+        return Err("key type does not match signature algorithm");
+    }
+
+    #[cfg(feature = "jwk-alg")]
+    match key.signing_alg() {
+        // if no specific algorithm is mandated, any will do
+        JsonWebKeyAlgorithm::Unspecified => Ok(()),
+        JsonWebKeyAlgorithm::Unsupported => Err("key algorithm is not a signing algorithm"),
+        JsonWebKeyAlgorithm::Algorithm(key_alg) if key_alg == signing_algorithm => Ok(()),
+        JsonWebKeyAlgorithm::Algorithm(_) => Err("incompatible key algorithm"),
+    }
+
+    #[cfg(not(feature = "jwk-alg"))]
+    Ok(())
+}
+
 impl<JS, JT, JU, K> JsonWebKeySet<JS, JT, JU, K>
 where
     JS: JwsSigningAlgorithm<JT>,
@@ -763,7 +810,7 @@ where
     ///
     /// Return a list of suitable keys, given a key id an signature algorithm
     ///
-    pub fn filter_keys(&self, key_id: &Option<JsonWebKeyId>, signature_alg: &JS) -> Vec<&K> {
+    pub(crate) fn filter_keys(&self, key_id: &Option<JsonWebKeyId>, signature_alg: &JS) -> Vec<&K> {
         self.keys()
         .iter()
         .filter(|key|
@@ -772,7 +819,7 @@ where
             if key_id.is_some() && key_id.as_ref() != key.key_id() {
                 false
             } else {
-                key.check_compatibility(signature_alg).is_ok()
+                check_key_compatibility(*key, signature_alg).is_ok()
             }
         )
         .collect()

@@ -1401,6 +1401,7 @@ mod tests {
                 x: None,
                 y: None,
                 d: None,
+                #[cfg(feature = "jwk-alg")]
                 alg: None,
             }]),
         )
@@ -1427,6 +1428,7 @@ mod tests {
                 x: None,
                 y: None,
                 d: None,
+                #[cfg(feature = "jwk-alg")]
                 alg: None,
             }]),
         )
