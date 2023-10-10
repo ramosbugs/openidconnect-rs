@@ -32,8 +32,8 @@ use crate::{
 use super::AuthenticationFlow;
 
 pub use self::jwk::{
-    CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreRsaPrivateSigningKey,
-    CoreEdDsaPrivateSigningKey
+    CoreEdDsaPrivateSigningKey, CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse,
+    CoreRsaPrivateSigningKey,
 };
 
 mod crypto;
@@ -856,7 +856,7 @@ pub enum CoreJwsSigningAlgorithm {
     #[serde(rename = "PS512")]
     RsaSsaPssSha512,
     ///
-    /// EdDSA signature using Ed25519 curve 
+    /// EdDSA signature using Ed25519 curve
     ///
     #[serde(rename = "Ed25519")]
     EdDsaEd25519,

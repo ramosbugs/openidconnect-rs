@@ -54,13 +54,7 @@ fn ec_public_key(
 
 fn ed_public_key(
     key: &CoreJsonWebKey,
-) -> Result<
-    (
-        &Base64UrlEncodedBytes,
-        &CoreJsonCurveType,
-    ),
-    String,
-> {
+) -> Result<(&Base64UrlEncodedBytes, &CoreJsonCurveType), String> {
     if *key.key_type() != CoreJsonWebKeyType::OctetKeyPair {
         Err("OKP key required".to_string())
     } else {
@@ -146,14 +140,16 @@ pub fn verify_ec_signature(
         CoreJsonCurveType::P521 => Err(SignatureVerificationError::UnsupportedAlg(
             "P521".to_string(),
         )),
-        _ => Err(SignatureVerificationError::InvalidKey(format!("unrecognized curve `{crv:?}`")))
+        _ => Err(SignatureVerificationError::InvalidKey(format!(
+            "unrecognized curve `{crv:?}`"
+        ))),
     }
 }
 
 pub fn verify_ed_signature(
     key: &CoreJsonWebKey,
     msg: &[u8],
-    signature: &[u8]
+    signature: &[u8],
 ) -> Result<(), SignatureVerificationError> {
     use ed25519_dalek::Verifier;
 
@@ -169,13 +165,15 @@ pub fn verify_ed_signature(
                     msg,
                     &ed25519_dalek::Signature::from_slice(signature).map_err(|_| {
                         SignatureVerificationError::CryptoError("invalid signature".to_string())
-                    })?
+                    })?,
                 )
                 .map_err(|_| {
                     SignatureVerificationError::CryptoError("incorrect EdDSA signature".to_string())
                 })
         }
-        _ => Err(SignatureVerificationError::InvalidKey(format!("unrecognized curve `{crv:?}`")))
+        _ => Err(SignatureVerificationError::InvalidKey(format!(
+            "unrecognized curve `{crv:?}`"
+        ))),
     }
 }
 
