@@ -638,13 +638,14 @@ pub use types::{
     EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName, EndUserName,
     EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone,
     EndUserUsername, EndUserWebsiteUrl, FormattedAddress, GrantType, InitiateLoginUrl, IssuerUrl,
-    JsonWebKey, JsonWebKeyId, JsonWebKeySet, JsonWebKeySetUrl, JsonWebKeyType, JsonWebKeyUse,
-    JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag,
-    LocalizedClaim, LoginHint, LogoUrl, LogoutHint, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl,
-    PostLogoutRedirectUrl, PrivateSigningKey, RegistrationAccessToken, RegistrationUrl, RequestUrl,
-    ResponseMode, ResponseType, ResponseTypes, SectorIdentifierUrl, ServiceDocUrl, SigningError,
-    StreetAddress, SubjectIdentifier, SubjectIdentifierType, ToSUrl,
+    JsonWebKey, JsonWebKeyAlgorithm, JsonWebKeyId, JsonWebKeySet, JsonWebKeySetUrl, JsonWebKeyType,
+    JsonWebKeyUse, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm,
+    LanguageTag, LocalizedClaim, LoginHint, LogoUrl, LogoutHint, Nonce, OpPolicyUrl, OpTosUrl,
+    PolicyUrl, PostLogoutRedirectUrl, PrivateSigningKey, RegistrationAccessToken, RegistrationUrl,
+    RequestUrl, ResponseMode, ResponseType, ResponseTypes, SectorIdentifierUrl, ServiceDocUrl,
+    SigningError, StreetAddress, SubjectIdentifier, SubjectIdentifierType, ToSUrl,
 };
+
 pub use user_info::{
     UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoRequest, UserInfoUrl,
 };

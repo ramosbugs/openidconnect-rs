@@ -1,14 +1,18 @@
 use rsa::pkcs1::DecodeRsaPrivateKey;
 use sha2::Digest;
 
-use crate::types::Base64UrlEncodedBytes;
+use super::{crypto, CoreJwsSigningAlgorithm};
+use crate::types::{check_key_compatibility, Base64UrlEncodedBytes};
 use crate::types::{helpers::deserialize_option_or_none, JsonCurveType};
 use crate::{
-    JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse, JwsSigningAlgorithm,
-    PrivateSigningKey, SignatureVerificationError, SigningError,
+    JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse, PrivateSigningKey,
+    SignatureVerificationError, SigningError,
 };
 
-use super::{crypto, CoreJwsSigningAlgorithm};
+#[cfg(feature = "jwk-alg")]
+use crate::{
+    core::CoreJweContentEncryptionAlgorithm, jwt::JsonWebTokenAlgorithm, types::JsonWebKeyAlgorithm,
+};
 
 // Other than the 'kty' (key type) parameter, which must be present in all JWKs, Section 4 of RFC
 // 7517 states that "member names used for representing key parameters for different keys types
@@ -27,6 +31,18 @@ pub struct CoreJsonWebKey {
     pub(crate) use_: Option<CoreJsonWebKeyUse>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) kid: Option<JsonWebKeyId>,
+
+    /// The algorithm intended to be used with this key (https://www.rfc-editor.org/rfc/rfc7517#section-4.4)
+    /// It can either be an algorithm intended for use with JWS or JWE, or something different.
+    #[cfg(feature = "jwk-alg")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) alg: Option<
+        JsonWebTokenAlgorithm<
+            CoreJweContentEncryptionAlgorithm,
+            CoreJwsSigningAlgorithm,
+            CoreJsonWebKeyType,
+        >,
+    >,
 
     // From RFC 7517, Section 4: "Additional members can be present in the JWK; if not understood
     // by implementations encountering them, they MUST be ignored.  Member names used for
@@ -99,6 +115,8 @@ impl CoreJsonWebKey {
             x: None,
             y: None,
             d: None,
+            #[cfg(feature = "jwk-alg")]
+            alg: None,
         }
     }
     /// Instantiate a new EC public key from the raw x (`x`) and y(`y`) part of the curve,
@@ -123,9 +141,12 @@ impl CoreJsonWebKey {
             x: Some(Base64UrlEncodedBytes::new(x)),
             y: Some(Base64UrlEncodedBytes::new(y)),
             d: None,
+            #[cfg(feature = "jwk-alg")]
+            alg: None,
         }
     }
 }
+
 impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> for CoreJsonWebKey {
     fn key_id(&self) -> Option<&JsonWebKeyId> {
         self.kid.as_ref()
@@ -149,6 +170,8 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
             x: None,
             y: None,
             d: None,
+            #[cfg(feature = "jwk-alg")]
+            alg: None,
         }
     }
 
@@ -159,19 +182,9 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
         signature: &[u8],
     ) -> Result<(), SignatureVerificationError> {
         use hmac::Mac;
-        if let Some(key_use) = self.key_use() {
-            if *key_use != CoreJsonWebKeyUse::Signature {
-                return Err(SignatureVerificationError::InvalidKey(
-                    "key usage not permitted for digital signatures".to_string(),
-                ));
-            }
-        }
 
-        if Some(self.key_type()) != signature_alg.key_type().as_ref() {
-            return Err(SignatureVerificationError::InvalidKey(
-                "key type does not match signature algorithm".to_string(),
-            ));
-        }
+        check_key_compatibility(self, signature_alg)
+            .map_err(|e| SignatureVerificationError::InvalidKey(e.to_owned()))?;
 
         match *signature_alg {
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256 => {
@@ -323,6 +336,17 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
                     )
                 }),
             )),
+        }
+    }
+
+    #[cfg(feature = "jwk-alg")]
+    fn signing_alg(&self) -> JsonWebKeyAlgorithm<&CoreJwsSigningAlgorithm> {
+        match self.alg {
+            None => JsonWebKeyAlgorithm::Unspecified,
+            Some(JsonWebTokenAlgorithm::Signature(ref alg, _)) => {
+                JsonWebKeyAlgorithm::Algorithm(alg)
+            }
+            Some(_) => JsonWebKeyAlgorithm::Unsupported,
         }
     }
 }
@@ -554,6 +578,8 @@ impl
             x: None,
             y: None,
             d: None,
+            #[cfg(feature = "jwk-alg")]
+            alg: None,
         }
     }
 }
@@ -664,6 +690,8 @@ serialize_as_str!(CoreJsonWebKeyUse);
 #[cfg(test)]
 mod tests {
     use crate::core::CoreJsonWebKeySet;
+    #[cfg(feature = "jwk-alg")]
+    use crate::{core::CoreJweContentEncryptionAlgorithm, jwt::JsonWebTokenAlgorithm};
     use rand::rngs::mock::StepRng;
     use rand::{CryptoRng, RngCore};
     use rsa::rand_core;
@@ -758,7 +786,7 @@ mod tests {
     fn test_core_jwk_deserialization_symmetric() {
         let json = "{\
             \"kty\":\"oct\",
-            \"alg\":\"A128KW\",
+            \"alg\":\"A128GCM\",
             \"k\":\"GawgguFyGrWKav7AX4VKUg\"
         }";
 
@@ -768,6 +796,13 @@ mod tests {
         assert_eq!(key.kid, None);
         assert_eq!(key.n, None);
         assert_eq!(key.e, None);
+        #[cfg(feature = "jwk-alg")]
+        assert_eq!(
+            key.alg,
+            Some(JsonWebTokenAlgorithm::Encryption(
+                CoreJweContentEncryptionAlgorithm::Aes128Gcm
+            ))
+        );
         assert_eq!(
             key.k,
             Some(Base64UrlEncodedBytes::new(vec![
@@ -1119,11 +1154,11 @@ mod tests {
 
     #[test]
     fn test_hmac_sha256_verification() {
+        // the original spec example also has alg=HS256, which was removed to test other signing algorithms
         let key_json = "{
             \"kty\": \"oct\",
             \"kid\": \"018c0ae5-4d9b-471b-bfd6-eef314bc7037\",
             \"use\": \"sig\",
-            \"alg\": \"HS256\",
             \"k\": \"hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg\"
         }";
 
@@ -1497,5 +1532,95 @@ mod tests {
             Some(JsonWebKeyId::new("2011-05-01".to_string()))
         );
         assert_eq!(jwks.keys()[1].crv, Some(CoreJsonCurveType::P256));
+    }
+
+    // Tests that JsonWebKeySet ignores keys with unsupported algorithms
+    #[cfg(feature = "jwk-alg")]
+    #[test]
+    fn test_jwks_unsupported_alg() {
+        let jwks_json = "{
+            \"keys\": [
+                {
+                    \"kty\": \"EC\",
+                    \"alg\": \"MAGIC\",
+                    \"crv\": \"P-256\",
+                    \"x\": \"kXCGZIr3oI6sKbnT6rRsIdxFXw3_VbLk_cveajgqXk8\",
+                    \"y\": \"StDvKIgXqAxJ6DuebREh-1vgvZRW3dfrOxSIKzBtRI0\"
+                },
+                {
+                    \"kty\": \"EC\",
+                    \"alg\": \"ES256\",
+                    \"kid\": \"2011-05-01\",
+                    \"crv\": \"P-256\",
+                    \"x\": \"kXCGZIr3oI6sKbnT6rRsIdxFXw3_VbLk_cveajgqXk8\",
+                    \"y\": \"StDvKIgXqAxJ6DuebREh-1vgvZRW3dfrOxSIKzBtRI0\"
+                }
+            ]
+        }";
+        let jwks = serde_json::from_str::<CoreJsonWebKeySet>(jwks_json)
+            .expect("deserialization should succeed");
+        assert_eq!(jwks.keys().len(), 1);
+        let key = &jwks.keys()[0];
+        assert_eq!(&key.kid, &Some(JsonWebKeyId::new("2011-05-01".to_string())));
+    }
+
+    // Test filtering keys by algorithm
+    #[cfg(feature = "jwk-alg")]
+    #[test]
+    fn test_jwks_same_kid_different_alg() {
+        let jwks_json = "{
+            \"keys\": [
+                {
+                    \"kty\": \"RSA\",
+                    \"use\": \"sig\",
+                    \"kid\": \"2011-04-29\",
+                    \"alg\": \"PS256\",
+                    \"n\": \"0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhD\
+                             R1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6C\
+                             f0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1\
+                             n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1\
+                             jF44-csFCur-kEgU8awapJzKnqDKgw\",
+                    \"e\": \"AQAB\"
+                },
+                {
+                    \"kty\": \"RSA\",
+                    \"use\": \"sig\",
+                    \"kid\": \"2011-04-29\",
+                    \"alg\": \"PS384\",
+                    \"n\": \"0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhD\
+                             R1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6C\
+                             f0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1\
+                             n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1\
+                             jF44-csFCur-kEgU8awapJzKnqDKgw\",
+                    \"e\": \"AQAB\"
+                }
+            ]
+        }";
+        let jwks = serde_json::from_str::<CoreJsonWebKeySet>(jwks_json)
+            .expect("deserialization should succeed");
+        assert_eq!(jwks.keys().len(), 2);
+
+        {
+            let keys = jwks.filter_keys(
+                &Some(JsonWebKeyId::new("2011-04-29".to_string())),
+                &CoreJwsSigningAlgorithm::RsaSsaPssSha384,
+            );
+            assert_eq!(keys.len(), 1);
+            assert_eq!(
+                keys[0].alg,
+                Some(crate::jwt::JsonWebTokenAlgorithm::Signature(
+                    CoreJwsSigningAlgorithm::RsaSsaPssSha384,
+                    std::marker::PhantomData
+                ))
+            );
+        }
+
+        {
+            let keys = jwks.filter_keys(
+                &Some(JsonWebKeyId::new("2011-04-29".to_string())),
+                &CoreJwsSigningAlgorithm::RsaSsaPssSha512,
+            );
+            assert_eq!(keys.len(), 0);
+        }
     }
 }

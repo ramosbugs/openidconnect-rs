@@ -1207,7 +1207,7 @@ impl ResponseMode for CoreResponseMode {}
 /// OpenID Connect Core response type.
 ///
 /// Informs the Authorization Server of the desired authorization processing flow, including what
-/// parameters are returned from the endpoints used.  
+/// parameters are returned from the endpoints used.
 ///
 /// This type represents a single Response Type. Multiple Response Types are represented via the
 /// `ResponseTypes` type, which wraps a `Vec<ResponseType>`.
