@@ -922,12 +922,8 @@ impl JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
             CoreJwsSigningAlgorithm::HmacSha512
             | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512
             | CoreJwsSigningAlgorithm::RsaSsaPssSha512
-            | CoreJwsSigningAlgorithm::EcdsaP521Sha512 => {
-                let mut hasher = Sha512::new();
-                hasher.update(bytes);
-                hasher.finalize().to_vec()
-            }
-            CoreJwsSigningAlgorithm::EdDsaEd25519 => {
+            | CoreJwsSigningAlgorithm::EcdsaP521Sha512
+            | CoreJwsSigningAlgorithm::EdDsaEd25519 => {
                 let mut hasher = Sha512::new();
                 hasher.update(bytes);
                 hasher.finalize().to_vec()
