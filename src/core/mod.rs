@@ -928,9 +928,9 @@ impl JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
                 hasher.finalize().to_vec()
             }
             CoreJwsSigningAlgorithm::EdDsaEd25519 => {
-                return Err(
-                    "signature algorithm `Ed25519` has no corresponding hash algorithm".to_string(),
-                );
+                let mut hasher = Sha512::new();
+                hasher.update(bytes);
+                hasher.finalize().to_vec()
             }
             CoreJwsSigningAlgorithm::None => {
                 return Err(
