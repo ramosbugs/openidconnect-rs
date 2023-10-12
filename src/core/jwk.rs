@@ -165,6 +165,8 @@ impl CoreJsonWebKey {
             x: Some(Base64UrlEncodedBytes::new(x)),
             y: None,
             d: None,
+            #[cfg(feature = "jwk-alg")]
+            alg: None,
         }
     }
 }
@@ -541,6 +543,8 @@ impl
                 y: None,
                 d: None,
                 k: None,
+                #[cfg(feature = "jwk-alg")]
+                alg: None,
             },
         }
     }
@@ -1087,6 +1091,26 @@ mod tests {
             pkcs1_signing_input,
             signature_ed25519_other,
         );
+
+        // non-EdDsa key
+        if let Some(err) = key_ed25519
+            .verify_signature(
+                &CoreJwsSigningAlgorithm::EcdsaP256Sha256,
+                pkcs1_signing_input.as_bytes(),
+                signature_ed25519.as_bytes(),
+            )
+            .err()
+        {
+            let error_msg = "key type does not match signature algorithm".to_string();
+            match err {
+                SignatureVerificationError::InvalidKey(msg) => {
+                    if msg != error_msg {
+                        panic!("The error should be about key type")
+                    }
+                }
+                _ => panic!("We should fail before actual validation"),
+            }
+        }
     }
 
     #[test]
