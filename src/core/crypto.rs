@@ -61,11 +61,11 @@ fn ed_public_key(
         let x = key
             .x
             .as_ref()
-            .ok_or_else(|| "ED `x` part is missing".to_string())?;
+            .ok_or_else(|| "OKP `x` part is missing".to_string())?;
         let crv = key
             .crv
             .as_ref()
-            .ok_or_else(|| "EC `crv` part is missing".to_string())?;
+            .ok_or_else(|| "OKP `crv` part is missing".to_string())?;
         Ok((x, crv))
     }
 }
