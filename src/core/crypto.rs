@@ -52,6 +52,24 @@ fn ec_public_key(
     }
 }
 
+fn ed_public_key(
+    key: &CoreJsonWebKey,
+) -> Result<(&Base64UrlEncodedBytes, &CoreJsonCurveType), String> {
+    if *key.key_type() != CoreJsonWebKeyType::OctetKeyPair {
+        Err("OKP key required".to_string())
+    } else {
+        let x = key
+            .x
+            .as_ref()
+            .ok_or_else(|| "OKP `x` part is missing".to_string())?;
+        let crv = key
+            .crv
+            .as_ref()
+            .ok_or_else(|| "OKP `crv` part is missing".to_string())?;
+        Ok((x, crv))
+    }
+}
+
 pub fn verify_rsa_signature(
     key: &CoreJsonWebKey,
     padding: impl rsa::traits::SignatureScheme,
@@ -122,6 +140,40 @@ pub fn verify_ec_signature(
         CoreJsonCurveType::P521 => Err(SignatureVerificationError::UnsupportedAlg(
             "P521".to_string(),
         )),
+        _ => Err(SignatureVerificationError::InvalidKey(format!(
+            "unrecognized curve `{crv:?}`"
+        ))),
+    }
+}
+
+pub fn verify_ed_signature(
+    key: &CoreJsonWebKey,
+    msg: &[u8],
+    signature: &[u8],
+) -> Result<(), SignatureVerificationError> {
+    use ed25519_dalek::Verifier;
+
+    let (x, crv) = ed_public_key(key).map_err(SignatureVerificationError::InvalidKey)?;
+
+    match *crv {
+        CoreJsonCurveType::Ed25519 => {
+            let public_key = ed25519_dalek::VerifyingKey::try_from(x.deref().as_slice())
+                .map_err(|e| SignatureVerificationError::InvalidKey(e.to_string()))?;
+
+            public_key
+                .verify(
+                    msg,
+                    &ed25519_dalek::Signature::from_slice(signature).map_err(|_| {
+                        SignatureVerificationError::CryptoError("invalid signature".to_string())
+                    })?,
+                )
+                .map_err(|_| {
+                    SignatureVerificationError::CryptoError("incorrect EdDSA signature".to_string())
+                })
+        }
+        _ => Err(SignatureVerificationError::InvalidKey(format!(
+            "unrecognized curve `{crv:?}`"
+        ))),
     }
 }
 

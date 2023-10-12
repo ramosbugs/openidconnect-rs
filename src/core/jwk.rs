@@ -1,3 +1,5 @@
+use ed25519_dalek::pkcs8::DecodePrivateKey;
+use ed25519_dalek::Signer;
 use rsa::pkcs1::DecodeRsaPrivateKey;
 use sha2::Digest;
 
@@ -140,6 +142,28 @@ impl CoreJsonWebKey {
             crv: Some(crv),
             x: Some(Base64UrlEncodedBytes::new(x)),
             y: Some(Base64UrlEncodedBytes::new(y)),
+            d: None,
+            #[cfg(feature = "jwk-alg")]
+            alg: None,
+        }
+    }
+
+    /// Instantiate a new Octet Key-Pair public key from the raw x (`x`) part of the curve,
+    /// along with an optional (but recommended) key ID.
+    ///
+    /// The key ID is used for matching signed JSON Web Tokens with the keys used for verifying
+    /// their signatures.
+    pub fn new_okp(x: Vec<u8>, crv: CoreJsonCurveType, kid: Option<JsonWebKeyId>) -> Self {
+        Self {
+            kty: CoreJsonWebKeyType::OctetKeyPair,
+            use_: Some(CoreJsonWebKeyUse::Signature),
+            kid,
+            n: None,
+            e: None,
+            k: None,
+            crv: Some(crv),
+            x: Some(Base64UrlEncodedBytes::new(x)),
+            y: None,
             d: None,
             #[cfg(feature = "jwk-alg")]
             alg: None,
@@ -328,6 +352,15 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
                     ))
                 }
             }
+            CoreJwsSigningAlgorithm::EdDsaEd25519 => {
+                if matches!(self.crv, Some(CoreJsonCurveType::Ed25519)) {
+                    crypto::verify_ed_signature(self, message, signature)
+                } else {
+                    Err(SignatureVerificationError::InvalidKey(
+                        "Key uses different CRV than JWT".to_string(),
+                    ))
+                }
+            }
             ref other => Err(SignatureVerificationError::UnsupportedAlg(
                 serde_plain::to_string(other).unwrap_or_else(|err| {
                     panic!(
@@ -423,6 +456,97 @@ impl
 
     fn as_verification_key(&self) -> CoreJsonWebKey {
         CoreJsonWebKey::new_symmetric(self.secret.clone())
+    }
+}
+
+enum EdDsaSigningKey {
+    Ed25519(ed25519_dalek::SigningKey),
+}
+
+impl EdDsaSigningKey {
+    fn from_ed25519_pem(pem: &str) -> Result<Self, String> {
+        Ok(Self::Ed25519(
+            ed25519_dalek::SigningKey::from_pkcs8_pem(pem).map_err(|err| err.to_string())?,
+        ))
+    }
+
+    fn sign(&self, message: &[u8]) -> Vec<u8> {
+        match self {
+            Self::Ed25519(key) => {
+                let signature = key.sign(message);
+
+                signature.to_vec()
+            }
+        }
+    }
+}
+
+///
+/// EdDSA Private Key.
+///
+/// This key can be used for signing messages, or converted to a `CoreJsonWebKey` for verifying
+/// them.
+///
+pub struct CoreEdDsaPrivateSigningKey {
+    kid: Option<JsonWebKeyId>,
+    key_pair: EdDsaSigningKey,
+}
+impl CoreEdDsaPrivateSigningKey {
+    ///
+    /// Converts an EdDSA private key (in PEM format) to a JWK representing its public key.
+    ///
+    pub fn from_ed25519_pem(pem: &str, kid: Option<JsonWebKeyId>) -> Result<Self, String> {
+        Ok(Self {
+            kid,
+            key_pair: EdDsaSigningKey::from_ed25519_pem(pem)?,
+        })
+    }
+}
+impl
+    PrivateSigningKey<
+        CoreJwsSigningAlgorithm,
+        CoreJsonWebKeyType,
+        CoreJsonWebKeyUse,
+        CoreJsonWebKey,
+    > for CoreEdDsaPrivateSigningKey
+{
+    fn sign(
+        &self,
+        signature_alg: &CoreJwsSigningAlgorithm,
+        message: &[u8],
+    ) -> Result<Vec<u8>, SigningError> {
+        match *signature_alg {
+            CoreJwsSigningAlgorithm::EdDsaEd25519 => Ok(self.key_pair.sign(message)),
+            ref other => Err(SigningError::UnsupportedAlg(
+                serde_plain::to_string(other).unwrap_or_else(|err| {
+                    panic!(
+                        "signature alg {:?} failed to serialize to a string: {}",
+                        other, err
+                    )
+                }),
+            )),
+        }
+    }
+
+    fn as_verification_key(&self) -> CoreJsonWebKey {
+        match &self.key_pair {
+            EdDsaSigningKey::Ed25519(key) => CoreJsonWebKey {
+                kty: CoreJsonWebKeyType::OctetKeyPair,
+                use_: Some(CoreJsonWebKeyUse::Signature),
+                kid: self.kid.clone(),
+                n: None,
+                e: None,
+                crv: Some(CoreJsonCurveType::Ed25519),
+                x: Some(Base64UrlEncodedBytes::new(
+                    key.verifying_key().as_bytes().to_vec(),
+                )),
+                y: None,
+                d: None,
+                k: None,
+                #[cfg(feature = "jwk-alg")]
+                alg: None,
+            },
+        }
     }
 }
 
@@ -603,6 +727,11 @@ pub enum CoreJsonWebKeyType {
     #[serde(rename = "RSA")]
     RSA,
     ///
+    /// EdDSA key.
+    ///
+    #[serde(rename = "OKP")]
+    OctetKeyPair,
+    ///
     /// Symmetric key.
     ///
     #[serde(rename = "oct")]
@@ -631,6 +760,11 @@ pub enum CoreJsonCurveType {
     ///
     #[serde(rename = "P-521")]
     P521,
+    ///
+    /// Ed25519 Curve
+    ///
+    #[serde(rename = "Ed25519")]
+    Ed25519,
 }
 impl JsonCurveType for CoreJsonWebKeyType {}
 
@@ -696,14 +830,16 @@ mod tests {
     use rand::{CryptoRng, RngCore};
     use rsa::rand_core;
 
-    use crate::jwt::tests::{TEST_EC_PUB_KEY_P256, TEST_EC_PUB_KEY_P384, TEST_RSA_PUB_KEY};
+    use crate::jwt::tests::{
+        TEST_EC_PUB_KEY_P256, TEST_EC_PUB_KEY_P384, TEST_ED_PUB_KEY_ED25519, TEST_RSA_PUB_KEY,
+    };
     use crate::types::Base64UrlEncodedBytes;
     use crate::types::{JsonWebKey, JsonWebKeyId};
     use crate::verification::SignatureVerificationError;
 
     use super::{
-        CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse,
-        CoreJwsSigningAlgorithm, CoreRsaPrivateSigningKey, PrivateSigningKey,
+        CoreEdDsaPrivateSigningKey, CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType,
+        CoreJsonWebKeyUse, CoreJwsSigningAlgorithm, CoreRsaPrivateSigningKey, PrivateSigningKey,
     };
     use super::{CoreJsonCurveType, SigningError};
 
@@ -778,6 +914,30 @@ mod tests {
                 0x91, 0x70, 0x86, 0x64, 0x8a, 0xf7, 0xa0, 0x8e, 0xac, 0x29, 0xb9, 0xd3, 0xea, 0xb4,
                 0x6c, 0x21, 0xdc, 0x45, 0x5f, 0x0d, 0xff, 0x55, 0xb2, 0xe4, 0xfd, 0xcb, 0xde, 0x6a,
                 0x38, 0x2a, 0x5e, 0x4f
+            ]))
+        );
+    }
+
+    #[test]
+    fn test_core_jwk_deserialization_ed() {
+        let json = "{
+            \"alg\": \"Ed25519\",
+            \"crv\": \"Ed25519\",
+            \"kty\": \"OKP\",
+            \"use\": \"sig\",
+            \"x\": \"vZ3CX884r0qNJ18pgXUTvFufK3ZmDzQfvMROJz6CLBc\"
+        }";
+
+        let key: CoreJsonWebKey = serde_json::from_str(json).expect("deserialization failed");
+        assert_eq!(key.kty, CoreJsonWebKeyType::OctetKeyPair);
+        assert_eq!(key.use_, Some(CoreJsonWebKeyUse::Signature));
+        assert_eq!(key.crv, Some(CoreJsonCurveType::Ed25519));
+        assert_eq!(
+            key.x,
+            Some(Base64UrlEncodedBytes::new(vec![
+                0xBD, 0x9D, 0xC2, 0x5F, 0xCF, 0x38, 0xAF, 0x4A, 0x8D, 0x27, 0x5F, 0x29, 0x81, 0x75,
+                0x13, 0xBC, 0x5B, 0x9F, 0x2B, 0x76, 0x66, 0x0F, 0x34, 0x1F, 0xBC, 0xC4, 0x4E, 0x27,
+                0x3E, 0x82, 0x2C, 0x17
             ]))
         );
     }
@@ -895,6 +1055,61 @@ mod tests {
         {
             SignatureVerificationError::CryptoError(_) => {}
             other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_eddsa_verification() {
+        let key_ed25519: CoreJsonWebKey =
+            serde_json::from_str(TEST_ED_PUB_KEY_ED25519).expect("deserialization failed");
+        let pkcs1_signing_input = "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiSldUIn0.eyJpc3MiOiJqb2UifQ";
+        let signature_ed25519 = "Augr7UH6hUbWVN0PHqSD5U0bb8y9UOw_eef09ZS5d5haUar_qAto8gyLJxUhNF5wHPoXhdvSGowkPvjiKsEsCQ";
+
+        let signature_ed25519_other = "xb4NH-q33sCaRXf1ZhnzQxd4o5ZkBWKd9vGibacqPMAblW_mIJLm9kGerqHX08SPoeDY-dYUmZQz9ls6csfvAw";
+        let signature_ed448 = "xxXVMyaYYePdGfMOdU0nENuc70pKwP3vJuc_jBA0rCW-RtbvBLSsc0D9iCPzhrPmQ2X1nTjPkGiAXJ0_NslDBvy3sHu88N64YhnnYBWwwHttBU0jijn_ikbBUHzUwzGuasRFb1ESG_PwedhEcMi-YAwA";
+
+        // test ed25519
+        verify_signature(
+            &key_ed25519,
+            &CoreJwsSigningAlgorithm::EdDsaEd25519,
+            pkcs1_signing_input,
+            signature_ed25519,
+        );
+
+        // signature from ed448 variant
+        verify_invalid_signature(
+            &key_ed25519,
+            &CoreJwsSigningAlgorithm::EdDsaEd25519,
+            pkcs1_signing_input,
+            signature_ed448,
+        );
+
+        // different signature
+        verify_invalid_signature(
+            &key_ed25519,
+            &CoreJwsSigningAlgorithm::EdDsaEd25519,
+            pkcs1_signing_input,
+            signature_ed25519_other,
+        );
+
+        // non-EdDsa key
+        if let Some(err) = key_ed25519
+            .verify_signature(
+                &CoreJwsSigningAlgorithm::EcdsaP256Sha256,
+                pkcs1_signing_input.as_bytes(),
+                signature_ed25519.as_bytes(),
+            )
+            .err()
+        {
+            let error_msg = "key type does not match signature algorithm".to_string();
+            match err {
+                SignatureVerificationError::InvalidKey(msg) => {
+                    if msg != error_msg {
+                        panic!("The error should be about key type")
+                    }
+                }
+                _ => panic!("We should fail before actual validation"),
+            }
         }
     }
 
@@ -1277,6 +1492,12 @@ mod tests {
         );
     }
 
+    const TEST_ED25519_KEY: &str = "\
+        -----BEGIN PRIVATE KEY-----\n\
+        MC4CAQAwBQYDK2VwBCIEICWeYPLxoZKHZlQ6rkBi11E9JwchynXtljATLqym/XS9\n\
+        -----END PRIVATE KEY-----\
+        ";
+
     // This is just a test key that isn't used for anything else.
     const TEST_RSA_KEY: &str = "\
                                -----BEGIN RSA PRIVATE KEY-----\n\
@@ -1308,6 +1529,19 @@ mod tests {
                                 -----END RSA PRIVATE KEY-----\
                                 ";
 
+    fn expect_ed_sig(
+        private_key: &CoreEdDsaPrivateSigningKey,
+        message: &[u8],
+        alg: &CoreJwsSigningAlgorithm,
+        expected_sig_base64: &str,
+    ) {
+        let sig = private_key.sign(alg, message).unwrap();
+        assert_eq!(expected_sig_base64, base64::encode(&sig));
+
+        let public_key = private_key.as_verification_key();
+        public_key.verify_signature(alg, message, &sig).unwrap();
+    }
+
     fn expect_rsa_sig(
         private_key: &CoreRsaPrivateSigningKey,
         message: &[u8],
@@ -1338,6 +1572,47 @@ mod tests {
         fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
             self.0.try_fill_bytes(dest)
         }
+    }
+
+    #[test]
+    fn test_ed_signing() {
+        let private_key = CoreEdDsaPrivateSigningKey::from_ed25519_pem(
+            TEST_ED25519_KEY,
+            Some(JsonWebKeyId::new("test_key".to_string())),
+        )
+        .unwrap();
+
+        let public_key_jwk = private_key.as_verification_key();
+        let public_key_jwk_str = serde_json::to_string(&public_key_jwk).unwrap();
+
+        assert_eq!(
+            "{\
+            \"kty\":\"OKP\",\
+            \"use\":\"sig\",\
+            \"kid\":\"test_key\",\
+            \"crv\":\"Ed25519\",\
+            \"x\":\"E6lXdyel1n9C1lcr3FK8OsfsfO2ZgcWhPflJ6yIf7e8\"\
+            }",
+            public_key_jwk_str
+        );
+
+        let message = "hello EdDsa".as_ref();
+        expect_ed_sig(
+            &private_key,
+            message,
+            &CoreJwsSigningAlgorithm::EdDsaEd25519,
+            "XqP8sXaPrQa37+2lw+aiXv+6pegjioYUgo1/ShcX6kRhD2Vxh8DrQUbQlaGbljLJTNNc453E2Axp+Mxm+4OVAQ=="
+        );
+
+        assert_eq!(
+            private_key.sign(&CoreJwsSigningAlgorithm::HmacSha256, message),
+            Err(SigningError::UnsupportedAlg("HS256".to_string())),
+        );
+
+        assert_eq!(
+            private_key.sign(&CoreJwsSigningAlgorithm::None, message),
+            Err(SigningError::UnsupportedAlg("none".to_string())),
+        );
     }
 
     #[test]

@@ -34,7 +34,7 @@ and will not happen in patch releases.
     * Relying Party flows: code, implicit, hybrid
     * Standard claims
     * UserInfo endpoint
-    * RSA, HMAC, and ECDSA (P-256/P-384 curves) ID token verification
+    * RSA, HMAC, ECDSA (P-256/P-384 curves) and EdDSA (Ed25519 curve) ID token verification
   * Unsupported features:
     * Aggregated and distributed claims
     * Passing request parameters as JWTs

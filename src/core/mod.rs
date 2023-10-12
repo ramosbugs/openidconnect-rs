@@ -32,7 +32,8 @@ use crate::{
 use super::AuthenticationFlow;
 
 pub use self::jwk::{
-    CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreRsaPrivateSigningKey,
+    CoreEdDsaPrivateSigningKey, CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse,
+    CoreRsaPrivateSigningKey,
 };
 
 mod crypto;
@@ -855,6 +856,11 @@ pub enum CoreJwsSigningAlgorithm {
     #[serde(rename = "PS512")]
     RsaSsaPssSha512,
     ///
+    /// EdDSA signature using Ed25519 curve
+    ///
+    #[serde(rename = "Ed25519")]
+    EdDsaEd25519,
+    ///
     /// No digital signature or MAC performed.
     ///
     /// # Security Warning
@@ -883,6 +889,7 @@ impl JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
             CoreJwsSigningAlgorithm::EcdsaP256Sha256
             | CoreJwsSigningAlgorithm::EcdsaP384Sha384
             | CoreJwsSigningAlgorithm::EcdsaP521Sha512 => Some(CoreJsonWebKeyType::EllipticCurve),
+            CoreJwsSigningAlgorithm::EdDsaEd25519 => Some(CoreJsonWebKeyType::OctetKeyPair),
             CoreJwsSigningAlgorithm::None => None,
         }
     }
@@ -916,6 +923,11 @@ impl JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
             | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512
             | CoreJwsSigningAlgorithm::RsaSsaPssSha512
             | CoreJwsSigningAlgorithm::EcdsaP521Sha512 => {
+                let mut hasher = Sha512::new();
+                hasher.update(bytes);
+                hasher.finalize().to_vec()
+            }
+            CoreJwsSigningAlgorithm::EdDsaEd25519 => {
                 let mut hasher = Sha512::new();
                 hasher.update(bytes);
                 hasher.finalize().to_vec()
