@@ -302,9 +302,11 @@ where
             .join(CONFIG_URL_SUFFIX)
             .map_err(DiscoveryError::UrlParse)?;
 
-        http_client(Self::discovery_request(discovery_url))
+        http_client(Self::discovery_request(discovery_url.clone()))
             .map_err(DiscoveryError::Request)
-            .and_then(|http_response| Self::discovery_response(issuer_url, http_response))
+            .and_then(|http_response| {
+                Self::discovery_response(issuer_url, &discovery_url, http_response)
+            })
             .and_then(|provider_metadata| {
                 JsonWebKeySet::fetch(provider_metadata.jwks_uri(), http_client).map(|jwks| Self {
                     jwks,
@@ -330,10 +332,12 @@ where
             .join(CONFIG_URL_SUFFIX)
             .map_err(DiscoveryError::UrlParse)?;
 
-        let provider_metadata = http_client(Self::discovery_request(discovery_url))
+        let provider_metadata = http_client(Self::discovery_request(discovery_url.clone()))
             .await
             .map_err(DiscoveryError::Request)
-            .and_then(|http_response| Self::discovery_response(&issuer_url, http_response))?;
+            .and_then(|http_response| {
+                Self::discovery_response(&issuer_url, &discovery_url, http_response)
+            })?;
 
         JsonWebKeySet::fetch_async(provider_metadata.jwks_uri(), http_client)
             .await
@@ -356,6 +360,7 @@ where
 
     fn discovery_response<RE>(
         issuer_url: &IssuerUrl,
+        discovery_url: &url::Url,
         discovery_response: HttpResponse,
     ) -> Result<Self, DiscoveryError<RE>>
     where
@@ -365,7 +370,10 @@ where
             return Err(DiscoveryError::Response(
                 discovery_response.status_code,
                 discovery_response.body,
-                format!("HTTP status code {}", discovery_response.status_code),
+                format!(
+                    "HTTP status code {} at {}",
+                    discovery_response.status_code, discovery_url
+                ),
             ));
         }
 
