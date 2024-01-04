@@ -663,6 +663,8 @@ mod macros;
 /// Baseline OpenID Connect implementation and types.
 pub mod core;
 
+pub mod jwt_profile;
+
 /// OpenID Connect Dynamic Client Registration.
 pub mod registration;
 

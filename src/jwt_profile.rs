@@ -1,7 +1,7 @@
+use std::ops::Deref;
 use std::{marker::PhantomData, time::Duration};
 
 use crate::{
-    core::CoreJwsSigningAlgorithm,
     jwt::{JsonWebToken, JsonWebTokenJsonPayloadSerde},
     types::helpers::{serde_utc_seconds, serde_utc_seconds_opt},
     AdditionalClaims, Audience, AuthDisplay, AuthPrompt, GenderClaim, IdTokenClaims, IssuerUrl,
@@ -10,9 +10,10 @@ use crate::{
 };
 use chrono::{DateTime, Days, Utc};
 use oauth2::{
-    AuthorizationCode, CodeTokenRequest, ErrorResponse, RevocableToken, TokenIntrospectionResponse,
-    TokenType, ClientCredentialsTokenRequest,
+    AuthorizationCode, ClientCredentialsTokenRequest, CodeTokenRequest, ErrorResponse,
+    RevocableToken, TokenIntrospectionResponse, TokenType,
 };
+use rand::{thread_rng, Rng};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::fmt::Debug;
@@ -58,25 +59,41 @@ pub struct ClientAuthTokenClaims<AC> {
         with = "serde_utc_seconds_opt",
         skip_serializing_if = "Option::is_none"
     )]
-    iat: Option<DateTime<Utc>>,
+    issued_at: Option<DateTime<Utc>>,
 
     #[serde(rename = "jti", default, skip_serializing_if = "Option::is_none")]
-    jti: Option<String>,
+    jwt_id: Option<ClientAuthTokenId>,
 
     #[serde(bound = "AC: AdditionalClientAuthTokenClaims")]
     #[serde(flatten)]
     additional_claims: AC,
 }
 
-#[must_use]
-#[derive(Clone, Deserialize, Serialize)]
-pub struct ClientAuthTokenId(String);
+new_type![
+    ///
+    /// Set of authentication methods or procedures that are considered to be equivalent to each
+    /// other in a particular context.
+    ///
+    #[derive(Deserialize, Serialize)]
+    ClientAuthTokenId(String)
+];
 impl ClientAuthTokenId {
     ///
     /// Generate a new random, base64-encoded 128-bit CSRF token.
     ///
     pub fn new_random() -> Self {
-        ClientAuthTokenId("haha".to_string())
+        ClientAuthTokenId::new_random_len(16)
+    }
+    ///
+    /// Generate a new random, base64-encoded ClientAuthTokenId of the specified length.
+    ///
+    /// # Arguments
+    ///
+    /// * `num_bytes` - Number of random bytes to generate, prior to base64-encoding.
+    ///
+    pub fn new_random_len(num_bytes: u32) -> Self {
+        let random_bytes: Vec<u8> = (0..num_bytes).map(|_| thread_rng().gen::<u8>()).collect();
+        ClientAuthTokenId::new(base64::encode_config(random_bytes, base64::URL_SAFE_NO_PAD))
     }
 }
 
@@ -105,40 +122,41 @@ where
         &self,
         signing_key: S,
         signing_algo: JS,
-        token_id: RF,
         duration: Duration,
+        jwt_id_method: RF,
         additional_claims: ATC,
     ) -> ClientAuthTokenBuilder<ATC, JE, JS, JT, JU, K, RF, S>
     where
-        RF: FnOnce() -> ClientAuthTokenId + 'static,
+        RF: FnOnce() -> ClientAuthTokenId,
         ATC: AdditionalClientAuthTokenClaims,
         S: PrivateSigningKey<JS, JT, JU, K>,
     {
         ClientAuthTokenBuilder::new(
             self.client_id.to_string(),
+            self.client_id.to_string(),
             Audience::new(self.oauth2_client.token_url().unwrap().to_string()),
             signing_key,
             signing_algo,
-            token_id,
             duration,
+            jwt_id_method,
             additional_claims,
         )
     }
 
     pub fn exchange_client_credential_with_auth_token<ATC>(
         &self,
-        token: ClientAuthToken<ATC, JE, JS, JT>
-) -> Result<ClientCredentialsTokenRequest<TE, TR, TT>, JsonWebTokenError>
-
+        token: ClientAuthToken<ATC, JE, JS, JT>,
+    ) -> Result<ClientCredentialsTokenRequest<TE, TR, TT>, JsonWebTokenError>
     where
         ATC: AdditionalClientAuthTokenClaims,
     {
-
-        let ccrt = self.exchange_client_credentials().add_extra_param(
-            "client_assertion_type",
-            "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
-        )
-        .add_extra_param("client_assertion", token.to_string());
+        let ccrt = self
+            .exchange_client_credentials()
+            .add_extra_param(
+                "client_assertion_type",
+                "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+            )
+            .add_extra_param("client_assertion", token.to_string());
 
         Ok(ccrt)
     }
@@ -151,17 +169,20 @@ pub struct ClientAuthTokenBuilder<
     JT: JsonWebKeyType,
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
-    RF: FnOnce() -> ClientAuthTokenId + 'static,
+    RF: FnOnce() -> ClientAuthTokenId,
     SK: PrivateSigningKey<JS, JT, JU, K>,
 > {
-    additional_claims: AC,
     issuer: String,
     subject: String,
     audience: Audience,
-    expiration_time: DateTime<Utc>,
-    key_id_method: JwsKeyIdMethod,
+    duration: Duration,
+    jwt_id_method: RF,
     signing_key: SK,
     signing_algo: JS,
+    additional_claims: AC,
+    include_nbf: bool,
+    include_iat: bool,
+    include_jti: bool,
     _phantom_jt: PhantomData<(AC, JE, JS, RF, JT, JU, K, JS)>,
 }
 
@@ -173,34 +194,42 @@ where
     JT: JsonWebKeyType,
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
-    RF: FnOnce() -> ClientAuthTokenId + 'static,
+    RF: FnOnce() -> ClientAuthTokenId,
     SK: PrivateSigningKey<JS, JT, JU, K>,
 {
     pub fn new(
         issuer: String,
+        subject: String,
         audience: Audience,
         signing_key: SK,
         signing_algo: JS,
-        random: RF,
         duration: Duration,
+        jwt_id_method: RF,
         additional_claims: AC,
     ) -> Self {
         Self {
-            issuer: issuer.clone(),
-            subject: issuer,
-            audience: audience,
-            additional_claims,
-            signing_key: signing_key,
+            issuer,
+            subject,
+            audience,
+            signing_key,
             signing_algo,
-            expiration_time: chrono::offset::Utc::now()
-                .checked_add_days(Days::new(1))
-                .unwrap(),
-            key_id_method: JwsKeyIdMethod::KeyId("default".to_string()),
+            duration,
+            jwt_id_method,
+            additional_claims,
+            include_iat: false,
+            include_nbf: false,
+            include_jti: true,
             _phantom_jt: PhantomData,
         }
     }
+
     pub fn set_issuer(mut self, issuer: String) -> Self {
         self.issuer = issuer;
+        self
+    }
+
+    pub fn set_subject(mut self, subject: String) -> Self {
+        self.subject = subject;
         self
     }
 
@@ -209,20 +238,67 @@ where
         self
     }
 
-    pub fn set_key_id_method(mut self, key_id_method: JwsKeyIdMethod) -> Self {
-        self.key_id_method = key_id_method;
+    pub fn set_signing_key(mut self, signing_key: SK) -> Self {
+        self.signing_key = signing_key;
+        self
+    }
+
+    pub fn set_signing_algo(mut self, signing_algo: JS) -> Self {
+        self.signing_algo = signing_algo;
+        self
+    }
+
+    pub fn set_duration(mut self, duration: Duration) -> Self {
+        self.duration = duration;
+        self
+    }
+
+    pub fn set_jwt_id_method(mut self, jwt_id_method: RF) -> Self {
+        self.jwt_id_method = jwt_id_method;
+        self
+    }
+
+    pub fn set_additional_claims(mut self, additional_claims: AC) -> Self {
+        self.additional_claims = additional_claims;
+        self
+    }
+
+    pub fn include_not_before(mut self, include_nbf: bool) -> Self {
+        self.include_nbf = include_nbf;
+        self
+    }
+
+    pub fn include_issued_at(mut self, include_iat: bool) -> Self {
+        self.include_iat = include_iat;
+        self
+    }
+
+    pub fn include_jwt_id(mut self, include_jti: bool) -> Self {
+        self.include_jti = include_jti;
         self
     }
 
     pub fn build(self) -> Result<ClientAuthToken<AC, JE, JS, JT>, JsonWebTokenError> {
+        let now = chrono::Utc::now();
+
+        let expiration = now + self.duration;
+        let not_before = if self.include_nbf { Some(now) } else { None };
+        let issued_at = if self.include_iat { Some(now) } else { None };
+        let jwt_id = if self.include_jti {
+            let f = self.jwt_id_method;
+            Some(f())
+        } else {
+            None
+        };
+
         let claims = ClientAuthTokenClaims {
             issuer: self.issuer,
             subject: self.subject,
             audience: self.audience,
-            expiration: self.expiration_time,
-            not_before: None,
-            iat: None,
-            jti: None,
+            expiration,
+            not_before,
+            issued_at,
+            jwt_id,
             additional_claims: self.additional_claims,
         };
 
@@ -231,14 +307,14 @@ where
     }
 }
 
-#[non_exhaustive]
-pub enum JwsKeyIdMethod {
-    X5t(String),
-    X509Sha256([u8; 32]),
-    KeyId(String),
-    X509Url(String),
-    X509Sha1(Vec<u8>),
-}
+// #[non_exhaustive]
+// pub enum JwsKeyIdMethod {
+//     X5t(String),
+//     X509Sha256([u8; 32]),
+//     KeyId(String),
+//     X509Url(String),
+//     X509Sha1(Vec<u8>),
+// }
 
 /// OpenID Connect ID token.
 ///
@@ -306,12 +382,13 @@ mod tests {
         core::{
             CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClientAuthMethod, CoreGrantType,
             CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse,
-            CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm, CoreResponseMode,
-            CoreRsaPrivateSigningKey, CoreSubjectIdentifierType,
+            CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm,
+            CoreJwsSigningAlgorithm, CoreResponseMode, CoreRsaPrivateSigningKey,
+            CoreSubjectIdentifierType,
         },
         jwt::tests::TEST_RSA_PRIV_KEY,
         AdditionalProviderMetadata, ClaimName, Client, EmptyAdditionalProviderMetadata,
-        JsonWebKeySetUrl, ProviderMetadata, ResponseType, ResponseTypes, JsonWebKeyId,
+        JsonWebKeyId, JsonWebKeySetUrl, ProviderMetadata, ResponseType, ResponseTypes,
     };
 
     use crate::core::{
@@ -352,9 +429,11 @@ mod tests {
 
     #[test]
     fn azure_ad_style() -> Result<(), anyhow::Error> {
-        let private_key = CoreRsaPrivateSigningKey::from_pem(TEST_RSA_PRIV_KEY, Some(JsonWebKeyId::new(
-            "flyveQx6E1p5crtxOzA64kwjYmo".to_string(),
-        ))).unwrap();
+        let private_key = CoreRsaPrivateSigningKey::from_pem(
+            TEST_RSA_PRIV_KEY,
+            Some(JsonWebKeyId::new("flyveQx6E1p5crtxOzA64kwjYmo".to_string())),
+        )
+        .unwrap();
         const tenant_id: &str = "3d02d73d-a23a-4989-93ef-ac3c459edabb";
 
         let client_id = ClientId::new("9aca7c0e-8e4a-4b36-8c69-1c2323092699".to_string());
@@ -382,35 +461,31 @@ mod tests {
         )
         .unwrap();
 
-        let client = CoreClient::from_provider_metadata(
-            provider_metadata,
-            client_id,
-            None,
+        let client = CoreClient::from_provider_metadata(provider_metadata, client_id, None);
+
+        println!("HERE1");
+
+        let client_auth_token_builder = client.client_auth_token_builder(
+            private_key,
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
+            Duration::from_secs(30),
+            || ClientAuthTokenId("haha".to_string()),
+            EmptyAdditionalClientAuthTokenClaims {},
         );
 
-
-        let client_auth_token_builder = client
-            .client_auth_token_builder(
-                private_key,
-                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
-                ClientAuthTokenId::new_random,
-                Duration::from_secs(30),
-                EmptyAdditionalClientAuthTokenClaims {},
-            )
-            // .set_audience(Audience::new("a".to_string()))
-            .set_key_id_method(JwsKeyIdMethod::X509Sha1(vec![]));
-
         let token = client_auth_token_builder.build().unwrap();
+        println!("HERE2");
 
         let token_response = client
             .exchange_client_credential_with_auth_token(token)
             .unwrap()
             .add_scope(Scope::new(
-                                "https://0fsxp-admin.sharepoint.com/.default".to_string(),
-                            ))
+                "https://0fsxp-admin.sharepoint.com/.default".to_string(),
+            ))
             .request(http_client)
             .unwrap();
 
+        println!("HERE3");
         eprintln!("token_response = {:?}", token_response);
 
         Ok(())
