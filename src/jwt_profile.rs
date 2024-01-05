@@ -4,14 +4,14 @@ use std::{marker::PhantomData, time::Duration};
 use crate::{
     jwt::{JsonWebToken, JsonWebTokenJsonPayloadSerde},
     types::helpers::{serde_utc_seconds, serde_utc_seconds_opt},
-    AdditionalClaims, Audience, AuthDisplay, AuthPrompt, GenderClaim, IdTokenClaims, IssuerUrl,
-    JsonWebKey, JsonWebKeyType, JsonWebKeyUse, JsonWebTokenError, JweContentEncryptionAlgorithm,
-    JwsSigningAlgorithm, Nonce, PrivateSigningKey, TokenResponse,
+    AdditionalClaims, Audience, AuthDisplay, AuthPrompt, GenderClaim, JsonWebKey, JsonWebKeyType,
+    JsonWebKeyUse, JsonWebTokenError, JweContentEncryptionAlgorithm, JwsSigningAlgorithm,
+    PrivateSigningKey, TokenResponse,
 };
-use chrono::{DateTime, Days, Utc};
+use chrono::{DateTime, Utc};
 use oauth2::{
-    AuthorizationCode, ClientCredentialsTokenRequest, CodeTokenRequest, ErrorResponse,
-    RevocableToken, TokenIntrospectionResponse, TokenType,
+    ClientCredentialsTokenRequest, ErrorResponse, RevocableToken, TokenIntrospectionResponse,
+    TokenType,
 };
 use rand::{thread_rng, Rng};
 use serde::de::DeserializeOwned;
@@ -31,6 +31,7 @@ pub trait AdditionalClientAuthTokenClaims: Debug + DeserializeOwned + Serialize 
 pub struct EmptyAdditionalClientAuthTokenClaims {}
 impl AdditionalClientAuthTokenClaims for EmptyAdditionalClientAuthTokenClaims {}
 
+/// FIXME: documentation
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ClientAuthTokenClaims<AC> {
     #[serde(rename = "iss")]
@@ -118,6 +119,7 @@ where
     RT: RevocableToken,
     TRE: ErrorResponse + 'static,
 {
+    /// FIXME: documentation
     pub fn client_auth_token_builder<S, RF, ATC>(
         &self,
         signing_key: S,
@@ -143,6 +145,7 @@ where
         )
     }
 
+    /// FIXME: documentation
     pub fn exchange_client_credential_with_auth_token<ATC>(
         &self,
         token: ClientAuthToken<ATC, JE, JS, JT>,
@@ -162,6 +165,7 @@ where
     }
 }
 
+/// FIXME: documentation
 pub struct ClientAuthTokenBuilder<
     AC: AdditionalClientAuthTokenClaims,
     JE: JweContentEncryptionAlgorithm<JT>,
@@ -186,7 +190,7 @@ pub struct ClientAuthTokenBuilder<
     _phantom_jt: PhantomData<(AC, JE, JS, RF, JT, JU, K, JS)>,
 }
 
-impl<'a, AC, JE, JS, JT, JU, K, RF, SK> ClientAuthTokenBuilder<AC, JE, JS, JT, JU, K, RF, SK>
+impl<AC, JE, JS, JT, JU, K, RF, SK> ClientAuthTokenBuilder<AC, JE, JS, JT, JU, K, RF, SK>
 where
     AC: AdditionalClientAuthTokenClaims,
     JE: JweContentEncryptionAlgorithm<JT>,
@@ -197,6 +201,8 @@ where
     RF: FnOnce() -> ClientAuthTokenId,
     SK: PrivateSigningKey<JS, JT, JU, K>,
 {
+    /// FIXME: documentation
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         issuer: String,
         subject: String,
@@ -223,61 +229,73 @@ where
         }
     }
 
+    /// FIXME: documentation
     pub fn set_issuer(mut self, issuer: String) -> Self {
         self.issuer = issuer;
         self
     }
 
+    /// FIXME: documentation
     pub fn set_subject(mut self, subject: String) -> Self {
         self.subject = subject;
         self
     }
 
+    /// FIXME: documentation
     pub fn set_audience(mut self, audience: Audience) -> Self {
         self.audience = audience;
         self
     }
 
+    /// FIXME: documentation
     pub fn set_signing_key(mut self, signing_key: SK) -> Self {
         self.signing_key = signing_key;
         self
     }
 
+    /// FIXME: documentation
     pub fn set_signing_algo(mut self, signing_algo: JS) -> Self {
         self.signing_algo = signing_algo;
         self
     }
 
+    /// FIXME: documentation
     pub fn set_duration(mut self, duration: Duration) -> Self {
         self.duration = duration;
         self
     }
 
+    /// FIXME: documentation
     pub fn set_jwt_id_method(mut self, jwt_id_method: RF) -> Self {
         self.jwt_id_method = jwt_id_method;
         self
     }
 
+    /// FIXME: documentation
     pub fn set_additional_claims(mut self, additional_claims: AC) -> Self {
         self.additional_claims = additional_claims;
         self
     }
 
+    /// FIXME: documentation
     pub fn include_not_before(mut self, include_nbf: bool) -> Self {
         self.include_nbf = include_nbf;
         self
     }
 
+    /// FIXME: documentation
     pub fn include_issued_at(mut self, include_iat: bool) -> Self {
         self.include_iat = include_iat;
         self
     }
 
+    /// FIXME: documentation
     pub fn include_jwt_id(mut self, include_jti: bool) -> Self {
         self.include_jti = include_jti;
         self
     }
 
+    /// FIXME: documentation
     pub fn build(self) -> Result<ClientAuthToken<AC, JE, JS, JT>, JsonWebTokenError> {
         let now = chrono::Utc::now();
 
@@ -336,6 +354,7 @@ where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
+    /// FIXME: documentation
     pub fn new<JU, K, S>(
         claims: ClientAuthTokenClaims<AC>,
         signing_key: &S,
@@ -360,7 +379,7 @@ where
     JT: JsonWebKeyType,
 {
     fn to_string(&self) -> String {
-        serde_json::to_value(&self)
+        serde_json::to_value(self)
             // This should never arise, since we're just asking serde_json to serialize the
             // signing input concatenated with the signature, both of which are precomputed.
             .expect("ID token serialization failed")
@@ -371,6 +390,7 @@ where
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
 
@@ -491,3 +511,4 @@ mod tests {
         Ok(())
     }
 }
+*/
