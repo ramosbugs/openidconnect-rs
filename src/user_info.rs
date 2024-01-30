@@ -41,6 +41,7 @@ where
     pub(super) access_token: AccessToken,
     pub(super) require_signed_response: bool,
     pub(super) signed_response_verifier: UserInfoVerifier<'static, JE, JS, JT, JU, K>,
+    pub(super) response_type: UserInfoResponseType,
 }
 impl<'a, JE, JS, JT, JU, K> UserInfoRequest<'a, JE, JS, JT, JU, K>
 where
@@ -94,11 +95,15 @@ where
 
     fn prepare_request(&self) -> HttpRequest {
         let (auth_header, auth_value) = auth_bearer(&self.access_token);
+        let accept_value = match self.response_type {
+            UserInfoResponseType::Jwt => MIME_TYPE_JWT,
+            _ => MIME_TYPE_JSON,
+        };
         HttpRequest {
             url: self.url.url().clone(),
             method: Method::GET,
             headers: vec![
-                (ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON)),
+                (ACCEPT, HeaderValue::from_static(accept_value)),
                 (auth_header, auth_value),
             ]
             .into_iter()
@@ -191,6 +196,14 @@ where
         self.signed_response_verifier = self
             .signed_response_verifier
             .require_audience_match(aud_required);
+        self
+    }
+
+    ///
+    /// Specifies the expected response type by setting the `Accept` header. Note that the server can ignore this header.
+    ///
+    pub fn set_response_type(mut self, response_type: UserInfoResponseType) -> Self {
+        self.response_type = response_type;
         self
     }
 }
@@ -443,6 +456,24 @@ new_url_type![
     ///
     UserInfoUrl
 ];
+
+///
+/// Indicates via the `Accept` header the body response type the server should use to return the user info. Note that the server can ignore this header.
+///
+/// Defaults to Json.
+///
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub enum UserInfoResponseType {
+    ///
+    /// Sets the `Accept` header to `application/json`.
+    ///
+    Json,
+    ///
+    /// Sets the `Accept` header to `application/jwt`.
+    ///
+    Jwt,
+}
 
 ///
 /// Error retrieving user info.
