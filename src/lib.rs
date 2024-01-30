@@ -647,7 +647,8 @@ pub use types::{
 };
 
 pub use user_info::{
-    UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoRequest, UserInfoUrl,
+    UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoRequest, UserInfoResponseType,
+    UserInfoUrl,
 };
 use verification::{AudiencesClaim, IssuerClaim};
 pub use verification::{
@@ -1183,6 +1184,7 @@ where
                 .ok_or(ConfigurationError::MissingUrl("userinfo"))?,
             access_token,
             require_signed_response: false,
+            response_type: UserInfoResponseType::Json,
             signed_response_verifier: UserInfoVerifier::new(
                 self.client_id.clone(),
                 self.issuer.clone(),
