@@ -13,8 +13,8 @@ use crate::{JsonWebKey, JsonWebKeyId, JsonWebTokenAlgorithm, PrivateSigningKey, 
 
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
-use rand::rngs::mock::StepRng;
-use rand::{CryptoRng, RngCore};
+use core::convert::Infallible;
+use rand::{TryCryptoRng, TryRng};
 use rsa::rand_core;
 
 #[test]
@@ -731,21 +731,30 @@ fn expect_rsa_sig(
 }
 
 #[derive(Clone)]
-struct TestRng(StepRng);
+struct TestRng {
+    x: u64,
+    increment: u64,
+}
+impl TestRng {
+    /// Construct a generator yielding an arithmetic sequence
+    fn new(x: u64, increment: u64) -> Self {
+        Self { x, increment }
+    }
+}
 
-impl CryptoRng for TestRng {}
-impl RngCore for TestRng {
-    fn next_u32(&mut self) -> u32 {
-        self.0.next_u32()
+impl TryCryptoRng for TestRng {}
+impl TryRng for TestRng {
+    type Error = Infallible;
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+        self.try_next_u64().map(|x| x as u32)
     }
-    fn next_u64(&mut self) -> u64 {
-        self.0.next_u64()
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+        let res = self.x;
+        self.x = self.x.wrapping_add(self.increment);
+        Ok(res)
     }
-    fn fill_bytes(&mut self, dest: &mut [u8]) {
-        self.0.fill_bytes(dest)
-    }
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
-        self.0.try_fill_bytes(dest)
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Self::Error> {
+        rand_core::utils::fill_bytes_via_next_word(dest, || self.try_next_u64())
     }
 }
 
@@ -795,7 +804,7 @@ fn test_rsa_signing() {
     let private_key = CoreRsaPrivateSigningKey::from_pem_internal(
         TEST_RSA_KEY,
         // Constant salt used for PSS test vectors below.
-        Box::new(TestRng(StepRng::new(127, 0))),
+        Some(Box::new(TestRng::new(127, 0))),
         Some(JsonWebKeyId::new("test_key".to_string())),
     )
     .unwrap();
