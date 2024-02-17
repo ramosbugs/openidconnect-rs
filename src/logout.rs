@@ -20,7 +20,6 @@ use crate::{
 /// Additional metadata for providers implementing [OpenID Connect RP-Initiated
 /// Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html).
 ///
-#[non_exhaustive]
 #[skip_serializing_none]
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct LogoutProviderMetadata<A>
