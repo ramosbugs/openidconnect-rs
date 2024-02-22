@@ -1,5 +1,6 @@
 use ed25519_dalek::pkcs8::DecodePrivateKey;
 use ed25519_dalek::Signer;
+use hmac::KeyInit;
 use rsa::pkcs1::DecodeRsaPrivateKey;
 use sha2::Digest;
 
@@ -301,7 +302,7 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
                     SignatureVerificationError::Other(format!("Could not create key: {}", e))
                 })?;
                 mac.update(message);
-                mac.verify(signature.into())
+                mac.verify_slice(signature)
                     .map_err(|_| SignatureVerificationError::CryptoError("bad HMAC".to_string()))
             }
             CoreJwsSigningAlgorithm::HmacSha384 => {
@@ -316,7 +317,7 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
                     SignatureVerificationError::Other(format!("Could not create key: {}", e))
                 })?;
                 mac.update(message);
-                mac.verify(signature.into())
+                mac.verify_slice(signature)
                     .map_err(|_| SignatureVerificationError::CryptoError("bad HMAC".to_string()))
             }
             CoreJwsSigningAlgorithm::HmacSha512 => {
@@ -331,7 +332,7 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
                     SignatureVerificationError::Other(format!("Could not create key: {}", e))
                 })?;
                 mac.update(message);
-                mac.verify(signature.into())
+                mac.verify_slice(signature)
                     .map_err(|_| SignatureVerificationError::CryptoError("bad HMAC".to_string()))
             }
             CoreJwsSigningAlgorithm::EcdsaP256Sha256 => {

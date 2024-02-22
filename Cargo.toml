@@ -30,6 +30,20 @@ nightly = []
 # see https://github.com/ramosbugs/openidconnect-rs/pull/131#discussion_r1349786021
 jwk-alg = []
 
+[patch.crates-io]
+
+# https://github.com/ramosbugs/oauth2-rs/pull/251
+oauth2 = { git = "https://github.com/baloo/oauth2-rs.git", branch = "baloo/sha2-prerelease" }
+
+p256 = { git = "https://github.com/RustCrypto/elliptic-curves.git" }
+p384 = { git = "https://github.com/RustCrypto/elliptic-curves.git" }
+
+ed25519 = { git = "https://github.com/baloo/signatures.git", branch = "baloo/pkcs8-0.11.0-pre.0" }
+
+# https://github.com/dalek-cryptography/curve25519-dalek/pull/620
+curve25519-dalek = { git = "https://github.com/baloo/curve25519-dalek.git", branch = "baloo/rust-crypto/digest-sha2-bumps" }
+ed25519-dalek    = { git = "https://github.com/baloo/curve25519-dalek.git", branch = "baloo/rust-crypto/digest-sha2-bumps" }
+
 [dependencies]
 base64 = "0.13"
 # Disable 'time' dependency since it triggers RUSTSEC-2020-0071 and we don't need it.
@@ -44,11 +58,11 @@ itertools = "0.10"
 log = "0.4"
 oauth2 = { version = "4.4.1", default-features = false }
 rand = "0.8.5"
-hmac = "0.12.1"
-rsa = "0.9.2"
-sha2 = { version = "0.10.6", features = ["oid"] } # Object ID needed for pkcs1v15 padding
-p256 = "0.13.2"
-p384 = "0.13.0"
+hmac = "=0.13.0-pre.3"
+rsa = "=0.10.0-pre.1"
+sha2 = { version = "=0.11.0-pre.3", features = ["oid"] } # Object ID needed for pkcs1v15 padding
+p256 = "=0.14.0-pre.0"
+p384 = "=0.14.0-pre"
 dyn-clone = "1.0.10"
 serde = "1.0"
 serde_derive = "1.0"
@@ -59,7 +73,7 @@ serde_with = "3"
 serde-value = "0.7"
 url = { version = "2.4", features = ["serde"] }
 subtle = "2.4"
-ed25519-dalek = { version = "2.0.0", features = ["pem"] }
+ed25519-dalek = { version = "=2.2.0-pre", features = ["pem"] }
 
 [dev-dependencies]
 color-backtrace = { version = "0.5" }
