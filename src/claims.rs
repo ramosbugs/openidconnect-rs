@@ -1,12 +1,11 @@
-use crate::helpers::FlattenFilter;
-use crate::types::helpers::{split_language_tag_key, timestamp_to_utc, utc_to_seconds};
-use crate::types::{Boolean, LocalizedClaim, Timestamp};
+use crate::helpers::{timestamp_to_utc, utc_to_seconds, Boolean, FlattenFilter, Timestamp};
+use crate::types::localized::split_language_tag_key;
 use crate::{
     AddressCountry, AddressLocality, AddressPostalCode, AddressRegion, EndUserBirthday,
     EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName, EndUserName,
     EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone,
-    EndUserUsername, EndUserWebsiteUrl, FormattedAddress, LanguageTag, StreetAddress,
-    SubjectIdentifier,
+    EndUserUsername, EndUserWebsiteUrl, FormattedAddress, LanguageTag, LocalizedClaim,
+    StreetAddress, SubjectIdentifier,
 };
 
 use chrono::{DateTime, Utc};

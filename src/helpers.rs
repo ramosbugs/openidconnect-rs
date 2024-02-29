@@ -1,11 +1,127 @@
+use chrono::{DateTime, TimeZone, Utc};
 use serde::de::value::MapDeserializer;
 use serde::de::{DeserializeOwned, Deserializer, MapAccess, Visitor};
-use serde::{Deserialize, Serialize};
-use serde_value::{Value, ValueDeserializer};
+use serde::{Deserialize, Serialize, Serializer};
+use serde_json::from_value;
+use serde_value::ValueDeserializer;
 
 use std::cmp::PartialEq;
-use std::fmt::{Debug, Formatter, Result as FormatterResult};
+use std::fmt::{Debug, Display, Formatter, Result as FormatterResult};
 use std::marker::PhantomData;
+
+pub(crate) fn deserialize_string_or_vec<'de, T, D>(deserializer: D) -> Result<Vec<T>, D::Error>
+where
+    T: DeserializeOwned,
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    let value: serde_json::Value = Deserialize::deserialize(deserializer)?;
+    match from_value::<Vec<T>>(value.clone()) {
+        Ok(val) => Ok(val),
+        Err(_) => {
+            let single_val: T = from_value(value).map_err(Error::custom)?;
+            Ok(vec![single_val])
+        }
+    }
+}
+
+pub(crate) fn deserialize_string_or_vec_opt<'de, T, D>(
+    deserializer: D,
+) -> Result<Option<Vec<T>>, D::Error>
+where
+    T: DeserializeOwned,
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    let value: serde_json::Value = Deserialize::deserialize(deserializer)?;
+    match from_value::<Option<Vec<T>>>(value.clone()) {
+        Ok(val) => Ok(val),
+        Err(_) => {
+            let single_val: T = from_value(value).map_err(Error::custom)?;
+            Ok(Some(vec![single_val]))
+        }
+    }
+}
+
+// Attempt to deserialize the value; if the value is null or an error occurs, return None.
+// This is useful when deserializing fields that may mean different things in different
+// contexts, and where we would rather ignore the result than fail to deserialize. For example,
+// the fields in JWKs are not well defined; extensions could theoretically define their own
+// field names that overload field names used by other JWK types.
+pub(crate) fn deserialize_option_or_none<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    T: DeserializeOwned,
+    D: Deserializer<'de>,
+{
+    let value: serde_json::Value = Deserialize::deserialize(deserializer)?;
+    match from_value::<Option<T>>(value) {
+        Ok(val) => Ok(val),
+        Err(_) => Ok(None),
+    }
+}
+
+// Some providers return boolean values as strings. Provide support for
+// parsing using stdlib.
+#[cfg(feature = "accept-string-booleans")]
+pub(crate) mod serde_string_bool {
+    use serde::{de, Deserializer};
+
+    use std::fmt;
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<bool, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct BooleanLikeVisitor;
+
+        impl<'de> de::Visitor<'de> for BooleanLikeVisitor {
+            type Value = bool;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("A boolean-like value")
+            }
+
+            fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(v)
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                v.parse().map_err(E::custom)
+            }
+        }
+        deserializer.deserialize_any(BooleanLikeVisitor)
+    }
+}
+
+/// Serde space-delimited string serializer for an `Option<Vec<String>>`.
+///
+/// This function serializes a string vector into a single space-delimited string.
+/// If `string_vec_opt` is `None`, the function serializes it as `None` (e.g., `null`
+/// in the case of JSON serialization).
+pub(crate) fn serialize_space_delimited_vec<T, S>(
+    vec: &[T],
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    T: AsRef<str>,
+    S: Serializer,
+{
+    let space_delimited = vec
+        .iter()
+        .map(AsRef::<str>::as_ref)
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    serializer.serialize_str(&space_delimited)
+}
 
 pub(crate) trait FlattenFilter {
     fn should_include(field_name: &str) -> bool;
@@ -120,9 +236,9 @@ where
             where
                 V: MapAccess<'de>,
             {
-                let mut entries = Vec::<(Value, Value)>::new();
+                let mut entries = Vec::<(serde_value::Value, serde_value::Value)>::new();
                 // JSON only supports String keys, and we really only need to support JSON input.
-                while let Some(key) = map.next_key::<Value>()? {
+                while let Some(key) = map.next_key::<serde_value::Value>()? {
                     let key_str = String::deserialize(ValueDeserializer::new(key.clone()))?;
                     if F::should_include(&key_str) {
                         entries.push((key, map.next_value()?));
@@ -180,5 +296,179 @@ where
     // Transparent Debug since we don't care about this struct.
     fn fmt(&self, f: &mut Formatter) -> FormatterResult {
         Debug::fmt(&self.inner, f)
+    }
+}
+
+pub(crate) fn join_vec<T>(entries: &[T]) -> String
+where
+    T: AsRef<str>,
+{
+    entries
+        .iter()
+        .map(AsRef::as_ref)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Newtype around a bool, optionally supporting string values.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(transparent)]
+pub(crate) struct Boolean(
+    #[cfg_attr(
+        feature = "accept-string-booleans",
+        serde(deserialize_with = "crate::helpers::serde_string_bool::deserialize")
+    )]
+    pub bool,
+);
+
+impl Display for Boolean {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+        Display::fmt(&self.0, f)
+    }
+}
+
+/// Timestamp as seconds since the unix epoch, or optionally an ISO 8601 string.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub(crate) enum Timestamp {
+    Seconds(serde_json::Number),
+    #[cfg(feature = "accept-rfc3339-timestamps")]
+    Rfc3339(String),
+}
+
+impl Display for Timestamp {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+        match self {
+            Timestamp::Seconds(seconds) => Display::fmt(seconds, f),
+            #[cfg(feature = "accept-rfc3339-timestamps")]
+            Timestamp::Rfc3339(iso) => Display::fmt(iso, f),
+        }
+    }
+}
+
+pub(crate) fn timestamp_to_utc(timestamp: &Timestamp) -> Result<DateTime<Utc>, ()> {
+    match timestamp {
+        Timestamp::Seconds(seconds) => {
+            let (secs, nsecs) = if seconds.is_i64() {
+                (seconds.as_i64().ok_or(())?, 0u32)
+            } else {
+                let secs_f64 = seconds.as_f64().ok_or(())?;
+                let secs = secs_f64.floor();
+                (
+                    secs as i64,
+                    ((secs_f64 - secs) * 1_000_000_000.).floor() as u32,
+                )
+            };
+            Utc.timestamp_opt(secs, nsecs).single().ok_or(())
+        }
+        #[cfg(feature = "accept-rfc3339-timestamps")]
+        Timestamp::Rfc3339(iso) => {
+            let datetime = DateTime::parse_from_rfc3339(iso).map_err(|_| ())?;
+            Ok(datetime.into())
+        }
+    }
+}
+
+pub mod serde_utc_seconds {
+    use crate::helpers::{timestamp_to_utc, utc_to_seconds, Timestamp};
+
+    use chrono::{DateTime, Utc};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let seconds: Timestamp = Deserialize::deserialize(deserializer)?;
+        timestamp_to_utc(&seconds).map_err(|_| {
+            serde::de::Error::custom(format!(
+                "failed to parse `{}` as UTC datetime (in seconds)",
+                seconds
+            ))
+        })
+    }
+
+    pub fn serialize<S>(v: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        utc_to_seconds(v).serialize(serializer)
+    }
+}
+
+pub mod serde_utc_seconds_opt {
+    use crate::helpers::{timestamp_to_utc, utc_to_seconds, Timestamp};
+
+    use chrono::{DateTime, Utc};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<DateTime<Utc>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let seconds: Option<Timestamp> = Deserialize::deserialize(deserializer)?;
+        seconds
+            .map(|sec| {
+                timestamp_to_utc(&sec).map_err(|_| {
+                    serde::de::Error::custom(format!(
+                        "failed to parse `{}` as UTC datetime (in seconds)",
+                        sec
+                    ))
+                })
+            })
+            .transpose()
+    }
+
+    pub fn serialize<S>(v: &Option<DateTime<Utc>>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        v.map(|sec| utc_to_seconds(&sec)).serialize(serializer)
+    }
+}
+
+// The spec is ambiguous about whether seconds should be expressed as integers, or
+// whether floating-point values are allowed. For compatibility with a wide range of
+// clients, we round down to the nearest second.
+pub(crate) fn utc_to_seconds(utc: &DateTime<Utc>) -> Timestamp {
+    Timestamp::Seconds(utc.timestamp().into())
+}
+
+new_type![
+    #[derive(Deserialize, Hash, Serialize)]
+    pub(crate) Base64UrlEncodedBytes(
+        #[serde(with = "serde_base64url_byte_array")]
+        Vec<u8>
+    )
+];
+
+mod serde_base64url_byte_array {
+    use crate::core::base64_url_safe_no_pad;
+
+    use serde::de::Error;
+    use serde::{Deserialize, Deserializer, Serializer};
+    use serde_json::{from_value, Value};
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value: Value = Deserialize::deserialize(deserializer)?;
+        let base64_encoded: String = from_value(value).map_err(D::Error::custom)?;
+
+        base64::decode_config(&base64_encoded, base64_url_safe_no_pad()).map_err(|err| {
+            D::Error::custom(format!(
+                "invalid base64url encoding `{}`: {:?}",
+                base64_encoded, err
+            ))
+        })
+    }
+
+    pub fn serialize<S>(v: &[u8], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let base64_encoded = base64::encode_config(v, base64::URL_SAFE_NO_PAD);
+        serializer.serialize_str(&base64_encoded)
     }
 }

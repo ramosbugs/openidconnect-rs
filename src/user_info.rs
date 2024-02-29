@@ -1,8 +1,6 @@
-use crate::helpers::FilteredFlatten;
+use crate::helpers::{deserialize_string_or_vec_opt, FilteredFlatten};
 use crate::http_utils::{auth_bearer, content_type_has_essence, MIME_TYPE_JSON, MIME_TYPE_JWT};
 use crate::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
-use crate::types::helpers::deserialize_string_or_vec_opt;
-use crate::types::LocalizedClaim;
 use crate::verification::UserInfoVerifier;
 use crate::{
     AccessToken, AdditionalClaims, AddressClaim, Audience, AudiencesClaim, ClaimsVerificationError,
@@ -10,8 +8,8 @@ use crate::{
     EndUserName, EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl,
     EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, GenderClaim, HttpRequest, HttpResponse,
     IssuerClaim, IssuerUrl, JsonWebKey, JsonWebKeyType, JsonWebKeyUse, JsonWebToken,
-    JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, PrivateSigningKey,
-    StandardClaims, SubjectIdentifier,
+    JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, LocalizedClaim,
+    PrivateSigningKey, StandardClaims, SubjectIdentifier,
 };
 
 use chrono::{DateTime, Utc};
@@ -20,10 +18,8 @@ use http::method::Method;
 use http::status::StatusCode;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use url::Url;
 
 use std::future::Future;
-use std::ops::Deref;
 use std::str;
 
 /// User info request.
@@ -35,11 +31,11 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
-    pub(super) url: &'a UserInfoUrl,
-    pub(super) access_token: AccessToken,
-    pub(super) require_signed_response: bool,
-    pub(super) signed_response_verifier: UserInfoVerifier<'static, JE, JS, JT, JU, K>,
-    pub(super) response_type: UserInfoResponseType,
+    pub(crate) url: &'a UserInfoUrl,
+    pub(crate) access_token: AccessToken,
+    pub(crate) require_signed_response: bool,
+    pub(crate) signed_response_verifier: UserInfoVerifier<'static, JE, JS, JT, JU, K>,
+    pub(crate) response_type: UserInfoResponseType,
 }
 impl<'a, JE, JS, JT, JU, K> UserInfoRequest<'a, JE, JS, JT, JU, K>
 where

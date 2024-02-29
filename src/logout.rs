@@ -4,9 +4,10 @@ use crate::core::{
     CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm, CoreResponseMode, CoreResponseType,
     CoreSubjectIdentifierType,
 };
+use crate::helpers::join_vec;
 use crate::types::{LogoutHint, PostLogoutRedirectUrl};
 use crate::{
-    join_vec, AdditionalClaims, AdditionalProviderMetadata, ClientId, CsrfToken,
+    AdditionalClaims, AdditionalProviderMetadata, ClientId, CsrfToken,
     EmptyAdditionalProviderMetadata, EndSessionUrl, GenderClaim, IdToken, JsonWebKeyType,
     JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, ProviderMetadata,
 };

@@ -133,7 +133,7 @@ macro_rules! new_type {
                 $name(s)
             }
         }
-        impl Deref for $name {
+        impl std::ops::Deref for $name {
             type Target = $type;
             fn deref(&self) -> &$type {
                 &self.0
@@ -171,7 +171,7 @@ macro_rules! new_type {
                 $name(s)
             }
         }
-        impl Deref for $name {
+        impl std::ops::Deref for $name {
             type Target = $type;
             fn deref(&self) -> &$type {
                 &self.0
@@ -248,7 +248,7 @@ macro_rules! new_secret_type {
             pub fn secret(&self) -> &$type { &self.0 }
         }
         impl Debug for $name {
-            fn fmt(&self, f: &mut Formatter) -> Result<(), FormatterError> {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
                 write!(f, concat!(stringify!($name), "([redacted])"))
             }
         }
@@ -312,30 +312,30 @@ macro_rules! new_url_type {
     ) => {
         $(#[$attr])*
         #[derive(Clone)]
-        pub struct $name(Url, String);
+        pub struct $name(url::Url, String);
         impl $name {
             #[doc = $new_doc]
             pub fn new(url: String) -> Result<Self, ::url::ParseError> {
-                Ok($name(Url::parse(&url)?, url))
+                Ok($name(url::Url::parse(&url)?, url))
             }
             #[doc = $from_url_doc]
-            pub fn from_url(url: Url) -> Self {
+            pub fn from_url(url: url::Url) -> Self {
                 let s = url.to_string();
                 Self(url, s)
             }            #[doc = $url_doc]
-            pub fn url(&self) -> &Url {
+            pub fn url(&self) -> &url::Url {
                 return &self.0;
             }
             $($item)*
         }
-        impl Deref for $name {
+        impl std::ops::Deref for $name {
             type Target = String;
             fn deref(&self) -> &String {
                 &self.1
             }
         }
-        impl From<$name> for Url {
-            fn from(t: $name) -> Url {
+        impl From<$name> for url::Url {
+            fn from(t: $name) -> url::Url {
                 t.0
             }
         }

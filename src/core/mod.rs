@@ -17,8 +17,7 @@ use crate::{
 use oauth2::ResponseType as OAuth2ResponseType;
 use serde::{Deserialize, Serialize};
 
-use std::fmt::{Display, Error as FormatterError, Formatter};
-use std::ops::Deref;
+use std::fmt::Display;
 
 pub use crate::core::jwk::{
     CoreEdDsaPrivateSigningKey, CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse,
@@ -290,7 +289,7 @@ impl AsRef<str> for CoreAuthDisplay {
 }
 impl AuthDisplay for CoreAuthDisplay {}
 impl Display for CoreAuthDisplay {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), FormatterError> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         write!(f, "{}", self.as_ref())
     }
 }
@@ -353,7 +352,7 @@ impl AsRef<str> for CoreAuthPrompt {
 impl AuthPrompt for CoreAuthPrompt {}
 
 impl Display for CoreAuthPrompt {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), FormatterError> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         write!(f, "{}", self.as_ref())
     }
 }
@@ -892,7 +891,7 @@ impl AsRef<str> for CoreRegisterErrorResponseType {
 impl ErrorResponseType for CoreRegisterErrorResponseType {}
 impl RegisterErrorResponseType for CoreRegisterErrorResponseType {}
 impl Display for CoreRegisterErrorResponseType {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), FormatterError> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         write!(f, "{}", self.as_ref())
     }
 }

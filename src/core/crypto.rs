@@ -1,6 +1,6 @@
 use crate::core::jwk::CoreJsonCurveType;
 use crate::core::{CoreJsonWebKey, CoreJsonWebKeyType};
-use crate::types::Base64UrlEncodedBytes;
+use crate::helpers::Base64UrlEncodedBytes;
 use crate::{JsonWebKey, SignatureVerificationError};
 
 use std::ops::Deref;
