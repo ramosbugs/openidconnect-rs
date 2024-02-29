@@ -468,7 +468,6 @@ fn test_jwt_verified_claims() {
             x: None,
             y: None,
             d: None,
-            #[cfg(feature = "jwk-alg")]
             alg: None,
         }]),
     )
@@ -495,7 +494,6 @@ fn test_jwt_verified_claims() {
             x: None,
             y: None,
             d: None,
-            #[cfg(feature = "jwk-alg")]
             alg: None,
         }]),
     )

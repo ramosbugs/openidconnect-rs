@@ -1,16 +1,15 @@
 use crate::core::jwk::CoreJsonCurveType;
 use crate::core::{
     CoreEdDsaPrivateSigningKey, CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeySet, CoreJsonWebKeyType,
-    CoreJsonWebKeyUse, CoreJwsSigningAlgorithm, CoreRsaPrivateSigningKey,
+    CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm,
+    CoreRsaPrivateSigningKey,
 };
 use crate::helpers::Base64UrlEncodedBytes;
 use crate::jwt::tests::{
     TEST_EC_PUB_KEY_P256, TEST_EC_PUB_KEY_P384, TEST_ED_PUB_KEY_ED25519, TEST_RSA_PUB_KEY,
 };
 use crate::verification::SignatureVerificationError;
-#[cfg(feature = "jwk-alg")]
-use crate::{core::CoreJweContentEncryptionAlgorithm, JsonWebTokenAlgorithm};
-use crate::{JsonWebKey, JsonWebKeyId, PrivateSigningKey, SigningError};
+use crate::{JsonWebKey, JsonWebKeyId, JsonWebTokenAlgorithm, PrivateSigningKey, SigningError};
 
 use rand::rngs::mock::StepRng;
 use rand::{CryptoRng, RngCore};
@@ -128,7 +127,6 @@ fn test_core_jwk_deserialization_symmetric() {
     assert_eq!(key.kid, None);
     assert_eq!(key.n, None);
     assert_eq!(key.e, None);
-    #[cfg(feature = "jwk-alg")]
     assert_eq!(
         key.alg,
         Some(JsonWebTokenAlgorithm::Encryption(
@@ -983,7 +981,6 @@ fn test_jwks_unsupported_key() {
 }
 
 // Tests that JsonWebKeySet ignores keys with unsupported algorithms
-#[cfg(feature = "jwk-alg")]
 #[test]
 fn test_jwks_unsupported_alg() {
     let jwks_json = "{
@@ -1013,7 +1010,6 @@ fn test_jwks_unsupported_alg() {
 }
 
 // Test filtering keys by algorithm
-#[cfg(feature = "jwk-alg")]
 #[test]
 fn test_jwks_same_kid_different_alg() {
     let jwks_json = "{

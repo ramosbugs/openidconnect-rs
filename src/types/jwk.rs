@@ -33,7 +33,6 @@ where
     /// no algorithm constraint was given, or unsupported if the algorithm is not for signing.
     ///
     /// It's not sufficient to tell whether a key can be used for signing, as key use also has to be validated.
-    #[cfg(feature = "jwk-alg")]
     fn signing_alg(&self) -> JsonWebKeyAlgorithm<&JS>;
 
     /// Initializes a new symmetric key or shared signing secret from the specified raw bytes.

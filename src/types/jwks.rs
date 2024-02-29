@@ -61,7 +61,6 @@ where
         return Err("key type does not match signature algorithm");
     }
 
-    #[cfg(feature = "jwk-alg")]
     match key.signing_alg() {
         // if no specific algorithm is mandated, any will do
         crate::JsonWebKeyAlgorithm::Unspecified => Ok(()),
@@ -69,9 +68,6 @@ where
         crate::JsonWebKeyAlgorithm::Algorithm(key_alg) if key_alg == signing_algorithm => Ok(()),
         crate::JsonWebKeyAlgorithm::Algorithm(_) => Err("incompatible key algorithm"),
     }
-
-    #[cfg(not(feature = "jwk-alg"))]
-    Ok(())
 }
 
 impl<JS, JT, JU, K> JsonWebKeySet<JS, JT, JU, K>

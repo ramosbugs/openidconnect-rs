@@ -1,11 +1,9 @@
-use crate::core::{crypto, CoreJwsSigningAlgorithm};
+use crate::core::{crypto, CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm};
 use crate::helpers::{deserialize_option_or_none, Base64UrlEncodedBytes};
 use crate::types::jwks::check_key_compatibility;
-#[cfg(feature = "jwk-alg")]
-use crate::{core::CoreJweContentEncryptionAlgorithm, JsonWebKeyAlgorithm, JsonWebTokenAlgorithm};
 use crate::{
-    JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse, PrivateSigningKey,
-    SignatureVerificationError, SigningError,
+    JsonWebKey, JsonWebKeyAlgorithm, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse,
+    JsonWebTokenAlgorithm, PrivateSigningKey, SignatureVerificationError, SigningError,
 };
 
 use ed25519_dalek::pkcs8::DecodePrivateKey;
@@ -37,7 +35,6 @@ pub struct CoreJsonWebKey {
     /// [RFC 7517](https://www.rfc-editor.org/rfc/rfc7517#section-4.4)).
     ///
     /// It can either be an algorithm intended for use with JWS or JWE, or something different.
-    #[cfg(feature = "jwk-alg")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) alg: Option<
         JsonWebTokenAlgorithm<
@@ -118,7 +115,6 @@ impl CoreJsonWebKey {
             x: None,
             y: None,
             d: None,
-            #[cfg(feature = "jwk-alg")]
             alg: None,
         }
     }
@@ -144,7 +140,6 @@ impl CoreJsonWebKey {
             x: Some(Base64UrlEncodedBytes::new(x)),
             y: Some(Base64UrlEncodedBytes::new(y)),
             d: None,
-            #[cfg(feature = "jwk-alg")]
             alg: None,
         }
     }
@@ -166,7 +161,6 @@ impl CoreJsonWebKey {
             x: Some(Base64UrlEncodedBytes::new(x)),
             y: None,
             d: None,
-            #[cfg(feature = "jwk-alg")]
             alg: None,
         }
     }
@@ -195,7 +189,6 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
             x: None,
             y: None,
             d: None,
-            #[cfg(feature = "jwk-alg")]
             alg: None,
         }
     }
@@ -373,7 +366,6 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
         }
     }
 
-    #[cfg(feature = "jwk-alg")]
     fn signing_alg(&self) -> JsonWebKeyAlgorithm<&CoreJwsSigningAlgorithm> {
         match self.alg {
             None => JsonWebKeyAlgorithm::Unspecified,
@@ -536,7 +528,6 @@ impl
                 y: None,
                 d: None,
                 k: None,
-                #[cfg(feature = "jwk-alg")]
                 alg: None,
             },
         }
@@ -691,7 +682,6 @@ impl
             x: None,
             y: None,
             d: None,
-            #[cfg(feature = "jwk-alg")]
             alg: None,
         }
     }
