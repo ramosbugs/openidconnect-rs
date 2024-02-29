@@ -1,6 +1,5 @@
 use crate::core::{crypto, CoreJwsSigningAlgorithm};
 use crate::helpers::{deserialize_option_or_none, Base64UrlEncodedBytes};
-use crate::types::jwk::JsonCurveType;
 use crate::types::jwks::check_key_compatibility;
 #[cfg(feature = "jwk-alg")]
 use crate::{core::CoreJweContentEncryptionAlgorithm, JsonWebKeyAlgorithm, JsonWebTokenAlgorithm};
@@ -736,7 +735,6 @@ pub enum CoreJsonCurveType {
     #[serde(rename = "Ed25519")]
     Ed25519,
 }
-impl JsonCurveType for CoreJsonWebKeyType {}
 
 /// Usage restriction for a JSON Web key.
 #[derive(Clone, Debug, PartialEq, Eq)]

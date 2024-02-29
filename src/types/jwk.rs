@@ -83,12 +83,6 @@ pub trait JsonWebKeyType:
 {
 }
 
-/// Curve type (e.g., P256).
-pub trait JsonCurveType:
-    Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
-{
-}
-
 /// Allowed key usage.
 pub trait JsonWebKeyUse: Debug + DeserializeOwned + Serialize + 'static {
     /// Returns true if the associated key may be used for digital signatures, or false otherwise.
