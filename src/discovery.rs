@@ -924,7 +924,7 @@ mod tests {
         );
         assert_eq!(
             Some(
-                &vec![
+                &[
                     "email",
                     "phone",
                     "profile",

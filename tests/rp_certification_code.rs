@@ -256,7 +256,7 @@ fn rp_response_type_code() {
 #[test]
 #[ignore]
 fn rp_scope_userinfo_claims() {
-    let user_info_scopes = vec!["profile", "email", "address", "phone"]
+    let user_info_scopes = ["profile", "email", "address", "phone"]
         .iter()
         .map(|scope| Scope::new((*scope).to_string()))
         .collect::<Vec<_>>();
