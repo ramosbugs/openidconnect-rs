@@ -1114,7 +1114,7 @@ checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
 
 [[package]]
 name = "openidconnect"
-version = "3.5.0"
+version = "4.0.0-alpha.1"
 dependencies = [
  "anyhow",
  "base64 0.13.1",
