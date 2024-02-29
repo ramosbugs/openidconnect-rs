@@ -26,9 +26,7 @@ pub(crate) trait IssuerClaim {
     fn issuer(&self) -> Option<&IssuerUrl>;
 }
 
-///
 /// Error verifying claims.
-///
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ClaimsVerificationError {
@@ -67,9 +65,7 @@ pub enum ClaimsVerificationError {
     Unsupported(String),
 }
 
-///
 /// Error verifying claims signature.
-///
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SignatureVerificationError {
@@ -461,15 +457,11 @@ where
     }
 }
 
-///
 /// Trait for verifying ID token nonces.
-///
 pub trait NonceVerifier {
-    ///
     /// Verifies the nonce.
     ///
     /// Returns `Ok(())` if the nonce is valid, or a string describing the error otherwise.
-    ///
     fn verify(self, nonce: Option<&Nonce>) -> Result<(), String>;
 }
 
@@ -496,9 +488,7 @@ where
     }
 }
 
-///
 /// ID token verifier.
-///
 #[derive(Clone)]
 pub struct IdTokenVerifier<'a, JS, JT, JU, K>
 where
@@ -536,9 +526,7 @@ where
         }
     }
 
-    ///
     /// Initializes a new verifier for a public client (i.e., one without a client secret).
-    ///
     pub fn new_public_client(
         client_id: ClientId,
         issuer: IssuerUrl,
@@ -547,10 +535,8 @@ where
         Self::new(JwtClaimsVerifier::new(client_id, issuer, signature_keys))
     }
 
-    ///
     /// Initializes a no-op verifier that performs no signature, audience, or issuer verification.
     /// The token's expiration time is still checked, and the token is otherwise required to conform to the expected format.
-    ///
     pub fn new_insecure_without_verification() -> Self {
         let empty_issuer = IssuerUrl::new("https://0.0.0.0".to_owned())
             .expect("Creating empty issuer url mustn't fail");
@@ -564,13 +550,11 @@ where
         .require_issuer_match(false)
     }
 
-    ///
     /// Initializes a new verifier for a confidential client (i.e., one with a client secret).
     ///
     /// A confidential client verifier is required in order to verify ID tokens signed using a
     /// shared secret algorithm such as `HS256`, `HS384`, or `HS512`. For these algorithms, the
     /// client secret is the shared secret.
-    ///
     pub fn new_confidential_client(
         client_id: ClientId,
         client_secret: ClientSecret,
@@ -583,9 +567,7 @@ where
         )
     }
 
-    ///
     /// Specifies which JSON Web Signature algorithms are supported.
-    ///
     pub fn set_allowed_algs<I>(mut self, algs: I) -> Self
     where
         I: IntoIterator<Item = JS>,
@@ -594,20 +576,16 @@ where
         self
     }
 
-    ///
     /// Specifies that any signature algorithm is supported.
-    ///
     pub fn allow_any_alg(mut self) -> Self {
         self.jwt_verifier = self.jwt_verifier.allow_any_alg();
         self
     }
 
-    ///
     /// Specifies a function for verifying the `acr` claim.
     ///
     /// The function should return `Ok(())` if the claim is valid, or a string describing the error
     /// otherwise.
-    ///
     pub fn set_auth_context_verifier_fn<T>(mut self, acr_verifier_fn: T) -> Self
     where
         T: Fn(Option<&AuthenticationContextClass>) -> Result<(), String> + 'a + Send + Sync,
@@ -616,12 +594,10 @@ where
         self
     }
 
-    ///
     /// Specifies a function for verifying the `auth_time` claim.
     ///
     /// The function should return `Ok(())` if the claim is valid, or a string describing the error
     /// otherwise.
-    ///
     pub fn set_auth_time_verifier_fn<T>(mut self, auth_time_verifier_fn: T) -> Self
     where
         T: Fn(Option<DateTime<Utc>>) -> Result<(), String> + 'a + Send + Sync,
@@ -630,18 +606,15 @@ where
         self
     }
 
-    ///
     /// Enables signature verification.
     ///
     /// Signature verification is enabled by default, so this function is only useful if
     /// [`IdTokenVerifier::insecure_disable_signature_check`] was previously invoked.
-    ///
     pub fn enable_signature_check(mut self) -> Self {
         self.jwt_verifier = self.jwt_verifier.require_signature_check(true);
         self
     }
 
-    ///
     /// Disables signature verification.
     ///
     /// # Security Warning
@@ -649,33 +622,26 @@ where
     /// Unverified ID tokens may be subject to forgery. See [Section 16.3](
     /// https://openid.net/specs/openid-connect-core-1_0.html#TokenManufacture) for more
     /// information.
-    ///
     pub fn insecure_disable_signature_check(mut self) -> Self {
         self.jwt_verifier = self.jwt_verifier.require_signature_check(false);
         self
     }
 
-    ///
     /// Specifies whether the issuer claim must match the expected issuer URL for the provider.
-    ///
     pub fn require_issuer_match(mut self, iss_required: bool) -> Self {
         self.jwt_verifier = self.jwt_verifier.require_issuer_match(iss_required);
         self
     }
 
-    ///
     /// Specifies whether the audience claim must match this client's client ID.
-    ///
     pub fn require_audience_match(mut self, aud_required: bool) -> Self {
         self.jwt_verifier = self.jwt_verifier.require_audience_match(aud_required);
         self
     }
 
-    ///
     /// Specifies a function for returning the current time.
     ///
     /// This function is used for verifying the ID token expiration time.
-    ///
     pub fn set_time_fn<T>(mut self, time_fn: T) -> Self
     where
         T: Fn() -> DateTime<Utc> + 'a + Send + Sync,
@@ -684,12 +650,10 @@ where
         self
     }
 
-    ///
     /// Specifies a function for verifying the ID token issue time.
     ///
     /// The function should return `Ok(())` if the claim is valid, or a string describing the error
     /// otherwise.
-    ///
     pub fn set_issue_time_verifier_fn<T>(mut self, iat_verifier_fn: T) -> Self
     where
         T: Fn(DateTime<Utc>) -> Result<(), String> + 'a + Send + Sync,
@@ -698,7 +662,6 @@ where
         self
     }
 
-    ///
     /// Specifies a function for verifying audiences included in the `aud` claim that differ from
     /// this client's client ID.
     ///
@@ -707,7 +670,6 @@ where
     /// [Section 3.1.3.7](https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation)
     /// states that *"The ID Token MUST be rejected if the ID Token does not list the Client as a
     /// valid audience, or if it contains additional audiences not trusted by the Client."*
-    ///
     pub fn set_other_audience_verifier_fn<T>(mut self, other_aud_verifier_fn: T) -> Self
     where
         T: Fn(&Audience) -> bool + 'a + Send + Sync,
@@ -843,9 +805,7 @@ where
     }
 }
 
-///
 /// User info verifier.
-///
 #[derive(Clone)]
 pub struct UserInfoVerifier<'a, JE, JS, JT, JU, K>
 where
@@ -867,9 +827,7 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
-    ///
     /// Instantiates a user info verifier.
-    ///
     pub fn new(
         client_id: ClientId,
         issuer: IssuerUrl,
@@ -887,17 +845,13 @@ where
         self.expected_subject.as_ref()
     }
 
-    ///
     /// Specifies whether the issuer claim must match the expected issuer URL for the provider.
-    ///
     pub fn require_issuer_match(mut self, iss_required: bool) -> Self {
         self.jwt_verifier = self.jwt_verifier.require_issuer_match(iss_required);
         self
     }
 
-    ///
     /// Specifies whether the audience claim must match this client's client ID.
-    ///
     pub fn require_audience_match(mut self, aud_required: bool) -> Self {
         self.jwt_verifier = self.jwt_verifier.require_audience_match(aud_required);
         self

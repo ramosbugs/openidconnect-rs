@@ -33,7 +33,6 @@ where
     Encryption(JE),
     // This is ugly, but we don't expose this module via the public API, so it's fine.
     Signature(JS, PhantomData<JT>),
-    ///
     /// No digital signature or MAC performed.
     ///
     /// # Security Warning
@@ -43,7 +42,6 @@ where
     /// [Critical vulnerabilities in JSON Web Token libraries](
     ///     https://auth0.com/blog/critical-vulnerabilities-in-json-web-token-libraries/) for
     /// further discussion.
-    ///
     None,
 }
 impl<'de, JE, JS, JT> Deserialize<'de> for JsonWebTokenAlgorithm<JE, JS, JT>
@@ -174,20 +172,14 @@ where
         JW: JsonWebKey<JS, JT, JU>;
 }
 
-///
 /// Error creating a JSON Web Token.
-///
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum JsonWebTokenError {
-    ///
     /// Failed to serialize JWT.
-    ///
     #[error("Failed to serialize JWT")]
     SerializationError(#[source] serde_json::Error),
-    ///
     /// Failed to sign JWT.
-    ///
     #[error("Failed to sign JWT")]
     SigningError(#[source] SigningError),
 }

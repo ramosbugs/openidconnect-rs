@@ -1,6 +1,4 @@
-///
 /// Copied from oauth2-rs crate (not part of that crate's stable public interface).
-///
 macro_rules! new_type {
     // Convenience pattern without an impl.
     (
@@ -187,9 +185,7 @@ macro_rules! new_type {
     };
 }
 
-///
 /// Copied from oauth2-rs crate (not part of that crate's stable public interface).
-///
 macro_rules! new_secret_type {
     (
         $(#[$attr:meta])*
@@ -244,13 +240,11 @@ macro_rules! new_secret_type {
             pub fn new(s: $type) -> Self {
                 $name(s)
             }
-            ///
             #[doc = $secret_doc]
             ///
             /// # Security Warning
             ///
             /// Leaking this value may compromise the security of the OAuth2 flow.
-            ///
             pub fn secret(&self) -> &$type { &self.0 }
         }
         impl Debug for $name {
@@ -261,7 +255,6 @@ macro_rules! new_secret_type {
     };
 }
 
-///
 /// Creates a URL-specific new type
 ///
 /// Types created by this macro enforce during construction that the contained value represents a
@@ -272,7 +265,6 @@ macro_rules! new_secret_type {
 ///
 /// In addition to the raw string representation, these types include a `url` method to retrieve a
 /// parsed `Url` struct.
-///
 macro_rules! new_url_type {
     // Convenience pattern without an impl.
     (

@@ -26,9 +26,7 @@ use std::future::Future;
 use std::ops::Deref;
 use std::str;
 
-///
 /// User info request.
-///
 pub struct UserInfoRequest<'a, JE, JS, JT, JU, K>
 where
     JE: JweContentEncryptionAlgorithm<JT>,
@@ -51,10 +49,8 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
-    ///
     /// Submits this request to the associated user info endpoint using the specified synchronous
     /// HTTP client.
-    ///
     pub fn request<AC, GC, HC, RE>(
         self,
         http_client: HC,
@@ -70,10 +66,8 @@ where
             .and_then(|http_response| self.user_info_response(http_response))
     }
 
-    ///
     /// Submits this request to the associated user info endpoint using the specified asynchronous
     /// HTTP client.
-    ///
     pub async fn request_async<AC, C, F, GC, RE>(
         self,
         http_client: C,
@@ -165,20 +159,16 @@ where
         }
     }
 
-    ///
     /// Specifies whether to require the user info response to be a signed JSON Web Token (JWT).
-    ///
     pub fn require_signed_response(mut self, require_signed_response: bool) -> Self {
         self.require_signed_response = require_signed_response;
         self
     }
 
-    ///
     /// Specifies whether to require the issuer of the signed JWT response to match the expected
     /// issuer URL for this provider.
     ///
     /// This option has no effect on unsigned JSON responses.
-    ///
     pub fn require_issuer_match(mut self, iss_required: bool) -> Self {
         self.signed_response_verifier = self
             .signed_response_verifier
@@ -186,12 +176,10 @@ where
         self
     }
 
-    ///
     /// Specifies whether to require the audience of the signed JWT response to match the expected
     /// audience (client ID).
     ///
     /// This option has no effect on unsigned JSON responses.
-    ///
     pub fn require_audience_match(mut self, aud_required: bool) -> Self {
         self.signed_response_verifier = self
             .signed_response_verifier
@@ -199,18 +187,14 @@ where
         self
     }
 
-    ///
     /// Specifies the expected response type by setting the `Accept` header. Note that the server can ignore this header.
-    ///
     pub fn set_response_type(mut self, response_type: UserInfoResponseType) -> Self {
         self.response_type = response_type;
         self
     }
 }
 
-///
 /// User info claims.
-///
 #[derive(Clone, Debug, Serialize)]
 pub struct UserInfoClaims<AC: AdditionalClaims, GC: GenderClaim>(UserInfoClaimsImpl<AC, GC>);
 impl<AC, GC> UserInfoClaims<AC, GC>
@@ -218,9 +202,7 @@ where
     AC: AdditionalClaims,
     GC: GenderClaim,
 {
-    ///
     /// Initializes user info claims.
-    ///
     pub fn new(standard_claims: StandardClaims<GC>, additional_claims: AC) -> Self {
         Self(UserInfoClaimsImpl {
             issuer: None,
@@ -230,12 +212,10 @@ where
         })
     }
 
-    ///
     /// Initializes user info claims from the provided raw JSON response.
     ///
     /// If an `expected_subject` is provided, this function verifies that the user info claims
     /// contain the expected subject and returns an error otherwise.
-    ///
     pub fn from_json<RE>(
         user_info_json: &[u8],
         expected_subject: Option<&SubjectIdentifier>,
@@ -274,15 +254,11 @@ where
         }
     ];
 
-    ///
     /// Returns the `sub` claim.
-    ///
     pub fn subject(&self) -> &SubjectIdentifier {
         &self.0.standard_claims.sub
     }
-    ///
     /// Sets the `sub` claim.
-    ///
     pub fn set_subject(&mut self, subject: SubjectIdentifier) {
         self.0.standard_claims.sub = subject
     }
@@ -314,22 +290,16 @@ where
         }
     ];
 
-    ///
     /// Returns the standard claims as a `StandardClaims` object.
-    ///
     pub fn standard_claims(&self) -> &StandardClaims<GC> {
         &self.0.standard_claims
     }
 
-    ///
     /// Returns additional user info claims.
-    ///
     pub fn additional_claims(&self) -> &AC {
         self.0.additional_claims.as_ref()
     }
-    ///
     /// Returns mutable additional user info claims.
-    ///
     pub fn additional_claims_mut(&mut self) -> &mut AC {
         self.0.additional_claims.as_mut()
     }
@@ -396,9 +366,7 @@ where
     }
 }
 
-///
 /// JSON Web Token (JWT) containing user info claims.
-///
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct UserInfoJsonWebToken<
     AC: AdditionalClaims,
@@ -418,10 +386,8 @@ where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
-    ///
     /// Initializes a new signed JWT containing the specified claims, signed with the specified key
     /// and signing algorithm.
-    ///
     pub fn new<JU, K, S>(
         claims: UserInfoClaims<AC, GC>,
         signing_key: &S,
@@ -435,9 +401,7 @@ where
         Ok(Self(JsonWebToken::new(claims.0, signing_key, &alg)?))
     }
 
-    ///
     /// Verifies and returns the user info claims.
-    ///
     pub fn claims<JU, K>(
         self,
         verifier: &UserInfoVerifier<JE, JS, JT, JU, K>,
@@ -451,63 +415,43 @@ where
 }
 
 new_url_type![
-    ///
     /// URL for a provider's user info endpoint.
-    ///
     UserInfoUrl
 ];
 
-///
 /// Indicates via the `Accept` header the body response type the server should use to return the user info. Note that the server can ignore this header.
 ///
 /// Defaults to Json.
-///
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub enum UserInfoResponseType {
-    ///
     /// Sets the `Accept` header to `application/json`.
-    ///
     Json,
-    ///
     /// Sets the `Accept` header to `application/jwt`.
-    ///
     Jwt,
 }
 
-///
 /// Error retrieving user info.
-///
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum UserInfoError<RE>
 where
     RE: std::error::Error + 'static,
 {
-    ///
     /// Failed to verify user info claims.
-    ///
     #[error("Failed to verify claims")]
     ClaimsVerification(#[source] ClaimsVerificationError),
-    ///
     /// Failed to parse server response.
-    ///
     #[error("Failed to parse server response")]
     Parse(#[source] serde_path_to_error::Error<serde_json::Error>),
-    ///
     /// An error occurred while sending the request or receiving the response (e.g., network
     /// connectivity failed).
-    ///
     #[error("Request failed")]
     Request(#[source] RE),
-    ///
     /// Server returned an invalid response.
-    ///
     #[error("Server returned invalid response: {2}")]
     Response(StatusCode, Vec<u8>, String),
-    ///
     /// An unexpected error occurred.
-    ///
     #[error("Other error: {0}")]
     Other(String),
 }

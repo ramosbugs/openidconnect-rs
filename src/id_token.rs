@@ -26,9 +26,7 @@ use std::str::FromStr;
 // This wrapper layer exists instead of directly verifying the JWT and returning the claims so that
 // we can pass it around and easily access a serialized JWT representation of it (e.g., for passing
 // to the authorization endpoint as an id_token_hint).
-///
 /// OpenID Connect ID token.
-///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct IdToken<
     AC: AdditionalClaims,
@@ -63,14 +61,12 @@ where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
-    ///
     /// Initializes an ID token with the specified claims, signed using the given signing key and
     /// algorithm.
     ///
     /// If an `access_token` and/or `code` are provided, this method sets the `at_hash` and/or
     /// `c_hash` claims using the given signing algorithm, respectively. Otherwise, those claims are
     /// unchanged from the values specified in `claims`.
-    ///
     pub fn new<JU, K, S>(
         claims: IdTokenClaims<AC, GC>,
         signing_key: &S,
@@ -108,9 +104,7 @@ where
         .map(Self)
     }
 
-    ///
     /// Verifies and returns a reference to the ID token claims.
-    ///
     pub fn claims<'a, JU, K, N>(
         &'a self,
         verifier: &IdTokenVerifier<JS, JT, JU, K>,
@@ -124,9 +118,7 @@ where
         verifier.verified_claims(&self.0, nonce_verifier)
     }
 
-    ///
     /// Verifies and returns the ID token claims.
-    ///
     pub fn into_claims<JU, K, N>(
         self,
         verifier: &IdTokenVerifier<JS, JT, JU, K>,
@@ -140,12 +132,10 @@ where
         verifier.verified_claims_owned(self.0, nonce_verifier)
     }
 
-    ///
     /// Returns the [`JwsSigningAlgorithm`] used to sign this ID token.
     ///
     /// This function returns an error if the token is unsigned or utilizes JSON Web Encryption
     /// (JWE).
-    ///
     pub fn signing_alg(&self) -> Result<JS, SigningError> {
         match self.0.unverified_header().alg {
             JsonWebTokenAlgorithm::Signature(ref signing_alg, _) => Ok(signing_alg.clone()),
@@ -181,9 +171,7 @@ where
     }
 }
 
-///
 /// OpenID Connect ID token claims.
-///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct IdTokenClaims<AC, GC>
 where
@@ -237,9 +225,7 @@ where
     AC: AdditionalClaims,
     GC: GenderClaim,
 {
-    ///
     /// Initializes new ID token claims.
-    ///
     pub fn new(
         issuer: IssuerUrl,
         audiences: Vec<Audience>,
@@ -281,15 +267,11 @@ where
         }
     ];
 
-    ///
     /// Returns the `sub` claim.
-    ///
     pub fn subject(&self) -> &SubjectIdentifier {
         &self.standard_claims.sub
     }
-    ///
     /// Sets the `sub` claim.
-    ///
     pub fn set_subject(mut self, subject: SubjectIdentifier) -> Self {
         self.standard_claims.sub = subject;
         self
@@ -322,15 +304,11 @@ where
         }
     ];
 
-    ///
     /// Returns additional ID token claims.
-    ///
     pub fn additional_claims(&self) -> &AC {
         self.additional_claims.as_ref()
     }
-    ///
     /// Returns mutable additional ID token claims.
-    ///
     pub fn additional_claims_mut(&mut self) -> &mut AC {
         self.additional_claims.as_mut()
     }
@@ -372,9 +350,7 @@ where
     }
 }
 
-///
 /// Extends the base OAuth2 token response with an ID token.
-///
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct IdTokenFields<AC, EF, GC, JE, JS, JT>
 where
@@ -401,9 +377,7 @@ where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
 {
-    ///
     /// Initializes new ID token fields containing the specified [`IdToken`] and extra fields.
-    ///
     pub fn new(id_token: Option<IdToken<AC, GC, JE, JS, JT>>, extra_fields: EF) -> Self {
         Self {
             id_token,
@@ -412,15 +386,11 @@ where
         }
     }
 
-    ///
     /// Returns the [`IdToken`] contained in the OAuth2 token response.
-    ///
     pub fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS, JT>> {
         self.id_token.as_ref()
     }
-    ///
     /// Returns the extra fields contained in the OAuth2 token response.
-    ///
     pub fn extra_fields(&self) -> &EF {
         &self.extra_fields
     }

@@ -23,9 +23,7 @@ use sha2::Digest;
 // support such key types, we'll need to define a new impl for JsonWebKey. Deserializing the new
 // impl would probably need to involve first deserializing the raw values to access the 'kty'
 // parameter, and then deserializing the fields and types appropriate for that key type.
-///
 /// Public or symmetric key expressed as a JSON Web Key.
-///
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct CoreJsonWebKey {
     pub(crate) kty: CoreJsonWebKeyType,
@@ -386,20 +384,16 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
     }
 }
 
-///
 /// HMAC secret key.
 ///
 /// This key can be used for signing messages, or converted to a `CoreJsonWebKey` for verifying
 /// them.
-///
 #[derive(Clone)]
 pub struct CoreHmacKey {
     secret: Vec<u8>,
 }
 impl CoreHmacKey {
-    ///
     /// Instantiate a new key from the specified secret bytes.
-    ///
     pub fn new<T>(secret: T) -> Self
     where
         T: Into<Vec<u8>>,
@@ -483,20 +477,16 @@ impl EdDsaSigningKey {
     }
 }
 
-///
 /// EdDSA Private Key.
 ///
 /// This key can be used for signing messages, or converted to a `CoreJsonWebKey` for verifying
 /// them.
-///
 pub struct CoreEdDsaPrivateSigningKey {
     kid: Option<JsonWebKeyId>,
     key_pair: EdDsaSigningKey,
 }
 impl CoreEdDsaPrivateSigningKey {
-    ///
     /// Converts an EdDSA private key (in PEM format) to a JWK representing its public key.
-    ///
     pub fn from_ed25519_pem(pem: &str, kid: Option<JsonWebKeyId>) -> Result<Self, String> {
         Ok(Self {
             kid,
@@ -558,21 +548,17 @@ pub(crate) trait RngClone: dyn_clone::DynClone + rand::RngCore + rand::CryptoRng
 dyn_clone::clone_trait_object!(RngClone);
 impl<T> RngClone for T where T: rand::RngCore + rand::CryptoRng + Clone {}
 
-///
 /// RSA private key.
 ///
 /// This key can be used for signing messages, or converted to a `CoreJsonWebKey` for verifying
 /// them.
-///
 pub struct CoreRsaPrivateSigningKey {
     key_pair: rsa::RsaPrivateKey,
     rng: Box<dyn RngClone + Send + Sync>,
     kid: Option<JsonWebKeyId>,
 }
 impl CoreRsaPrivateSigningKey {
-    ///
     /// Converts an RSA private key (in PEM format) to a JWK representing its public key.
-    ///
     pub fn from_pem(pem: &str, kid: Option<JsonWebKeyId>) -> Result<Self, String> {
         Self::from_pem_internal(pem, Box::new(rand::rngs::OsRng), kid)
     }
@@ -710,85 +696,57 @@ impl
     }
 }
 
-///
 /// Type of JSON Web Key.
-///
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[non_exhaustive]
 pub enum CoreJsonWebKeyType {
-    ///
     /// Elliptic Curve Cryptography (ECC) key.
     ///
     /// ECC algorithms such as ECDSA are currently unsupported.
-    ///
     #[serde(rename = "EC")]
     EllipticCurve,
-    ///
     /// RSA key.
-    ///
     #[serde(rename = "RSA")]
     RSA,
-    ///
     /// EdDSA key.
-    ///
     #[serde(rename = "OKP")]
     OctetKeyPair,
-    ///
     /// Symmetric key.
-    ///
     #[serde(rename = "oct")]
     Symmetric,
 }
 impl JsonWebKeyType for CoreJsonWebKeyType {}
 
-///
 /// Type of EC-Curve
-///
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[non_exhaustive]
 pub enum CoreJsonCurveType {
-    ///
     /// P-256 Curve
-    ///
     #[serde(rename = "P-256")]
     P256,
-    ///
     /// P-384 Curve
-    ///
     #[serde(rename = "P-384")]
     P384,
-    ///
     /// P-521 Curve (currently not supported)
-    ///
     #[serde(rename = "P-521")]
     P521,
-    ///
     /// Ed25519 Curve
-    ///
     #[serde(rename = "Ed25519")]
     Ed25519,
 }
 impl JsonCurveType for CoreJsonWebKeyType {}
 
-///
 /// Usage restriction for a JSON Web key.
-///
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum CoreJsonWebKeyUse {
-    ///
     /// Key may be used for digital signatures.
-    ///
     Signature,
 
-    ///
     /// Key may be used for encryption.
-    ///
     Encryption,
 
-    ///
     /// Fallback case for other key uses not understood by this library.
-    ///
     Other(String),
 }
 impl CoreJsonWebKeyUse {

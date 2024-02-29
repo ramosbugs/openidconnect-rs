@@ -23,26 +23,20 @@ use std::iter::FromIterator;
 use std::marker::PhantomData;
 use std::ops::Deref;
 
-///
 /// A [locale-aware](https://openid.net/specs/openid-connect-core-1_0.html#IndividualClaimsLanguages)
 /// claim.
 ///
 /// This structure associates one more `Option<LanguageTag>` locales with the corresponding
 /// claims values.
-///
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LocalizedClaim<T>(HashMap<LanguageTag, T>, Option<T>);
 impl<T> LocalizedClaim<T> {
-    ///
     /// Initialize an empty claim.
-    ///
     pub fn new() -> Self {
         Self::default()
     }
 
-    ///
     /// Returns true if the claim contains a value for the specified locale.
-    ///
     pub fn contains_key(&self, locale: Option<&LanguageTag>) -> bool {
         if let Some(l) = locale {
             self.0.contains_key(l)
@@ -51,9 +45,7 @@ impl<T> LocalizedClaim<T> {
         }
     }
 
-    ///
     /// Returns the entry for the specified locale or `None` if there is no such entry.
-    ///
     pub fn get(&self, locale: Option<&LanguageTag>) -> Option<&T> {
         if let Some(l) = locale {
             self.0.get(l)
@@ -62,9 +54,7 @@ impl<T> LocalizedClaim<T> {
         }
     }
 
-    ///
     /// Returns an iterator over the locales and claim value entries.
-    ///
     pub fn iter(&self) -> impl Iterator<Item = (Option<&LanguageTag>, &T)> {
         self.1
             .iter()
@@ -72,12 +62,10 @@ impl<T> LocalizedClaim<T> {
             .chain(self.0.iter().map(|(locale, value)| (Some(locale), value)))
     }
 
-    ///
     /// Inserts or updates an entry for the specified locale.
     ///
     /// Returns the current value associated with the given locale, or `None` if there is no
     /// such entry.
-    ///
     pub fn insert(&mut self, locale: Option<LanguageTag>, value: T) -> Option<T> {
         if let Some(l) = locale {
             self.0.insert(l, value)
@@ -86,12 +74,10 @@ impl<T> LocalizedClaim<T> {
         }
     }
 
-    ///
     /// Removes an entry for the specified locale.
     ///
     /// Returns the current value associated with the given locale, or `None` if there is no
     /// such entry.
-    ///
     pub fn remove(&mut self, locale: Option<&LanguageTag>) -> Option<T> {
         if let Some(l) = locale {
             self.0.remove(l)
@@ -142,9 +128,7 @@ where
     }
 }
 
-///
 /// Owned iterator over a LocalizedClaim.
-///
 pub struct LocalizedClaimIterator<T> {
     inner: Box<dyn Iterator<Item = (Option<LanguageTag>, T)>>,
 }
@@ -155,45 +139,29 @@ impl<T> Iterator for LocalizedClaimIterator<T> {
     }
 }
 
-///
 /// Client application type.
-///
 pub trait ApplicationType: Debug + DeserializeOwned + Serialize + 'static {}
 
-///
 /// How the Authorization Server displays the authentication and consent user interface pages to
 /// the End-User.
-///
 pub trait AuthDisplay: AsRef<str> + Debug + DeserializeOwned + Serialize + 'static {}
 
-///
 /// Whether the Authorization Server should prompt the End-User for reauthentication and consent.
-///
 pub trait AuthPrompt: AsRef<str> + 'static {}
 
-///
 /// Claim name.
-///
 pub trait ClaimName: Debug + DeserializeOwned + Serialize + 'static {}
 
-///
 /// Claim type (e.g., normal, aggregated, or distributed).
-///
 pub trait ClaimType: Debug + DeserializeOwned + Serialize + 'static {}
 
-///
 /// Client authentication method.
-///
 pub trait ClientAuthMethod: Debug + DeserializeOwned + Serialize + 'static {}
 
-///
 /// Grant type.
-///
 pub trait GrantType: Debug + DeserializeOwned + Serialize + 'static {}
 
-///
 /// Error signing a message.
-///
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SigningError {
@@ -208,51 +176,37 @@ pub enum SigningError {
     Other(String),
 }
 
-///
 /// JSON Web Key.
-///
 pub trait JsonWebKey<JS, JT, JU>: Clone + Debug + DeserializeOwned + Serialize + 'static
 where
     JS: JwsSigningAlgorithm<JT>,
     JT: JsonWebKeyType,
     JU: JsonWebKeyUse,
 {
-    ///
     /// Returns the key ID, or `None` if no key ID is specified.
-    ///
     fn key_id(&self) -> Option<&JsonWebKeyId>;
 
-    ///
     /// Returns the key type (e.g., RSA).
-    ///
     fn key_type(&self) -> &JT;
 
-    ///
     /// Returns the allowed key usage (e.g., signing or encryption), or `None` if no usage is
     /// specified.
-    ///
     fn key_use(&self) -> Option<&JU>;
 
-    ///
     /// Returns the algorithm (e.g. ES512) this key must be used with, or `Unspecified` if
     /// no algorithm constraint was given, or unsupported if the algorithm is not for signing.
     ///
     /// It's not sufficient to tell whether a key can be used for signing, as key use also has to be validated.
-    ///
     #[cfg(feature = "jwk-alg")]
     fn signing_alg(&self) -> JsonWebKeyAlgorithm<&JS>;
 
-    ///
     /// Initializes a new symmetric key or shared signing secret from the specified raw bytes.
-    ///
     fn new_symmetric(key: Vec<u8>) -> Self;
 
-    ///
     /// Verifies the given `signature` using the given signature algorithm (`signature_alg`) over
     /// the given `message`.
     ///
     /// Returns `Ok` if the signature is valid, or an `Err` otherwise.
-    ///
     fn verify_signature(
         &self,
         signature_alg: &JS,
@@ -261,9 +215,7 @@ where
     ) -> Result<(), SignatureVerificationError>;
 }
 
-///
 /// Encodes a JWK key's alg field compatibility with either signing or encryption operations.
-///
 #[derive(Debug)]
 pub enum JsonWebKeyAlgorithm<A: Debug> {
     /// the alg field allows this kind of operation to be performed with this algorithm only
@@ -274,9 +226,7 @@ pub enum JsonWebKeyAlgorithm<A: Debug> {
     Unsupported,
 }
 
-///
 /// Private or symmetric key for signing.
-///
 pub trait PrivateSigningKey<JS, JT, JU, K>
 where
     JS: JwsSigningAlgorithm<JT>,
@@ -284,134 +234,94 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
-    ///
     /// Signs the given `message` using the given signature algorithm.
-    ///
     fn sign(&self, signature_alg: &JS, message: &[u8]) -> Result<Vec<u8>, SigningError>;
 
-    ///
     /// Converts this key to a JSON Web Key that can be used for verifying signatures.
-    ///
     fn as_verification_key(&self) -> K;
 }
 
-///
 /// Key type (e.g., RSA).
-///
 pub trait JsonWebKeyType:
     Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
 {
 }
 
-///
 /// Curve type (e.g., P256).
-///
 pub trait JsonCurveType:
     Clone + Debug + DeserializeOwned + PartialEq + Serialize + 'static
 {
 }
 
-///
 /// Allowed key usage.
-///
 pub trait JsonWebKeyUse: Debug + DeserializeOwned + Serialize + 'static {
-    ///
     /// Returns true if the associated key may be used for digital signatures, or false otherwise.
-    ///
     fn allows_signature(&self) -> bool;
 
-    ///
     /// Returns true if the associated key may be used for encryption, or false otherwise.
-    ///
     fn allows_encryption(&self) -> bool;
 }
 
-///
 /// JSON Web Encryption (JWE) content encryption algorithm.
-///
 pub trait JweContentEncryptionAlgorithm<JT>:
     Clone + Debug + DeserializeOwned + Serialize + 'static
 where
     JT: JsonWebKeyType,
 {
-    ///
     /// Returns the type of key required to use this encryption algorithm.
-    ///
     fn key_type(&self) -> Result<JT, String>;
 }
 
-///
 /// JSON Web Encryption (JWE) key management algorithm.
-///
 pub trait JweKeyManagementAlgorithm: Debug + DeserializeOwned + Serialize + 'static {
     // TODO: add a key_type() method
 }
 
-///
 /// JSON Web Signature (JWS) algorithm.
-///
 pub trait JwsSigningAlgorithm<JT>:
     Clone + Debug + DeserializeOwned + Eq + Hash + PartialEq + Serialize + 'static
 where
     JT: JsonWebKeyType,
 {
-    ///
     /// Returns the type of key required to use this signature algorithm, or `None` if this
     /// algorithm does not require a key.
-    ///
     fn key_type(&self) -> Option<JT>;
 
-    ///
     /// Returns true if the signature algorithm uses a shared secret (symmetric key).
-    ///
     fn uses_shared_secret(&self) -> bool;
 
-    ///
     /// Hashes the given `bytes` using the hash algorithm associated with this signing
     /// algorithm, and returns the hashed bytes.
     ///
     /// If hashing fails or this signing algorithm does not have an associated hash function, an
     /// `Err` is returned with a string describing the cause of the error.
-    ///
     fn hash_bytes(&self, bytes: &[u8]) -> Result<Vec<u8>, String>;
 
-    ///
     /// Returns the RS256 algorithm.
     ///
     /// This is the default algorithm for OpenID Connect ID tokens and must be supported by all
     /// implementations.
-    ///
     fn rsa_sha_256() -> Self;
 }
 
-///
 /// Response mode indicating how the OpenID Connect Provider should return the Authorization
 /// Response to the Relying Party (client).
-///
 pub trait ResponseMode: Debug + DeserializeOwned + Serialize + 'static {}
 
-///
 /// Response type indicating the desired authorization processing flow, including what
 /// parameters are returned from the endpoints used.
-///
 pub trait ResponseType: AsRef<str> + Debug + DeserializeOwned + Serialize + 'static {
-    ///
     /// Converts this OpenID Connect response type to an [`oauth2::ResponseType`] used by the
     /// underlying [`oauth2`] crate.
-    ///
     fn to_oauth2(&self) -> oauth2::ResponseType;
 }
 
-///
 /// Subject identifier type returned by an OpenID Connect Provider to uniquely identify its users.
-///
 pub trait SubjectIdentifierType: Debug + DeserializeOwned + Serialize + 'static {}
 
 new_type![
-    ///
     /// Set of authentication methods or procedures that are considered to be equivalent to each
     /// other in a particular context.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     AuthenticationContextClass(String)
 ];
@@ -422,25 +332,19 @@ impl AsRef<str> for AuthenticationContextClass {
 }
 
 new_type![
-    ///
     /// Identifier for an authentication method (e.g., `password` or `totp`).
     ///
     /// Defining specific AMR identifiers is beyond the scope of the OpenID Connect Core spec.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     AuthenticationMethodReference(String)
 ];
 
 new_type![
-    ///
     /// Access token hash.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     AccessTokenHash(String)
     impl {
-        ///
         /// Initialize a new access token hash from an [`AccessToken`] and signature algorithm.
-        ///
         pub fn from_token<JS, JT>(
             access_token: &AccessToken,
             alg: &JS
@@ -461,56 +365,42 @@ new_type![
 ];
 
 new_type![
-    ///
     /// Country portion of address.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     AddressCountry(String)
 ];
 
 new_type![
-    ///
     /// Locality portion of address.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     AddressLocality(String)
 ];
 
 new_type![
-    ///
     /// Postal code portion of address.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     AddressPostalCode(String)
 ];
 
 new_type![
-    ///
     /// Region portion of address.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     AddressRegion(String)
 ];
 
 new_type![
-    ///
     /// Audience claim value.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     Audience(String)
 ];
 
 new_type![
-    ///
     /// Authorization code hash.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     AuthorizationCodeHash(String)
     impl {
-        ///
         /// Initialize a new authorization code hash from an [`AuthorizationCode`] and signature
         /// algorithm.
-        ///
         pub fn from_code<JS, JT>(
             code: &AuthorizationCode,
             alg: &JS
@@ -539,45 +429,34 @@ new_type![
 ];
 
 new_type![
-    ///
     /// OpenID Connect client name.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     ClientName(String)
 ];
 
 new_url_type![
-    ///
     /// Client configuration endpoint URL.
-    ///
     ClientConfigUrl
 ];
 
 new_url_type![
-    ///
     /// Client homepage URL.
-    ///
     ClientUrl
 ];
 
 new_type![
-    ///
     /// Client contact e-mail address.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     ClientContactEmail(String)
 ];
 
 new_url_type![
-    ///
     /// URL for the [OpenID Connect RP-Initiated Logout 1.0](
     /// https://openid.net/specs/openid-connect-rpinitiated-1_0.html) end session endpoint.
-    ///
     EndSessionUrl
 ];
 
 new_type![
-    ///
     /// End user's birthday, represented as an
     /// [ISO 8601:2004](https://www.iso.org/standard/40874.html) `YYYY-MM-DD` format.
     ///
@@ -585,140 +464,107 @@ new_type![
     /// format is allowed. Note that depending on the underlying platform's date related function,
     /// providing just year can result in varying month and day, so the implementers need to take
     /// this factor into account to correctly process the dates.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserBirthday(String)
 ];
 
 new_type![
-    ///
     /// End user's e-mail address.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserEmail(String)
 ];
 
 new_type![
-    ///
     /// End user's family name.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserFamilyName(String)
 ];
 
 new_type![
-    ///
     /// End user's given name.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserGivenName(String)
 ];
 
 new_type![
-    ///
     /// End user's middle name.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserMiddleName(String)
 ];
 
 new_type![
-    ///
     /// End user's name.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserName(String)
 ];
 
 new_type![
-    ///
     /// End user's nickname.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserNickname(String)
 ];
 
 new_type![
-    ///
     /// End user's phone number.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserPhoneNumber(String)
 ];
 
 new_type![
-    ///
     /// URL of end user's profile picture.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserPictureUrl(String)
 ];
 
 new_type![
-    ///
     /// URL of end user's profile page.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserProfileUrl(String)
 ];
 
 new_type![
-    ///
     /// End user's time zone as a string from the
     /// [time zone database](https://www.iana.org/time-zones).
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserTimezone(String)
 ];
 
 new_type![
-    ///
     /// URL of end user's website.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserWebsiteUrl(String)
 ];
 
 new_type![
-    ///
     /// End user's username.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserUsername(String)
 ];
 
 new_type![
-    ///
     /// Full mailing address, formatted for display or use on a mailing label.
     ///
     /// This field MAY contain multiple lines, separated by newlines. Newlines can be represented
     /// either as a carriage return/line feed pair (`"\r\n"`) or as a single line feed character
     /// (`"\n"`).
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     FormattedAddress(String)
 ];
 
 new_url_type![
-    ///
     /// URI using the `https` scheme that a third party can use to initiate a login by the Relying
     /// Party.
-    ///
     InitiateLoginUrl
 ];
 
 new_url_type![
-    ///
     /// URL using the `https` scheme with no query or fragment component that the OP asserts as its
     /// Issuer Identifier.
-    ///
     IssuerUrl
     impl {
-        ///
         /// Parse a string as a URL, with this URL as the base URL.
         ///
         /// See [`Url::parse`].
-        ///
         pub fn join(&self, suffix: &str) -> Result<Url, url::ParseError> {
             if let Some('/') = self.1.chars().next_back() {
                 Url::parse(&(self.1.clone() + suffix))
@@ -730,16 +576,12 @@ new_url_type![
 ];
 
 new_type![
-    ///
     /// ID of a JSON Web Key.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     JsonWebKeyId(String)
 ];
 
-///
 /// JSON Web Key Set.
-///
 #[serde_as]
 #[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct JsonWebKeySet<JS, JT, JU, K>
@@ -760,9 +602,7 @@ where
     _phantom: PhantomData<(JS, JT, JU)>,
 }
 
-///
 /// Checks whether a JWK key can be used with a given signing algorithm.
-///
 pub(crate) fn check_key_compatibility<JS, JT, JU, K>(
     key: &K,
     signing_algorithm: &JS,
@@ -805,9 +645,7 @@ where
     JU: JsonWebKeyUse,
     K: JsonWebKey<JS, JT, JU>,
 {
-    ///
     /// Create a new JSON Web Key Set.
-    ///
     pub fn new(keys: Vec<K>) -> Self {
         Self {
             keys,
@@ -815,9 +653,7 @@ where
         }
     }
 
-    ///
     /// Return a list of suitable keys, given a key id an signature algorithm
-    ///
     pub(crate) fn filter_keys(&self, key_id: &Option<JsonWebKeyId>, signature_alg: &JS) -> Vec<&K> {
         self.keys()
         .iter()
@@ -833,10 +669,8 @@ where
         .collect()
     }
 
-    ///
     /// Fetch a remote JSON Web Key Set from the specified `url` using the given `http_client`
     /// (e.g., [`crate::reqwest::http_client`] or [`crate::curl::http_client`]).
-    ///
     pub fn fetch<HC, RE>(
         url: &JsonWebKeySetUrl,
         http_client: HC,
@@ -850,10 +684,8 @@ where
             .and_then(Self::fetch_response)
     }
 
-    ///
     /// Fetch a remote JSON Web Key Set from the specified `url` using the given async `http_client`
     /// (e.g., [`crate::reqwest::async_http_client`]).
-    ///
     pub async fn fetch_async<F, HC, RE>(
         url: &JsonWebKeySetUrl,
         http_client: HC,
@@ -910,9 +742,7 @@ where
         .map_err(DiscoveryError::Parse)
     }
 
-    ///
     /// Return the keys in this JSON Web Key Set.
-    ///
     pub fn keys(&self) -> &Vec<K> {
         &self.keys
     }
@@ -941,16 +771,12 @@ where
 }
 
 new_url_type![
-    ///
     /// JSON Web Key Set URL.
-    ///
     JsonWebKeySetUrl
 ];
 
 new_type![
-    ///
     /// Language tag adhering to RFC 5646 (e.g., `fr` or `fr-CA`).
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     LanguageTag(String)
 ];
@@ -961,53 +787,41 @@ impl AsRef<str> for LanguageTag {
 }
 
 new_secret_type![
-    ///
     /// Hint about the login identifier the End-User might use to log in.
     ///
     /// The use of this parameter is left to the OpenID Connect Provider's discretion.
-    ///
     #[derive(Clone, Deserialize, Serialize)]
     LoginHint(String)
 ];
 
 new_secret_type![
-    ///
     /// Hint about the logout identifier the End-User might use to log out.
     ///
     /// The use of this parameter is left to the OpenID Connect Provider's discretion.
-    ///
     #[derive(Clone, Deserialize, Serialize)]
     LogoutHint(String)
 ];
 
 new_url_type![
-    ///
     /// URL that references a logo for the Client application.
-    ///
     LogoUrl
 ];
 
 new_secret_type![
-    ///
     /// String value used to associate a client session with an ID Token, and to mitigate replay
     /// attacks.
-    ///
     #[derive(Clone, Deserialize, Serialize)]
     Nonce(String)
     impl {
-        ///
         /// Generate a new random, base64-encoded 128-bit nonce.
-        ///
         pub fn new_random() -> Self {
             Nonce::new_random_len(16)
         }
-        ///
         /// Generate a new random, base64-encoded nonce of the specified length.
         ///
         /// # Arguments
         ///
         /// * `num_bytes` - Number of random bytes to generate, prior to base64-encoding.
-        ///
         pub fn new_random_len(num_bytes: u32) -> Self {
             let random_bytes: Vec<u8> = (0..num_bytes).map(|_| thread_rng().gen::<u8>()).collect();
             Nonce::new(base64::encode_config(random_bytes, base64::URL_SAFE_NO_PAD))
@@ -1025,65 +839,49 @@ impl PartialEq for Nonce {
 }
 
 new_url_type![
-    ///
     /// URL providing the OpenID Connect Provider's data usage policies for client applications.
-    ///
     OpPolicyUrl
 ];
 
 new_url_type![
-    ///
     /// URL providing the OpenID Connect Provider's Terms of Service.
-    ///
     OpTosUrl
 ];
 
 new_url_type![
-    ///
     /// URL providing a client application's data usage policy.
-    ///
     PolicyUrl
 ];
 
 new_url_type![
-    ///
     /// The post logout redirect URL, which should be passed to the end session endpoint
     /// of providers implementing [OpenID Connect RP-Initiated Logout 1.0](
     /// https://openid.net/specs/openid-connect-rpinitiated-1_0.html).
-    ///
     PostLogoutRedirectUrl
 ];
 
 new_secret_type![
-    ///
     /// Access token used by a client application to access the Client Registration endpoint.
-    ///
     #[derive(Clone, Deserialize, Serialize)]
     RegistrationAccessToken(String)
 ];
 
 new_url_type![
-    ///
     /// URL of the Client Registration endpoint.
-    ///
     RegistrationUrl
 ];
 
 new_url_type![
-    ///
     /// URL used to pass request parameters as JWTs by reference.
-    ///
     RequestUrl
 ];
 
-///
 /// Informs the Authorization Server of the desired authorization processing flow, including what
 /// parameters are returned from the endpoints used.
 ///
 /// See [OAuth 2.0 Multiple Response Type Encoding Practices](
 ///     http://openid.net/specs/oauth-v2-multiple-response-types-1_0.html#ResponseTypesAndModes)
 /// for further details.
-///
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ResponseTypes<RT: ResponseType>(
     #[serde(
@@ -1093,9 +891,7 @@ pub struct ResponseTypes<RT: ResponseType>(
     Vec<RT>,
 );
 impl<RT: ResponseType> ResponseTypes<RT> {
-    ///
     /// Create a new [`ResponseTypes<RT>`] to wrap the given [`Vec<RT>`].
-    ///
     pub fn new(s: Vec<RT>) -> Self {
         ResponseTypes::<RT>(s)
     }
@@ -1107,9 +903,7 @@ impl<RT: ResponseType> Deref for ResponseTypes<RT> {
     }
 }
 
-///
 /// Timestamp as seconds since the unix epoch, or optionally an ISO 8601 string.
-///
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub(crate) enum Timestamp {
@@ -1128,9 +922,7 @@ impl Display for Timestamp {
     }
 }
 
-///
 /// Newtype around a bool, optionally supporting string values.
-///
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(transparent)]
 pub(crate) struct Boolean(
@@ -1148,45 +940,35 @@ impl Display for Boolean {
 }
 
 new_url_type![
-    ///
     /// URL for retrieving redirect URIs that should receive identical pairwise subject identifiers.
-    ///
     SectorIdentifierUrl
 ];
 
 new_url_type![
-    ///
     /// URL for developer documentation for an OpenID Connect Provider.
-    ///
     ServiceDocUrl
 ];
 
 new_type![
-    ///
     /// A user's street address.
     ///
     /// Full street address component, which MAY include house number, street name, Post Office Box,
     /// and multi-line extended street address information. This field MAY contain multiple lines,
     /// separated by newlines. Newlines can be represented either as a carriage return/line feed
     /// pair (`\r\n`) or as a single line feed character (`\n`).
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     StreetAddress(String)
 ];
 
 new_type![
-    ///
     /// Locally unique and never reassigned identifier within the Issuer for the End-User, which is
     /// intended to be consumed by the client application.
-    ///
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     SubjectIdentifier(String)
 ];
 
 new_url_type![
-    ///
     /// URL for the relying party's Terms of Service.
-    ///
     ToSUrl
 ];
 
@@ -1252,13 +1034,11 @@ pub(crate) mod helpers {
         }
     }
 
-    ///
     /// Serde space-delimited string serializer for an `Option<Vec<String>>`.
     ///
     /// This function serializes a string vector into a single space-delimited string.
     /// If `string_vec_opt` is `None`, the function serializes it as `None` (e.g., `null`
     /// in the case of JSON serialization).
-    ///
     pub fn serialize_space_delimited_vec<T, S>(vec: &[T], serializer: S) -> Result<S::Ok, S::Error>
     where
         T: AsRef<str>,

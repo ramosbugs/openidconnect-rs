@@ -20,24 +20,18 @@ use std::fmt::Debug;
 use std::future::Future;
 use std::marker::PhantomData;
 
-///
 /// Trait for adding extra fields to [`ProviderMetadata`].
-///
 pub trait AdditionalProviderMetadata: Clone + Debug + DeserializeOwned + Serialize {}
 
 // In order to support serde flatten, this must be an empty struct rather than an empty
 // tuple struct.
-///
 /// Empty (default) extra [`ProviderMetadata`] fields.
-///
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct EmptyAdditionalProviderMetadata {}
 impl AdditionalProviderMetadata for EmptyAdditionalProviderMetadata {}
 
-///
 /// Provider metadata returned by [OpenID Connect Discovery](
 /// https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata).
-///
 #[serde_as]
 #[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -178,9 +172,7 @@ where
     RT: ResponseType,
     S: SubjectIdentifierType,
 {
-    ///
     /// Instantiates new provider metadata.
-    ///
     pub fn new(
         issuer: IssuerUrl,
         authorization_endpoint: AuthUrl,
@@ -285,10 +277,8 @@ where
         }
     ];
 
-    ///
     /// Fetches the OpenID Connect Discovery document and associated JSON Web Key Set from the
     /// OpenID Connect Provider.
-    ///
     pub fn discover<HC, RE>(
         issuer_url: &IssuerUrl,
         http_client: HC,
@@ -314,10 +304,8 @@ where
             })
     }
 
-    ///
     /// Asynchronously fetches the OpenID Connect Discovery document and associated JSON Web Key Set
     /// from the OpenID Connect Provider.
-    ///
     pub async fn discover_async<F, HC, RE>(
         issuer_url: IssuerUrl,
         http_client: HC,
@@ -400,58 +388,40 @@ where
         }
     }
 
-    ///
     /// Returns additional provider metadata fields.
-    ///
     pub fn additional_metadata(&self) -> &A {
         &self.additional_metadata
     }
-    ///
     /// Returns mutable additional provider metadata fields.
-    ///
     pub fn additional_metadata_mut(&mut self) -> &mut A {
         &mut self.additional_metadata
     }
 }
 
-///
 /// Error retrieving provider metadata.
-///
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum DiscoveryError<RE>
 where
     RE: std::error::Error + 'static,
 {
-    ///
     /// An unexpected error occurred.
-    ///
     #[error("Other error: {0}")]
     Other(String),
-    ///
     /// Failed to parse server response.
-    ///
     #[error("Failed to parse server response")]
     Parse(#[source] serde_path_to_error::Error<serde_json::Error>),
-    ///
     /// An error occurred while sending the request or receiving the response (e.g., network
     /// connectivity failed).
-    ///
     #[error("Request failed")]
     Request(#[source] RE),
-    ///
     /// Server returned an invalid response.
-    ///
     #[error("Server returned invalid response: {2}")]
     Response(StatusCode, Vec<u8>, String),
-    ///
     /// Failed to parse discovery URL from issuer URL.
-    ///
     #[error("Failed to parse URL")]
     UrlParse(#[source] url::ParseError),
-    ///
     /// Failed to validate provider metadata.
-    ///
     #[error("Validation error: {0}")]
     Validation(String),
 }
