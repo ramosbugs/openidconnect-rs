@@ -121,7 +121,7 @@ macro_rules! new_type {
         }
     ) => {
         $(#[$attr])*
-        #[derive(Clone, Debug, PartialEq)]
+        #[derive(Clone, Debug, PartialEq, Eq)]
         pub struct $name(
             $(#[$type_attr])*
             $type
@@ -155,7 +155,7 @@ macro_rules! new_type {
         }
     ) => {
         $(#[$attr])*
-        #[derive(Clone, Debug, PartialEq)]
+        #[derive(Clone, Debug, PartialEq, Eq)]
         pub(crate) struct $name(
             $(#[$type_attr])*
             $type

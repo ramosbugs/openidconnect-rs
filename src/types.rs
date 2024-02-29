@@ -412,7 +412,7 @@ new_type![
     /// Set of authentication methods or procedures that are considered to be equivalent to each
     /// other in a particular context.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     AuthenticationContextClass(String)
 ];
 impl AsRef<str> for AuthenticationContextClass {
@@ -427,7 +427,7 @@ new_type![
     ///
     /// Defining specific AMR identifiers is beyond the scope of the OpenID Connect Core spec.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     AuthenticationMethodReference(String)
 ];
 
@@ -435,7 +435,7 @@ new_type![
     ///
     /// Access token hash.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     AccessTokenHash(String)
     impl {
         ///
@@ -464,7 +464,7 @@ new_type![
     ///
     /// Country portion of address.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     AddressCountry(String)
 ];
 
@@ -472,7 +472,7 @@ new_type![
     ///
     /// Locality portion of address.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     AddressLocality(String)
 ];
 
@@ -480,7 +480,7 @@ new_type![
     ///
     /// Postal code portion of address.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     AddressPostalCode(String)
 ];
 
@@ -488,7 +488,7 @@ new_type![
     ///
     /// Region portion of address.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     AddressRegion(String)
 ];
 
@@ -496,7 +496,7 @@ new_type![
     ///
     /// Audience claim value.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     Audience(String)
 ];
 
@@ -504,7 +504,7 @@ new_type![
     ///
     /// Authorization code hash.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     AuthorizationCodeHash(String)
     impl {
         ///
@@ -531,7 +531,7 @@ new_type![
 ];
 
 new_type![
-    #[derive(Deserialize, Eq, Hash, Serialize)]
+    #[derive(Deserialize, Hash, Serialize)]
     pub(crate) Base64UrlEncodedBytes(
         #[serde(with = "serde_base64url_byte_array")]
         Vec<u8>
@@ -542,7 +542,7 @@ new_type![
     ///
     /// OpenID Connect client name.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     ClientName(String)
 ];
 
@@ -564,7 +564,7 @@ new_type![
     ///
     /// Client contact e-mail address.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     ClientContactEmail(String)
 ];
 
@@ -586,7 +586,7 @@ new_type![
     /// providing just year can result in varying month and day, so the implementers need to take
     /// this factor into account to correctly process the dates.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserBirthday(String)
 ];
 
@@ -594,7 +594,7 @@ new_type![
     ///
     /// End user's e-mail address.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserEmail(String)
 ];
 
@@ -602,7 +602,7 @@ new_type![
     ///
     /// End user's family name.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserFamilyName(String)
 ];
 
@@ -610,7 +610,7 @@ new_type![
     ///
     /// End user's given name.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserGivenName(String)
 ];
 
@@ -618,7 +618,7 @@ new_type![
     ///
     /// End user's middle name.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserMiddleName(String)
 ];
 
@@ -626,7 +626,7 @@ new_type![
     ///
     /// End user's name.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserName(String)
 ];
 
@@ -634,7 +634,7 @@ new_type![
     ///
     /// End user's nickname.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserNickname(String)
 ];
 
@@ -642,7 +642,7 @@ new_type![
     ///
     /// End user's phone number.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserPhoneNumber(String)
 ];
 
@@ -650,7 +650,7 @@ new_type![
     ///
     /// URL of end user's profile picture.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserPictureUrl(String)
 ];
 
@@ -658,7 +658,7 @@ new_type![
     ///
     /// URL of end user's profile page.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserProfileUrl(String)
 ];
 
@@ -667,7 +667,7 @@ new_type![
     /// End user's time zone as a string from the
     /// [time zone database](https://www.iana.org/time-zones).
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserTimezone(String)
 ];
 
@@ -675,7 +675,7 @@ new_type![
     ///
     /// URL of end user's website.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserWebsiteUrl(String)
 ];
 
@@ -683,7 +683,7 @@ new_type![
     ///
     /// End user's username.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     EndUserUsername(String)
 ];
 
@@ -695,7 +695,7 @@ new_type![
     /// either as a carriage return/line feed pair (`"\r\n"`) or as a single line feed character
     /// (`"\n"`).
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     FormattedAddress(String)
 ];
 
@@ -733,7 +733,7 @@ new_type![
     ///
     /// ID of a JSON Web Key.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     JsonWebKeyId(String)
 ];
 
@@ -951,7 +951,7 @@ new_type![
     ///
     /// Language tag adhering to RFC 5646 (e.g., `fr` or `fr-CA`).
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     LanguageTag(String)
 ];
 impl AsRef<str> for LanguageTag {
@@ -1170,7 +1170,7 @@ new_type![
     /// separated by newlines. Newlines can be represented either as a carriage return/line feed
     /// pair (`\r\n`) or as a single line feed character (`\n`).
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     StreetAddress(String)
 ];
 
@@ -1179,7 +1179,7 @@ new_type![
     /// Locally unique and never reassigned identifier within the Issuer for the End-User, which is
     /// intended to be consumed by the client application.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     SubjectIdentifier(String)
 ];
 

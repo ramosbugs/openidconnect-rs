@@ -13,12 +13,12 @@ use std::ops::Deref;
 use std::str;
 
 new_type![
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     JsonWebTokenContentType(String)
 ];
 
 new_type![
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     JsonWebTokenType(String)
 ];
 

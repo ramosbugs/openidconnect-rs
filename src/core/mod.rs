@@ -428,7 +428,7 @@ new_type![
     ///
     /// OpenID Connect Core claim name.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     CoreClaimName(String)
 ];
 impl ClaimName for CoreClaimName {}
@@ -557,7 +557,7 @@ new_type![
     ///
     /// OpenID Connect Core gender claim.
     ///
-    #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     CoreGenderClaim(String)
 ];
 impl GenderClaim for CoreGenderClaim {}
