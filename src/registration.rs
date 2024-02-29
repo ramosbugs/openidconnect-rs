@@ -878,7 +878,7 @@ where
     ///
     /// Server returned an invalid response.
     ///
-    #[error("Server returned invalid response: {2}")]
+    #[error("Server returned invalid response with status {0}: {2}")]
     Response(StatusCode, Vec<u8>, String),
     ///
     /// Failed to serialize client metadata.
@@ -888,7 +888,7 @@ where
     ///
     /// Server returned an error.
     ///
-    #[error("Server returned error")]
+    #[error("Server returned error: {0}")]
     ServerResponse(StandardErrorResponse<T>),
 }
 
