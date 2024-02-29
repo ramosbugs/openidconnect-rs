@@ -141,6 +141,11 @@ macro_rules! new_type {
                 &self.0
             }
         }
+        impl From<$name> for $type {
+            fn from(t: $name) -> $type {
+                t.0
+            }
+        }
     };
     // Actual implementation, after stringifying the #[doc] attr.
     (
@@ -172,6 +177,11 @@ macro_rules! new_type {
             type Target = $type;
             fn deref(&self) -> &$type {
                 &self.0
+            }
+        }
+        impl From<$name> for $type {
+            fn from(t: $name) -> $type {
+                t.0
             }
         }
     };
@@ -330,6 +340,11 @@ macro_rules! new_url_type {
             type Target = String;
             fn deref(&self) -> &String {
                 &self.1
+            }
+        }
+        impl From<$name> for Url {
+            fn from(t: $name) -> Url {
+                t.0
             }
         }
         impl ::std::fmt::Debug for $name {
