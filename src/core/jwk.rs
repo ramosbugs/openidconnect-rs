@@ -34,7 +34,9 @@ pub struct CoreJsonWebKey {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) kid: Option<JsonWebKeyId>,
 
-    /// The algorithm intended to be used with this key (https://www.rfc-editor.org/rfc/rfc7517#section-4.4)
+    /// The algorithm intended to be used with this key (see
+    /// [RFC 7517](https://www.rfc-editor.org/rfc/rfc7517#section-4.4)).
+    ///
     /// It can either be an algorithm intended for use with JWS or JWE, or something different.
     #[cfg(feature = "jwk-alg")]
     #[serde(skip_serializing_if = "Option::is_none")]
