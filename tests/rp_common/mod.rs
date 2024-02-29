@@ -1,11 +1,6 @@
 #![allow(clippy::cognitive_complexity, clippy::expect_fun_call)]
-extern crate color_backtrace;
-extern crate env_logger;
 
-use std::cell::RefCell;
-use std::sync::Once;
-use std::time::Duration;
-
+use log::{error, warn};
 use openidconnect::core::{
     CoreApplicationType, CoreClientRegistrationRequest, CoreClientRegistrationResponse,
     CoreProviderMetadata,
@@ -13,6 +8,10 @@ use openidconnect::core::{
 use openidconnect::{
     ClientContactEmail, ClientName, HttpRequest, HttpResponse, IssuerUrl, RedirectUrl,
 };
+
+use std::cell::RefCell;
+use std::sync::Once;
+use std::time::Duration;
 
 pub const CERTIFICATION_BASE_URL: &str = "https://rp.certification.openid.net:8080";
 pub const RP_CONTACT_EMAIL: &str = "ramos@cs.stanford.edu";

@@ -1,5 +1,6 @@
+use crate::AccessToken;
+
 use http::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
-use oauth2::AccessToken;
 
 pub const MIME_TYPE_JSON: &str = "application/json";
 pub const MIME_TYPE_JWKS: &str = "application/jwk-set+json";

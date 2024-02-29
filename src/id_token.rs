@@ -1,12 +1,3 @@
-use std::fmt::Debug;
-use std::marker::PhantomData;
-use std::str::FromStr;
-
-use chrono::{DateTime, Utc};
-use oauth2::ClientId;
-use serde::Serialize;
-use serde_json::Value;
-
 use crate::helpers::FilteredFlatten;
 use crate::jwt::JsonWebTokenAccess;
 use crate::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
@@ -15,7 +6,7 @@ use crate::types::LocalizedClaim;
 use crate::{
     AccessToken, AccessTokenHash, AdditionalClaims, AddressClaim, Audience, AudiencesClaim,
     AuthenticationContextClass, AuthenticationMethodReference, AuthorizationCode,
-    AuthorizationCodeHash, ClaimsVerificationError, EndUserBirthday, EndUserEmail,
+    AuthorizationCodeHash, ClaimsVerificationError, ClientId, EndUserBirthday, EndUserEmail,
     EndUserFamilyName, EndUserGivenName, EndUserMiddleName, EndUserName, EndUserNickname,
     EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone, EndUserUsername,
     EndUserWebsiteUrl, ExtraTokenFields, GenderClaim, IdTokenVerifier, IssuerClaim, IssuerUrl,
@@ -23,6 +14,14 @@ use crate::{
     JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, Nonce, NonceVerifier,
     PrivateSigningKey, SigningError, StandardClaims, SubjectIdentifier,
 };
+
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+use std::fmt::Debug;
+use std::marker::PhantomData;
+use std::str::FromStr;
 
 // This wrapper layer exists instead of directly verifying the JWT and returning the claims so that
 // we can pass it around and easily access a serialized JWT representation of it (e.g., for passing
@@ -439,27 +438,28 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-    use std::str::FromStr;
-
-    use chrono::{TimeZone, Utc};
-    use oauth2::basic::BasicTokenType;
-    use oauth2::{ClientId, TokenResponse};
-    use url::Url;
-
     use crate::claims::{AdditionalClaims, EmptyAdditionalClaims, StandardClaims};
-    use crate::core::{CoreGenderClaim, CoreIdToken, CoreIdTokenClaims, CoreTokenResponse};
+    use crate::core::{
+        CoreGenderClaim, CoreIdToken, CoreIdTokenClaims, CoreTokenResponse, CoreTokenType,
+    };
     use crate::jwt::JsonWebTokenAccess;
     use crate::{
         AccessTokenHash, AddressClaim, AddressCountry, AddressLocality, AddressPostalCode,
-        AddressRegion, Audience, AuthenticationContextClass, AuthenticationMethodReference,
-        AuthorizationCodeHash, EndUserBirthday, EndUserEmail, EndUserFamilyName, EndUserGivenName,
-        EndUserMiddleName, EndUserName, EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl,
-        EndUserProfileUrl, EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, FormattedAddress,
+        AddressRegion, Audience, AudiencesClaim, AuthenticationContextClass,
+        AuthenticationMethodReference, AuthorizationCodeHash, ClientId, EndUserBirthday,
+        EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName, EndUserName,
+        EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone,
+        EndUserUsername, EndUserWebsiteUrl, FormattedAddress, IdTokenClaims, IssuerClaim,
         IssuerUrl, LanguageTag, Nonce, StreetAddress, SubjectIdentifier,
     };
 
-    use super::{AudiencesClaim, IdTokenClaims, IssuerClaim};
+    use chrono::{TimeZone, Utc};
+    use oauth2::TokenResponse;
+    use serde::{Deserialize, Serialize};
+    use url::Url;
+
+    use std::collections::HashMap;
+    use std::str::FromStr;
 
     #[test]
     fn test_id_token() {
@@ -522,7 +522,7 @@ mod tests {
             serde_json::from_str::<CoreTokenResponse>(response_str).expect("failed to deserialize");
 
         assert_eq!(*response.access_token().secret(), "foobar");
-        assert_eq!(*response.token_type(), BasicTokenType::Bearer);
+        assert_eq!(*response.token_type(), CoreTokenType::Bearer);
 
         let id_token = response.extra_fields().id_token();
         let claims = id_token.unwrap().0.unverified_payload_ref();

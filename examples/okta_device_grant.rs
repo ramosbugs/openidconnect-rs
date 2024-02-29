@@ -21,16 +21,14 @@ use openidconnect::core::{
     CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm,
     CoreJwsSigningAlgorithm, CoreResponseMode, CoreResponseType, CoreSubjectIdentifierType,
 };
+use openidconnect::reqwest::http_client;
 use openidconnect::{
     AdditionalProviderMetadata, AuthType, ClientId, ClientSecret, DeviceAuthorizationUrl,
     IssuerUrl, ProviderMetadata, Scope,
 };
-use std::env;
-
 use serde::{Deserialize, Serialize};
 
-use openidconnect::reqwest::http_client;
-
+use std::env;
 use std::process::exit;
 
 // Obtain the device_authorization_url from the OIDC metadata provider.

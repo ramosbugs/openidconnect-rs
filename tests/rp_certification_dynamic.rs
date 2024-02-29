@@ -1,17 +1,11 @@
 #![allow(clippy::cognitive_complexity)]
-extern crate env_logger;
-#[macro_use]
-extern crate log;
-extern crate openidconnect;
-#[macro_use]
-extern crate pretty_assertions;
-extern crate url;
 
-use rp_common::{
+use crate::rp_common::{
     get_provider_metadata, init_log, issuer_url, register_client, CERTIFICATION_BASE_URL, RP_NAME,
 };
 
-#[macro_use]
+use log::{debug, info};
+
 mod rp_common;
 
 #[test]

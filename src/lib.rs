@@ -88,6 +88,7 @@
 //! ### Example
 //!
 //! ```rust,no_run
+//! use anyhow::anyhow;
 //! use openidconnect::{
 //!     AccessTokenHash,
 //!     AuthenticationFlow,
@@ -95,11 +96,13 @@
 //!     ClientId,
 //!     ClientSecret,
 //!     CsrfToken,
-//!     Nonce,
 //!     IssuerUrl,
+//!     Nonce,
+//!     OAuth2TokenResponse,
 //!     PkceCodeChallenge,
 //!     RedirectUrl,
 //!     Scope,
+//!     TokenResponse,
 //! };
 //! use openidconnect::core::{
 //!   CoreAuthenticationFlow,
@@ -108,8 +111,6 @@
 //!   CoreResponseType,
 //!   CoreUserInfoClaims,
 //! };
-//! use anyhow::anyhow;
-//!
 //! # #[cfg(feature = "reqwest")]
 //! use openidconnect::reqwest::http_client;
 //! use url::Url;
@@ -117,7 +118,6 @@
 //! # #[cfg(feature = "reqwest")]
 //! # fn err_wrapper() -> Result<(), anyhow::Error> {
 //! // Use OpenID Connect Discovery to fetch the provider metadata.
-//! use openidconnect::{OAuth2TokenResponse, TokenResponse};
 //! let provider_metadata = CoreProviderMetadata::discover(
 //!     &IssuerUrl::new("https://accounts.example.com".to_string())?,
 //!     http_client,
@@ -245,7 +245,6 @@
 //!     CoreSubjectIdentifierType
 //! };
 //! use url::Url;
-//! use anyhow;
 //!
 //! # fn err_wrapper() -> Result<String, anyhow::Error> {
 //! let provider_metadata = CoreProviderMetadata::new(
@@ -322,7 +321,6 @@
 //! ```rust,no_run
 //! use openidconnect::{JsonWebKeyId, PrivateSigningKey};
 //! use openidconnect::core::{CoreJsonWebKey, CoreJsonWebKeySet, CoreRsaPrivateSigningKey};
-//! use anyhow;
 //!
 //! # fn err_wrapper() -> Result<String, anyhow::Error> {
 //! # let rsa_pem = "";
@@ -383,7 +381,6 @@
 //!     CoreTokenResponse,
 //!     CoreTokenType,
 //! };
-//! use anyhow;
 //!
 //! # fn err_wrapper() -> Result<CoreTokenResponse, anyhow::Error> {
 //! # let rsa_pem = "";
@@ -455,7 +452,7 @@
 //! ## Example
 //!
 //! ```rust,no_run
-//! # #[cfg(feature = "reqwest")]
+//! use anyhow::anyhow;
 //! use openidconnect::{
 //!     AccessTokenHash,
 //!     AuthenticationFlow,
@@ -463,11 +460,13 @@
 //!     ClientId,
 //!     ClientSecret,
 //!     CsrfToken,
-//!     Nonce,
 //!     IssuerUrl,
+//!     Nonce,
+//!     OAuth2TokenResponse,
 //!     PkceCodeChallenge,
 //!     RedirectUrl,
 //!     Scope,
+//!     TokenResponse,
 //! };
 //! use openidconnect::core::{
 //!   CoreAuthenticationFlow,
@@ -478,13 +477,11 @@
 //! # #[cfg(feature = "reqwest")]
 //! use openidconnect::reqwest::async_http_client;
 //! use url::Url;
-//! use anyhow::anyhow;
 //!
 //!
 //! # #[cfg(feature = "reqwest")]
 //! # async fn err_wrapper() -> Result<(), anyhow::Error> {
 //! // Use OpenID Connect Discovery to fetch the provider metadata.
-//! use openidconnect::{OAuth2TokenResponse, TokenResponse};
 //! let provider_metadata = CoreProviderMetadata::discover_async(
 //!     IssuerUrl::new("https://accounts.example.com".to_string())?,
 //!     async_http_client,
@@ -570,11 +567,8 @@
 //! ```
 //!
 
-#[cfg(test)]
-#[macro_use]
-extern crate pretty_assertions;
-#[macro_use]
-extern crate serde_derive;
+use crate::jwt::{JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenHeader};
+use crate::verification::{AudiencesClaim, IssuerClaim};
 
 use oauth2::ResponseType as OAuth2ResponseType;
 use url::Url;
@@ -583,6 +577,34 @@ use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::str;
 use std::time::Duration;
+
+// Defined first since other modules need the macros, and definition order is significant for
+// macros. This module is private.
+#[macro_use]
+mod macros;
+
+/// Baseline OpenID Connect implementation and types.
+pub mod core;
+
+/// OpenID Connect Dynamic Client Registration.
+pub mod registration;
+
+// Private modules since we may move types between different modules; these are exported publicly
+// via the pub use above.
+mod claims;
+mod discovery;
+mod helpers;
+mod id_token;
+mod logout;
+pub(crate) mod types;
+mod user_info;
+mod verification;
+
+// Private module for HTTP(S) utilities.
+mod http_utils;
+
+// Private module for JWT utilities.
+mod jwt;
 
 pub use oauth2::{
     AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientCredentialsTokenRequest, ClientId,
@@ -617,20 +639,19 @@ pub use oauth2::reqwest;
 #[cfg(feature = "ureq")]
 pub use oauth2::ureq;
 
-pub use claims::{
+pub use crate::claims::{
     AdditionalClaims, AddressClaim, EmptyAdditionalClaims, GenderClaim, StandardClaims,
 };
-pub use discovery::{
+pub use crate::discovery::{
     AdditionalProviderMetadata, DiscoveryError, EmptyAdditionalProviderMetadata, ProviderMetadata,
 };
-pub use id_token::IdTokenFields;
-pub use id_token::{IdToken, IdTokenClaims};
-pub use jwt::JsonWebTokenError;
-use jwt::{JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenHeader};
-pub use logout::{LogoutProviderMetadata, LogoutRequest, ProviderMetadataWithLogout};
+pub use crate::id_token::IdTokenFields;
+pub use crate::id_token::{IdToken, IdTokenClaims};
+pub use crate::jwt::JsonWebTokenError;
+pub use crate::logout::{LogoutProviderMetadata, LogoutRequest, ProviderMetadataWithLogout};
 // Flatten the module hierarchy involving types. They're only separated to improve code
 // organization.
-pub use types::{
+pub use crate::types::{
     AccessTokenHash, AddressCountry, AddressLocality, AddressPostalCode, AddressRegion,
     ApplicationType, Audience, AuthDisplay, AuthPrompt, AuthenticationContextClass,
     AuthenticationMethodReference, AuthorizationCodeHash, ClaimName, ClaimType, ClientAuthMethod,
@@ -645,44 +666,14 @@ pub use types::{
     RequestUrl, ResponseMode, ResponseType, ResponseTypes, SectorIdentifierUrl, ServiceDocUrl,
     SigningError, StreetAddress, SubjectIdentifier, SubjectIdentifierType, ToSUrl,
 };
-
-pub use user_info::{
+pub use crate::user_info::{
     UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoRequest, UserInfoResponseType,
     UserInfoUrl,
 };
-use verification::{AudiencesClaim, IssuerClaim};
-pub use verification::{
+pub use crate::verification::{
     ClaimsVerificationError, IdTokenVerifier, NonceVerifier, SignatureVerificationError,
     UserInfoVerifier,
 };
-
-// Defined first since other modules need the macros, and definition order is significant for
-// macros. This module is private.
-#[macro_use]
-mod macros;
-
-/// Baseline OpenID Connect implementation and types.
-pub mod core;
-
-/// OpenID Connect Dynamic Client Registration.
-pub mod registration;
-
-// Private modules since we may move types between different modules; these are exported publicly
-// via the pub use above.
-mod claims;
-mod discovery;
-mod helpers;
-mod id_token;
-mod logout;
-pub(crate) mod types;
-mod user_info;
-mod verification;
-
-// Private module for HTTP(S) utilities.
-mod http_utils;
-
-// Private module for JWT utilities.
-mod jwt;
 
 const CONFIG_URL_SUFFIX: &str = ".well-known/openid-configuration";
 const OPENID_SCOPE: &str = "openid";
@@ -737,11 +728,24 @@ pub enum AuthenticationFlow<RT: ResponseType> {
 ///
 /// For example when revoking a token, error code `unsupported_token_type` (from RFC 7009) may be returned:
 /// ```rust
-/// # use thiserror::Error;
 /// # use http::status::StatusCode;
 /// # use http::header::{HeaderValue, CONTENT_TYPE};
-/// # use oauth2::*;
-/// # use openidconnect::{*, core::*};
+/// # use openidconnect::core::CoreClient;
+/// # use openidconnect::{
+/// #     AccessToken,
+/// #     AuthUrl,
+/// #     ClientId,
+/// #     ClientSecret,
+/// #     HttpResponse,
+/// #     IssuerUrl,
+/// #     JsonWebKeySet,
+/// #     RequestTokenError,
+/// #     RevocationErrorResponseType,
+/// #     RevocationUrl,
+/// #     TokenUrl,
+/// # };
+/// # use thiserror::Error;
+/// #
 /// # let client = CoreClient::new(
 /// #     ClientId::new("aaa".to_string()),
 /// #     Some(ClientSecret::new("bbb".to_string())),
@@ -1531,18 +1535,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
-    use std::time::Duration;
-
-    use oauth2::{AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl};
-
     use crate::core::CoreAuthenticationFlow;
     use crate::core::{CoreAuthDisplay, CoreAuthPrompt, CoreClient, CoreIdToken, CoreResponseType};
     use crate::IssuerUrl;
     use crate::{
-        AuthenticationContextClass, AuthenticationFlow, JsonWebKeySet, LanguageTag, LoginHint,
-        Nonce,
+        AuthUrl, AuthenticationContextClass, AuthenticationFlow, ClientId, ClientSecret, CsrfToken,
+        JsonWebKeySet, LanguageTag, LoginHint, Nonce, RedirectUrl, Scope, TokenUrl,
     };
+
+    use std::borrow::Cow;
+    use std::time::Duration;
 
     fn new_client() -> CoreClient {
         color_backtrace::install();

@@ -1,10 +1,8 @@
-use std::collections::HashMap;
-use std::fmt::{Debug, Display, Error as FormatterError, Formatter};
-use std::future::Future;
-use std::hash::Hash;
-use std::iter::FromIterator;
-use std::marker::PhantomData;
-use std::ops::Deref;
+use crate::http_utils::{check_content_type, MIME_TYPE_JSON, MIME_TYPE_JWKS};
+use crate::{
+    AccessToken, AuthorizationCode, DiscoveryError, HttpRequest, HttpResponse,
+    SignatureVerificationError,
+};
 
 use http::header::{HeaderValue, ACCEPT};
 use http::method::Method;
@@ -17,11 +15,13 @@ use serde_with::{serde_as, VecSkipError};
 use thiserror::Error;
 use url::Url;
 
-use super::http_utils::{check_content_type, MIME_TYPE_JSON, MIME_TYPE_JWKS};
-use super::{
-    AccessToken, AuthorizationCode, DiscoveryError, HttpRequest, HttpResponse,
-    SignatureVerificationError,
-};
+use std::collections::HashMap;
+use std::fmt::{Debug, Display, Error as FormatterError, Formatter};
+use std::future::Future;
+use std::hash::Hash;
+use std::iter::FromIterator;
+use std::marker::PhantomData;
+use std::ops::Deref;
 
 ///
 /// A [locale-aware](https://openid.net/specs/openid-connect-core-1_0.html#IndividualClaimsLanguages)
@@ -1192,12 +1192,12 @@ new_url_type![
 
 // FIXME: Add tests
 pub(crate) mod helpers {
+    use crate::types::{LanguageTag, Timestamp};
+
     use chrono::{DateTime, TimeZone, Utc};
     use serde::de::DeserializeOwned;
     use serde::{Deserialize, Deserializer, Serializer};
     use serde_json::{from_value, Value};
-
-    use super::{LanguageTag, Timestamp};
 
     pub fn deserialize_string_or_vec<'de, T, D>(deserializer: D) -> Result<Vec<T>, D::Error>
     where
@@ -1358,6 +1358,7 @@ pub(crate) mod helpers {
 
     pub mod serde_utc_seconds {
         use crate::types::Timestamp;
+
         use chrono::{DateTime, Utc};
         use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -1366,7 +1367,7 @@ pub(crate) mod helpers {
             D: Deserializer<'de>,
         {
             let seconds: Timestamp = Deserialize::deserialize(deserializer)?;
-            super::timestamp_to_utc(&seconds).map_err(|_| {
+            crate::types::helpers::timestamp_to_utc(&seconds).map_err(|_| {
                 serde::de::Error::custom(format!(
                     "failed to parse `{}` as UTC datetime (in seconds)",
                     seconds
@@ -1378,12 +1379,13 @@ pub(crate) mod helpers {
         where
             S: Serializer,
         {
-            super::utc_to_seconds(v).serialize(serializer)
+            crate::types::helpers::utc_to_seconds(v).serialize(serializer)
         }
     }
 
     pub mod serde_utc_seconds_opt {
         use crate::types::Timestamp;
+
         use chrono::{DateTime, Utc};
         use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -1394,7 +1396,7 @@ pub(crate) mod helpers {
             let seconds: Option<Timestamp> = Deserialize::deserialize(deserializer)?;
             seconds
                 .map(|sec| {
-                    super::timestamp_to_utc(&sec).map_err(|_| {
+                    crate::types::helpers::timestamp_to_utc(&sec).map_err(|_| {
                         serde::de::Error::custom(format!(
                             "failed to parse `{}` as UTC datetime (in seconds)",
                             sec
@@ -1408,7 +1410,7 @@ pub(crate) mod helpers {
         where
             S: Serializer,
         {
-            v.map(|sec| super::utc_to_seconds(&sec))
+            v.map(|sec| crate::types::helpers::utc_to_seconds(&sec))
                 .serialize(serializer)
         }
     }
@@ -1447,7 +1449,7 @@ mod serde_base64url_byte_array {
 
 #[cfg(test)]
 mod tests {
-    use super::IssuerUrl;
+    use crate::IssuerUrl;
 
     #[test]
     fn test_issuer_url_append() {

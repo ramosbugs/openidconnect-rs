@@ -1,16 +1,16 @@
-use std::fmt::{Debug, Formatter, Result as FormatterResult};
-use std::marker::PhantomData;
-use std::ops::Deref;
-use std::str;
+use crate::{
+    JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse, JweContentEncryptionAlgorithm,
+    JwsSigningAlgorithm, PrivateSigningKey, SignatureVerificationError, SigningError,
+};
 
 use serde::de::{DeserializeOwned, Error as _, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
 
-use super::{
-    JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse, JweContentEncryptionAlgorithm,
-    JwsSigningAlgorithm, PrivateSigningKey, SignatureVerificationError, SigningError,
-};
+use std::fmt::{Debug, Formatter, Result as FormatterResult};
+use std::marker::PhantomData;
+use std::ops::Deref;
+use std::str;
 
 new_type![
     #[derive(Deserialize, Eq, Hash, Ord, PartialOrd, Serialize)]
@@ -451,19 +451,20 @@ where
 
 #[cfg(test)]
 pub mod tests {
-    use std::marker::PhantomData;
-    use std::string::ToString;
-
     use crate::core::{
         CoreJsonWebKey, CoreJsonWebKeyType, CoreJweContentEncryptionAlgorithm,
         CoreJwsSigningAlgorithm, CoreRsaPrivateSigningKey,
     };
-    use crate::JsonWebKeyId;
-
-    use super::{
+    use crate::jwt::{
         JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenJsonPayloadSerde,
         JsonWebTokenPayloadSerde,
     };
+    use crate::JsonWebKeyId;
+
+    use serde::{Deserialize, Serialize};
+
+    use std::marker::PhantomData;
+    use std::string::ToString;
 
     type CoreAlgorithm = JsonWebTokenAlgorithm<
         CoreJweContentEncryptionAlgorithm,

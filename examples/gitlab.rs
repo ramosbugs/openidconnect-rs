@@ -16,26 +16,23 @@
 //! ...and follow the instructions.
 //!
 
-use std::env;
-use std::io::{BufRead, BufReader, Write};
-use std::net::TcpListener;
-use std::process::exit;
-
-use url::Url;
-
 use openidconnect::core::{
     CoreClient, CoreGenderClaim, CoreIdTokenClaims, CoreIdTokenVerifier, CoreProviderMetadata,
     CoreResponseType,
 };
-
 use openidconnect::reqwest::http_client;
 use openidconnect::{AdditionalClaims, UserInfoClaims};
 use openidconnect::{
     AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce,
     OAuth2TokenResponse, RedirectUrl, Scope,
 };
-
 use serde::{Deserialize, Serialize};
+use url::Url;
+
+use std::env;
+use std::io::{BufRead, BufReader, Write};
+use std::net::TcpListener;
+use std::process::exit;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct GitLabClaims {

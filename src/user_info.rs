@@ -1,15 +1,3 @@
-use std::future::Future;
-use std::ops::Deref;
-use std::str;
-
-use chrono::{DateTime, Utc};
-use http::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
-use http::method::Method;
-use http::status::StatusCode;
-use oauth2::AccessToken;
-use thiserror::Error;
-use url::Url;
-
 use crate::helpers::FilteredFlatten;
 use crate::http_utils::{auth_bearer, content_type_has_essence, MIME_TYPE_JSON, MIME_TYPE_JWT};
 use crate::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
@@ -17,7 +5,7 @@ use crate::types::helpers::deserialize_string_or_vec_opt;
 use crate::types::LocalizedClaim;
 use crate::verification::UserInfoVerifier;
 use crate::{
-    AdditionalClaims, AddressClaim, Audience, AudiencesClaim, ClaimsVerificationError,
+    AccessToken, AdditionalClaims, AddressClaim, Audience, AudiencesClaim, ClaimsVerificationError,
     EndUserBirthday, EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName,
     EndUserName, EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl,
     EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, GenderClaim, HttpRequest, HttpResponse,
@@ -25,6 +13,18 @@ use crate::{
     JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, PrivateSigningKey,
     StandardClaims, SubjectIdentifier,
 };
+
+use chrono::{DateTime, Utc};
+use http::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
+use http::method::Method;
+use http::status::StatusCode;
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+use url::Url;
+
+use std::future::Future;
+use std::ops::Deref;
+use std::str;
 
 ///
 /// User info request.
@@ -516,6 +516,8 @@ where
 mod tests {
     use crate::core::CoreGenderClaim;
     use crate::{AdditionalClaims, UserInfoClaims};
+
+    use serde::{Deserialize, Serialize};
 
     use std::collections::HashMap;
 

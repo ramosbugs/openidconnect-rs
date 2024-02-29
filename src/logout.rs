@@ -1,20 +1,19 @@
-use oauth2::{ClientId, CsrfToken};
+use crate::core::{
+    CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClientAuthMethod, CoreGrantType,
+    CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm,
+    CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm, CoreResponseMode, CoreResponseType,
+    CoreSubjectIdentifierType,
+};
+use crate::types::{LogoutHint, PostLogoutRedirectUrl};
+use crate::{
+    join_vec, AdditionalClaims, AdditionalProviderMetadata, ClientId, CsrfToken,
+    EmptyAdditionalProviderMetadata, EndSessionUrl, GenderClaim, IdToken, JsonWebKeyType,
+    JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, ProviderMetadata,
+};
+
+use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use url::Url;
-
-use crate::{
-    core::{
-        CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClientAuthMethod, CoreGrantType,
-        CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm,
-        CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm, CoreResponseMode, CoreResponseType,
-        CoreSubjectIdentifierType,
-    },
-    join_vec,
-    types::{LogoutHint, PostLogoutRedirectUrl},
-    AdditionalClaims, AdditionalProviderMetadata, EmptyAdditionalProviderMetadata, EndSessionUrl,
-    GenderClaim, IdToken, JsonWebKeyType, JweContentEncryptionAlgorithm, JwsSigningAlgorithm,
-    LanguageTag, ProviderMetadata,
-};
 
 ///
 /// Additional metadata for providers implementing [OpenID Connect RP-Initiated
@@ -199,20 +198,20 @@ impl LogoutRequest {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
+    use crate::core::{
+        CoreGenderClaim, CoreJsonWebKeyType, CoreJweContentEncryptionAlgorithm,
+        CoreJwsSigningAlgorithm,
+    };
+    use crate::types::{LogoutHint, PostLogoutRedirectUrl};
+    use crate::{
+        AuthUrl, ClientId, CsrfToken, EmptyAdditionalClaims, EndSessionUrl, IdToken, IssuerUrl,
+        JsonWebKeySetUrl, LanguageTag, LogoutProviderMetadata, LogoutRequest,
+        ProviderMetadataWithLogout,
+    };
 
-    use oauth2::{AuthUrl, ClientId, CsrfToken};
     use url::Url;
 
-    use crate::{
-        core::{
-            CoreGenderClaim, CoreJsonWebKeyType, CoreJweContentEncryptionAlgorithm,
-            CoreJwsSigningAlgorithm,
-        },
-        types::{LogoutHint, PostLogoutRedirectUrl},
-        EmptyAdditionalClaims, EndSessionUrl, IdToken, IssuerUrl, JsonWebKeySetUrl, LanguageTag,
-        LogoutProviderMetadata, LogoutRequest, ProviderMetadataWithLogout,
-    };
+    use std::str::FromStr;
 
     #[test]
     fn test_end_session_endpoint_deserialization() {

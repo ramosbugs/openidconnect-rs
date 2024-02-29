@@ -1,6 +1,4 @@
-use crate::core::CoreJwsSigningAlgorithm;
-
-use super::CoreGrantType;
+use crate::core::{CoreGrantType, CoreJwsSigningAlgorithm};
 
 #[test]
 fn test_grant_type_serialize() {

@@ -1,21 +1,12 @@
 #![allow(clippy::expect_fun_call)]
-extern crate env_logger;
-extern crate http;
-#[macro_use]
-extern crate log;
-extern crate openidconnect;
-#[macro_use]
-extern crate pretty_assertions;
-extern crate reqwest_ as reqwest;
-extern crate url;
 
-use std::collections::HashMap;
+use crate::rp_common::{
+    get_provider_metadata, http_client, init_log, issuer_url, register_client, PanicIfFail,
+};
 
 use http::header::LOCATION;
 use http::method::Method;
-use reqwest::{blocking::Client, redirect::Policy};
-use url::Url;
-
+use log::{debug, error, info};
 use openidconnect::core::{
     CoreClient, CoreClientAuthMethod, CoreClientRegistrationRequest,
     CoreClientRegistrationResponse, CoreIdToken, CoreIdTokenClaims, CoreIdTokenVerifier,
@@ -28,13 +19,12 @@ use openidconnect::{
     CsrfToken, OAuth2TokenResponse, RequestTokenError, Scope, SignatureVerificationError,
     UserInfoError,
 };
+use reqwest::{blocking::Client, redirect::Policy};
+use url::Url;
 
-#[macro_use]
+use std::collections::HashMap;
+
 mod rp_common;
-
-use rp_common::{
-    get_provider_metadata, http_client, init_log, issuer_url, register_client, PanicIfFail,
-};
 
 struct TestState {
     access_token: Option<AccessToken>,

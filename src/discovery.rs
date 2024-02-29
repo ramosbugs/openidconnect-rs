@@ -1,25 +1,24 @@
-use std::fmt::Debug;
-use std::future::Future;
-use std::marker::PhantomData;
-
-use http::header::{HeaderValue, ACCEPT};
-use http::method::Method;
-use http::status::StatusCode;
-use oauth2::{AuthUrl, Scope, TokenUrl};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-use serde_with::{serde_as, skip_serializing_none, VecSkipError};
-use thiserror::Error;
-
-use super::http_utils::{check_content_type, MIME_TYPE_JSON};
-use super::types::{
+use crate::http_utils::{check_content_type, MIME_TYPE_JSON};
+use crate::types::{
     AuthDisplay, AuthenticationContextClass, ClaimName, ClaimType, ClientAuthMethod, GrantType,
     IssuerUrl, JsonWebKey, JsonWebKeySet, JsonWebKeySetUrl, JsonWebKeyType, JsonWebKeyUse,
     JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag,
     OpPolicyUrl, OpTosUrl, RegistrationUrl, ResponseMode, ResponseType, ResponseTypes,
     ServiceDocUrl, SubjectIdentifierType,
 };
-use super::{HttpRequest, HttpResponse, UserInfoUrl, CONFIG_URL_SUFFIX};
+use crate::{AuthUrl, HttpRequest, HttpResponse, Scope, TokenUrl, UserInfoUrl, CONFIG_URL_SUFFIX};
+
+use http::header::{HeaderValue, ACCEPT};
+use http::method::Method;
+use http::status::StatusCode;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, skip_serializing_none, VecSkipError};
+use thiserror::Error;
+
+use std::fmt::Debug;
+use std::future::Future;
+use std::marker::PhantomData;
 
 ///
 /// Trait for adding extra fields to [`ProviderMetadata`].
@@ -459,17 +458,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use oauth2::{AuthUrl, Scope, TokenUrl};
-
     use crate::core::{
         CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClientAuthMethod, CoreGrantType,
         CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm,
         CoreProviderMetadata, CoreResponseMode, CoreResponseType, CoreSubjectIdentifierType,
     };
-
-    use super::{
-        AuthenticationContextClass, IssuerUrl, JsonWebKeySetUrl, LanguageTag, OpPolicyUrl,
-        OpTosUrl, RegistrationUrl, ResponseTypes, ServiceDocUrl, UserInfoUrl,
+    use crate::{
+        AuthUrl, AuthenticationContextClass, IssuerUrl, JsonWebKeySetUrl, LanguageTag, OpPolicyUrl,
+        OpTosUrl, RegistrationUrl, ResponseTypes, Scope, ServiceDocUrl, TokenUrl, UserInfoUrl,
     };
 
     #[test]

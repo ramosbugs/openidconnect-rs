@@ -1,7 +1,7 @@
+use crate::core::jwk::CoreJsonCurveType;
+use crate::core::{CoreJsonWebKey, CoreJsonWebKeyType};
 use crate::types::Base64UrlEncodedBytes;
 use crate::{JsonWebKey, SignatureVerificationError};
-
-use super::{jwk::CoreJsonCurveType, CoreJsonWebKey, CoreJsonWebKeyType};
 
 use std::ops::Deref;
 
@@ -179,10 +179,10 @@ pub fn verify_ed_signature(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use sha2::Digest;
-
+    use crate::core::crypto::verify_rsa_signature;
     use crate::core::CoreJsonWebKey;
+
+    use sha2::Digest;
 
     #[test]
     fn test_leading_zeros_are_parsed_correctly() {

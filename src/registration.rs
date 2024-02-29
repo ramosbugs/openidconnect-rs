@@ -1,20 +1,6 @@
-use std::fmt::{Debug, Formatter, Result as FormatterResult};
-use std::future::Future;
-use std::marker::PhantomData;
-use std::time::Duration;
-
-use chrono::{DateTime, Utc};
-use http::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
-use http::method::Method;
-use http::status::StatusCode;
-use serde::de::{Deserialize, DeserializeOwned, Deserializer, MapAccess, Visitor};
-use serde::ser::SerializeMap;
-use serde::{Serialize, Serializer};
-use thiserror::Error;
-
-use super::http_utils::{auth_bearer, check_content_type, MIME_TYPE_JSON};
-use super::types::helpers::{serde_utc_seconds_opt, split_language_tag_key};
-use super::types::{
+use crate::http_utils::{auth_bearer, check_content_type, MIME_TYPE_JSON};
+use crate::types::helpers::{serde_utc_seconds_opt, split_language_tag_key};
+use crate::types::{
     ApplicationType, AuthenticationContextClass, ClientAuthMethod, ClientConfigUrl,
     ClientContactEmail, ClientName, ClientUrl, GrantType, InitiateLoginUrl, JsonWebKeySetUrl,
     JsonWebKeyType, JsonWebKeyUse, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm,
@@ -22,10 +8,24 @@ use super::types::{
     RegistrationUrl, RequestUrl, ResponseType, ResponseTypes, SectorIdentifierUrl,
     SubjectIdentifierType, ToSUrl,
 };
-use super::{
+use crate::{
     AccessToken, ClientId, ClientSecret, ErrorResponseType, HttpRequest, HttpResponse, JsonWebKey,
     JsonWebKeySet, RedirectUrl, StandardErrorResponse,
 };
+
+use chrono::{DateTime, Utc};
+use http::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
+use http::method::Method;
+use http::status::StatusCode;
+use serde::de::{DeserializeOwned, Deserializer, MapAccess, Visitor};
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize, Serializer};
+use thiserror::Error;
+
+use std::fmt::{Debug, Formatter, Result as FormatterResult};
+use std::future::Future;
+use std::marker::PhantomData;
+use std::time::Duration;
 
 ///
 /// Trait for adding extra fields to [`ClientMetadata`].
@@ -894,12 +894,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
-    use chrono::{TimeZone, Utc};
-    use itertools::sorted;
-    use oauth2::{ClientId, RedirectUrl};
-
     use crate::core::{
         CoreApplicationType, CoreClientAuthMethod, CoreClientMetadata,
         CoreClientRegistrationResponse, CoreGrantType, CoreJweContentEncryptionAlgorithm,
@@ -912,6 +906,12 @@ mod tests {
         JsonWebKeySet, JsonWebKeySetUrl, LanguageTag, LogoUrl, PolicyUrl, RequestUrl,
         ResponseTypes, SectorIdentifierUrl, ToSUrl,
     };
+    use crate::{ClientId, RedirectUrl};
+
+    use chrono::{TimeZone, Utc};
+    use itertools::sorted;
+
+    use std::time::Duration;
 
     #[test]
     fn test_metadata_serialization() {

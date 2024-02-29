@@ -1,12 +1,3 @@
-use std::fmt::{Debug, Formatter, Result as FormatterResult};
-use std::marker::PhantomData;
-use std::str;
-
-use chrono::{DateTime, Utc};
-use serde::de::{Deserialize, DeserializeOwned, Deserializer, MapAccess, Visitor};
-use serde::ser::SerializeMap;
-use serde::{Serialize, Serializer};
-
 use crate::helpers::FlattenFilter;
 use crate::types::helpers::{split_language_tag_key, timestamp_to_utc, utc_to_seconds};
 use crate::types::{Boolean, LocalizedClaim, Timestamp};
@@ -17,6 +8,15 @@ use crate::{
     EndUserUsername, EndUserWebsiteUrl, FormattedAddress, LanguageTag, StreetAddress,
     SubjectIdentifier,
 };
+
+use chrono::{DateTime, Utc};
+use serde::de::{DeserializeOwned, Deserializer, MapAccess, Visitor};
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize, Serializer};
+
+use std::fmt::{Debug, Formatter, Result as FormatterResult};
+use std::marker::PhantomData;
+use std::str;
 
 ///
 /// Additional claims beyond the set of Standard Claims defined by OpenID Connect Core.

@@ -14,14 +14,6 @@
 //! ...and follow the instructions.
 //!
 
-use std::env;
-use std::io::{BufRead, BufReader, Write};
-use std::net::TcpListener;
-use std::process::exit;
-
-use serde::{Deserialize, Serialize};
-use url::Url;
-
 use openidconnect::core::{
     CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClient, CoreClientAuthMethod, CoreGrantType,
     CoreIdTokenClaims, CoreIdTokenVerifier, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse,
@@ -34,6 +26,13 @@ use openidconnect::{
     CsrfToken, IssuerUrl, Nonce, OAuth2TokenResponse, ProviderMetadata, RedirectUrl, RevocationUrl,
     Scope,
 };
+use serde::{Deserialize, Serialize};
+use url::Url;
+
+use std::env;
+use std::io::{BufRead, BufReader, Write};
+use std::net::TcpListener;
+use std::process::exit;
 
 fn handle_error<T: std::error::Error>(fail: &T, msg: &'static str) {
     let mut err_msg = format!("ERROR: {}", msg);

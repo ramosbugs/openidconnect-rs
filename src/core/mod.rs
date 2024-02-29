@@ -1,40 +1,36 @@
-use std::fmt::{Display, Error as FormatterError, Formatter};
-use std::ops::Deref;
-
-pub use oauth2::basic::{
-    BasicErrorResponseType as CoreErrorResponseType,
-    BasicRequestTokenError as CoreRequestTokenError,
-    BasicRevocationErrorResponse as CoreRevocationErrorResponse, BasicTokenType as CoreTokenType,
-};
-
-use oauth2::devicecode::{DeviceAuthorizationResponse, EmptyExtraDeviceAuthorizationFields};
-pub use oauth2::StandardRevocableToken as CoreRevocableToken;
-use oauth2::{
-    EmptyExtraTokenFields, ErrorResponseType, ResponseType as OAuth2ResponseType,
-    StandardErrorResponse, StandardTokenIntrospectionResponse, StandardTokenResponse,
-};
-
-use serde::{Deserialize, Serialize};
-
 use crate::registration::{
     ClientMetadata, ClientRegistrationRequest, ClientRegistrationResponse,
     EmptyAdditionalClientMetadata, EmptyAdditionalClientRegistrationResponse,
     RegisterErrorResponseType,
 };
 use crate::{
-    ApplicationType, AuthDisplay, AuthPrompt, ClaimName, ClaimType, Client, ClientAuthMethod,
-    EmptyAdditionalClaims, EmptyAdditionalProviderMetadata, GenderClaim, GrantType, IdToken,
-    IdTokenClaims, IdTokenFields, IdTokenVerifier, JsonWebKeySet, JweContentEncryptionAlgorithm,
-    JweKeyManagementAlgorithm, JwsSigningAlgorithm, ProviderMetadata, ResponseMode, ResponseType,
-    SubjectIdentifierType, UserInfoClaims, UserInfoJsonWebToken, UserInfoVerifier,
+    ApplicationType, AuthDisplay, AuthPrompt, AuthenticationFlow, ClaimName, ClaimType, Client,
+    ClientAuthMethod, DeviceAuthorizationResponse, EmptyAdditionalClaims,
+    EmptyAdditionalProviderMetadata, EmptyExtraDeviceAuthorizationFields, EmptyExtraTokenFields,
+    ErrorResponseType, GenderClaim, GrantType, IdToken, IdTokenClaims, IdTokenFields,
+    IdTokenVerifier, JsonWebKeySet, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm,
+    JwsSigningAlgorithm, ProviderMetadata, ResponseMode, ResponseType, StandardErrorResponse,
+    StandardTokenIntrospectionResponse, StandardTokenResponse, SubjectIdentifierType,
+    UserInfoClaims, UserInfoJsonWebToken, UserInfoVerifier,
 };
 
-use super::AuthenticationFlow;
+use oauth2::ResponseType as OAuth2ResponseType;
+use serde::{Deserialize, Serialize};
 
-pub use self::jwk::{
+use std::fmt::{Display, Error as FormatterError, Formatter};
+use std::ops::Deref;
+
+pub use crate::core::jwk::{
     CoreEdDsaPrivateSigningKey, CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse,
     CoreRsaPrivateSigningKey,
 };
+
+pub use oauth2::basic::{
+    BasicErrorResponseType as CoreErrorResponseType,
+    BasicRequestTokenError as CoreRequestTokenError,
+    BasicRevocationErrorResponse as CoreRevocationErrorResponse, BasicTokenType as CoreTokenType,
+};
+pub use oauth2::StandardRevocableToken as CoreRevocableToken;
 
 mod crypto;
 

@@ -1,20 +1,20 @@
-use ed25519_dalek::pkcs8::DecodePrivateKey;
-use ed25519_dalek::Signer;
-use rsa::pkcs1::DecodeRsaPrivateKey;
-use sha2::Digest;
-
-use super::{crypto, CoreJwsSigningAlgorithm};
-use crate::types::{check_key_compatibility, Base64UrlEncodedBytes};
-use crate::types::{helpers::deserialize_option_or_none, JsonCurveType};
+use crate::core::{crypto, CoreJwsSigningAlgorithm};
+use crate::types::helpers::deserialize_option_or_none;
+use crate::types::{check_key_compatibility, Base64UrlEncodedBytes, JsonCurveType};
+#[cfg(feature = "jwk-alg")]
+use crate::{
+    core::CoreJweContentEncryptionAlgorithm, jwt::JsonWebTokenAlgorithm, types::JsonWebKeyAlgorithm,
+};
 use crate::{
     JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse, PrivateSigningKey,
     SignatureVerificationError, SigningError,
 };
 
-#[cfg(feature = "jwk-alg")]
-use crate::{
-    core::CoreJweContentEncryptionAlgorithm, jwt::JsonWebTokenAlgorithm, types::JsonWebKeyAlgorithm,
-};
+use ed25519_dalek::pkcs8::DecodePrivateKey;
+use ed25519_dalek::Signer;
+use rsa::pkcs1::DecodeRsaPrivateKey;
+use serde::{Deserialize, Serialize};
+use sha2::Digest;
 
 // Other than the 'kty' (key type) parameter, which must be present in all JWKs, Section 4 of RFC
 // 7517 states that "member names used for representing key parameters for different keys types
@@ -823,25 +823,24 @@ serialize_as_str!(CoreJsonWebKeyUse);
 
 #[cfg(test)]
 mod tests {
-    use crate::core::CoreJsonWebKeySet;
-    #[cfg(feature = "jwk-alg")]
-    use crate::{core::CoreJweContentEncryptionAlgorithm, jwt::JsonWebTokenAlgorithm};
-    use rand::rngs::mock::StepRng;
-    use rand::{CryptoRng, RngCore};
-    use rsa::rand_core;
-
+    use crate::core::jwk::CoreJsonCurveType;
+    use crate::core::{
+        CoreEdDsaPrivateSigningKey, CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeySet,
+        CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJwsSigningAlgorithm, CoreRsaPrivateSigningKey,
+    };
     use crate::jwt::tests::{
         TEST_EC_PUB_KEY_P256, TEST_EC_PUB_KEY_P384, TEST_ED_PUB_KEY_ED25519, TEST_RSA_PUB_KEY,
     };
     use crate::types::Base64UrlEncodedBytes;
     use crate::types::{JsonWebKey, JsonWebKeyId};
     use crate::verification::SignatureVerificationError;
+    #[cfg(feature = "jwk-alg")]
+    use crate::{core::CoreJweContentEncryptionAlgorithm, jwt::JsonWebTokenAlgorithm};
+    use crate::{PrivateSigningKey, SigningError};
 
-    use super::{
-        CoreEdDsaPrivateSigningKey, CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType,
-        CoreJsonWebKeyUse, CoreJwsSigningAlgorithm, CoreRsaPrivateSigningKey, PrivateSigningKey,
-    };
-    use super::{CoreJsonCurveType, SigningError};
+    use rand::rngs::mock::StepRng;
+    use rand::{CryptoRng, RngCore};
+    use rsa::rand_core;
 
     #[test]
     fn test_core_jwk_deserialization_rsa() {
