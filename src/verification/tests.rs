@@ -1009,20 +1009,17 @@ fn test_user_info_verified_claims() {
 
     // JSON response (default args)
     assert_eq!(
-        CoreUserInfoClaims::from_json::<crate::reqwest::AsyncHttpClientError>(
-            json_claims.as_bytes(),
-            Some(&sub)
-        )
-        .expect("verification should succeed")
-        .name()
-        .unwrap()
-        .iter()
-        .collect::<Vec<_>>(),
+        CoreUserInfoClaims::from_json::<crate::reqwest::Error>(json_claims.as_bytes(), Some(&sub))
+            .expect("verification should succeed")
+            .name()
+            .unwrap()
+            .iter()
+            .collect::<Vec<_>>(),
         vec![(None, &EndUserName::new("Jane Doe".to_string()))],
     );
 
     // Invalid subject
-    match CoreUserInfoClaims::from_json::<crate::reqwest::AsyncHttpClientError>(
+    match CoreUserInfoClaims::from_json::<crate::reqwest::Error>(
         json_claims.as_bytes(),
         Some(&SubjectIdentifier::new("wrong_subject".to_string())),
     ) {

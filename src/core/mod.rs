@@ -14,7 +14,7 @@ use crate::{
     UserInfoClaims, UserInfoJsonWebToken, UserInfoVerifier,
 };
 
-use oauth2::ResponseType as OAuth2ResponseType;
+use oauth2::{EndpointNotSet, ResponseType as OAuth2ResponseType};
 use serde::{Deserialize, Serialize};
 
 use std::fmt::Display;
@@ -48,7 +48,14 @@ pub type CoreTokenIntrospectionResponse =
 pub type CoreAuthenticationFlow = AuthenticationFlow<CoreResponseType>;
 
 /// OpenID Connect Core client.
-pub type CoreClient = Client<
+pub type CoreClient<
+    HasAuthUrl = EndpointNotSet,
+    HasDeviceAuthUrl = EndpointNotSet,
+    HasIntrospectionUrl = EndpointNotSet,
+    HasRevocationUrl = EndpointNotSet,
+    HasTokenUrl = EndpointNotSet,
+    HasUserInfoUrl = EndpointNotSet,
+> = Client<
     EmptyAdditionalClaims,
     CoreAuthDisplay,
     CoreGenderClaim,
@@ -64,6 +71,12 @@ pub type CoreClient = Client<
     CoreTokenIntrospectionResponse,
     CoreRevocableToken,
     CoreRevocationErrorResponse,
+    HasAuthUrl,
+    HasDeviceAuthUrl,
+    HasIntrospectionUrl,
+    HasRevocationUrl,
+    HasTokenUrl,
+    HasUserInfoUrl,
 >;
 
 /// OpenID Connect Core client metadata.

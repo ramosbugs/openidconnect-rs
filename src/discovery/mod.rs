@@ -1,11 +1,11 @@
 use crate::http_utils::{check_content_type, MIME_TYPE_JSON};
 use crate::{
-    AuthDisplay, AuthUrl, AuthenticationContextClass, ClaimName, ClaimType, ClientAuthMethod,
-    GrantType, HttpRequest, HttpResponse, IssuerUrl, JsonWebKey, JsonWebKeySet, JsonWebKeySetUrl,
-    JsonWebKeyType, JsonWebKeyUse, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm,
-    JwsSigningAlgorithm, LanguageTag, OpPolicyUrl, OpTosUrl, RegistrationUrl, ResponseMode,
-    ResponseType, ResponseTypes, Scope, ServiceDocUrl, SubjectIdentifierType, TokenUrl,
-    UserInfoUrl,
+    AsyncHttpClient, AuthDisplay, AuthUrl, AuthenticationContextClass, ClaimName, ClaimType,
+    ClientAuthMethod, GrantType, HttpRequest, HttpResponse, IssuerUrl, JsonWebKey, JsonWebKeySet,
+    JsonWebKeySetUrl, JsonWebKeyType, JsonWebKeyUse, JweContentEncryptionAlgorithm,
+    JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag, OpPolicyUrl, OpTosUrl,
+    RegistrationUrl, ResponseMode, ResponseType, ResponseTypes, Scope, ServiceDocUrl,
+    SubjectIdentifierType, SyncHttpClient, TokenUrl, UserInfoUrl,
 };
 
 use http::header::{HeaderValue, ACCEPT};
@@ -19,6 +19,7 @@ use thiserror::Error;
 use std::fmt::Debug;
 use std::future::Future;
 use std::marker::PhantomData;
+use std::pin::Pin;
 
 #[cfg(test)]
 mod tests;
@@ -284,19 +285,23 @@ where
 
     /// Fetches the OpenID Connect Discovery document and associated JSON Web Key Set from the
     /// OpenID Connect Provider.
-    pub fn discover<HC, RE>(
+    pub fn discover<C>(
         issuer_url: &IssuerUrl,
-        http_client: HC,
-    ) -> Result<Self, DiscoveryError<RE>>
+        http_client: &C,
+    ) -> Result<Self, DiscoveryError<<C as SyncHttpClient>::Error>>
     where
-        HC: Fn(HttpRequest) -> Result<HttpResponse, RE>,
-        RE: std::error::Error + 'static,
+        C: SyncHttpClient,
     {
         let discovery_url = issuer_url
             .join(CONFIG_URL_SUFFIX)
             .map_err(DiscoveryError::UrlParse)?;
 
-        http_client(Self::discovery_request(discovery_url.clone()))
+        http_client
+            .call(
+                Self::discovery_request(discovery_url.clone()).map_err(|err| {
+                    DiscoveryError::Other(format!("failed to prepare request: {err}"))
+                })?,
+            )
             .map_err(DiscoveryError::Request)
             .and_then(|http_response| {
                 Self::discovery_response(issuer_url, &discovery_url, http_response)
@@ -311,43 +316,51 @@ where
 
     /// Asynchronously fetches the OpenID Connect Discovery document and associated JSON Web Key Set
     /// from the OpenID Connect Provider.
-    pub async fn discover_async<F, HC, RE>(
+    pub fn discover_async<'c, C>(
         issuer_url: IssuerUrl,
-        http_client: HC,
-    ) -> Result<Self, DiscoveryError<RE>>
+        http_client: &'c C,
+    ) -> Pin<
+        Box<
+            dyn Future<Output = Result<Self, DiscoveryError<<C as AsyncHttpClient<'c>>::Error>>>
+                + 'c,
+        >,
+    >
     where
-        F: Future<Output = Result<HttpResponse, RE>>,
-        HC: Fn(HttpRequest) -> F,
-        RE: std::error::Error + 'static,
+        Self: 'c,
+        C: AsyncHttpClient<'c>,
     {
-        let discovery_url = issuer_url
-            .join(CONFIG_URL_SUFFIX)
-            .map_err(DiscoveryError::UrlParse)?;
+        Box::pin(async move {
+            let discovery_url = issuer_url
+                .join(CONFIG_URL_SUFFIX)
+                .map_err(DiscoveryError::UrlParse)?;
 
-        let provider_metadata = http_client(Self::discovery_request(discovery_url.clone()))
-            .await
-            .map_err(DiscoveryError::Request)
-            .and_then(|http_response| {
-                Self::discovery_response(&issuer_url, &discovery_url, http_response)
-            })?;
+            let provider_metadata = http_client
+                .call(
+                    Self::discovery_request(discovery_url.clone()).map_err(|err| {
+                        DiscoveryError::Other(format!("failed to prepare request: {err}"))
+                    })?,
+                )
+                .await
+                .map_err(DiscoveryError::Request)
+                .and_then(|http_response| {
+                    Self::discovery_response(&issuer_url, &discovery_url, http_response)
+                })?;
 
-        JsonWebKeySet::fetch_async(provider_metadata.jwks_uri(), http_client)
-            .await
-            .map(|jwks| Self {
-                jwks,
-                ..provider_metadata
-            })
+            JsonWebKeySet::fetch_async(provider_metadata.jwks_uri(), http_client)
+                .await
+                .map(|jwks| Self {
+                    jwks,
+                    ..provider_metadata
+                })
+        })
     }
 
-    fn discovery_request(discovery_url: url::Url) -> HttpRequest {
-        HttpRequest {
-            url: discovery_url,
-            method: Method::GET,
-            headers: vec![(ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON))]
-                .into_iter()
-                .collect(),
-            body: Vec::new(),
-        }
+    fn discovery_request(discovery_url: url::Url) -> Result<HttpRequest, http::Error> {
+        http::Request::builder()
+            .uri(discovery_url.to_string())
+            .method(Method::GET)
+            .header(ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON))
+            .body(Vec::new())
     }
 
     fn discovery_response<RE>(
@@ -358,27 +371,28 @@ where
     where
         RE: std::error::Error + 'static,
     {
-        if discovery_response.status_code != StatusCode::OK {
+        if discovery_response.status() != StatusCode::OK {
             return Err(DiscoveryError::Response(
-                discovery_response.status_code,
-                discovery_response.body,
+                discovery_response.status(),
+                discovery_response.body().to_owned(),
                 format!(
                     "HTTP status code {} at {}",
-                    discovery_response.status_code, discovery_url
+                    discovery_response.status(),
+                    discovery_url
                 ),
             ));
         }
 
-        check_content_type(&discovery_response.headers, MIME_TYPE_JSON).map_err(|err_msg| {
+        check_content_type(discovery_response.headers(), MIME_TYPE_JSON).map_err(|err_msg| {
             DiscoveryError::Response(
-                discovery_response.status_code,
-                discovery_response.body.clone(),
+                discovery_response.status(),
+                discovery_response.body().to_owned(),
                 err_msg,
             )
         })?;
 
         let provider_metadata = serde_path_to_error::deserialize::<_, Self>(
-            &mut serde_json::Deserializer::from_slice(&discovery_response.body),
+            &mut serde_json::Deserializer::from_slice(discovery_response.body()),
         )
         .map_err(DiscoveryError::Parse)?;
 

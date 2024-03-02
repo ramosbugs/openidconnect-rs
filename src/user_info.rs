@@ -3,13 +3,15 @@ use crate::http_utils::{auth_bearer, content_type_has_essence, MIME_TYPE_JSON, M
 use crate::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
 use crate::verification::UserInfoVerifier;
 use crate::{
-    AccessToken, AdditionalClaims, AddressClaim, Audience, AudiencesClaim, ClaimsVerificationError,
-    EndUserBirthday, EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName,
-    EndUserName, EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl,
-    EndUserTimezone, EndUserUsername, EndUserWebsiteUrl, GenderClaim, HttpRequest, HttpResponse,
+    AccessToken, AdditionalClaims, AddressClaim, AsyncHttpClient, Audience, AudiencesClaim,
+    AuthDisplay, AuthPrompt, ClaimsVerificationError, Client, EndUserBirthday, EndUserEmail,
+    EndUserFamilyName, EndUserGivenName, EndUserMiddleName, EndUserName, EndUserNickname,
+    EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone, EndUserUsername,
+    EndUserWebsiteUrl, EndpointState, ErrorResponse, GenderClaim, HttpRequest, HttpResponse,
     IssuerClaim, IssuerUrl, JsonWebKey, JsonWebKeyType, JsonWebKeyUse, JsonWebToken,
     JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, LocalizedClaim,
-    PrivateSigningKey, StandardClaims, SubjectIdentifier,
+    PrivateSigningKey, RevocableToken, StandardClaims, SubjectIdentifier, SyncHttpClient,
+    TokenIntrospectionResponse, TokenResponse, TokenType,
 };
 
 use chrono::{DateTime, Utc};
@@ -20,7 +22,98 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use std::future::Future;
+use std::pin::Pin;
 use std::str;
+
+impl<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        HasTokenUrl,
+        HasUserInfoUrl,
+    >
+    Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        HasTokenUrl,
+        HasUserInfoUrl,
+    >
+where
+    AC: AdditionalClaims,
+    AD: AuthDisplay,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    P: AuthPrompt,
+    TE: ErrorResponse + 'static,
+    TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
+    TT: TokenType + 'static,
+    TIR: TokenIntrospectionResponse<TT>,
+    RT: RevocableToken,
+    TRE: ErrorResponse + 'static,
+    HasAuthUrl: EndpointState,
+    HasDeviceAuthUrl: EndpointState,
+    HasIntrospectionUrl: EndpointState,
+    HasRevocationUrl: EndpointState,
+    HasTokenUrl: EndpointState,
+    HasUserInfoUrl: EndpointState,
+{
+    pub(crate) fn user_info_impl<'a>(
+        &'a self,
+        userinfo_endpoint: &'a UserInfoUrl,
+        access_token: AccessToken,
+        expected_subject: Option<SubjectIdentifier>,
+    ) -> UserInfoRequest<'a, JE, JS, JT, JU, K> {
+        UserInfoRequest {
+            url: userinfo_endpoint,
+            access_token,
+            require_signed_response: false,
+            response_type: UserInfoResponseType::Json,
+            signed_response_verifier: UserInfoVerifier::new(
+                self.client_id.clone(),
+                self.issuer.clone(),
+                self.jwks.clone(),
+                expected_subject,
+            ),
+        }
+    }
+}
 
 /// User info request.
 pub struct UserInfoRequest<'a, JE, JS, JT, JU, K>
@@ -47,59 +140,71 @@ where
 {
     /// Submits this request to the associated user info endpoint using the specified synchronous
     /// HTTP client.
-    pub fn request<AC, GC, HC, RE>(
+    pub fn request<AC, GC, C>(
         self,
-        http_client: HC,
-    ) -> Result<UserInfoClaims<AC, GC>, UserInfoError<RE>>
+        http_client: &C,
+    ) -> Result<UserInfoClaims<AC, GC>, UserInfoError<<C as SyncHttpClient>::Error>>
     where
         AC: AdditionalClaims,
         GC: GenderClaim,
-        HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
-        RE: std::error::Error + 'static,
+        C: SyncHttpClient,
     {
-        http_client(self.prepare_request())
+        http_client
+            .call(
+                self.prepare_request().map_err(|err| {
+                    UserInfoError::Other(format!("failed to prepare request: {err}"))
+                })?,
+            )
             .map_err(UserInfoError::Request)
             .and_then(|http_response| self.user_info_response(http_response))
     }
 
     /// Submits this request to the associated user info endpoint using the specified asynchronous
     /// HTTP client.
-    pub async fn request_async<AC, C, F, GC, RE>(
+    pub fn request_async<'c, AC, C, GC>(
         self,
-        http_client: C,
-    ) -> Result<UserInfoClaims<AC, GC>, UserInfoError<RE>>
+        http_client: &'c C,
+    ) -> Pin<
+        Box<
+            dyn Future<
+                    Output = Result<
+                        UserInfoClaims<AC, GC>,
+                        UserInfoError<<C as AsyncHttpClient<'c>>::Error>,
+                    >,
+                > + 'c,
+        >,
+    >
     where
+        Self: 'c,
         AC: AdditionalClaims,
-        C: FnOnce(HttpRequest) -> F,
-        F: Future<Output = Result<HttpResponse, RE>>,
+        C: AsyncHttpClient<'c>,
         GC: GenderClaim,
-        RE: std::error::Error + 'static,
     {
-        let http_request = self.prepare_request();
-        let http_response = http_client(http_request)
-            .await
-            .map_err(UserInfoError::Request)?;
+        Box::pin(async move {
+            let http_response = http_client
+                .call(self.prepare_request().map_err(|err| {
+                    UserInfoError::Other(format!("failed to prepare request: {err}"))
+                })?)
+                .await
+                .map_err(UserInfoError::Request)?;
 
-        self.user_info_response(http_response)
+            self.user_info_response(http_response)
+        })
     }
 
-    fn prepare_request(&self) -> HttpRequest {
+    fn prepare_request(&self) -> Result<HttpRequest, http::Error> {
         let (auth_header, auth_value) = auth_bearer(&self.access_token);
         let accept_value = match self.response_type {
             UserInfoResponseType::Jwt => MIME_TYPE_JWT,
             _ => MIME_TYPE_JSON,
         };
-        HttpRequest {
-            url: self.url.url().clone(),
-            method: Method::GET,
-            headers: vec![
-                (ACCEPT, HeaderValue::from_static(accept_value)),
-                (auth_header, auth_value),
-            ]
-            .into_iter()
-            .collect(),
-            body: Vec::new(),
-        }
+
+        http::Request::builder()
+            .uri(self.url.to_string())
+            .method(Method::GET)
+            .header(ACCEPT, HeaderValue::from_static(accept_value))
+            .header(auth_header, auth_value)
+            .body(Vec::new())
     }
 
     fn user_info_response<AC, GC, RE>(
@@ -111,16 +216,16 @@ where
         GC: GenderClaim,
         RE: std::error::Error + 'static,
     {
-        if http_response.status_code != StatusCode::OK {
+        if http_response.status() != StatusCode::OK {
             return Err(UserInfoError::Response(
-                http_response.status_code,
-                http_response.body,
+                http_response.status(),
+                http_response.body().to_owned(),
                 "unexpected HTTP status code".to_string(),
             ));
         }
 
         match http_response
-            .headers
+            .headers()
             .get(CONTENT_TYPE)
             .map(ToOwned::to_owned)
             .unwrap_or_else(|| HeaderValue::from_static(MIME_TYPE_JSON))
@@ -132,12 +237,12 @@ where
                     ));
                 }
                 UserInfoClaims::from_json(
-                    &http_response.body,
+                    http_response.body(),
                     self.signed_response_verifier.expected_subject(),
                 )
             }
             ref content_type if content_type_has_essence(content_type, MIME_TYPE_JWT) => {
-                let jwt_str = String::from_utf8(http_response.body).map_err(|_| {
+                let jwt_str = String::from_utf8(http_response.body().to_owned()).map_err(|_| {
                     UserInfoError::Other("response body has invalid UTF-8 encoding".to_string())
                 })?;
                 serde_path_to_error::deserialize::<_, UserInfoJsonWebToken<AC, GC, JE, JS, JT>>(
@@ -148,8 +253,8 @@ where
                 .map_err(UserInfoError::ClaimsVerification)
             }
             ref content_type => Err(UserInfoError::Response(
-                http_response.status_code,
-                http_response.body,
+                http_response.status(),
+                http_response.body().to_owned(),
                 format!("unexpected response Content-Type: `{:?}`", content_type),
             )),
         }
@@ -469,19 +574,18 @@ mod tests {
 
     #[test]
     fn test_additional_claims() {
-        let claims = UserInfoClaims::<TestClaims, CoreGenderClaim>::from_json::<
-            crate::reqwest::AsyncHttpClientError,
-        >(
-            "{
+        let claims =
+            UserInfoClaims::<TestClaims, CoreGenderClaim>::from_json::<crate::reqwest::Error>(
+                "{
                 \"iss\": \"https://server.example.com\",
                 \"sub\": \"24400320\",
                 \"aud\": [\"s6BhdRkqt3\"],
                 \"tfa_method\": \"u2f\"
             }"
-            .as_bytes(),
-            None,
-        )
-        .expect("failed to deserialize");
+                .as_bytes(),
+                None,
+            )
+            .expect("failed to deserialize");
         assert_eq!(claims.additional_claims().tfa_method, "u2f");
         assert_eq!(
             serde_json::to_string(&claims).expect("failed to serialize"),
@@ -493,9 +597,7 @@ mod tests {
              }",
         );
 
-        UserInfoClaims::<TestClaims, CoreGenderClaim>::from_json::<
-            crate::reqwest::AsyncHttpClientError,
-        >(
+        UserInfoClaims::<TestClaims, CoreGenderClaim>::from_json::<crate::reqwest::Error>(
             "{
                 \"iss\": \"https://server.example.com\",
                 \"sub\": \"24400320\",
@@ -513,20 +615,19 @@ mod tests {
 
     #[test]
     fn test_catch_all_additional_claims() {
-        let claims = UserInfoClaims::<AllOtherClaims, CoreGenderClaim>::from_json::<
-            crate::reqwest::AsyncHttpClientError,
-        >(
-            "{
+        let claims =
+            UserInfoClaims::<AllOtherClaims, CoreGenderClaim>::from_json::<crate::reqwest::Error>(
+                "{
                 \"iss\": \"https://server.example.com\",
                 \"sub\": \"24400320\",
                 \"aud\": [\"s6BhdRkqt3\"],
                 \"tfa_method\": \"u2f\",
                 \"updated_at\": 1000
             }"
-            .as_bytes(),
-            None,
-        )
-        .expect("failed to deserialize");
+                .as_bytes(),
+                None,
+            )
+            .expect("failed to deserialize");
 
         assert_eq!(claims.additional_claims().0.len(), 1);
         assert_eq!(claims.additional_claims().0["tfa_method"], "u2f");

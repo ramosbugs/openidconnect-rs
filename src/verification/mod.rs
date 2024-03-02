@@ -10,6 +10,7 @@ use crate::{
 use chrono::{DateTime, Utc};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use std::collections::HashSet;
@@ -471,8 +472,8 @@ pub trait NonceVerifier {
 impl NonceVerifier for &Nonce {
     fn verify(self, nonce: Option<&Nonce>) -> Result<(), String> {
         if let Some(claims_nonce) = nonce {
-            // Nonce::eq is already implemented with a constant time comparison
-            if claims_nonce != self {
+            // Avoid timing side-channel.
+            if Sha256::digest(claims_nonce.secret()) != Sha256::digest(self.secret()) {
                 return Err("nonce mismatch".to_string());
             }
         } else {

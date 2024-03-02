@@ -23,9 +23,25 @@
 //!
 //! # Importing `openidconnect`: selecting an HTTP client interface
 //!
+//!
 //! This library offers a flexible HTTP client interface with two modes:
 //!  * **Synchronous (blocking)**
+//!
+//!    NOTE: Be careful not to use a blocking HTTP client within `async` Rust code, which may panic
+//!    or cause other issues. The
+//!    [`tokio::task::spawn_blocking`](https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html)
+//!    function may be useful in this situation.
 //!  * **Asynchronous**
+//!
+//! ## Security Warning
+//!
+//! To prevent
+//! [SSRF](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html)
+//! vulnerabilities, be sure to configure the HTTP client **not to follow redirects**. For example,
+//! use [`redirect::Policy::none`](reqwest::redirect::Policy::none) when using
+//! [`reqwest`], or [`redirects(0)`](ureq::AgentBuilder::redirects) when using [`ureq`].
+//!
+//! ## HTTP Clients
 //!
 //! For the HTTP client modes described above, the following HTTP client implementations can be
 //! used:
@@ -34,16 +50,26 @@
 //!    The `reqwest` HTTP client supports both the synchronous and asynchronous modes and is enabled
 //!    by default.
 //!
-//!    Synchronous client: [`reqwest::http_client`]
+//!    Synchronous client: [`reqwest::blocking::Client`]
+//!    (requires the `reqwest-blocking` feature flag)
 //!
-//!    Asynchronous client: [`reqwest::async_http_client`]
+//!    Asynchronous client: [`reqwest::Client`] (requires either
+//!    the `reqwest` or `reqwest-blocking` feature flags)
 //!
 //!  * **[`curl`]**
 //!
 //!    The `curl` HTTP client only supports the synchronous HTTP client mode and can be enabled in
 //!    `Cargo.toml` via the `curl` feature flag.
 //!
-//!    Synchronous client: [`curl::http_client`]
+//!    Synchronous client: [`CurlHttpClient`]
+//!
+//! * **[`ureq`]**
+//!
+//!    The `ureq` HTTP client is a simple HTTP client with minimal dependencies. It only supports
+//!    the synchronous HTTP client mode and can be enabled in `Cargo.toml` via the `ureq` feature
+//!    flag.
+//!
+//!    Synchronous client: [`ureq::Agent`]
 //!
 //!  * **Custom**
 //!
@@ -56,19 +82,37 @@
 //!    openidconnect = { version = "...", default-features = false }
 //!    ```
 //!
-//!    Synchronous HTTP clients should implement the following trait:
-//!    ```text,ignore
-//!    FnOnce(HttpRequest) -> Result<HttpResponse, RE>
-//!    where RE: std::error::Error + 'static
+//!    Synchronous HTTP clients should implement the [`SyncHttpClient`] trait, which is
+//!    automatically implemented for any function/closure that implements:
+//!    ```rust,ignore
+//!    Fn(HttpRequest) -> Result<HttpResponse, E>
+//!    where
+//!      E: std::error::Error + 'static
 //!    ```
 //!
-//!    Asynchronous HTTP clients should implement the following trait:
-//!    ```text,ignore
-//!    FnOnce(HttpRequest) -> F
+//!    Asynchronous HTTP clients should implement the [`AsyncHttpClient`] trait, which is
+//!    automatically implemented for any function/closure that implements:
+//!    ```rust,ignore
+//!    Fn(HttpRequest) -> F
 //!    where
-//!      F: Future<Output = Result<HttpResponse, RE>>,
-//!      RE: std::error::Error + 'static
+//!      E: std::error::Error + 'static,
+//!      F: Future<Output = Result<HttpResponse, E>>,
 //!    ```
+//!
+//! # Comparing secrets securely
+//!
+//! OpenID Connect flows require comparing secrets received from providers. To do so securely
+//! while avoiding [timing side-channels](https://en.wikipedia.org/wiki/Timing_attack), the
+//! comparison must be done in constant time, either using a constant-time crate such as
+//! [`constant_time_eq`](https://crates.io/crates/constant_time_eq) (which could break if a future
+//! compiler version decides to be overly smart
+//! about its optimizations), or by first computing a cryptographically-secure hash (e.g., SHA-256)
+//! of both values and then comparing the hashes using `==`.
+//!
+//! The `timing-resistant-secret-traits` feature flag adds a safe (but comparatively expensive)
+//! [`PartialEq`] implementation to the secret types. Timing side-channels are why [`PartialEq`] is
+//! not auto-derived for this crate's secret types, and the lack of [`PartialEq`] is intended to
+//! prompt users to think more carefully about these comparisons.
 //!
 //! # OpenID Connect Relying Party (Client) Interface
 //!
@@ -111,16 +155,22 @@
 //!   CoreResponseType,
 //!   CoreUserInfoClaims,
 //! };
-//! # #[cfg(feature = "reqwest")]
-//! use openidconnect::reqwest::http_client;
+//! # #[cfg(feature = "reqwest-blocking")]
+//! use openidconnect::reqwest;
 //! use url::Url;
 //!
-//! # #[cfg(feature = "reqwest")]
+//! # #[cfg(feature = "reqwest-blocking")]
 //! # fn err_wrapper() -> Result<(), anyhow::Error> {
+//! let http_client = reqwest::blocking::ClientBuilder::new()
+//!     // Following redirects opens the client up to SSRF vulnerabilities.
+//!     .redirect(reqwest::redirect::Policy::none())
+//!     .build()
+//!     .expect("Client should build");
+//!
 //! // Use OpenID Connect Discovery to fetch the provider metadata.
 //! let provider_metadata = CoreProviderMetadata::discover(
 //!     &IssuerUrl::new("https://accounts.example.com".to_string())?,
-//!     http_client,
+//!     &http_client,
 //! )?;
 //!
 //! // Create an OpenID Connect client by specifying the client ID, client secret, authorization URL
@@ -162,10 +212,10 @@
 //! // Now you can exchange it for an access token and ID token.
 //! let token_response =
 //!     client
-//!         .exchange_code(AuthorizationCode::new("some authorization code".to_string()))
+//!         .exchange_code(AuthorizationCode::new("some authorization code".to_string()))?
 //!         // Set the PKCE code verifier.
 //!         .set_pkce_verifier(pkce_verifier)
-//!         .request(http_client)?;
+//!         .request(&http_client)?;
 //!
 //! // Extract the ID token claims after verifying its authenticity and nonce.
 //! let id_token = token_response
@@ -193,16 +243,15 @@
 //!     claims.email().map(|email| email.as_str()).unwrap_or("<not provided>"),
 //! );
 //!
-//! // If available, we can use the UserInfo endpoint to request additional information.
+//! // If available, we can use the user info endpoint to request additional information.
 //!
 //! // The user_info request uses the AccessToken returned in the token response. To parse custom
 //! // claims, use UserInfoClaims directly (with the desired type parameters) rather than using the
 //! // CoreUserInfoClaims type alias.
 //! let userinfo: CoreUserInfoClaims = client
-//!   .user_info(token_response.access_token().to_owned(), None)
-//!   .map_err(|err| anyhow!("No user info endpoint: {:?}", err))?
-//!   .request(http_client)
-//!   .map_err(|err| anyhow!("Failed requesting user info: {:?}", err))?;
+//!     .user_info(token_response.access_token().to_owned(), None)?
+//!     .request(&http_client)
+//!     .map_err(|err| anyhow!("Failed requesting user info: {}", err))?;
 //!
 //! // See the OAuth2TokenResponse trait for a listing of other available fields such as
 //! // access_token() and refresh_token().
@@ -277,7 +326,7 @@
 //! )
 //! // Specify the token endpoint (required for the code flow).
 //! .set_token_endpoint(Some(TokenUrl::new("https://accounts.example.com/token".to_string())?))
-//! // Recommended: support the UserInfo endpoint.
+//! // Recommended: support the user info endpoint.
 //! .set_userinfo_endpoint(
 //!     Some(UserInfoUrl::new("https://accounts.example.com/userinfo".to_string())?)
 //! )
@@ -475,16 +524,22 @@
 //!   CoreResponseType,
 //! };
 //! # #[cfg(feature = "reqwest")]
-//! use openidconnect::reqwest::async_http_client;
+//! use openidconnect::reqwest;
 //! use url::Url;
 //!
 //!
 //! # #[cfg(feature = "reqwest")]
 //! # async fn err_wrapper() -> Result<(), anyhow::Error> {
+//! let http_client = reqwest::ClientBuilder::new()
+//!     // Following redirects opens the client up to SSRF vulnerabilities.
+//!     .redirect(reqwest::redirect::Policy::none())
+//!     .build()
+//!     .expect("Client should build");
+//!
 //! // Use OpenID Connect Discovery to fetch the provider metadata.
 //! let provider_metadata = CoreProviderMetadata::discover_async(
 //!     IssuerUrl::new("https://accounts.example.com".to_string())?,
-//!     async_http_client,
+//!     &http_client,
 //! )
 //! .await?;
 //!
@@ -527,10 +582,10 @@
 //! // Now you can exchange it for an access token and ID token.
 //! let token_response =
 //!     client
-//!         .exchange_code(AuthorizationCode::new("some authorization code".to_string()))
+//!         .exchange_code(AuthorizationCode::new("some authorization code".to_string()))?
 //!         // Set the PKCE code verifier.
 //!         .set_pkce_verifier(pkce_verifier)
-//!         .request_async(async_http_client)
+//!         .request_async(&http_client)
 //!         .await?;
 //!
 //! // Extract the ID token claims after verifying its authenticity and nonce.
@@ -601,18 +656,21 @@ mod http_utils;
 mod jwt;
 
 pub use oauth2::{
-    AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientCredentialsTokenRequest, ClientId,
-    ClientSecret, CodeTokenRequest, ConfigurationError, CsrfToken, DeviceAccessTokenRequest,
-    DeviceAuthorizationRequest, DeviceAuthorizationResponse, DeviceAuthorizationUrl, DeviceCode,
-    DeviceCodeErrorResponse, DeviceCodeErrorResponseType, EmptyExtraDeviceAuthorizationFields,
-    EmptyExtraTokenFields, EndUserVerificationUrl, ErrorResponse, ErrorResponseType,
-    ExtraDeviceAuthorizationFields, ExtraTokenFields, HttpRequest, HttpResponse,
+    AccessToken, AsyncHttpClient, AuthType, AuthUrl, AuthorizationCode,
+    ClientCredentialsTokenRequest, ClientId, ClientSecret, CodeTokenRequest, ConfigurationError,
+    CsrfToken, DeviceAccessTokenRequest, DeviceAuthorizationRequest,
+    DeviceAuthorizationRequestFuture, DeviceAuthorizationResponse, DeviceAuthorizationUrl,
+    DeviceCode, DeviceCodeErrorResponse, DeviceCodeErrorResponseType,
+    EmptyExtraDeviceAuthorizationFields, EmptyExtraTokenFields, EndUserVerificationUrl,
+    EndpointMaybeSet, EndpointNotSet, EndpointSet, EndpointState, ErrorResponse, ErrorResponseType,
+    ExtraDeviceAuthorizationFields, ExtraTokenFields, HttpClientError, HttpRequest, HttpResponse,
     IntrospectionRequest, IntrospectionUrl, PasswordTokenRequest, PkceCodeChallenge,
     PkceCodeChallengeMethod, PkceCodeVerifier, RedirectUrl, RefreshToken, RefreshTokenRequest,
     RequestTokenError, ResourceOwnerPassword, ResourceOwnerUsername, RevocableToken,
     RevocationErrorResponseType, RevocationRequest, RevocationUrl, Scope, StandardErrorResponse,
-    StandardTokenIntrospectionResponse, StandardTokenResponse, TokenIntrospectionResponse,
-    TokenResponse as OAuth2TokenResponse, TokenType, TokenUrl, UserCode, VerificationUriComplete,
+    StandardTokenIntrospectionResponse, StandardTokenResponse, SyncHttpClient,
+    TokenIntrospectionResponse, TokenRequestFuture, TokenResponse as OAuth2TokenResponse,
+    TokenType, TokenUrl, UserCode, VerificationUriComplete,
 };
 
 /// Public re-exports of types used for HTTP client interfaces.
@@ -622,10 +680,13 @@ pub use oauth2::url;
 #[cfg(all(feature = "curl", not(target_arch = "wasm32")))]
 pub use oauth2::curl;
 
+#[cfg(all(feature = "curl", not(target_arch = "wasm32")))]
+pub use oauth2::CurlHttpClient;
+
 #[cfg(all(feature = "curl", target_arch = "wasm32"))]
 compile_error!("wasm32 is not supported with the `curl` feature. Use the `reqwest` backend or a custom backend for wasm32 support");
 
-#[cfg(feature = "reqwest")]
+#[cfg(any(feature = "reqwest", feature = "reqwest-blocking"))]
 pub use oauth2::reqwest;
 
 #[cfg(feature = "ureq")]

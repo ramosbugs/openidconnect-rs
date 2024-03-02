@@ -115,7 +115,7 @@ where
     ///
     /// ACR values should be added in order of preference. The Authentication Context Class
     /// satisfied by the authentication performed is accessible from the ID token via the
-    /// [`IdTokenClaims::auth_context_ref`] method.
+    /// [`IdTokenClaims::auth_context_ref()`](crate::IdTokenClaims::auth_context_ref) method.
     pub fn add_auth_context_value(mut self, acr_value: AuthenticationContextClass) -> Self {
         self.acr_values.push(acr_value);
         self
@@ -142,7 +142,8 @@ where
     /// Provides an ID token previously issued by this OpenID Connect Provider as a hint about
     /// the user's identity.
     ///
-    /// This field should be set whenever [`core::CoreAuthPrompt::None`] is used (see
+    /// This field should be set whenever
+    /// [`CoreAuthPrompt::None`](crate::core::CoreAuthPrompt::None) is used (see
     /// [`AuthorizationRequest::add_prompt`]), it but may be provided for any authorization
     /// request.
     pub fn set_id_token_hint<AC, GC, JE, JS, JT>(
@@ -268,23 +269,30 @@ mod tests {
     use crate::IssuerUrl;
     use crate::{
         AuthUrl, AuthenticationContextClass, AuthenticationFlow, ClientId, ClientSecret, CsrfToken,
-        JsonWebKeySet, LanguageTag, LoginHint, Nonce, RedirectUrl, Scope, TokenUrl,
+        EndpointNotSet, EndpointSet, JsonWebKeySet, LanguageTag, LoginHint, Nonce, RedirectUrl,
+        Scope, TokenUrl,
     };
 
     use std::borrow::Cow;
     use std::time::Duration;
 
-    fn new_client() -> CoreClient {
+    fn new_client() -> CoreClient<
+        EndpointSet,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointSet,
+        EndpointNotSet,
+    > {
         color_backtrace::install();
         CoreClient::new(
             ClientId::new("aaa".to_string()),
-            Some(ClientSecret::new("bbb".to_string())),
             IssuerUrl::new("https://example".to_string()).unwrap(),
-            AuthUrl::new("https://example/authorize".to_string()).unwrap(),
-            Some(TokenUrl::new("https://example/token".to_string()).unwrap()),
-            None,
             JsonWebKeySet::default(),
         )
+        .set_client_secret(ClientSecret::new("bbb".to_string()))
+        .set_auth_uri(AuthUrl::new("https://example/authorize".to_string()).unwrap())
+        .set_token_uri(TokenUrl::new("https://example/token".to_string()).unwrap())
     }
 
     #[test]

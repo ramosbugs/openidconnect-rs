@@ -3,15 +3,15 @@ use crate::{
     AuthUrl, AuthenticationFlow, AuthorizationCode, AuthorizationRequest, ClaimName, ClaimType,
     ClientAuthMethod, ClientCredentialsTokenRequest, ClientId, ClientSecret, CodeTokenRequest,
     ConfigurationError, CsrfToken, DeviceAccessTokenRequest, DeviceAuthorizationRequest,
-    DeviceAuthorizationResponse, DeviceAuthorizationUrl, ErrorResponse,
-    ExtraDeviceAuthorizationFields, GenderClaim, GrantType, IdTokenVerifier, IntrospectionRequest,
-    IntrospectionUrl, IssuerUrl, JsonWebKey, JsonWebKeySet, JsonWebKeyType, JsonWebKeyUse,
-    JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, Nonce,
-    PasswordTokenRequest, ProviderMetadata, RedirectUrl, RefreshToken, RefreshTokenRequest,
-    ResourceOwnerPassword, ResourceOwnerUsername, ResponseMode, ResponseType, RevocableToken,
-    RevocationRequest, RevocationUrl, Scope, SubjectIdentifier, SubjectIdentifierType,
-    TokenIntrospectionResponse, TokenResponse, TokenType, TokenUrl, UserInfoRequest,
-    UserInfoResponseType, UserInfoUrl, UserInfoVerifier,
+    DeviceAuthorizationResponse, DeviceAuthorizationUrl, EndpointMaybeSet, EndpointNotSet,
+    EndpointSet, EndpointState, ErrorResponse, ExtraDeviceAuthorizationFields, GenderClaim,
+    GrantType, IdTokenVerifier, IntrospectionRequest, IntrospectionUrl, IssuerUrl, JsonWebKey,
+    JsonWebKeySet, JsonWebKeyType, JsonWebKeyUse, JweContentEncryptionAlgorithm,
+    JweKeyManagementAlgorithm, JwsSigningAlgorithm, Nonce, PasswordTokenRequest, ProviderMetadata,
+    RedirectUrl, RefreshToken, RefreshTokenRequest, ResourceOwnerPassword, ResourceOwnerUsername,
+    ResponseMode, ResponseType, RevocableToken, RevocationRequest, RevocationUrl, Scope,
+    SubjectIdentifier, SubjectIdentifierType, TokenIntrospectionResponse, TokenResponse, TokenType,
+    TokenUrl, UserInfoRequest, UserInfoUrl,
 };
 
 use std::marker::PhantomData;
@@ -50,16 +50,16 @@ const OPENID_SCOPE: &str = "openid";
 /// # };
 /// # use thiserror::Error;
 /// #
-/// # let client = CoreClient::new(
-/// #     ClientId::new("aaa".to_string()),
-/// #     Some(ClientSecret::new("bbb".to_string())),
-/// #     IssuerUrl::new("https://example".to_string()).unwrap(),
-/// #     AuthUrl::new("https://example/authorize".to_string()).unwrap(),
-/// #     Some(TokenUrl::new("https://example/token".to_string()).unwrap()),
-/// #     None,
-/// #     JsonWebKeySet::default(),
-/// # )
-/// # .set_revocation_uri(RevocationUrl::new("https://revocation/url".to_string()).unwrap());
+/// # let client =
+/// #     CoreClient::new(
+/// #         ClientId::new("aaa".to_string()),
+/// #         IssuerUrl::new("https://example".to_string()).unwrap(),
+/// #         JsonWebKeySet::default(),
+/// #     )
+/// #     .set_client_secret(ClientSecret::new("bbb".to_string()))
+/// #     .set_auth_uri(AuthUrl::new("https://example/authorize".to_string()).unwrap())
+/// #     .set_token_uri(TokenUrl::new("https://example/token".to_string()).unwrap())
+/// #     .set_revocation_url(RevocationUrl::new("https://revocation/url".to_string()).unwrap());
 /// #
 /// # #[derive(Debug, Error)]
 /// # enum FakeError {
@@ -68,33 +68,52 @@ const OPENID_SCOPE: &str = "openid";
 /// # }
 /// #
 /// # let http_client = |_| -> Result<HttpResponse, FakeError> {
-/// #     Ok(HttpResponse {
-/// #         status_code: StatusCode::BAD_REQUEST,
-/// #         headers: vec![(
-/// #             CONTENT_TYPE,
-/// #             HeaderValue::from_str("application/json").unwrap(),
-/// #         )]
-/// #         .into_iter()
-/// #         .collect(),
-/// #         body: "{\"error\": \"unsupported_token_type\", \"error_description\": \"stuff happened\", \
-/// #                \"error_uri\": \"https://errors\"}"
+/// #     Ok(http::Response::builder()
+/// #         .status(StatusCode::BAD_REQUEST)
+/// #         .header(CONTENT_TYPE, HeaderValue::from_str("application/json").unwrap())
+/// #         .body(
+/// #             r#"{"error": "unsupported_token_type",
+/// #                 "error_description": "stuff happened",
+/// #                 "error_uri": "https://errors"}"#
 /// #             .to_string()
 /// #             .into_bytes(),
-/// #     })
+/// #         )
+/// #         .unwrap())
 /// # };
 /// #
 /// let res = client
 ///     .revoke_token(AccessToken::new("some token".to_string()).into())
 ///     .unwrap()
-///     .request(http_client);
+///     .request(&http_client);
 ///
 /// assert!(matches!(res, Err(
 ///     RequestTokenError::ServerResponse(err)) if matches!(err.error(),
 ///         RevocationErrorResponseType::UnsupportedTokenType)));
 /// ```
 #[derive(Clone, Debug)]
-pub struct Client<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT, TIR, RT, TRE>
-where
+pub struct Client<
+    AC,
+    AD,
+    GC,
+    JE,
+    JS,
+    JT,
+    JU,
+    K,
+    P,
+    TE,
+    TR,
+    TT,
+    TIR,
+    RT,
+    TRE,
+    HasAuthUrl,
+    HasDeviceAuthUrl,
+    HasIntrospectionUrl,
+    HasRevocationUrl,
+    HasTokenUrl,
+    HasUserInfoUrl,
+> where
     AC: AdditionalClaims,
     AD: AuthDisplay,
     GC: GenderClaim,
@@ -110,19 +129,59 @@ where
     TIR: TokenIntrospectionResponse<TT>,
     RT: RevocableToken,
     TRE: ErrorResponse,
+    HasAuthUrl: EndpointState,
+    HasDeviceAuthUrl: EndpointState,
+    HasIntrospectionUrl: EndpointState,
+    HasRevocationUrl: EndpointState,
+    HasTokenUrl: EndpointState,
+    HasUserInfoUrl: EndpointState,
 {
-    oauth2_client: oauth2::Client<TE, TR, TT, TIR, RT, TRE>,
-    client_id: ClientId,
+    oauth2_client: oauth2::Client<
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        HasTokenUrl,
+    >,
+    pub(crate) client_id: ClientId,
     client_secret: Option<ClientSecret>,
-    issuer: IssuerUrl,
+    pub(crate) issuer: IssuerUrl,
     userinfo_endpoint: Option<UserInfoUrl>,
-    jwks: JsonWebKeySet<JS, JT, JU, K>,
+    pub(crate) jwks: JsonWebKeySet<JS, JT, JU, K>,
     id_token_signing_algs: Option<Vec<JS>>,
     use_openid_scope: bool,
-    _phantom: PhantomData<(AC, AD, GC, JE, P)>,
+    _phantom: PhantomData<(AC, AD, GC, JE, P, HasUserInfoUrl)>,
 }
 impl<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT, TIR, RT, TRE>
-    Client<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT, TIR, RT, TRE>
+    Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointNotSet,
+    >
 where
     AC: AdditionalClaims,
     AD: AuthDisplay,
@@ -140,35 +199,63 @@ where
     RT: RevocableToken,
     TRE: ErrorResponse + 'static,
 {
-    /// Initializes an OpenID Connect client.
-    pub fn new(
-        client_id: ClientId,
-        client_secret: Option<ClientSecret>,
-        issuer: IssuerUrl,
-        auth_url: AuthUrl,
-        token_url: Option<TokenUrl>,
-        userinfo_endpoint: Option<UserInfoUrl>,
-        jwks: JsonWebKeySet<JS, JT, JU, K>,
-    ) -> Self {
+    /// Initialize an OpenID Connect client.
+    pub fn new(client_id: ClientId, issuer: IssuerUrl, jwks: JsonWebKeySet<JS, JT, JU, K>) -> Self {
         Client {
-            oauth2_client: oauth2::Client::new(
-                client_id.clone(),
-                client_secret.clone(),
-                auth_url,
-                token_url,
-            ),
+            oauth2_client: oauth2::Client::new(client_id.clone()),
             client_id,
-            client_secret,
+            client_secret: None,
             issuer,
-            userinfo_endpoint,
+            userinfo_endpoint: None,
             jwks,
             id_token_signing_algs: None,
             use_openid_scope: true,
             _phantom: PhantomData,
         }
     }
-
-    /// Initializes an OpenID Connect client from OpenID Connect Discovery provider metadata.
+}
+impl<AC, AD, GC, JE, JS, JT, JU, K, P, TE, TR, TT, TIR, RT, TRE>
+    Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        EndpointSet,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointMaybeSet,
+        EndpointMaybeSet,
+    >
+where
+    AC: AdditionalClaims,
+    AD: AuthDisplay,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    P: AuthPrompt,
+    TE: ErrorResponse + 'static,
+    TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
+    TT: TokenType + 'static,
+    TIR: TokenIntrospectionResponse<TT>,
+    RT: RevocableToken,
+    TRE: ErrorResponse + 'static,
+{
+    /// Initialize an OpenID Connect client from OpenID Connect Discovery provider metadata.
     ///
     /// Use [`ProviderMetadata::discover`] or
     /// [`ProviderMetadata::discover_async`] to fetch the provider metadata.
@@ -188,13 +275,15 @@ where
         RS: ResponseType,
         S: SubjectIdentifierType,
     {
+        let mut oauth2_client = oauth2::Client::new(client_id.clone())
+            .set_auth_uri(provider_metadata.authorization_endpoint().clone())
+            .set_token_uri_option(provider_metadata.token_endpoint().cloned());
+        if let Some(ref client_secret) = client_secret {
+            oauth2_client = oauth2_client.set_client_secret(client_secret.to_owned());
+        }
+
         Client {
-            oauth2_client: oauth2::Client::new(
-                client_id.clone(),
-                client_secret.clone(),
-                provider_metadata.authorization_endpoint().clone(),
-                provider_metadata.token_endpoint().cloned(),
-            ),
+            oauth2_client,
             client_id,
             client_secret,
             issuer: provider_metadata.issuer().clone(),
@@ -209,53 +298,385 @@ where
             _phantom: PhantomData,
         }
     }
-
-    /// Configures the type of client authentication used for communicating with the authorization
+}
+impl<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        HasTokenUrl,
+        HasUserInfoUrl,
+    >
+    Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        HasTokenUrl,
+        HasUserInfoUrl,
+    >
+where
+    AC: AdditionalClaims,
+    AD: AuthDisplay,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    P: AuthPrompt,
+    TE: ErrorResponse + 'static,
+    TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
+    TT: TokenType + 'static,
+    TIR: TokenIntrospectionResponse<TT>,
+    RT: RevocableToken,
+    TRE: ErrorResponse + 'static,
+    HasAuthUrl: EndpointState,
+    HasDeviceAuthUrl: EndpointState,
+    HasIntrospectionUrl: EndpointState,
+    HasRevocationUrl: EndpointState,
+    HasTokenUrl: EndpointState,
+    HasUserInfoUrl: EndpointState,
+{
+    /// Set the type of client authentication used for communicating with the authorization
     /// server.
     ///
     /// The default is to use HTTP Basic authentication, as recommended in
     /// [Section 2.3.1 of RFC 6749](https://tools.ietf.org/html/rfc6749#section-2.3.1). Note that
-    /// if a client secret is omitted (i.e., `client_secret` is set to `None` when calling
-    /// [`Client::new`]), [`AuthType::RequestBody`] is used regardless of the `auth_type` passed to
+    /// if a client secret is omitted (i.e., [`set_client_secret()`](Self::set_client_secret) is not
+    /// called), [`AuthType::RequestBody`] is used regardless of the `auth_type` passed to
     /// this function.
     pub fn set_auth_type(mut self, auth_type: AuthType) -> Self {
         self.oauth2_client = self.oauth2_client.set_auth_type(auth_type);
         self
     }
 
-    /// Sets the redirect URL used by the authorization endpoint.
+    /// Return the type of client authentication used for communicating with the authorization
+    /// server.
+    pub fn auth_type(&self) -> &AuthType {
+        self.oauth2_client.auth_type()
+    }
+
+    /// Set the authorization endpoint.
+    ///
+    /// The client uses the authorization endpoint to obtain authorization from the resource owner
+    /// via user-agent redirection. This URL is used in all standard OAuth2 flows except the
+    /// [Resource Owner Password Credentials Grant](https://tools.ietf.org/html/rfc6749#section-4.3)
+    /// and the [Client Credentials Grant](https://tools.ietf.org/html/rfc6749#section-4.4).
+    pub fn set_auth_uri(
+        self,
+        auth_uri: AuthUrl,
+    ) -> Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        EndpointSet,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        HasTokenUrl,
+        HasUserInfoUrl,
+    > {
+        Client {
+            oauth2_client: self.oauth2_client.set_auth_uri(auth_uri),
+            client_id: self.client_id,
+            client_secret: self.client_secret,
+            issuer: self.issuer,
+            userinfo_endpoint: self.userinfo_endpoint,
+            jwks: self.jwks,
+            id_token_signing_algs: self.id_token_signing_algs,
+            use_openid_scope: self.use_openid_scope,
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Return the Client ID.
+    pub fn client_id(&self) -> &ClientId {
+        &self.client_id
+    }
+
+    /// Set the client secret.
+    ///
+    /// A client secret is generally used for confidential (i.e., server-side) OAuth2 clients and
+    /// omitted from public (browser or native app) OAuth2 clients (see
+    /// [RFC 8252](https://tools.ietf.org/html/rfc8252)).
+    pub fn set_client_secret(mut self, client_secret: ClientSecret) -> Self {
+        self.oauth2_client = self.oauth2_client.set_client_secret(client_secret.clone());
+        self.client_secret = Some(client_secret);
+
+        self
+    }
+
+    /// Set the [RFC 8628](https://tools.ietf.org/html/rfc8628) device authorization endpoint used
+    /// for the Device Authorization Flow.
+    ///
+    /// See [`exchange_device_code()`](Self::exchange_device_code).
+    pub fn set_device_authorization_url(
+        self,
+        device_authorization_url: DeviceAuthorizationUrl,
+    ) -> Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        EndpointSet,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        HasTokenUrl,
+        HasUserInfoUrl,
+    > {
+        Client {
+            oauth2_client: self
+                .oauth2_client
+                .set_device_authorization_url(device_authorization_url),
+            client_id: self.client_id,
+            client_secret: self.client_secret,
+            issuer: self.issuer,
+            userinfo_endpoint: self.userinfo_endpoint,
+            jwks: self.jwks,
+            id_token_signing_algs: self.id_token_signing_algs,
+            use_openid_scope: self.use_openid_scope,
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Set the [RFC 7662](https://tools.ietf.org/html/rfc7662) introspection endpoint.
+    ///
+    /// See [`introspect()`](Self::introspect).
+    pub fn set_introspection_url(
+        self,
+        introspection_url: IntrospectionUrl,
+    ) -> Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        EndpointSet,
+        HasRevocationUrl,
+        HasTokenUrl,
+        HasUserInfoUrl,
+    > {
+        Client {
+            oauth2_client: self.oauth2_client.set_introspection_url(introspection_url),
+            client_id: self.client_id,
+            client_secret: self.client_secret,
+            issuer: self.issuer,
+            userinfo_endpoint: self.userinfo_endpoint,
+            jwks: self.jwks,
+            id_token_signing_algs: self.id_token_signing_algs,
+            use_openid_scope: self.use_openid_scope,
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Set the redirect URL used by the authorization endpoint.
     pub fn set_redirect_uri(mut self, redirect_url: RedirectUrl) -> Self {
         self.oauth2_client = self.oauth2_client.set_redirect_uri(redirect_url);
         self
     }
 
-    /// Sets the introspection URL for contacting the ([RFC 7662](https://tools.ietf.org/html/rfc7662))
-    /// introspection endpoint.
-    pub fn set_introspection_uri(mut self, introspection_url: IntrospectionUrl) -> Self {
-        self.oauth2_client = self.oauth2_client.set_introspection_uri(introspection_url);
-        self
+    /// Return the redirect URL used by the authorization endpoint.
+    pub fn redirect_uri(&self) -> Option<&RedirectUrl> {
+        self.oauth2_client.redirect_uri()
     }
 
-    /// Sets the revocation URL for contacting the revocation endpoint ([RFC 7009](https://tools.ietf.org/html/rfc7009)).
+    /// Set the [RFC 7009](https://tools.ietf.org/html/rfc7009) revocation endpoint.
     ///
-    /// See: [`revoke_token()`](Self::revoke_token())
-    pub fn set_revocation_uri(mut self, revocation_url: RevocationUrl) -> Self {
-        self.oauth2_client = self.oauth2_client.set_revocation_uri(revocation_url);
-        self
+    /// See [`revoke_token()`](Self::revoke_token).
+    pub fn set_revocation_url(
+        self,
+        revocation_uri: RevocationUrl,
+    ) -> Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        EndpointSet,
+        HasTokenUrl,
+        HasUserInfoUrl,
+    > {
+        Client {
+            oauth2_client: self.oauth2_client.set_revocation_url(revocation_uri),
+            client_id: self.client_id,
+            client_secret: self.client_secret,
+            issuer: self.issuer,
+            userinfo_endpoint: self.userinfo_endpoint,
+            jwks: self.jwks,
+            id_token_signing_algs: self.id_token_signing_algs,
+            use_openid_scope: self.use_openid_scope,
+            _phantom: PhantomData,
+        }
     }
 
-    /// Sets the device authorization URL for contacting the device authorization endpoint ([RFC 8628](https://tools.ietf.org/html/rfc8628)).
-    pub fn set_device_authorization_uri(
-        mut self,
-        device_authorization_url: DeviceAuthorizationUrl,
-    ) -> Self {
-        self.oauth2_client = self
-            .oauth2_client
-            .set_device_authorization_url(device_authorization_url);
-        self
+    /// Set the token endpoint.
+    ///
+    /// The client uses the token endpoint to exchange an authorization code for an access token,
+    /// typically with client authentication. This URL is used in
+    /// all standard OAuth2 flows except the
+    /// [Implicit Grant](https://tools.ietf.org/html/rfc6749#section-4.2).
+    pub fn set_token_uri(
+        self,
+        token_uri: TokenUrl,
+    ) -> Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        EndpointSet,
+        HasUserInfoUrl,
+    > {
+        Client {
+            oauth2_client: self.oauth2_client.set_token_uri(token_uri),
+            client_id: self.client_id,
+            client_secret: self.client_secret,
+            issuer: self.issuer,
+            userinfo_endpoint: self.userinfo_endpoint,
+            jwks: self.jwks,
+            id_token_signing_algs: self.id_token_signing_algs,
+            use_openid_scope: self.use_openid_scope,
+            _phantom: PhantomData,
+        }
     }
 
-    /// Enables the `openid` scope to be requested automatically.
+    /// Set the user info endpoint.
+    ///
+    /// See [`user_info()`](Self::user_info).
+    pub fn set_user_info_url(
+        self,
+        userinfo_endpoint: UserInfoUrl,
+    ) -> Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        HasTokenUrl,
+        EndpointSet,
+    > {
+        Client {
+            oauth2_client: self.oauth2_client,
+            client_id: self.client_id,
+            client_secret: self.client_secret,
+            issuer: self.issuer,
+            userinfo_endpoint: Some(userinfo_endpoint),
+            jwks: self.jwks,
+            id_token_signing_algs: self.id_token_signing_algs,
+            use_openid_scope: self.use_openid_scope,
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Enable the `openid` scope to be requested automatically.
     ///
     /// This scope is requested by default, so this function is only useful after previous calls to
     /// [`disable_openid_scope`][Client::disable_openid_scope].
@@ -264,13 +685,14 @@ where
         self
     }
 
-    /// Disables the `openid` scope from being requested automatically.
+    /// Disable the `openid` scope from being requested automatically.
     pub fn disable_openid_scope(mut self) -> Self {
         self.use_openid_scope = false;
         self
     }
 
-    /// Returns an ID token verifier for use with the [`IdToken::claims`] method.
+    /// Return an ID token verifier for use with the [`IdToken::claims`](crate::IdToken::claims)
+    /// method.
     pub fn id_token_verifier(&self) -> IdTokenVerifier<JS, JT, JU, K> {
         let verifier = if let Some(ref client_secret) = self.client_secret {
             IdTokenVerifier::new_confidential_client(
@@ -293,8 +715,85 @@ where
             verifier
         }
     }
+}
 
-    /// Generates an authorization URL for a new authorization request.
+/// Methods requiring an authorization endpoint.
+impl<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        HasTokenUrl,
+        HasUserInfoUrl,
+    >
+    Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        EndpointSet,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        HasTokenUrl,
+        HasUserInfoUrl,
+    >
+where
+    AC: AdditionalClaims,
+    AD: AuthDisplay,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    P: AuthPrompt,
+    TE: ErrorResponse + 'static,
+    TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
+    TT: TokenType + 'static,
+    TIR: TokenIntrospectionResponse<TT>,
+    RT: RevocableToken,
+    TRE: ErrorResponse + 'static,
+    HasDeviceAuthUrl: EndpointState,
+    HasIntrospectionUrl: EndpointState,
+    HasRevocationUrl: EndpointState,
+    HasTokenUrl: EndpointState,
+    HasUserInfoUrl: EndpointState,
+{
+    /// Return the authorization endpoint.
+    pub fn auth_uri(&self) -> &AuthUrl {
+        self.oauth2_client.auth_uri()
+    }
+
+    /// Generate an authorization URL for a new authorization request.
+    ///
+    /// Requires [`set_auth_uri()`](Self::set_auth_uri) to have been previously
+    /// called to set the authorization endpoint.
     ///
     /// NOTE: [Passing authorization request parameters as a JSON Web Token
     /// ](https://openid.net/specs/openid-connect-core-1_0.html#JWTRequests)
@@ -352,142 +851,757 @@ where
             request
         }
     }
+}
 
-    /// Creates a request builder for exchanging an authorization code for an access token.
+/// Methods requiring a token endpoint.
+impl<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        HasUserInfoUrl,
+    >
+    Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        EndpointSet,
+        HasUserInfoUrl,
+    >
+where
+    AC: AdditionalClaims,
+    AD: AuthDisplay,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    P: AuthPrompt,
+    TE: ErrorResponse + 'static,
+    TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
+    TT: TokenType + 'static,
+    TIR: TokenIntrospectionResponse<TT>,
+    RT: RevocableToken,
+    TRE: ErrorResponse + 'static,
+    HasAuthUrl: EndpointState,
+    HasDeviceAuthUrl: EndpointState,
+    HasIntrospectionUrl: EndpointState,
+    HasRevocationUrl: EndpointState,
+    HasUserInfoUrl: EndpointState,
+{
+    /// Request an access token using the
+    /// [Client Credentials Flow](https://datatracker.ietf.org/doc/html/rfc6749#section-4.4).
+    ///
+    /// Requires [`set_token_uri()`](Self::set_token_uri) to have been previously
+    /// called to set the token endpoint.
+    pub fn exchange_client_credentials(&self) -> ClientCredentialsTokenRequest<TE, TR, TT> {
+        self.oauth2_client.exchange_client_credentials()
+    }
+
+    /// Exchange a code returned during the
+    /// [Authorization Code Flow](https://datatracker.ietf.org/doc/html/rfc6749#section-4.1)
+    /// for an access token.
     ///
     /// Acquires ownership of the `code` because authorization codes may only be used once to
     /// retrieve an access token from the authorization server.
     ///
-    /// See <https://tools.ietf.org/html/rfc6749#section-4.1.3>
+    /// Requires [`set_token_uri()`](Self::set_token_uri) to have been previously
+    /// called to set the token endpoint.
     pub fn exchange_code(&self, code: AuthorizationCode) -> CodeTokenRequest<TE, TR, TT> {
         self.oauth2_client.exchange_code(code)
     }
 
-    /// Creates a request builder for device authorization.
+    /// Exchange an [RFC 8628](https://tools.ietf.org/html/rfc8628#section-3.2) Device Authorization
+    /// Response returned by [`exchange_device_code()`](Self::exchange_device_code) for an access
+    /// token.
     ///
-    /// See <https://tools.ietf.org/html/rfc8628#section-3.4>
-    pub fn exchange_device_code(
-        &self,
-    ) -> Result<DeviceAuthorizationRequest<TE>, ConfigurationError> {
-        let request = self.oauth2_client.exchange_device_code();
-        if self.use_openid_scope {
-            Ok(request?.add_scope(Scope::new(OPENID_SCOPE.to_string())))
-        } else {
-            request
-        }
-    }
-
-    /// Creates a request builder for exchanging a device code for an access token.
-    ///
-    /// See <https://tools.ietf.org/html/rfc8628#section-3.4>
-    pub fn exchange_device_access_token<'a, 'b, 'c, EF>(
+    /// Requires [`set_token_uri()`](Self::set_token_uri) to have been previously
+    /// called to set the token endpoint.
+    pub fn exchange_device_access_token<'a, EF>(
         &'a self,
-        auth_response: &'b DeviceAuthorizationResponse<EF>,
-    ) -> DeviceAccessTokenRequest<'b, 'c, TR, TT, EF>
+        auth_response: &'a DeviceAuthorizationResponse<EF>,
+    ) -> DeviceAccessTokenRequest<'a, 'static, TR, TT, EF>
     where
-        'a: 'b,
         EF: ExtraDeviceAuthorizationFields,
     {
         self.oauth2_client
             .exchange_device_access_token(auth_response)
     }
 
-    /// Creates a request builder for exchanging a refresh token for an access token.
+    /// Request an access token using the
+    /// [Resource Owner Password Credentials Flow](https://datatracker.ietf.org/doc/html/rfc6749#section-4.3).
     ///
-    /// See <https://tools.ietf.org/html/rfc6749#section-6>
-    pub fn exchange_refresh_token<'a, 'b>(
+    /// Requires
+    /// [`set_token_uri()`](Self::set_token_uri) to have
+    /// been previously called to set the token endpoint.
+    pub fn exchange_password<'a>(
         &'a self,
-        refresh_token: &'b RefreshToken,
-    ) -> RefreshTokenRequest<'b, TE, TR, TT>
-    where
-        'a: 'b,
-    {
-        self.oauth2_client.exchange_refresh_token(refresh_token)
-    }
-
-    /// Creates a request builder for exchanging credentials for an access token.
-    ///
-    /// See <https://tools.ietf.org/html/rfc6749#section-6>
-    pub fn exchange_password<'a, 'b>(
-        &'a self,
-        username: &'b ResourceOwnerUsername,
-        password: &'b ResourceOwnerPassword,
-    ) -> PasswordTokenRequest<'b, TE, TR, TT>
-    where
-        'a: 'b,
-    {
+        username: &'a ResourceOwnerUsername,
+        password: &'a ResourceOwnerPassword,
+    ) -> PasswordTokenRequest<'a, TE, TR, TT> {
         self.oauth2_client.exchange_password(username, password)
     }
 
-    /// Creates a request builder for exchanging client credentials for an access token.
+    /// Exchange a refresh token for an access token.
     ///
-    /// See <https://tools.ietf.org/html/rfc6749#section-4.4>
-    pub fn exchange_client_credentials<'a, 'b>(
+    /// See <https://tools.ietf.org/html/rfc6749#section-6>.
+    ///
+    /// Requires
+    /// [`set_token_uri()`](Self::set_token_uri) to have
+    /// been previously called to set the token endpoint.
+    pub fn exchange_refresh_token<'a>(
         &'a self,
-    ) -> ClientCredentialsTokenRequest<'b, TE, TR, TT>
-    where
-        'a: 'b,
-    {
+        refresh_token: &'a RefreshToken,
+    ) -> RefreshTokenRequest<'a, TE, TR, TT> {
+        self.oauth2_client.exchange_refresh_token(refresh_token)
+    }
+
+    /// Return the token endpoint.
+    pub fn token_uri(&self) -> &TokenUrl {
+        self.oauth2_client.token_uri()
+    }
+}
+
+/// Methods with a possibly-set token endpoint after calling
+/// [`from_provider_metadata()`](Self::from_provider_metadata).
+impl<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        HasUserInfoUrl,
+    >
+    Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        EndpointMaybeSet,
+        HasUserInfoUrl,
+    >
+where
+    AC: AdditionalClaims,
+    AD: AuthDisplay,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    P: AuthPrompt,
+    TE: ErrorResponse + 'static,
+    TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
+    TT: TokenType + 'static,
+    TIR: TokenIntrospectionResponse<TT>,
+    RT: RevocableToken,
+    TRE: ErrorResponse + 'static,
+    HasAuthUrl: EndpointState,
+    HasDeviceAuthUrl: EndpointState,
+    HasIntrospectionUrl: EndpointState,
+    HasRevocationUrl: EndpointState,
+    HasUserInfoUrl: EndpointState,
+{
+    /// Request an access token using the
+    /// [Client Credentials Flow](https://datatracker.ietf.org/doc/html/rfc6749#section-4.4).
+    ///
+    /// Requires [`from_provider_metadata()`](Self::from_provider_metadata) to have been previously
+    /// called to construct the client.
+    pub fn exchange_client_credentials(
+        &self,
+    ) -> Result<ClientCredentialsTokenRequest<TE, TR, TT>, ConfigurationError> {
         self.oauth2_client.exchange_client_credentials()
     }
 
-    /// Creates a request builder for info about the user associated with the given access token.
+    /// Exchange a code returned during the
+    /// [Authorization Code Flow](https://datatracker.ietf.org/doc/html/rfc6749#section-4.1)
+    /// for an access token.
     ///
-    /// This function requires that this [`Client`] be configured with a user info endpoint,
-    /// which is an optional feature for OpenID Connect Providers to implement. If this `Client`
-    /// does not know the provider's user info endpoint, it returns the [`ConfigurationError`]
-    /// error.
+    /// Acquires ownership of the `code` because authorization codes may only be used once to
+    /// retrieve an access token from the authorization server.
     ///
-    /// To help protect against token substitution attacks, this function optionally allows clients
-    /// to provide the subject identifier whose user info they expect to receive. If provided and
-    /// the subject returned by the OpenID Connect Provider does not match, the
-    /// [`UserInfoRequest::request`] or [`UserInfoRequest::request_async`] functions will return
-    /// [`UserInfoError::ClaimsVerification`]. If set to `None`, any subject is accepted.
-    pub fn user_info(
+    /// Requires [`from_provider_metadata()`](Self::from_provider_metadata) to have been previously
+    /// called to construct the client.
+    pub fn exchange_code(
         &self,
-        access_token: AccessToken,
-        expected_subject: Option<SubjectIdentifier>,
-    ) -> Result<UserInfoRequest<JE, JS, JT, JU, K>, ConfigurationError> {
-        Ok(UserInfoRequest {
-            url: self
-                .userinfo_endpoint
-                .as_ref()
-                .ok_or(ConfigurationError::MissingUrl("userinfo"))?,
-            access_token,
-            require_signed_response: false,
-            response_type: UserInfoResponseType::Json,
-            signed_response_verifier: UserInfoVerifier::new(
-                self.client_id.clone(),
-                self.issuer.clone(),
-                self.jwks.clone(),
-                expected_subject,
-            ),
-        })
+        code: AuthorizationCode,
+    ) -> Result<CodeTokenRequest<TE, TR, TT>, ConfigurationError> {
+        self.oauth2_client.exchange_code(code)
     }
 
-    /// Creates a request builder for obtaining metadata about a previously received token.
+    /// Exchange an [RFC 8628](https://tools.ietf.org/html/rfc8628#section-3.2) Device Authorization
+    /// Response returned by [`exchange_device_code()`](Self::exchange_device_code) for an access
+    /// token.
     ///
-    /// See <https://tools.ietf.org/html/rfc7662>
+    /// Requires [`from_provider_metadata()`](Self::from_provider_metadata) to have been previously
+    /// called to construct the client.
+    pub fn exchange_device_access_token<'a, EF>(
+        &'a self,
+        auth_response: &'a DeviceAuthorizationResponse<EF>,
+    ) -> Result<DeviceAccessTokenRequest<'a, 'static, TR, TT, EF>, ConfigurationError>
+    where
+        EF: ExtraDeviceAuthorizationFields,
+    {
+        self.oauth2_client
+            .exchange_device_access_token(auth_response)
+    }
+
+    /// Request an access token using the
+    /// [Resource Owner Password Credentials Flow](https://datatracker.ietf.org/doc/html/rfc6749#section-4.3).
+    ///
+    /// Requires [`from_provider_metadata()`](Self::from_provider_metadata) to have been previously
+    /// called to construct the client.
+    pub fn exchange_password<'a>(
+        &'a self,
+        username: &'a ResourceOwnerUsername,
+        password: &'a ResourceOwnerPassword,
+    ) -> Result<PasswordTokenRequest<'a, TE, TR, TT>, ConfigurationError> {
+        self.oauth2_client.exchange_password(username, password)
+    }
+
+    /// Exchange a refresh token for an access token.
+    ///
+    /// See <https://tools.ietf.org/html/rfc6749#section-6>.
+    ///
+    /// Requires [`from_provider_metadata()`](Self::from_provider_metadata) to have been previously
+    /// called to construct the client.
+    pub fn exchange_refresh_token<'a>(
+        &'a self,
+        refresh_token: &'a RefreshToken,
+    ) -> Result<RefreshTokenRequest<'a, TE, TR, TT>, ConfigurationError> {
+        self.oauth2_client.exchange_refresh_token(refresh_token)
+    }
+
+    /// Return the token endpoint.
+    pub fn token_uri(&self) -> Option<&TokenUrl> {
+        self.oauth2_client.token_uri()
+    }
+}
+
+/// Methods requiring a device authorization endpoint.
+impl<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        HasTokenUrl,
+        HasUserInfoUrl,
+    >
+    Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        EndpointSet,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        HasTokenUrl,
+        HasUserInfoUrl,
+    >
+where
+    AC: AdditionalClaims,
+    AD: AuthDisplay,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    P: AuthPrompt,
+    TE: ErrorResponse + 'static,
+    TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
+    TT: TokenType + 'static,
+    TIR: TokenIntrospectionResponse<TT>,
+    RT: RevocableToken,
+    TRE: ErrorResponse + 'static,
+    HasAuthUrl: EndpointState,
+    HasIntrospectionUrl: EndpointState,
+    HasRevocationUrl: EndpointState,
+    HasTokenUrl: EndpointState,
+    HasUserInfoUrl: EndpointState,
+{
+    /// Begin the [RFC 8628](https://tools.ietf.org/html/rfc8628) Device Authorization Flow and
+    /// retrieve a Device Authorization Response.
+    ///
+    /// Requires
+    /// [`set_device_authorization_url()`](Self::set_device_authorization_url) to have
+    /// been previously called to set the device authorization endpoint.
+    ///
+    /// See [`exchange_device_access_token()`](Self::exchange_device_access_token).
+    pub fn exchange_device_code(&self) -> DeviceAuthorizationRequest<TE> {
+        let request = self.oauth2_client.exchange_device_code();
+        if self.use_openid_scope {
+            request.add_scope(Scope::new(OPENID_SCOPE.to_string()))
+        } else {
+            request
+        }
+    }
+
+    /// Return the [RFC 8628](https://tools.ietf.org/html/rfc8628) device authorization endpoint
+    /// used for the Device Authorization Flow.
+    ///
+    /// See [`exchange_device_code()`](Self::exchange_device_code).
+    pub fn device_authorization_url(&self) -> &DeviceAuthorizationUrl {
+        self.oauth2_client.device_authorization_url()
+    }
+}
+
+/// Methods requiring an introspection endpoint.
+impl<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasRevocationUrl,
+        HasTokenUrl,
+        HasUserInfoUrl,
+    >
+    Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        EndpointSet,
+        HasRevocationUrl,
+        HasTokenUrl,
+        HasUserInfoUrl,
+    >
+where
+    AC: AdditionalClaims,
+    AD: AuthDisplay,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    P: AuthPrompt,
+    TE: ErrorResponse + 'static,
+    TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
+    TT: TokenType + 'static,
+    TIR: TokenIntrospectionResponse<TT>,
+    RT: RevocableToken,
+    TRE: ErrorResponse + 'static,
+    HasAuthUrl: EndpointState,
+    HasDeviceAuthUrl: EndpointState,
+    HasRevocationUrl: EndpointState,
+    HasTokenUrl: EndpointState,
+    HasUserInfoUrl: EndpointState,
+{
+    /// Retrieve metadata for an access token using the
+    /// [`RFC 7662`](https://tools.ietf.org/html/rfc7662) introspection endpoint.
+    ///
+    /// Requires [`set_introspection_url()`](Self::set_introspection_url) to have been previously
+    /// called to set the introspection endpoint.
     pub fn introspect<'a>(
         &'a self,
         token: &'a AccessToken,
-    ) -> Result<IntrospectionRequest<'a, TE, TIR, TT>, ConfigurationError> {
+    ) -> IntrospectionRequest<'a, TE, TIR, TT> {
         self.oauth2_client.introspect(token)
     }
 
-    /// Creates a request builder for revoking a previously received token.
+    /// Return the [RFC 7662](https://tools.ietf.org/html/rfc7662) introspection endpoint.
+    pub fn introspection_url(&self) -> &IntrospectionUrl {
+        self.oauth2_client.introspection_url()
+    }
+}
+
+/// Methods requiring a revocation endpoint.
+impl<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        HasTokenUrl,
+        HasUserInfoUrl,
+    >
+    Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        EndpointSet,
+        HasTokenUrl,
+        HasUserInfoUrl,
+    >
+where
+    AC: AdditionalClaims,
+    AD: AuthDisplay,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    P: AuthPrompt,
+    TE: ErrorResponse + 'static,
+    TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
+    TT: TokenType + 'static,
+    TIR: TokenIntrospectionResponse<TT>,
+    RT: RevocableToken,
+    TRE: ErrorResponse + 'static,
+    HasAuthUrl: EndpointState,
+    HasDeviceAuthUrl: EndpointState,
+    HasIntrospectionUrl: EndpointState,
+    HasTokenUrl: EndpointState,
+    HasUserInfoUrl: EndpointState,
+{
+    /// Revoke an access or refresh token using the [RFC 7009](https://tools.ietf.org/html/rfc7009)
+    /// revocation endpoint.
     ///
-    /// Requires that [`set_revocation_uri()`](Self::set_revocation_uri()) have already been called to set the
-    /// revocation endpoint URL.
-    ///
-    /// Attempting to submit the generated request without calling [`set_revocation_uri()`](Self::set_revocation_uri())
-    /// first will result in an error.
-    ///
-    /// See <https://tools.ietf.org/html/rfc7009>
+    /// Requires [`set_revocation_url()`](Self::set_revocation_url) to have been previously
+    /// called to set the revocation endpoint.
     pub fn revoke_token(
         &self,
         token: RT,
     ) -> Result<RevocationRequest<RT, TRE>, ConfigurationError> {
         self.oauth2_client.revoke_token(token)
+    }
+
+    /// Return the [RFC 7009](https://tools.ietf.org/html/rfc7009) revocation endpoint.
+    ///
+    /// See [`revoke_token()`](Self::revoke_token()).
+    pub fn revocation_url(&self) -> &RevocationUrl {
+        self.oauth2_client.revocation_url()
+    }
+}
+
+/// Methods requiring a user info endpoint.
+impl<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        HasTokenUrl,
+    >
+    Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        HasTokenUrl,
+        EndpointSet,
+    >
+where
+    AC: AdditionalClaims,
+    AD: AuthDisplay,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    P: AuthPrompt,
+    TE: ErrorResponse + 'static,
+    TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
+    TT: TokenType + 'static,
+    TIR: TokenIntrospectionResponse<TT>,
+    RT: RevocableToken,
+    TRE: ErrorResponse + 'static,
+    HasAuthUrl: EndpointState,
+    HasDeviceAuthUrl: EndpointState,
+    HasIntrospectionUrl: EndpointState,
+    HasRevocationUrl: EndpointState,
+    HasTokenUrl: EndpointState,
+{
+    /// Request info about the user associated with the given access token.
+    ///
+    /// Requires [`set_user_info_url()`](Self::set_user_info_url) to have been previously
+    /// called to set the user info endpoint.
+    ///
+    /// To help protect against token substitution attacks, this function optionally allows clients
+    /// to provide the subject identifier whose user info they expect to receive. If provided and
+    /// the subject returned by the OpenID Connect Provider does not match, the
+    /// [`UserInfoRequest::request`] or [`UserInfoRequest::request_async`] functions will return
+    /// [`UserInfoError::ClaimsVerification`](crate::UserInfoError::ClaimsVerification). If set to
+    /// `None`, any subject is accepted.
+    pub fn user_info(
+        &self,
+        access_token: AccessToken,
+        expected_subject: Option<SubjectIdentifier>,
+    ) -> UserInfoRequest<JE, JS, JT, JU, K> {
+        self.user_info_impl(self.user_info_url(), access_token, expected_subject)
+    }
+
+    /// Return the user info endpoint.
+    ///
+    /// See ['user_info()'](Self::user_info).
+    pub fn user_info_url(&self) -> &UserInfoUrl {
+        // This is enforced statically via the HasUserInfo generic type.
+        self.userinfo_endpoint
+            .as_ref()
+            .expect("should have user info endpoint")
+    }
+}
+
+/// Methods with a possibly-set user info endpoint.
+impl<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        HasTokenUrl,
+    >
+    Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        JS,
+        JT,
+        JU,
+        K,
+        P,
+        TE,
+        TR,
+        TT,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasIntrospectionUrl,
+        HasRevocationUrl,
+        HasTokenUrl,
+        EndpointMaybeSet,
+    >
+where
+    AC: AdditionalClaims,
+    AD: AuthDisplay,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JS: JwsSigningAlgorithm<JT>,
+    JT: JsonWebKeyType,
+    JU: JsonWebKeyUse,
+    K: JsonWebKey<JS, JT, JU>,
+    P: AuthPrompt,
+    TE: ErrorResponse + 'static,
+    TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
+    TT: TokenType + 'static,
+    TIR: TokenIntrospectionResponse<TT>,
+    RT: RevocableToken,
+    TRE: ErrorResponse + 'static,
+    HasAuthUrl: EndpointState,
+    HasDeviceAuthUrl: EndpointState,
+    HasIntrospectionUrl: EndpointState,
+    HasRevocationUrl: EndpointState,
+    HasTokenUrl: EndpointState,
+{
+    /// Request info about the user associated with the given access token.
+    ///
+    /// Requires [`from_provider_metadata()`](Self::from_provider_metadata) to have been previously
+    /// called to construct the client.
+    ///
+    /// To help protect against token substitution attacks, this function optionally allows clients
+    /// to provide the subject identifier whose user info they expect to receive. If provided and
+    /// the subject returned by the OpenID Connect Provider does not match, the
+    /// [`UserInfoRequest::request`] or [`UserInfoRequest::request_async`] functions will return
+    /// [`UserInfoError::ClaimsVerification`](crate::UserInfoError::ClaimsVerification). If set to
+    /// `None`, any subject is accepted.
+    pub fn user_info(
+        &self,
+        access_token: AccessToken,
+        expected_subject: Option<SubjectIdentifier>,
+    ) -> Result<UserInfoRequest<JE, JS, JT, JU, K>, ConfigurationError> {
+        Ok(self.user_info_impl(
+            self.userinfo_endpoint
+                .as_ref()
+                .ok_or(ConfigurationError::MissingUrl("user info"))?,
+            access_token,
+            expected_subject,
+        ))
+    }
+
+    /// Return the user info endpoint.
+    ///
+    /// See ['user_info()'](Self::user_info).
+    pub fn user_info_url(&self) -> Option<&UserInfoUrl> {
+        self.userinfo_endpoint.as_ref()
     }
 }

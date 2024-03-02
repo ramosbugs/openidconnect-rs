@@ -167,7 +167,7 @@ macro_rules! new_type {
             $($item)*
 
             #[doc = $new_doc]
-            pub fn new(s: $type) -> Self {
+            pub const fn new(s: $type) -> Self {
                 $name(s)
             }
         }
@@ -232,6 +232,7 @@ macro_rules! new_secret_type {
         $(
             #[$attr]
         )*
+        #[cfg_attr(feature = "timing-resistant-secret-traits", derive(Eq))]
         pub struct $name($type);
         impl $name {
             $($item)*
@@ -252,6 +253,22 @@ macro_rules! new_secret_type {
                 write!(f, concat!(stringify!($name), "([redacted])"))
             }
         }
+
+        #[cfg(any(test, feature = "timing-resistant-secret-traits"))]
+        impl PartialEq for $name {
+            fn eq(&self, other: &Self) -> bool {
+                <sha2::Sha256 as sha2::Digest>::digest(&self.0)
+                  == <sha2::Sha256 as sha2::Digest>::digest(&other.0)
+            }
+        }
+
+        #[cfg(feature = "timing-resistant-secret-traits")]
+        impl std::hash::Hash for $name {
+            fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+                <sha2::Sha256 as sha2::Digest>::digest(&self.0).hash(state)
+            }
+        }
+
     };
 }
 
@@ -322,7 +339,8 @@ macro_rules! new_url_type {
             pub fn from_url(url: url::Url) -> Self {
                 let s = url.to_string();
                 Self(url, s)
-            }            #[doc = $url_doc]
+            }
+            #[doc = $url_doc]
             pub fn url(&self) -> &url::Url {
                 return &self.0;
             }
@@ -332,6 +350,11 @@ macro_rules! new_url_type {
             type Target = String;
             fn deref(&self) -> &String {
                 &self.1
+            }
+        }
+        impl ::std::fmt::Display for $name {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
+                write!(f, "{}", self.1)
             }
         }
         impl From<$name> for url::Url {

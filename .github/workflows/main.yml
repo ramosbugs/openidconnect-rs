@@ -63,7 +63,10 @@ jobs:
       - name: Run tests
         run: cargo ${CARGO_LOCKED} test --tests --examples
       - name: Doc tests
-        run: cargo ${CARGO_LOCKED} test --doc
+        run: |
+          cargo ${CARGO_LOCKED} test --doc
+          cargo ${CARGO_LOCKED} test --doc --no-default-features
+          cargo ${CARGO_LOCKED} test --doc --all-features
       - name: Test with all features enabled
         run: cargo ${CARGO_LOCKED} test --all-features
 

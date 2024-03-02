@@ -6,7 +6,8 @@ use openidconnect::core::{
     CoreProviderMetadata,
 };
 use openidconnect::{
-    ClientContactEmail, ClientName, HttpRequest, HttpResponse, IssuerUrl, RedirectUrl,
+    ClientContactEmail, ClientName, HttpClientError, HttpRequest, HttpResponse, IssuerUrl,
+    RedirectUrl,
 };
 
 use std::cell::RefCell;
@@ -71,9 +72,21 @@ pub fn init_log(test_id: &'static str) {
     set_test_id(test_id);
 }
 
-pub fn http_client(
-    request: HttpRequest,
-) -> Result<HttpResponse, openidconnect::reqwest::HttpClientError> {
+// FIXME: just clone `request` directly once we update `http` to 1.0, which implements `Clone`.
+#[cfg(feature = "reqwest-blocking")]
+pub(crate) fn clone_request(request: &HttpRequest) -> HttpRequest {
+    let mut request_copy = http::Request::builder()
+        .method(request.method().to_owned())
+        .uri(request.uri().to_owned())
+        .version(request.version());
+
+    for (name, value) in request.headers() {
+        request_copy = request_copy.header(name, value);
+    }
+    request_copy.body(request.body().to_owned()).unwrap()
+}
+
+pub fn http_client(request: HttpRequest) -> Result<HttpResponse, HttpClientError<reqwest::Error>> {
     retry::retry(
         (0..5).map(|i| {
             if i != 0 {
@@ -81,11 +94,22 @@ pub fn http_client(
             }
             Duration::from_millis(500)
         }),
-        || openidconnect::reqwest::http_client(request.clone()),
+        || -> Result<HttpResponse, HttpClientError<reqwest::Error>> {
+            #[cfg(feature = "reqwest-blocking")]
+            {
+                use openidconnect::SyncHttpClient;
+                reqwest::blocking::Client::default().call(clone_request(&request))
+            }
+            #[cfg(not(feature = "reqwest-blocking"))]
+            {
+                let _ = &request;
+                panic!("reqwest-blocking feature is required")
+            }
+        },
     )
     .map_err(|err| match err {
         retry::Error::Operation { error, .. } => error,
-        retry::Error::Internal(msg) => openidconnect::reqwest::Error::Other(msg),
+        retry::Error::Internal(msg) => panic!("unexpected error: {msg}"),
     })
 }
 
@@ -127,7 +151,7 @@ pub fn issuer_url(test_id: &str) -> IssuerUrl {
 
 pub fn get_provider_metadata(test_id: &str) -> CoreProviderMetadata {
     let _issuer_url = issuer_url(test_id);
-    CoreProviderMetadata::discover(&_issuer_url, http_client).expect(&format!(
+    CoreProviderMetadata::discover(&_issuer_url, &http_client).expect(&format!(
         "Failed to fetch provider metadata from {:?}",
         _issuer_url
     ))
@@ -160,7 +184,7 @@ where
         .registration_endpoint()
         .expect("provider does not support dynamic registration");
     registration_request_post
-        .register(registration_endpoint, http_client)
+        .register(registration_endpoint, &http_client)
         .expect(&format!(
             "Failed to register client at {:?}",
             registration_endpoint

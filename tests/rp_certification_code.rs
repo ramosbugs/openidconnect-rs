@@ -16,8 +16,8 @@ use openidconnect::core::{
 use openidconnect::Nonce;
 use openidconnect::{
     AccessToken, AuthType, AuthenticationFlow, AuthorizationCode, ClaimsVerificationError,
-    CsrfToken, OAuth2TokenResponse, RequestTokenError, Scope, SignatureVerificationError,
-    UserInfoError,
+    CsrfToken, EndpointMaybeSet, EndpointNotSet, EndpointSet, HttpClientError, OAuth2TokenResponse,
+    RequestTokenError, Scope, SignatureVerificationError, UserInfoError,
 };
 use reqwest::{blocking::Client, redirect::Policy};
 use url::Url;
@@ -29,7 +29,14 @@ mod rp_common;
 struct TestState {
     access_token: Option<AccessToken>,
     authorization_code: Option<AuthorizationCode>,
-    client: CoreClient,
+    client: CoreClient<
+        EndpointSet,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointMaybeSet,
+        EndpointMaybeSet,
+    >,
     id_token: Option<CoreIdToken>,
     nonce: Option<Nonce>,
     provider_metadata: CoreProviderMetadata,
@@ -47,7 +54,7 @@ impl TestState {
         let registration_response = register_client(&provider_metadata, reg_request_fn);
 
         let redirect_uri = registration_response.redirect_uris()[0].clone();
-        let client: CoreClient = CoreClient::from_provider_metadata(
+        let client: CoreClient<_, _, _, _, _, _> = CoreClient::from_provider_metadata(
             provider_metadata.clone(),
             registration_response.client_id().to_owned(),
             registration_response.client_secret().cloned(),
@@ -149,7 +156,8 @@ impl TestState {
                     .take()
                     .expect("no authorization_code"),
             )
-            .request(http_client)
+            .panic_if_fail("should have a token endpoint")
+            .request(&http_client)
             .panic_if_fail("failed to exchange authorization code for token");
         log_debug!(
             "Authorization Server returned token response: {:?}",
@@ -199,7 +207,7 @@ impl TestState {
     }
 
     pub fn jwks(&self) -> CoreJsonWebKeySet {
-        CoreJsonWebKeySet::fetch(self.provider_metadata.jwks_uri(), http_client)
+        CoreJsonWebKeySet::fetch(self.provider_metadata.jwks_uri(), &http_client)
             .panic_if_fail("failed to fetch JWK set")
     }
 
@@ -216,13 +224,11 @@ impl TestState {
             )
             .unwrap()
             .require_signed_response(false)
-            .request(http_client)
+            .request(&http_client)
             .panic_if_fail("failed to get UserInfo")
     }
 
-    pub fn user_info_claims_failure(
-        &self,
-    ) -> UserInfoError<openidconnect::reqwest::HttpClientError> {
+    pub fn user_info_claims_failure(&self) -> UserInfoError<HttpClientError<reqwest::Error>> {
         let user_info_result: Result<CoreUserInfoClaims, _> = self
             .client
             .user_info(
@@ -231,7 +237,7 @@ impl TestState {
             )
             .unwrap()
             .require_signed_response(false)
-            .request(http_client);
+            .request(&http_client);
         match user_info_result {
             Err(err) => err,
             _ => panic!("claims verification succeeded but was expected to fail"),
@@ -364,7 +370,8 @@ fn rp_id_token_iat() {
                 .take()
                 .expect("no authorization_code"),
         )
-        .request(http_client);
+        .panic_if_fail("should have a token endpoint")
+        .request(&http_client);
 
     match token_response {
         Err(RequestTokenError::Parse(_, _)) => {
@@ -474,7 +481,8 @@ fn rp_id_token_sub() {
                 .take()
                 .expect("no authorization_code"),
         )
-        .request(http_client);
+        .panic_if_fail("should have a token endpoint")
+        .request(&http_client);
 
     match token_response {
         Err(RequestTokenError::Parse(_, _)) => {
@@ -597,7 +605,7 @@ fn rp_userinfo_sig() {
         // that the RP SHOULD verify these.
         .require_audience_match(false)
         .require_issuer_match(false)
-        .request(http_client)
+        .request(&http_client)
         .panic_if_fail("failed to get UserInfo");
 
     log_debug!("UserInfo response: {:?}", user_info_claims);

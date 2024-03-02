@@ -8,14 +8,14 @@ use crate::types::{
     SectorIdentifierUrl, SubjectIdentifierType, ToSUrl,
 };
 use crate::{
-    AccessToken, ClientId, ClientSecret, ErrorResponseType, HttpRequest, HttpResponse, JsonWebKey,
-    JsonWebKeySet, JsonWebKeySetUrl, JsonWebKeyType, JsonWebKeyUse, JweContentEncryptionAlgorithm,
-    JweKeyManagementAlgorithm, JwsSigningAlgorithm, LocalizedClaim, RedirectUrl,
-    StandardErrorResponse,
+    AccessToken, AsyncHttpClient, ClientId, ClientSecret, ErrorResponseType, HttpRequest,
+    HttpResponse, JsonWebKey, JsonWebKeySet, JsonWebKeySetUrl, JsonWebKeyType, JsonWebKeyUse,
+    JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LocalizedClaim,
+    RedirectUrl, StandardErrorResponse, SyncHttpClient,
 };
 
 use chrono::{DateTime, Utc};
-use http::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
+use http::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
 use http::method::Method;
 use http::status::StatusCode;
 use serde::de::{DeserializeOwned, Deserializer, MapAccess, Visitor};
@@ -26,6 +26,7 @@ use thiserror::Error;
 use std::fmt::{Debug, Formatter, Result as FormatterResult};
 use std::future::Future;
 use std::marker::PhantomData;
+use std::pin::Pin;
 use std::time::Duration;
 
 #[cfg(test)]
@@ -441,45 +442,54 @@ where
 
     /// Submits this request to the specified registration endpoint using the specified synchronous
     /// HTTP client.
-    pub fn register<HC, RE>(
+    pub fn register<C>(
         &self,
         registration_endpoint: &RegistrationUrl,
-        http_client: HC,
+        http_client: &C,
     ) -> Result<
         ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
-        ClientRegistrationError<ET, RE>,
+        ClientRegistrationError<ET, <C as SyncHttpClient>::Error>,
     >
     where
-        HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
-        RE: std::error::Error + 'static,
+        C: SyncHttpClient,
     {
         self.prepare_registration(registration_endpoint)
             .and_then(|http_request| {
-                http_client(http_request).map_err(ClientRegistrationError::Request)
+                http_client
+                    .call(http_request)
+                    .map_err(ClientRegistrationError::Request)
             })
             .and_then(Self::register_response)
     }
 
     /// Submits this request to the specified registration endpoint using the specified asynchronous
     /// HTTP client.
-    pub async fn register_async<F, HC, RE>(
-        &self,
-        registration_endpoint: &RegistrationUrl,
-        http_client: HC,
-    ) -> Result<
-        ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
-        ClientRegistrationError<ET, RE>,
+    pub fn register_async<'c, C>(
+        &'c self,
+        registration_endpoint: &'c RegistrationUrl,
+        http_client: &'c C,
+    ) -> Pin<
+        Box<
+            dyn Future<
+                    Output = Result<
+                        ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+                        ClientRegistrationError<ET, <C as AsyncHttpClient<'c>>::Error>,
+                    >,
+                > + 'c,
+        >,
     >
     where
-        F: Future<Output = Result<HttpResponse, RE>>,
-        HC: FnOnce(HttpRequest) -> F,
-        RE: std::error::Error + 'static,
+        Self: 'c,
+        C: AsyncHttpClient<'c>,
     {
-        let http_request = self.prepare_registration(registration_endpoint)?;
-        let http_response = http_client(http_request)
-            .await
-            .map_err(ClientRegistrationError::Request)?;
-        Self::register_response(http_response)
+        Box::pin(async move {
+            let http_request = self.prepare_registration(registration_endpoint)?;
+            let http_response = http_client
+                .call(http_request)
+                .await
+                .map_err(ClientRegistrationError::Request)?;
+            Self::register_response(http_response)
+        })
     }
 
     fn prepare_registration<RE>(
@@ -495,18 +505,17 @@ where
 
         let auth_header_opt = self.initial_access_token().map(auth_bearer);
 
-        let mut headers = HeaderMap::new();
-        headers.append(ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON));
-        headers.append(CONTENT_TYPE, HeaderValue::from_static(MIME_TYPE_JSON));
+        let mut request = http::Request::builder()
+            .uri(registration_endpoint.to_string())
+            .method(Method::POST)
+            .header(ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON))
+            .header(CONTENT_TYPE, HeaderValue::from_static(MIME_TYPE_JSON));
         if let Some((header, value)) = auth_header_opt {
-            headers.append(header, value);
+            request = request.header(header, value);
         }
 
-        Ok(HttpRequest {
-            url: registration_endpoint.url().clone(),
-            method: Method::POST,
-            headers,
-            body: request_json,
+        request.body(request_json).map_err(|err| {
+            ClientRegistrationError::Other(format!("failed to prepare request: {err}"))
         })
     }
 
@@ -526,32 +535,33 @@ where
         // Spec says that a successful response SHOULD use 201 Created, and a registration error
         // condition returns (no "SHOULD") 400 Bad Request. For now, only accept these two status
         // codes. We may need to relax the success status to improve interoperability.
-        if http_response.status_code != StatusCode::CREATED
-            && http_response.status_code != StatusCode::BAD_REQUEST
+        if http_response.status() != StatusCode::CREATED
+            && http_response.status() != StatusCode::BAD_REQUEST
         {
             return Err(ClientRegistrationError::Response(
-                http_response.status_code,
-                http_response.body,
+                http_response.status(),
+                http_response.body().to_owned(),
                 "unexpected HTTP status code".to_string(),
             ));
         }
 
-        check_content_type(&http_response.headers, MIME_TYPE_JSON).map_err(|err_msg| {
+        check_content_type(http_response.headers(), MIME_TYPE_JSON).map_err(|err_msg| {
             ClientRegistrationError::Response(
-                http_response.status_code,
-                http_response.body.clone(),
+                http_response.status(),
+                http_response.body().to_owned(),
                 err_msg,
             )
         })?;
 
-        let response_body = String::from_utf8(http_response.body).map_err(|parse_error| {
-            ClientRegistrationError::Other(format!(
-                "couldn't parse response as UTF-8: {}",
-                parse_error
-            ))
-        })?;
+        let response_body =
+            String::from_utf8(http_response.body().to_owned()).map_err(|parse_error| {
+                ClientRegistrationError::Other(format!(
+                    "couldn't parse response as UTF-8: {}",
+                    parse_error
+                ))
+            })?;
 
-        if http_response.status_code == StatusCode::BAD_REQUEST {
+        if http_response.status() == StatusCode::BAD_REQUEST {
             let response_error: StandardErrorResponse<ET> = serde_path_to_error::deserialize(
                 &mut serde_json::Deserializer::from_str(&response_body),
             )

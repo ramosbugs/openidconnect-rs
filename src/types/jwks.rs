@@ -2,7 +2,7 @@ use crate::http_utils::{check_content_type, MIME_TYPE_JSON, MIME_TYPE_JWKS};
 use crate::types::jwk::{
     JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse, JwsSigningAlgorithm,
 };
-use crate::{DiscoveryError, HttpRequest, HttpResponse};
+use crate::{AsyncHttpClient, DiscoveryError, HttpRequest, HttpResponse, SyncHttpClient};
 
 use http::header::ACCEPT;
 use http::{HeaderValue, Method, StatusCode};
@@ -11,6 +11,7 @@ use serde_with::{serde_as, VecSkipError};
 
 use std::future::Future;
 use std::marker::PhantomData;
+use std::pin::Pin;
 
 new_url_type![
     /// JSON Web Key Set URL.
@@ -85,7 +86,7 @@ where
         }
     }
 
-    /// Return a list of suitable keys, given a key id an signature algorithm
+    /// Return a list of suitable keys, given a key ID and signature algorithm
     pub(crate) fn filter_keys(&self, key_id: &Option<JsonWebKeyId>, signature_alg: &JS) -> Vec<&K> {
         self.keys()
         .iter()
@@ -102,74 +103,83 @@ where
     }
 
     /// Fetch a remote JSON Web Key Set from the specified `url` using the given `http_client`
-    /// (e.g., [`crate::reqwest::http_client`] or [`crate::curl::http_client`]).
-    pub fn fetch<HC, RE>(
+    /// (e.g., [`reqwest::blocking::Client`](crate::reqwest::blocking::Client) or
+    /// [`CurlHttpClient`](crate::CurlHttpClient)).
+    pub fn fetch<C>(
         url: &JsonWebKeySetUrl,
-        http_client: HC,
-    ) -> Result<Self, DiscoveryError<RE>>
+        http_client: &C,
+    ) -> Result<Self, DiscoveryError<<C as SyncHttpClient>::Error>>
     where
-        HC: FnOnce(HttpRequest) -> Result<HttpResponse, RE>,
-        RE: std::error::Error + 'static,
+        C: SyncHttpClient,
     {
-        http_client(Self::fetch_request(url))
+        http_client
+            .call(Self::fetch_request(url).map_err(|err| {
+                DiscoveryError::Other(format!("failed to prepare request: {err}"))
+            })?)
             .map_err(DiscoveryError::Request)
             .and_then(Self::fetch_response)
     }
 
     /// Fetch a remote JSON Web Key Set from the specified `url` using the given async `http_client`
-    /// (e.g., [`crate::reqwest::async_http_client`]).
-    pub async fn fetch_async<F, HC, RE>(
+    /// (e.g., [`reqwest::Client`](crate::reqwest::Client)).
+    pub fn fetch_async<'c, C>(
         url: &JsonWebKeySetUrl,
-        http_client: HC,
-    ) -> Result<Self, DiscoveryError<RE>>
+        http_client: &'c C,
+    ) -> Pin<
+        Box<
+            dyn Future<Output = Result<Self, DiscoveryError<<C as AsyncHttpClient<'c>>::Error>>>
+                + 'c,
+        >,
+    >
     where
-        F: Future<Output = Result<HttpResponse, RE>>,
-        HC: FnOnce(HttpRequest) -> F,
-        RE: std::error::Error + 'static,
+        Self: 'c,
+        C: AsyncHttpClient<'c>,
     {
-        http_client(Self::fetch_request(url))
-            .await
-            .map_err(DiscoveryError::Request)
-            .and_then(Self::fetch_response)
+        let fetch_request = Self::fetch_request(url)
+            .map_err(|err| DiscoveryError::Other(format!("failed to prepare request: {err}")));
+        Box::pin(async move {
+            http_client
+                .call(fetch_request?)
+                .await
+                .map_err(DiscoveryError::Request)
+                .and_then(Self::fetch_response)
+        })
     }
 
-    fn fetch_request(url: &JsonWebKeySetUrl) -> HttpRequest {
-        HttpRequest {
-            url: url.url().clone(),
-            method: Method::GET,
-            headers: vec![(ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON))]
-                .into_iter()
-                .collect(),
-            body: Vec::new(),
-        }
+    fn fetch_request(url: &JsonWebKeySetUrl) -> Result<HttpRequest, http::Error> {
+        http::Request::builder()
+            .uri(url.to_string())
+            .method(Method::GET)
+            .header(ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON))
+            .body(Vec::new())
     }
 
     fn fetch_response<RE>(http_response: HttpResponse) -> Result<Self, DiscoveryError<RE>>
     where
         RE: std::error::Error + 'static,
     {
-        if http_response.status_code != StatusCode::OK {
+        if http_response.status() != StatusCode::OK {
             return Err(DiscoveryError::Response(
-                http_response.status_code,
-                http_response.body,
-                format!("HTTP status code {}", http_response.status_code),
+                http_response.status(),
+                http_response.body().to_owned(),
+                format!("HTTP status code {}", http_response.status()),
             ));
         }
 
-        check_content_type(&http_response.headers, MIME_TYPE_JSON)
+        check_content_type(http_response.headers(), MIME_TYPE_JSON)
             .or_else(|err| {
-                check_content_type(&http_response.headers, MIME_TYPE_JWKS).map_err(|_| err)
+                check_content_type(http_response.headers(), MIME_TYPE_JWKS).map_err(|_| err)
             })
             .map_err(|err_msg| {
                 DiscoveryError::Response(
-                    http_response.status_code,
-                    http_response.body.clone(),
+                    http_response.status(),
+                    http_response.body().to_owned(),
                     err_msg,
                 )
             })?;
 
         serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_slice(
-            &http_response.body,
+            http_response.body(),
         ))
         .map_err(DiscoveryError::Parse)
     }

@@ -21,7 +21,7 @@ use openidconnect::core::{
     CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm,
     CoreJwsSigningAlgorithm, CoreResponseMode, CoreResponseType, CoreSubjectIdentifierType,
 };
-use openidconnect::reqwest::http_client;
+use openidconnect::reqwest;
 use openidconnect::{
     AdditionalProviderMetadata, AuthType, ClientId, ClientSecret, DeviceAuthorizationUrl,
     IssuerUrl, ProviderMetadata, Scope,
@@ -77,10 +77,22 @@ fn main() -> Result<(), anyhow::Error> {
     let issuer_url = IssuerUrl::new(
         env::var("ISSUER_URL").expect("Missing the ISSUER_URL environment variable."),
     )
-    .expect("Invalid issuer URL");
+    .unwrap_or_else(|err| {
+        handle_error(&err, "Invalid issuer URL");
+        unreachable!();
+    });
+
+    let http_client = reqwest::blocking::ClientBuilder::new()
+        // Following redirects opens the client up to SSRF vulnerabilities.
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .unwrap_or_else(|err| {
+            handle_error(&err, "Failed to build HTTP client");
+            unreachable!();
+        });
 
     // Fetch Okta's OpenID Connect discovery document.
-    let provider_metadata = DeviceProviderMetadata::discover(&issuer_url, http_client)
+    let provider_metadata = DeviceProviderMetadata::discover(&issuer_url, &http_client)
         .unwrap_or_else(|err| {
             handle_error(&err, "Failed to discover OpenID Provider");
             unreachable!();
@@ -95,14 +107,17 @@ fn main() -> Result<(), anyhow::Error> {
     // Set up the config for the Okta device authorization process.
     let client =
         CoreClient::from_provider_metadata(provider_metadata, client_id, Some(client_secret))
-            .set_device_authorization_uri(device_authorization_endpoint)
+            .set_device_authorization_url(device_authorization_endpoint)
             .set_auth_type(AuthType::RequestBody);
 
     let details: CoreDeviceAuthorizationResponse = client
-        .exchange_device_code()?
+        .exchange_device_code()
         .add_scope(Scope::new("profile".to_string()))
-        .request(http_client)
-        .expect("Failed to get device code");
+        .request(&http_client)
+        .unwrap_or_else(|err| {
+            handle_error(&err, "Failed to get device code");
+            unreachable!();
+        });
     println!("Fetching device code...");
     dbg!(&details);
 
@@ -116,8 +131,15 @@ fn main() -> Result<(), anyhow::Error> {
     // Now poll for the token
     let token = client
         .exchange_device_access_token(&details)
-        .request(http_client, std::thread::sleep, None)
-        .expect("Failed to get token");
+        .unwrap_or_else(|err| {
+            handle_error(&err, "Failed to get access token");
+            unreachable!();
+        })
+        .request(&http_client, std::thread::sleep, None)
+        .unwrap_or_else(|err| {
+            handle_error(&err, "Failed to get access token");
+            unreachable!();
+        });
 
     // Finally, display the ID Token to verify we are using OIDC
     println!("ID Token response: {:?}", token.extra_fields().id_token());

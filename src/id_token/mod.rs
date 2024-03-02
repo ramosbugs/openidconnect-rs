@@ -31,7 +31,11 @@ mod tests;
 // we can pass it around and easily access a serialized JWT representation of it (e.g., for passing
 // to the authorization endpoint as an id_token_hint).
 /// OpenID Connect ID token.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[cfg_attr(
+    any(test, feature = "timing-resistant-secret-traits"),
+    derive(PartialEq)
+)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct IdToken<
     AC: AdditionalClaims,
     GC: GenderClaim,
@@ -176,7 +180,11 @@ where
 }
 
 /// OpenID Connect ID token claims.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[cfg_attr(
+    any(test, feature = "timing-resistant-secret-traits"),
+    derive(PartialEq)
+)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct IdTokenClaims<AC, GC>
 where
     AC: AdditionalClaims,
@@ -355,7 +363,11 @@ where
 }
 
 /// Extends the base OAuth2 token response with an ID token.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[cfg_attr(
+    any(test, feature = "timing-resistant-secret-traits"),
+    derive(PartialEq)
+)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct IdTokenFields<AC, EF, GC, JE, JS, JT>
 where
     AC: AdditionalClaims,

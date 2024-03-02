@@ -361,15 +361,6 @@ new_secret_type![
         }
     }
 ];
-impl PartialEq for Nonce {
-    fn eq(&self, other: &Self) -> bool {
-        use subtle::ConstantTimeEq;
-        self.secret()
-            .as_bytes()
-            .ct_eq(other.secret().as_bytes())
-            .into()
-    }
-}
 
 new_url_type![
     /// URL providing the OpenID Connect Provider's data usage policies for client applications.

@@ -20,7 +20,7 @@ use openidconnect::core::{
     CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm,
     CoreResponseMode, CoreResponseType, CoreRevocableToken, CoreSubjectIdentifierType,
 };
-use openidconnect::reqwest::http_client;
+use openidconnect::reqwest;
 use openidconnect::{
     AdditionalProviderMetadata, AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret,
     CsrfToken, IssuerUrl, Nonce, OAuth2TokenResponse, ProviderMetadata, RedirectUrl, RevocationUrl,
@@ -82,7 +82,19 @@ fn main() {
             .expect("Missing the GOOGLE_CLIENT_SECRET environment variable."),
     );
     let issuer_url =
-        IssuerUrl::new("https://accounts.google.com".to_string()).expect("Invalid issuer URL");
+        IssuerUrl::new("https://accounts.google.com".to_string()).unwrap_or_else(|err| {
+            handle_error(&err, "Invalid issuer URL");
+            unreachable!();
+        });
+
+    let http_client = reqwest::blocking::ClientBuilder::new()
+        // Following redirects opens the client up to SSRF vulnerabilities.
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .unwrap_or_else(|err| {
+            handle_error(&err, "Failed to build HTTP client");
+            unreachable!();
+        });
 
     // Fetch Google's OpenID Connect discovery document.
     //
@@ -95,7 +107,7 @@ fn main() {
     // And then test for the presence of "revocation_endpoint" in the map returned by a call to
     // .additional_metadata().
 
-    let provider_metadata = GoogleProviderMetadata::discover(&issuer_url, http_client)
+    let provider_metadata = GoogleProviderMetadata::discover(&issuer_url, &http_client)
         .unwrap_or_else(|err| {
             handle_error(&err, "Failed to discover OpenID Provider");
             unreachable!();
@@ -119,11 +131,17 @@ fn main() {
     // This example will be running its own server at localhost:8080.
     // See below for the server implementation.
     .set_redirect_uri(
-        RedirectUrl::new("http://localhost:8080".to_string()).expect("Invalid redirect URL"),
+        RedirectUrl::new("http://localhost:8080".to_string()).unwrap_or_else(|err| {
+            handle_error(&err, "Invalid redirect URL");
+            unreachable!();
+        }),
     )
     // Google supports OAuth 2.0 Token Revocation (RFC-7009)
-    .set_revocation_uri(
-        RevocationUrl::new(revocation_endpoint).expect("Invalid revocation endpoint URL"),
+    .set_revocation_url(
+        RevocationUrl::new(revocation_endpoint).unwrap_or_else(|err| {
+            handle_error(&err, "Invalid revocation endpoint URL");
+            unreachable!();
+        }),
     );
 
     // Generate the authorization URL to which we'll redirect the user.
@@ -188,7 +206,11 @@ fn main() {
     // Exchange the code with a token.
     let token_response = client
         .exchange_code(code)
-        .request(http_client)
+        .unwrap_or_else(|err| {
+            handle_error(&err, "No user info endpoint");
+            unreachable!();
+        })
+        .request(&http_client)
         .unwrap_or_else(|err| {
             handle_error(&err, "Failed to contact token endpoint");
             unreachable!();
@@ -220,10 +242,13 @@ fn main() {
 
     client
         .revoke_token(token_to_revoke)
-        .expect("no revocation_uri configured")
-        .request(http_client)
         .unwrap_or_else(|err| {
-            handle_error(&err, "Failed to contact token revocation endpoint");
+            handle_error(&err, "Failed to revoke token");
+            unreachable!();
+        })
+        .request(&http_client)
+        .unwrap_or_else(|err| {
+            handle_error(&err, "Failed to revoke token");
             unreachable!();
         });
 }
