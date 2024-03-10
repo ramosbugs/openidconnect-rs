@@ -6,7 +6,8 @@
 [![codecov](https://codecov.io/gh/ramosbugs/openidconnect-rs/branch/main/graph/badge.svg)](https://codecov.io/gh/ramosbugs/openidconnect-rs)
 
 This library provides extensible, strongly-typed interfaces for the OpenID
-Connect protocol.
+Connect protocol, which can be used to authenticate users via GitHub, Google, GitLab, Microsoft,
+Apple, Discord, and many other providers.
 
 API documentation and examples are available on [docs.rs](https://docs.rs/openidconnect).
 
@@ -27,9 +28,6 @@ and will not happen in patch releases.
 ## Standards
 
 * [OpenID Connect Core](https://openid.net/specs/openid-connect-core-1_0.html)
-  * This crate passes the
-    [Relying Party Certification](https://rp.certification.openid.net:8080/list?profile=C)
-    conformance tests for `response_type=code`
   * Supported features:
     * Relying Party flows: code, implicit, hybrid
     * Standard claims
