@@ -658,9 +658,8 @@ mod jwt;
 pub use oauth2::{
     AccessToken, AsyncHttpClient, AuthType, AuthUrl, AuthorizationCode,
     ClientCredentialsTokenRequest, ClientId, ClientSecret, CodeTokenRequest, ConfigurationError,
-    CsrfToken, DeviceAccessTokenRequest, DeviceAuthorizationRequest,
-    DeviceAuthorizationRequestFuture, DeviceAuthorizationResponse, DeviceAuthorizationUrl,
-    DeviceCode, DeviceCodeErrorResponse, DeviceCodeErrorResponseType,
+    CsrfToken, DeviceAccessTokenRequest, DeviceAuthorizationRequest, DeviceAuthorizationResponse,
+    DeviceAuthorizationUrl, DeviceCode, DeviceCodeErrorResponse, DeviceCodeErrorResponseType,
     EmptyExtraDeviceAuthorizationFields, EmptyExtraTokenFields, EndUserVerificationUrl,
     EndpointMaybeSet, EndpointNotSet, EndpointSet, EndpointState, ErrorResponse, ErrorResponseType,
     ExtraDeviceAuthorizationFields, ExtraTokenFields, HttpClientError, HttpRequest, HttpResponse,
@@ -669,8 +668,8 @@ pub use oauth2::{
     RequestTokenError, ResourceOwnerPassword, ResourceOwnerUsername, RevocableToken,
     RevocationErrorResponseType, RevocationRequest, RevocationUrl, Scope, StandardErrorResponse,
     StandardTokenIntrospectionResponse, StandardTokenResponse, SyncHttpClient,
-    TokenIntrospectionResponse, TokenRequestFuture, TokenResponse as OAuth2TokenResponse,
-    TokenType, TokenUrl, UserCode, VerificationUriComplete,
+    TokenIntrospectionResponse, TokenResponse as OAuth2TokenResponse, TokenType, TokenUrl,
+    UserCode, VerificationUriComplete,
 };
 
 /// Public re-exports of types used for HTTP client interfaces.

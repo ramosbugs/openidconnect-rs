@@ -445,6 +445,8 @@ new_type![
 mod serde_base64url_byte_array {
     use crate::core::base64_url_safe_no_pad;
 
+    use base64::prelude::BASE64_URL_SAFE_NO_PAD;
+    use base64::Engine;
     use serde::de::Error;
     use serde::{Deserialize, Deserializer, Serializer};
     use serde_json::{from_value, Value};
@@ -456,19 +458,21 @@ mod serde_base64url_byte_array {
         let value: Value = Deserialize::deserialize(deserializer)?;
         let base64_encoded: String = from_value(value).map_err(D::Error::custom)?;
 
-        base64::decode_config(&base64_encoded, base64_url_safe_no_pad()).map_err(|err| {
-            D::Error::custom(format!(
-                "invalid base64url encoding `{}`: {:?}",
-                base64_encoded, err
-            ))
-        })
+        base64_url_safe_no_pad()
+            .decode(&base64_encoded)
+            .map_err(|err| {
+                D::Error::custom(format!(
+                    "invalid base64url encoding `{}`: {:?}",
+                    base64_encoded, err
+                ))
+            })
     }
 
     pub fn serialize<S>(v: &[u8], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let base64_encoded = base64::encode_config(v, base64::URL_SAFE_NO_PAD);
+        let base64_encoded = BASE64_URL_SAFE_NO_PAD.encode(v);
         serializer.serialize_str(&base64_encoded)
     }
 }

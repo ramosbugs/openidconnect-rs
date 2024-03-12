@@ -14,6 +14,9 @@ use crate::{
     UserInfoClaims, UserInfoJsonWebToken, UserInfoVerifier,
 };
 
+use base64::alphabet::URL_SAFE;
+use base64::engine::general_purpose::NO_PAD;
+use base64::engine::GeneralPurpose;
 use oauth2::{EndpointNotSet, ResponseType as OAuth2ResponseType};
 use serde::{Deserialize, Serialize};
 
@@ -1076,8 +1079,8 @@ impl AsRef<str> for CoreSubjectIdentifierType {
 }
 impl SubjectIdentifierType for CoreSubjectIdentifierType {}
 
-pub(crate) fn base64_url_safe_no_pad() -> base64::Config {
-    base64::URL_SAFE_NO_PAD.decode_allow_trailing_bits(true)
+pub(crate) fn base64_url_safe_no_pad() -> GeneralPurpose {
+    GeneralPurpose::new(&URL_SAFE, NO_PAD.with_decode_allow_trailing_bits(true))
 }
 
 #[cfg(test)]

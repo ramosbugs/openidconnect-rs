@@ -182,13 +182,15 @@ mod tests {
     use crate::core::crypto::verify_rsa_signature;
     use crate::core::CoreJsonWebKey;
 
+    use base64::prelude::BASE64_URL_SAFE_NO_PAD;
+    use base64::Engine;
     use sha2::Digest;
 
     #[test]
     fn test_leading_zeros_are_parsed_correctly() {
         // The message we signed
         let msg = "THIS IS A SIGNATURE TEST";
-        let signature = base64::decode_config("bg0ohqKwYHAiODeG6qkJ-6IhodN7LGPxAh4hbWeIoBdSXrXMt8Ft8U0BV7vANPvF56h20XB9C0021x2kt7iAbMgPNcZ7LCuXMPPq04DrBpMHafH5BXBwnyDKJKrzDm5sfr6OgEkcxSLHaSJ6gTWQ3waPt6_SeH2-Fi74rg13MHyX-0iqz7bZveoBbGIs5yQCwvXgrDS9zW5LUwUHozHfE6FuSi_Z92ioXeu7FHHDg1KFfg3hs8ZLx4wAX15Vw2GCQOzvyNdbItxXRLnrN1NPqxFquVNo5RGlx6ihR1Jfe7y_n0NSR2q2TuU4cIwR0LRwEaANy5SDqtleQPrTEn8nGQ", base64::URL_SAFE_NO_PAD).unwrap();
+        let signature = BASE64_URL_SAFE_NO_PAD.decode("bg0ohqKwYHAiODeG6qkJ-6IhodN7LGPxAh4hbWeIoBdSXrXMt8Ft8U0BV7vANPvF56h20XB9C0021x2kt7iAbMgPNcZ7LCuXMPPq04DrBpMHafH5BXBwnyDKJKrzDm5sfr6OgEkcxSLHaSJ6gTWQ3waPt6_SeH2-Fi74rg13MHyX-0iqz7bZveoBbGIs5yQCwvXgrDS9zW5LUwUHozHfE6FuSi_Z92ioXeu7FHHDg1KFfg3hs8ZLx4wAX15Vw2GCQOzvyNdbItxXRLnrN1NPqxFquVNo5RGlx6ihR1Jfe7y_n0NSR2q2TuU4cIwR0LRwEaANy5SDqtleQPrTEn8nGQ").unwrap();
         // RSA pub key with leading 0
         let key : CoreJsonWebKey = serde_json::from_value(serde_json::json!(
             {
