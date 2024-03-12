@@ -3,6 +3,8 @@ use crate::{
     JwsSigningAlgorithm, PrivateSigningKey, SignatureVerificationError, SigningError,
 };
 
+use base64::prelude::BASE64_URL_SAFE_NO_PAD;
+use base64::Engine;
 use serde::de::{DeserializeOwned, Error as _, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
@@ -225,11 +227,11 @@ where
 
         let header_json =
             serde_json::to_string(&header).map_err(JsonWebTokenError::SerializationError)?;
-        let header_base64 = base64::encode_config(header_json, base64::URL_SAFE_NO_PAD);
+        let header_base64 = BASE64_URL_SAFE_NO_PAD.encode(header_json);
 
         let serialized_payload =
             S::serialize(&payload).map_err(JsonWebTokenError::SerializationError)?;
-        let payload_base64 = base64::encode_config(serialized_payload, base64::URL_SAFE_NO_PAD);
+        let payload_base64 = BASE64_URL_SAFE_NO_PAD.encode(serialized_payload);
 
         let signing_input = format!("{}.{}", header_base64, payload_base64);
 
@@ -379,30 +381,27 @@ where
                         )));
                     }
 
-                    let header_json =
-                        base64::decode_config(parts[0], crate::core::base64_url_safe_no_pad())
-                            .map_err(|err| {
-                                DE::custom(format!("Invalid base64url header encoding: {:?}", err))
-                            })?;
+                    let header_json = crate::core::base64_url_safe_no_pad()
+                        .decode(parts[0])
+                        .map_err(|err| {
+                            DE::custom(format!("Invalid base64url header encoding: {:?}", err))
+                        })?;
                     header = serde_json::from_slice(&header_json).map_err(|err| {
                         DE::custom(format!("Failed to parse header JSON: {:?}", err))
                     })?;
 
-                    let raw_payload =
-                        base64::decode_config(parts[1], crate::core::base64_url_safe_no_pad())
-                            .map_err(|err| {
-                                DE::custom(format!("Invalid base64url payload encoding: {:?}", err))
-                            })?;
+                    let raw_payload = crate::core::base64_url_safe_no_pad()
+                        .decode(parts[1])
+                        .map_err(|err| {
+                            DE::custom(format!("Invalid base64url payload encoding: {:?}", err))
+                        })?;
                     payload = S::deserialize::<DE>(&raw_payload)?;
 
-                    signature =
-                        base64::decode_config(parts[2], crate::core::base64_url_safe_no_pad())
-                            .map_err(|err| {
-                                DE::custom(format!(
-                                    "Invalid base64url signature encoding: {:?}",
-                                    err
-                                ))
-                            })?;
+                    signature = crate::core::base64_url_safe_no_pad()
+                        .decode(parts[2])
+                        .map_err(|err| {
+                            DE::custom(format!("Invalid base64url signature encoding: {:?}", err))
+                        })?;
 
                     signing_input = format!("{}.{}", parts[0], parts[1]);
                 }
@@ -437,7 +436,7 @@ where
     where
         SE: Serializer,
     {
-        let signature_base64 = base64::encode_config(&self.signature, base64::URL_SAFE_NO_PAD);
+        let signature_base64 = BASE64_URL_SAFE_NO_PAD.encode(&self.signature);
         serializer.serialize_str(&format!("{}.{}", self.signing_input, signature_base64))
     }
 }

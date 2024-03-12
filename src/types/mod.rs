@@ -1,6 +1,8 @@
 use crate::types::jwk::{JsonWebKeyType, JwsSigningAlgorithm};
 use crate::{AccessToken, AuthorizationCode};
 
+use base64::prelude::BASE64_URL_SAFE_NO_PAD;
+use base64::Engine;
 use oauth2::helpers::deserialize_space_delimited_vec;
 use rand::{thread_rng, Rng};
 use serde::de::DeserializeOwned;
@@ -106,11 +108,7 @@ new_type![
             JT: JsonWebKeyType,
         {
             alg.hash_bytes(access_token.secret().as_bytes())
-                .map(|hash| {
-                    Self::new(
-                        base64::encode_config(&hash[0..hash.len() / 2], base64::URL_SAFE_NO_PAD)
-                    )
-                })
+                .map(|hash| Self::new(BASE64_URL_SAFE_NO_PAD.encode(&hash[0..hash.len() / 2])))
                 .map_err(SigningError::UnsupportedAlg)
         }
     }
@@ -162,11 +160,7 @@ new_type![
             JT: JsonWebKeyType,
         {
             alg.hash_bytes(code.secret().as_bytes())
-                .map(|hash| {
-                    Self::new(
-                        base64::encode_config(&hash[0..hash.len() / 2], base64::URL_SAFE_NO_PAD)
-                    )
-                })
+                .map(|hash| Self::new(BASE64_URL_SAFE_NO_PAD.encode(&hash[0..hash.len() / 2])))
                 .map_err(SigningError::UnsupportedAlg)
         }
     }
@@ -357,7 +351,7 @@ new_secret_type![
         /// * `num_bytes` - Number of random bytes to generate, prior to base64-encoding.
         pub fn new_random_len(num_bytes: u32) -> Self {
             let random_bytes: Vec<u8> = (0..num_bytes).map(|_| thread_rng().gen::<u8>()).collect();
-            Nonce::new(base64::encode_config(random_bytes, base64::URL_SAFE_NO_PAD))
+            Nonce::new(BASE64_URL_SAFE_NO_PAD.encode(random_bytes))
         }
     }
 ];

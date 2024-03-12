@@ -11,6 +11,8 @@ use crate::jwt::tests::{
 use crate::verification::SignatureVerificationError;
 use crate::{JsonWebKey, JsonWebKeyId, JsonWebTokenAlgorithm, PrivateSigningKey, SigningError};
 
+use base64::prelude::BASE64_STANDARD;
+use base64::Engine;
 use rand::rngs::mock::StepRng;
 use rand::{CryptoRng, RngCore};
 use rsa::rand_core;
@@ -192,7 +194,8 @@ fn verify_signature(
     signing_input: &str,
     signature_base64: &str,
 ) {
-    let signature = base64::decode_config(signature_base64, crate::core::base64_url_safe_no_pad())
+    let signature = crate::core::base64_url_safe_no_pad()
+        .decode(signature_base64)
         .expect("failed to base64url decode");
     key.verify_signature(alg, signing_input.as_bytes(), &signature)
         .expect("signature verification failed");
@@ -215,7 +218,8 @@ fn verify_invalid_signature(
     signing_input: &str,
     signature_base64: &str,
 ) {
-    let signature = base64::decode_config(signature_base64, crate::core::base64_url_safe_no_pad())
+    let signature = crate::core::base64_url_safe_no_pad()
+        .decode(signature_base64)
         .expect("failed to base64url decode");
     match key
         .verify_signature(alg, signing_input.as_bytes(), &signature)
@@ -587,7 +591,7 @@ fn expect_hmac(
     expected_sig_base64: &str,
 ) {
     let sig = secret_key.sign(alg, message).unwrap();
-    assert_eq!(expected_sig_base64, base64::encode(&sig));
+    assert_eq!(expected_sig_base64, BASE64_STANDARD.encode(&sig));
 
     secret_key
         .as_verification_key()
@@ -707,7 +711,7 @@ fn expect_ed_sig(
     expected_sig_base64: &str,
 ) {
     let sig = private_key.sign(alg, message).unwrap();
-    assert_eq!(expected_sig_base64, base64::encode(&sig));
+    assert_eq!(expected_sig_base64, BASE64_STANDARD.encode(&sig));
 
     let public_key = private_key.as_verification_key();
     public_key.verify_signature(alg, message, &sig).unwrap();
@@ -720,7 +724,7 @@ fn expect_rsa_sig(
     expected_sig_base64: &str,
 ) {
     let sig = private_key.sign(alg, message).unwrap();
-    assert_eq!(expected_sig_base64, base64::encode(&sig));
+    assert_eq!(expected_sig_base64, BASE64_STANDARD.encode(&sig));
 
     let public_key = private_key.as_verification_key();
     public_key.verify_signature(alg, message, &sig).unwrap();
