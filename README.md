@@ -6,8 +6,11 @@
 [![codecov](https://codecov.io/gh/ramosbugs/openidconnect-rs/branch/main/graph/badge.svg)](https://codecov.io/gh/ramosbugs/openidconnect-rs)
 
 This library provides extensible, strongly-typed interfaces for the OpenID
-Connect protocol, which can be used to authenticate users via GitHub, Google, GitLab, Microsoft,
-Apple, Discord, and many other providers.
+Connect protocol, which can be used to authenticate users via
+[Google](https://developers.google.com/identity/openid-connect/openid-connect),
+[GitLab](https://docs.gitlab.com/ee/integration/openid_connect_provider.html),
+[Microsoft](https://learn.microsoft.com/en-us/entra/identity-platform/v2-protocols-oidc),
+and [many other providers](https://openid.net/certification/#OPENID-OP-P).
 
 API documentation and examples are available on [docs.rs](https://docs.rs/openidconnect).
 
