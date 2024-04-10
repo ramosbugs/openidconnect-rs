@@ -302,7 +302,9 @@ fn test_jwt_verified_claims() {
         ))
         .expect("failed to deserialize"),
     ) {
-        Err(ClaimsVerificationError::NoSignature) => {}
+        Err(ClaimsVerificationError::SignatureVerification(
+            SignatureVerificationError::NoSignature,
+        )) => {}
         other => panic!("unexpected result: {:?}", other),
     }
 
@@ -368,7 +370,9 @@ fn test_jwt_verified_claims() {
         ))
         .expect("failed to deserialize"),
     ) {
-        Err(ClaimsVerificationError::NoSignature) => {}
+        Err(ClaimsVerificationError::SignatureVerification(
+            SignatureVerificationError::NoSignature,
+        )) => {}
         other => panic!("unexpected result: {:?}", other),
     }
 

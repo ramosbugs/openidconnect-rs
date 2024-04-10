@@ -2,9 +2,9 @@ use crate::jwt::{JsonWebToken, JsonWebTokenJsonPayloadSerde};
 use crate::user_info::UserInfoClaimsImpl;
 use crate::{
     AdditionalClaims, Audience, AuthenticationContextClass, ClientId, ClientSecret, GenderClaim,
-    IdTokenClaims, IssuerUrl, JsonWebKey, JsonWebKeySet, JsonWebTokenAccess, JsonWebTokenAlgorithm,
-    JsonWebTokenHeader, JweContentEncryptionAlgorithm, JwsSigningAlgorithm, Nonce,
-    SubjectIdentifier,
+    IdTokenClaims, IssuerUrl, JsonWebKey, JsonWebKeyId, JsonWebKeySet, JsonWebTokenAccess,
+    JsonWebTokenAlgorithm, JsonWebTokenHeader, JweContentEncryptionAlgorithm, JwsSigningAlgorithm,
+    Nonce, SubjectIdentifier,
 };
 
 use chrono::{DateTime, Utc};
@@ -55,9 +55,6 @@ pub enum ClaimsVerificationError {
     /// Subject claim is invalid.
     #[error("Invalid subject: {0}")]
     InvalidSubject(String),
-    /// No signature present but claims must be signed.
-    #[error("Claims must be signed")]
-    NoSignature,
     /// An unexpected error occurred.
     #[error("{0}")]
     Other(String),
@@ -104,6 +101,9 @@ pub enum SignatureVerificationError {
     /// when the JOSE header specifies an ECDSA algorithm) or does not support signing.
     #[error("No matching key found")]
     NoMatchingKey,
+    /// No signature present but claims must be signed.
+    #[error("No signature found")]
+    NoSignature,
     /// Unsupported signature algorithm.
     #[error("Unsupported signature algorithm: {0}")]
     UnsupportedAlg(String),
@@ -114,7 +114,7 @@ pub enum SignatureVerificationError {
 
 // This struct is intentionally private.
 #[derive(Clone)]
-struct JwtClaimsVerifier<'a, K>
+pub(crate) struct JwtClaimsVerifier<'a, K>
 where
     K: JsonWebKey,
 {
@@ -344,21 +344,10 @@ where
 
         // Borrow the header again. We had to drop the reference above to allow for the
         // early exit calling jwt.unverified_claims(), which takes ownership of the JWT.
-        let signature_alg = match jwt.unverified_header().alg {
-            // Encryption is handled above.
-            JsonWebTokenAlgorithm::Encryption(_) => unreachable!(),
-            JsonWebTokenAlgorithm::Signature(ref signature_alg) => signature_alg,
-            // Section 2 of OpenID Connect Core 1.0 specifies that "ID Tokens MUST NOT use
-            // none as the alg value unless the Response Type used returns no ID Token from
-            // the Authorization Endpoint (such as when using the Authorization Code Flow)
-            // and the Client explicitly requested the use of none at Registration time."
-            //
-            // While there's technically a use case where this is ok, we choose not to
-            // support it for now to protect against accidental misuse. If demand arises,
-            // we can figure out a API that mitigates the risk.
-            JsonWebTokenAlgorithm::None => return Err(ClaimsVerificationError::NoSignature),
-        }
-        .clone();
+        let signature_alg = jwt
+            .signing_alg()
+            .map_err(ClaimsVerificationError::SignatureVerification)?
+            .to_owned();
 
         // 7. The alg value SHOULD be the default of RS256 or the algorithm sent by the Client
         //    in the id_token_signed_response_alg parameter during Registration.
@@ -416,47 +405,48 @@ where
         // Section 10.1 of OpenID Connect Core 1.0 states that the JWT must include a key ID
         // if the JWK set contains more than one public key.
 
-        // See if any key has a matching key ID (if supplied) and compatible type.
-        let public_keys = {
-            let key_id = &jwt.unverified_header().kid;
-            self.signature_keys.filter_keys(key_id, &signature_alg)
-        };
-        if public_keys.is_empty() {
-            return Err(ClaimsVerificationError::SignatureVerification(
-                SignatureVerificationError::NoMatchingKey,
-            ));
-        } else if public_keys.len() != 1 {
-            return Err(ClaimsVerificationError::SignatureVerification(
-                SignatureVerificationError::AmbiguousKeyId(format!(
-                    "JWK set must only contain one eligible public key \
-                     ({} eligible keys: {})",
-                    public_keys.len(),
-                    public_keys
-                        .iter()
-                        .map(|key| format!(
-                            "{} ({})",
-                            key.key_id()
-                                .map(|kid| format!("`{}`", **kid))
-                                .unwrap_or_else(|| "null ID".to_string()),
-                            serde_plain::to_string(key.key_type()).unwrap_or_else(|err| panic!(
-                                "key type {:?} failed to serialize to a string: {}",
-                                key.key_type(),
-                                err,
-                            ))
-                        ))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )),
-            ));
-        }
+        let public_key = self
+            .signing_key(jwt.unverified_header().kid.as_ref(), &signature_alg)
+            .map_err(ClaimsVerificationError::SignatureVerification)?;
 
-        jwt.payload(
-            &signature_alg.clone(),
-            *public_keys.first().expect("unreachable"),
-        )
-        .map_err(ClaimsVerificationError::SignatureVerification)
+        jwt.payload(&signature_alg.clone(), public_key)
+            .map_err(ClaimsVerificationError::SignatureVerification)
 
         // Steps 9--13 are specific to the ID token.
+    }
+
+    pub(crate) fn signing_key<'b>(
+        &'b self,
+        key_id: Option<&JsonWebKeyId>,
+        signature_alg: &K::SigningAlgorithm,
+    ) -> Result<&'b K, SignatureVerificationError> {
+        // See if any key has a matching key ID (if supplied) and compatible type.
+        let public_keys = self.signature_keys.filter_keys(key_id, signature_alg);
+        if public_keys.is_empty() {
+            Err(SignatureVerificationError::NoMatchingKey)
+        } else if public_keys.len() == 1 {
+            Ok(public_keys.first().expect("unreachable"))
+        } else {
+            Err(SignatureVerificationError::AmbiguousKeyId(format!(
+                "JWK set must only contain one eligible public key, but found {} eligible keys: {}",
+                public_keys.len(),
+                public_keys
+                    .iter()
+                    .map(|key| format!(
+                        "{} ({})",
+                        key.key_id()
+                            .map(|kid| format!("`{}`", **kid))
+                            .unwrap_or_else(|| "null ID".to_string()),
+                        serde_plain::to_string(key.key_type()).unwrap_or_else(|err| panic!(
+                            "key type {:?} failed to serialize to a string: {}",
+                            key.key_type(),
+                            err,
+                        ))
+                    ))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )))
+        }
     }
 }
 
@@ -503,7 +493,7 @@ where
     auth_time_verifier_fn:
         Arc<dyn Fn(Option<DateTime<Utc>>) -> Result<(), String> + 'a + Send + Sync>,
     iat_verifier_fn: Arc<dyn Fn(DateTime<Utc>) -> Result<(), String> + 'a + Send + Sync>,
-    jwt_verifier: JwtClaimsVerifier<'a, K>,
+    pub(crate) jwt_verifier: JwtClaimsVerifier<'a, K>,
     time_fn: Arc<dyn Fn() -> DateTime<Utc> + 'a + Send + Sync>,
 }
 impl<'a, K> IdTokenVerifier<'a, K>

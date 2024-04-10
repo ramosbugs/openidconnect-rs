@@ -49,6 +49,19 @@ pub trait JsonWebKey: Clone + Debug + DeserializeOwned + Serialize + 'static {
         message: &[u8],
         signature: &[u8],
     ) -> Result<(), SignatureVerificationError>;
+
+    /// Hashes the given `bytes` using the hash function associated with the specified signing
+    /// algorithm and returns the hashed bytes.
+    ///
+    /// Certain signing algorithms (e.g., `EdDSA`) use different hash functions depending on the
+    /// type of key (e.g., whether the `Ed25519` or `Ed448` curve is used), so this method is
+    /// implemented on the corresponding public key instead of the [`JwsSigningAlgorithm`] trait
+    /// to allow the implementation to determine the proper hash function to use.
+    /// If hashing fails or this key/signing algorithm does not have an associated hash function, an
+    /// `Err` is returned with a string describing the cause of the error. An error is also returned
+    /// if the specified signature algorithm is incompatible with this key (e.g., passing `EdDSA`
+    /// with an RSA key).
+    fn hash_bytes(&self, bytes: &[u8], alg: &Self::SigningAlgorithm) -> Result<Vec<u8>, String>;
 }
 
 /// Encodes a JWK key's alg field compatibility with either signing or encryption operations.
@@ -122,13 +135,6 @@ pub trait JwsSigningAlgorithm:
 
     /// Returns true if the signature algorithm uses a shared secret (symmetric key).
     fn uses_shared_secret(&self) -> bool;
-
-    /// Hashes the given `bytes` using the hash algorithm associated with this signing
-    /// algorithm, and returns the hashed bytes.
-    ///
-    /// If hashing fails or this signing algorithm does not have an associated hash function, an
-    /// `Err` is returned with a string describing the cause of the error.
-    fn hash_bytes(&self, bytes: &[u8]) -> Result<Vec<u8>, String>;
 
     /// Returns the RS256 algorithm.
     ///

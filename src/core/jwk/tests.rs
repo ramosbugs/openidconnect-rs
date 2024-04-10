@@ -94,7 +94,7 @@ fn test_core_jwk_deserialization_ec() {
 #[test]
 fn test_core_jwk_deserialization_ed() {
     let json = "{
-            \"alg\": \"Ed25519\",
+            \"alg\": \"EdDSA\",
             \"crv\": \"Ed25519\",
             \"kty\": \"OKP\",
             \"use\": \"sig\",
@@ -245,7 +245,7 @@ fn test_eddsa_verification() {
     // test ed25519
     verify_signature(
         &key_ed25519,
-        &CoreJwsSigningAlgorithm::EdDsaEd25519,
+        &CoreJwsSigningAlgorithm::EdDsa,
         pkcs1_signing_input,
         signature_ed25519,
     );
@@ -253,7 +253,7 @@ fn test_eddsa_verification() {
     // signature from ed448 variant
     verify_invalid_signature(
         &key_ed25519,
-        &CoreJwsSigningAlgorithm::EdDsaEd25519,
+        &CoreJwsSigningAlgorithm::EdDsa,
         pkcs1_signing_input,
         signature_ed448,
     );
@@ -261,7 +261,7 @@ fn test_eddsa_verification() {
     // different signature
     verify_invalid_signature(
         &key_ed25519,
-        &CoreJwsSigningAlgorithm::EdDsaEd25519,
+        &CoreJwsSigningAlgorithm::EdDsa,
         pkcs1_signing_input,
         signature_ed25519_other,
     );
@@ -775,7 +775,7 @@ fn test_ed_signing() {
     expect_ed_sig(
         &private_key,
         message,
-        &CoreJwsSigningAlgorithm::EdDsaEd25519,
+        &CoreJwsSigningAlgorithm::EdDsa,
         "XqP8sXaPrQa37+2lw+aiXv+6pegjioYUgo1/ShcX6kRhD2Vxh8DrQUbQlaGbljLJTNNc453E2Axp+Mxm+4OVAQ==",
     );
 
@@ -1050,7 +1050,7 @@ fn test_jwks_same_kid_different_alg() {
 
     {
         let keys = jwks.filter_keys(
-            &Some(JsonWebKeyId::new("2011-04-29".to_string())),
+            Some(&JsonWebKeyId::new("2011-04-29".to_string())),
             &CoreJwsSigningAlgorithm::RsaSsaPssSha384,
         );
         assert_eq!(keys.len(), 1);
@@ -1064,7 +1064,7 @@ fn test_jwks_same_kid_different_alg() {
 
     {
         let keys = jwks.filter_keys(
-            &Some(JsonWebKeyId::new("2011-04-29".to_string())),
+            Some(&JsonWebKeyId::new("2011-04-29".to_string())),
             &CoreJwsSigningAlgorithm::RsaSsaPssSha512,
         );
         assert_eq!(keys.len(), 0);

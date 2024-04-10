@@ -10,7 +10,7 @@ use ed25519_dalek::pkcs8::DecodePrivateKey;
 use ed25519_dalek::Signer;
 use rsa::pkcs1::DecodeRsaPrivateKey;
 use serde::{Deserialize, Serialize};
-use sha2::Digest;
+use sha2::{Digest, Sha256, Sha384, Sha512};
 
 #[cfg(test)]
 mod tests;
@@ -351,15 +351,17 @@ impl JsonWebKey for CoreJsonWebKey {
                     ))
                 }
             }
-            CoreJwsSigningAlgorithm::EdDsaEd25519 => {
-                if matches!(self.crv, Some(CoreJsonCurveType::Ed25519)) {
+            CoreJwsSigningAlgorithm::EdDsa => match self.crv {
+                None => Err(SignatureVerificationError::InvalidKey(
+                    "EdDSA key must specify `crv`".to_string(),
+                )),
+                Some(CoreJsonCurveType::Ed25519) => {
                     crypto::verify_ed_signature(self, message, signature)
-                } else {
-                    Err(SignatureVerificationError::InvalidKey(
-                        "Key uses different CRV than JWT".to_string(),
-                    ))
                 }
-            }
+                Some(ref crv) => Err(SignatureVerificationError::InvalidKey(format!(
+                    "Unsupported EdDSA curve {crv:?}"
+                ))),
+            },
             ref other => Err(SignatureVerificationError::UnsupportedAlg(
                 serde_plain::to_string(other).unwrap_or_else(|err| {
                     panic!(
@@ -368,6 +370,45 @@ impl JsonWebKey for CoreJsonWebKey {
                     )
                 }),
             )),
+        }
+    }
+
+    fn hash_bytes(&self, bytes: &[u8], alg: &Self::SigningAlgorithm) -> Result<Vec<u8>, String> {
+        check_key_compatibility(self, alg).map_err(String::from)?;
+
+        match *alg {
+            CoreJwsSigningAlgorithm::HmacSha256
+            | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256
+            | CoreJwsSigningAlgorithm::RsaSsaPssSha256
+            | CoreJwsSigningAlgorithm::EcdsaP256Sha256 => {
+                let mut hasher = Sha256::new();
+                hasher.update(bytes);
+                Ok(hasher.finalize().to_vec())
+            }
+            CoreJwsSigningAlgorithm::HmacSha384
+            | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384
+            | CoreJwsSigningAlgorithm::RsaSsaPssSha384
+            | CoreJwsSigningAlgorithm::EcdsaP384Sha384 => {
+                let mut hasher = Sha384::new();
+                hasher.update(bytes);
+                Ok(hasher.finalize().to_vec())
+            }
+            CoreJwsSigningAlgorithm::HmacSha512
+            | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512
+            | CoreJwsSigningAlgorithm::RsaSsaPssSha512
+            | CoreJwsSigningAlgorithm::EcdsaP521Sha512
+            | CoreJwsSigningAlgorithm::EdDsa => match self.crv {
+                None => Err("EdDSA key must specify `crv`".to_string()),
+                Some(CoreJsonCurveType::Ed25519) => {
+                    let mut hasher = Sha512::new();
+                    hasher.update(bytes);
+                    Ok(hasher.finalize().to_vec())
+                }
+                Some(ref crv) => Err(format!("Unsupported EdDSA curve {crv:?}")),
+            },
+            CoreJwsSigningAlgorithm::None => {
+                Err("Signature algorithm `none` has no corresponding hash algorithm".to_string())
+            }
         }
     }
 }
@@ -486,7 +527,7 @@ impl PrivateSigningKey for CoreEdDsaPrivateSigningKey {
         message: &[u8],
     ) -> Result<Vec<u8>, SigningError> {
         match *signature_alg {
-            CoreJwsSigningAlgorithm::EdDsaEd25519 => Ok(self.key_pair.sign(message)),
+            CoreJwsSigningAlgorithm::EdDsa => Ok(self.key_pair.sign(message)),
             ref other => Err(SigningError::UnsupportedAlg(
                 serde_plain::to_string(other).unwrap_or_else(|err| {
                     panic!(

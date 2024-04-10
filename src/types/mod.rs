@@ -1,4 +1,4 @@
-use crate::types::jwk::JwsSigningAlgorithm;
+use crate::types::jwk::JsonWebKey;
 use crate::{AccessToken, AuthorizationCode};
 
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
@@ -99,14 +99,15 @@ new_type![
     AccessTokenHash(String)
     impl {
         /// Initialize a new access token hash from an [`AccessToken`] and signature algorithm.
-        pub fn from_token<JS>(
+        pub fn from_token<K>(
             access_token: &AccessToken,
-            alg: &JS
+            alg: &K::SigningAlgorithm,
+            key: &K,
         ) -> Result<Self, SigningError>
         where
-            JS: JwsSigningAlgorithm,
+            K: JsonWebKey,
         {
-            alg.hash_bytes(access_token.secret().as_bytes())
+            key.hash_bytes(access_token.secret().as_bytes(), alg)
                 .map(|hash| Self::new(BASE64_URL_SAFE_NO_PAD.encode(&hash[0..hash.len() / 2])))
                 .map_err(SigningError::UnsupportedAlg)
         }
@@ -150,14 +151,15 @@ new_type![
     impl {
         /// Initialize a new authorization code hash from an [`AuthorizationCode`] and signature
         /// algorithm.
-        pub fn from_code<JS>(
+        pub fn from_code<K>(
             code: &AuthorizationCode,
-            alg: &JS
+            alg: &K::SigningAlgorithm,
+            key: &K,
         ) -> Result<Self, SigningError>
         where
-            JS: JwsSigningAlgorithm,
+            K: JsonWebKey,
         {
-            alg.hash_bytes(code.secret().as_bytes())
+            key.hash_bytes(code.secret().as_bytes(), alg)
                 .map(|hash| Self::new(BASE64_URL_SAFE_NO_PAD.encode(&hash[0..hash.len() / 2])))
                 .map_err(SigningError::UnsupportedAlg)
         }

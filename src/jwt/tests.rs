@@ -47,7 +47,7 @@ pub const TEST_RSA_PUB_KEY: &str = "{
 pub const TEST_ED_PUB_KEY_ED25519: &str = r#"{
         "kty": "OKP",
         "use": "sig",
-        "alg": "Ed25519",
+        "alg": "EdDSA",
         "crv": "Ed25519",
         "x": "sfliRRhciU_d5qsuC5Vcydi-t8bRfxTg_4qulVatW4A"
     }"#;

@@ -650,9 +650,9 @@ pub enum CoreJwsSigningAlgorithm {
     /// RSA SSA-PSS using SHA-512 and MGF1 with SHA-512.
     #[serde(rename = "PS512")]
     RsaSsaPssSha512,
-    /// EdDSA signature using Ed25519 curve
-    #[serde(rename = "Ed25519")]
-    EdDsaEd25519,
+    /// EdDSA signature (algorithm depends on `crv` header).
+    #[serde(rename = "EdDSA")]
+    EdDsa,
     /// No digital signature or MAC performed.
     ///
     /// # Security Warning
@@ -682,7 +682,7 @@ impl JwsSigningAlgorithm for CoreJwsSigningAlgorithm {
             CoreJwsSigningAlgorithm::EcdsaP256Sha256
             | CoreJwsSigningAlgorithm::EcdsaP384Sha384
             | CoreJwsSigningAlgorithm::EcdsaP521Sha512 => Some(CoreJsonWebKeyType::EllipticCurve),
-            CoreJwsSigningAlgorithm::EdDsaEd25519 => Some(CoreJsonWebKeyType::OctetKeyPair),
+            CoreJwsSigningAlgorithm::EdDsa => Some(CoreJsonWebKeyType::OctetKeyPair),
             CoreJwsSigningAlgorithm::None => None,
         }
     }
@@ -691,42 +691,6 @@ impl JwsSigningAlgorithm for CoreJwsSigningAlgorithm {
         self.key_type()
             .map(|kty| kty == CoreJsonWebKeyType::Symmetric)
             .unwrap_or(false)
-    }
-
-    fn hash_bytes(&self, bytes: &[u8]) -> Result<Vec<u8>, String> {
-        use sha2::{Digest, Sha256, Sha384, Sha512};
-        Ok(match *self {
-            CoreJwsSigningAlgorithm::HmacSha256
-            | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256
-            | CoreJwsSigningAlgorithm::RsaSsaPssSha256
-            | CoreJwsSigningAlgorithm::EcdsaP256Sha256 => {
-                let mut hasher = Sha256::new();
-                hasher.update(bytes);
-                hasher.finalize().to_vec()
-            }
-            CoreJwsSigningAlgorithm::HmacSha384
-            | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384
-            | CoreJwsSigningAlgorithm::RsaSsaPssSha384
-            | CoreJwsSigningAlgorithm::EcdsaP384Sha384 => {
-                let mut hasher = Sha384::new();
-                hasher.update(bytes);
-                hasher.finalize().to_vec()
-            }
-            CoreJwsSigningAlgorithm::HmacSha512
-            | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512
-            | CoreJwsSigningAlgorithm::RsaSsaPssSha512
-            | CoreJwsSigningAlgorithm::EcdsaP521Sha512
-            | CoreJwsSigningAlgorithm::EdDsaEd25519 => {
-                let mut hasher = Sha512::new();
-                hasher.update(bytes);
-                hasher.finalize().to_vec()
-            }
-            CoreJwsSigningAlgorithm::None => {
-                return Err(
-                    "signature algorithm `none` has no corresponding hash algorithm".to_string(),
-                );
-            }
-        })
     }
 
     fn rsa_sha_256() -> Self {

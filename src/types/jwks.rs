@@ -74,7 +74,7 @@ where
     /// Return a list of suitable keys, given a key ID and signature algorithm
     pub(crate) fn filter_keys(
         &self,
-        key_id: &Option<JsonWebKeyId>,
+        key_id: Option<&JsonWebKeyId>,
         signature_alg: &K::SigningAlgorithm,
     ) -> Vec<&K> {
         self.keys()
@@ -82,7 +82,7 @@ where
         .filter(|key|
             // Either the JWT doesn't include a 'kid' (in which case any 'kid'
             // is acceptable), or the 'kid' matches the key's ID.
-            if key_id.is_some() && key_id.as_ref() != key.key_id() {
+            if key_id.is_some() && key_id != key.key_id() {
                 false
             } else {
                 check_key_compatibility(*key, signature_alg).is_ok()

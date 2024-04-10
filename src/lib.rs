@@ -221,14 +221,16 @@
 //! let id_token = token_response
 //!   .id_token()
 //!   .ok_or_else(|| anyhow!("Server did not return an ID token"))?;
-//! let claims = id_token.claims(&client.id_token_verifier(), &nonce)?;
+//! let id_token_verifier = client.id_token_verifier();
+//! let claims = id_token.claims(&id_token_verifier, &nonce)?;
 //!
 //! // Verify the access token hash to ensure that the access token hasn't been substituted for
 //! // another user's.
 //! if let Some(expected_access_token_hash) = claims.access_token_hash() {
 //!     let actual_access_token_hash = AccessTokenHash::from_token(
 //!         token_response.access_token(),
-//!         &id_token.signing_alg()?
+//!         id_token.signing_alg()?,
+//!         id_token.signing_key(&id_token_verifier)?,
 //!     )?;
 //!     if actual_access_token_hash != *expected_access_token_hash {
 //!         return Err(anyhow!("Invalid access token"));
@@ -592,14 +594,16 @@
 //! let id_token = token_response
 //!   .id_token()
 //!   .ok_or_else(|| anyhow!("Server did not return an ID token"))?;
-//! let claims = id_token.claims(&client.id_token_verifier(), &nonce)?;
+//! let id_token_verifier = client.id_token_verifier();
+//! let claims = id_token.claims(&id_token_verifier, &nonce)?;
 //!
 //! // Verify the access token hash to ensure that the access token hasn't been substituted for
 //! // another user's.
 //! if let Some(expected_access_token_hash) = claims.access_token_hash() {
 //!     let actual_access_token_hash = AccessTokenHash::from_token(
 //!         token_response.access_token(),
-//!         &id_token.signing_alg()?
+//!         id_token.signing_alg()?,
+//!         id_token.signing_key(&id_token_verifier)?,
 //!     )?;
 //!     if actual_access_token_hash != *expected_access_token_hash {
 //!         return Err(anyhow!("Invalid access token"));

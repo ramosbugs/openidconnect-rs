@@ -164,6 +164,31 @@ where
     ) -> Result<Self::ReturnType, SignatureVerificationError>
     where
         K: JsonWebKey<SigningAlgorithm = JS>;
+
+    fn signing_alg(&self) -> Result<&JS, SignatureVerificationError> {
+        match self.unverified_header().alg {
+            JsonWebTokenAlgorithm::Signature(ref signing_alg) => Ok(signing_alg),
+            JsonWebTokenAlgorithm::Encryption(ref other) => {
+                Err(SignatureVerificationError::UnsupportedAlg(
+                    serde_plain::to_string(other).unwrap_or_else(|err| {
+                        panic!(
+                            "encryption alg {:?} failed to serialize to a string: {}",
+                            other, err
+                        )
+                    }),
+                ))
+            }
+            // Section 2 of OpenID Connect Core 1.0 specifies that "ID Tokens MUST NOT use
+            // none as the alg value unless the Response Type used returns no ID Token from
+            // the Authorization Endpoint (such as when using the Authorization Code Flow)
+            // and the Client explicitly requested the use of none at Registration time."
+            //
+            // While there's technically a use case where this is ok, we choose not to
+            // support it for now to protect against accidental misuse. If demand arises,
+            // we can figure out a API that mitigates the risk.
+            JsonWebTokenAlgorithm::None => Err(SignatureVerificationError::NoSignature),
+        }
+    }
 }
 
 /// Error creating a JSON Web Token.

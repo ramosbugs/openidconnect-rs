@@ -10,8 +10,8 @@ use crate::{
     EndUserWebsiteUrl, EndpointState, ErrorResponse, GenderClaim, HttpRequest, HttpResponse,
     IssuerClaim, IssuerUrl, JsonWebKey, JsonWebToken, JweContentEncryptionAlgorithm,
     JwsSigningAlgorithm, LanguageTag, LocalizedClaim, PrivateSigningKey, RevocableToken,
-    StandardClaims, SubjectIdentifier, SyncHttpClient, TokenIntrospectionResponse, TokenResponse,
-    TokenType,
+    SignatureVerificationError, StandardClaims, SubjectIdentifier, SyncHttpClient,
+    TokenIntrospectionResponse, TokenResponse, TokenType,
 };
 
 use chrono::{DateTime, Utc};
@@ -224,7 +224,9 @@ where
             ref content_type if content_type_has_essence(content_type, MIME_TYPE_JSON) => {
                 if self.require_signed_response {
                     return Err(UserInfoError::ClaimsVerification(
-                        ClaimsVerificationError::NoSignature,
+                        ClaimsVerificationError::SignatureVerification(
+                            SignatureVerificationError::NoSignature,
+                        ),
                     ));
                 }
                 UserInfoClaims::from_json(

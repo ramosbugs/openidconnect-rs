@@ -12,8 +12,8 @@ use crate::{
     EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone, EndUserUsername,
     EndUserWebsiteUrl, ExtraTokenFields, GenderClaim, IdTokenVerifier, IssuerClaim, IssuerUrl,
     JsonWebKey, JsonWebToken, JsonWebTokenAlgorithm, JweContentEncryptionAlgorithm, LanguageTag,
-    LocalizedClaim, Nonce, NonceVerifier, PrivateSigningKey, SigningError, StandardClaims,
-    SubjectIdentifier,
+    LocalizedClaim, Nonce, NonceVerifier, PrivateSigningKey, SignatureVerificationError,
+    StandardClaims, SubjectIdentifier,
 };
 
 use chrono::{DateTime, Utc};
@@ -82,15 +82,18 @@ where
         S: PrivateSigningKey,
         <S as PrivateSigningKey>::VerificationKey: JsonWebKey<SigningAlgorithm = JS>,
     {
+        let verification_key = signing_key.as_verification_key();
         let at_hash = access_token
             .map(|at| {
-                AccessTokenHash::from_token(at, &alg).map_err(JsonWebTokenError::SigningError)
+                AccessTokenHash::from_token(at, &alg, &verification_key)
+                    .map_err(JsonWebTokenError::SigningError)
             })
             .transpose()?
             .or_else(|| claims.access_token_hash.clone());
         let c_hash = code
             .map(|c| {
-                AuthorizationCodeHash::from_code(c, &alg).map_err(JsonWebTokenError::SigningError)
+                AuthorizationCodeHash::from_code(c, &alg, &verification_key)
+                    .map_err(JsonWebTokenError::SigningError)
             })
             .transpose()?
             .or_else(|| claims.code_hash.clone());
@@ -137,19 +140,37 @@ where
     ///
     /// This function returns an error if the token is unsigned or utilizes JSON Web Encryption
     /// (JWE).
-    pub fn signing_alg(&self) -> Result<JS, SigningError> {
+    pub fn signing_alg(&self) -> Result<&JS, SignatureVerificationError> {
         match self.0.unverified_header().alg {
-            JsonWebTokenAlgorithm::Signature(ref signing_alg) => Ok(signing_alg.clone()),
-            JsonWebTokenAlgorithm::Encryption(ref other) => Err(SigningError::UnsupportedAlg(
-                serde_plain::to_string(other).unwrap_or_else(|err| {
-                    panic!(
-                        "encryption alg {:?} failed to serialize to a string: {}",
-                        other, err
-                    )
-                }),
-            )),
-            JsonWebTokenAlgorithm::None => Err(SigningError::UnsupportedAlg("none".to_string())),
+            JsonWebTokenAlgorithm::Signature(ref signing_alg) => Ok(signing_alg),
+            JsonWebTokenAlgorithm::Encryption(ref other) => {
+                Err(SignatureVerificationError::UnsupportedAlg(
+                    serde_plain::to_string(other).unwrap_or_else(|err| {
+                        panic!(
+                            "encryption alg {:?} failed to serialize to a string: {}",
+                            other, err
+                        )
+                    }),
+                ))
+            }
+            JsonWebTokenAlgorithm::None => Err(SignatureVerificationError::NoSignature),
         }
+    }
+
+    /// Returns the [`JsonWebKey`] usable for verifying this ID token's JSON Web Signature.
+    ///
+    /// This function returns an error if the token has no signature or a corresponding key cannot
+    /// be found.
+    pub fn signing_key<'s, K>(
+        &self,
+        verifier: &'s IdTokenVerifier<'s, K>,
+    ) -> Result<&'s K, SignatureVerificationError>
+    where
+        K: JsonWebKey<SigningAlgorithm = JS>,
+    {
+        verifier
+            .jwt_verifier
+            .signing_key(self.0.unverified_header().kid.as_ref(), self.signing_alg()?)
     }
 }
 impl<AC, GC, JE, JS> ToString for IdToken<AC, GC, JE, JS>
