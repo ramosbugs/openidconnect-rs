@@ -3,7 +3,7 @@ use crate::helpers::{
 };
 use crate::jwt::JsonWebTokenAccess;
 use crate::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
-use crate::types::jwk::{JsonWebKeyType, JwsSigningAlgorithm};
+use crate::types::jwk::JwsSigningAlgorithm;
 use crate::{
     AccessToken, AccessTokenHash, AdditionalClaims, AddressClaim, Audience, AudiencesClaim,
     AuthenticationContextClass, AuthenticationMethodReference, AuthorizationCode,
@@ -11,9 +11,9 @@ use crate::{
     EndUserFamilyName, EndUserGivenName, EndUserMiddleName, EndUserName, EndUserNickname,
     EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone, EndUserUsername,
     EndUserWebsiteUrl, ExtraTokenFields, GenderClaim, IdTokenVerifier, IssuerClaim, IssuerUrl,
-    JsonWebKey, JsonWebKeyUse, JsonWebToken, JsonWebTokenAlgorithm, JweContentEncryptionAlgorithm,
-    LanguageTag, LocalizedClaim, Nonce, NonceVerifier, PrivateSigningKey, SigningError,
-    StandardClaims, SubjectIdentifier,
+    JsonWebKey, JsonWebToken, JsonWebTokenAlgorithm, JweContentEncryptionAlgorithm, LanguageTag,
+    LocalizedClaim, Nonce, NonceVerifier, PrivateSigningKey, SigningError, StandardClaims,
+    SubjectIdentifier,
 };
 
 use chrono::{DateTime, Utc};
@@ -21,7 +21,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use std::fmt::Debug;
-use std::marker::PhantomData;
 use std::str::FromStr;
 
 #[cfg(test)]
@@ -39,21 +38,19 @@ mod tests;
 pub struct IdToken<
     AC: AdditionalClaims,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
 >(
     #[serde(bound = "AC: AdditionalClaims")]
-    JsonWebToken<JE, JS, JT, IdTokenClaims<AC, GC>, JsonWebTokenJsonPayloadSerde>,
+    JsonWebToken<JE, JS, IdTokenClaims<AC, GC>, JsonWebTokenJsonPayloadSerde>,
 );
 
-impl<AC, GC, JE, JS, JT> FromStr for IdToken<AC, GC, JE, JS, JT>
+impl<AC, GC, JE, JS> FromStr for IdToken<AC, GC, JE, JS>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
 {
     type Err = serde_json::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -61,13 +58,12 @@ where
     }
 }
 
-impl<AC, GC, JE, JS, JT> IdToken<AC, GC, JE, JS, JT>
+impl<AC, GC, JE, JS> IdToken<AC, GC, JE, JS>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
 {
     /// Initializes an ID token with the specified claims, signed using the given signing key and
     /// algorithm.
@@ -75,7 +71,7 @@ where
     /// If an `access_token` and/or `code` are provided, this method sets the `at_hash` and/or
     /// `c_hash` claims using the given signing algorithm, respectively. Otherwise, those claims are
     /// unchanged from the values specified in `claims`.
-    pub fn new<JU, K, S>(
+    pub fn new<S>(
         claims: IdTokenClaims<AC, GC>,
         signing_key: &S,
         alg: JS,
@@ -83,9 +79,8 @@ where
         code: Option<&AuthorizationCode>,
     ) -> Result<Self, JsonWebTokenError>
     where
-        JU: JsonWebKeyUse,
-        K: JsonWebKey<JS, JT, JU>,
-        S: PrivateSigningKey<JS, JT, JU, K>,
+        S: PrivateSigningKey,
+        <S as PrivateSigningKey>::VerificationKey: JsonWebKey<SigningAlgorithm = JS>,
     {
         let at_hash = access_token
             .map(|at| {
@@ -113,28 +108,26 @@ where
     }
 
     /// Verifies and returns a reference to the ID token claims.
-    pub fn claims<'a, JU, K, N>(
+    pub fn claims<'a, K, N>(
         &'a self,
-        verifier: &IdTokenVerifier<JS, JT, JU, K>,
+        verifier: &IdTokenVerifier<K>,
         nonce_verifier: N,
     ) -> Result<&'a IdTokenClaims<AC, GC>, ClaimsVerificationError>
     where
-        JU: JsonWebKeyUse,
-        K: JsonWebKey<JS, JT, JU>,
+        K: JsonWebKey<SigningAlgorithm = JS>,
         N: NonceVerifier,
     {
         verifier.verified_claims(&self.0, nonce_verifier)
     }
 
     /// Verifies and returns the ID token claims.
-    pub fn into_claims<JU, K, N>(
+    pub fn into_claims<K, N>(
         self,
-        verifier: &IdTokenVerifier<JS, JT, JU, K>,
+        verifier: &IdTokenVerifier<K>,
         nonce_verifier: N,
     ) -> Result<IdTokenClaims<AC, GC>, ClaimsVerificationError>
     where
-        JU: JsonWebKeyUse,
-        K: JsonWebKey<JS, JT, JU>,
+        K: JsonWebKey<SigningAlgorithm = JS>,
         N: NonceVerifier,
     {
         verifier.verified_claims_owned(self.0, nonce_verifier)
@@ -146,7 +139,7 @@ where
     /// (JWE).
     pub fn signing_alg(&self) -> Result<JS, SigningError> {
         match self.0.unverified_header().alg {
-            JsonWebTokenAlgorithm::Signature(ref signing_alg, _) => Ok(signing_alg.clone()),
+            JsonWebTokenAlgorithm::Signature(ref signing_alg) => Ok(signing_alg.clone()),
             JsonWebTokenAlgorithm::Encryption(ref other) => Err(SigningError::UnsupportedAlg(
                 serde_plain::to_string(other).unwrap_or_else(|err| {
                     panic!(
@@ -159,13 +152,12 @@ where
         }
     }
 }
-impl<AC, GC, JE, JS, JT> ToString for IdToken<AC, GC, JE, JS, JT>
+impl<AC, GC, JE, JS> ToString for IdToken<AC, GC, JE, JS>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
 {
     fn to_string(&self) -> String {
         serde_json::to_value(self)
@@ -368,42 +360,37 @@ where
     derive(PartialEq)
 )]
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct IdTokenFields<AC, EF, GC, JE, JS, JT>
+pub struct IdTokenFields<AC, EF, GC, JE, JS>
 where
     AC: AdditionalClaims,
     EF: ExtraTokenFields,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
 {
     #[serde(bound = "AC: AdditionalClaims")]
-    id_token: Option<IdToken<AC, GC, JE, JS, JT>>,
+    id_token: Option<IdToken<AC, GC, JE, JS>>,
     #[serde(bound = "EF: ExtraTokenFields", flatten)]
     extra_fields: EF,
-    #[serde(skip)]
-    _phantom: PhantomData<JT>,
 }
-impl<AC, EF, GC, JE, JS, JT> IdTokenFields<AC, EF, GC, JE, JS, JT>
+impl<AC, EF, GC, JE, JS> IdTokenFields<AC, EF, GC, JE, JS>
 where
     AC: AdditionalClaims,
     EF: ExtraTokenFields,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
 {
     /// Initializes new ID token fields containing the specified [`IdToken`] and extra fields.
-    pub fn new(id_token: Option<IdToken<AC, GC, JE, JS, JT>>, extra_fields: EF) -> Self {
+    pub fn new(id_token: Option<IdToken<AC, GC, JE, JS>>, extra_fields: EF) -> Self {
         Self {
             id_token,
             extra_fields,
-            _phantom: PhantomData,
         }
     }
 
     /// Returns the [`IdToken`] contained in the OAuth2 token response.
-    pub fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS, JT>> {
+    pub fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS>> {
         self.id_token.as_ref()
     }
     /// Returns the extra fields contained in the OAuth2 token response.
@@ -411,13 +398,12 @@ where
         &self.extra_fields
     }
 }
-impl<AC, EF, GC, JE, JS, JT> ExtraTokenFields for IdTokenFields<AC, EF, GC, JE, JS, JT>
+impl<AC, EF, GC, JE, JS> ExtraTokenFields for IdTokenFields<AC, EF, GC, JE, JS>
 where
     AC: AdditionalClaims,
     EF: ExtraTokenFields,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
 {
 }

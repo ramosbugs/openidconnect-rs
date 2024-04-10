@@ -13,27 +13,28 @@ new_type![
 ];
 
 /// JSON Web Key.
-pub trait JsonWebKey<JS, JT, JU>: Clone + Debug + DeserializeOwned + Serialize + 'static
-where
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-{
+pub trait JsonWebKey: Clone + Debug + DeserializeOwned + Serialize + 'static {
+    /// Allowed key usage.
+    type KeyUse: JsonWebKeyUse;
+
+    /// JSON Web Signature (JWS) algorithm.
+    type SigningAlgorithm: JwsSigningAlgorithm;
+
     /// Returns the key ID, or `None` if no key ID is specified.
     fn key_id(&self) -> Option<&JsonWebKeyId>;
 
     /// Returns the key type (e.g., RSA).
-    fn key_type(&self) -> &JT;
+    fn key_type(&self) -> &<Self::SigningAlgorithm as JwsSigningAlgorithm>::KeyType;
 
     /// Returns the allowed key usage (e.g., signing or encryption), or `None` if no usage is
     /// specified.
-    fn key_use(&self) -> Option<&JU>;
+    fn key_use(&self) -> Option<&Self::KeyUse>;
 
     /// Returns the algorithm (e.g. ES512) this key must be used with, or `Unspecified` if
     /// no algorithm constraint was given, or unsupported if the algorithm is not for signing.
     ///
     /// It's not sufficient to tell whether a key can be used for signing, as key use also has to be validated.
-    fn signing_alg(&self) -> JsonWebKeyAlgorithm<&JS>;
+    fn signing_alg(&self) -> JsonWebKeyAlgorithm<&Self::SigningAlgorithm>;
 
     /// Initializes a new symmetric key or shared signing secret from the specified raw bytes.
     fn new_symmetric(key: Vec<u8>) -> Self;
@@ -44,7 +45,7 @@ where
     /// Returns `Ok` if the signature is valid, or an `Err` otherwise.
     fn verify_signature(
         &self,
-        signature_alg: &JS,
+        signature_alg: &Self::SigningAlgorithm,
         message: &[u8],
         signature: &[u8],
     ) -> Result<(), SignatureVerificationError>;
@@ -62,18 +63,19 @@ pub enum JsonWebKeyAlgorithm<A: Debug> {
 }
 
 /// Private or symmetric key for signing.
-pub trait PrivateSigningKey<JS, JT, JU, K>
-where
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
-{
+pub trait PrivateSigningKey {
+    /// Corresponding type of JSON Web Key used for verifying signatures produced by this key.
+    type VerificationKey: JsonWebKey;
+
     /// Signs the given `message` using the given signature algorithm.
-    fn sign(&self, signature_alg: &JS, message: &[u8]) -> Result<Vec<u8>, SigningError>;
+    fn sign(
+        &self,
+        signature_alg: &<Self::VerificationKey as JsonWebKey>::SigningAlgorithm,
+        message: &[u8],
+    ) -> Result<Vec<u8>, SigningError>;
 
     /// Converts this key to a JSON Web Key that can be used for verifying signatures.
-    fn as_verification_key(&self) -> K;
+    fn as_verification_key(&self) -> Self::VerificationKey;
 }
 
 /// Key type (e.g., RSA).
@@ -92,13 +94,14 @@ pub trait JsonWebKeyUse: Debug + DeserializeOwned + Serialize + 'static {
 }
 
 /// JSON Web Encryption (JWE) content encryption algorithm.
-pub trait JweContentEncryptionAlgorithm<JT>:
+pub trait JweContentEncryptionAlgorithm:
     Clone + Debug + DeserializeOwned + Serialize + 'static
-where
-    JT: JsonWebKeyType,
 {
+    /// Key type (e.g., RSA).
+    type KeyType: JsonWebKeyType;
+
     /// Returns the type of key required to use this encryption algorithm.
-    fn key_type(&self) -> Result<JT, String>;
+    fn key_type(&self) -> Result<Self::KeyType, String>;
 }
 
 /// JSON Web Encryption (JWE) key management algorithm.
@@ -107,14 +110,15 @@ pub trait JweKeyManagementAlgorithm: Debug + DeserializeOwned + Serialize + 'sta
 }
 
 /// JSON Web Signature (JWS) algorithm.
-pub trait JwsSigningAlgorithm<JT>:
+pub trait JwsSigningAlgorithm:
     Clone + Debug + DeserializeOwned + Eq + Hash + PartialEq + Serialize + 'static
-where
-    JT: JsonWebKeyType,
 {
+    /// Key type (e.g., RSA).
+    type KeyType: JsonWebKeyType;
+
     /// Returns the type of key required to use this signature algorithm, or `None` if this
     /// algorithm does not require a key.
-    fn key_type(&self) -> Option<JT>;
+    fn key_type(&self) -> Option<Self::KeyType>;
 
     /// Returns true if the signature algorithm uses a shared secret (symmetric key).
     fn uses_shared_secret(&self) -> bool;

@@ -36,13 +36,8 @@ pub struct CoreJsonWebKey {
     ///
     /// It can either be an algorithm intended for use with JWS or JWE, or something different.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) alg: Option<
-        JsonWebTokenAlgorithm<
-            CoreJweContentEncryptionAlgorithm,
-            CoreJwsSigningAlgorithm,
-            CoreJsonWebKeyType,
-        >,
-    >,
+    pub(crate) alg:
+        Option<JsonWebTokenAlgorithm<CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm>>,
 
     // From RFC 7517, Section 4: "Additional members can be present in the JWK; if not understood
     // by implementations encountering them, they MUST be ignored.  Member names used for
@@ -165,8 +160,10 @@ impl CoreJsonWebKey {
         }
     }
 }
+impl JsonWebKey for CoreJsonWebKey {
+    type KeyUse = CoreJsonWebKeyUse;
+    type SigningAlgorithm = CoreJwsSigningAlgorithm;
 
-impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> for CoreJsonWebKey {
     fn key_id(&self) -> Option<&JsonWebKeyId> {
         self.kid.as_ref()
     }
@@ -175,6 +172,14 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
     }
     fn key_use(&self) -> Option<&CoreJsonWebKeyUse> {
         self.use_.as_ref()
+    }
+
+    fn signing_alg(&self) -> JsonWebKeyAlgorithm<&CoreJwsSigningAlgorithm> {
+        match self.alg {
+            None => JsonWebKeyAlgorithm::Unspecified,
+            Some(JsonWebTokenAlgorithm::Signature(ref alg)) => JsonWebKeyAlgorithm::Algorithm(alg),
+            Some(_) => JsonWebKeyAlgorithm::Unsupported,
+        }
     }
 
     fn new_symmetric(key: Vec<u8>) -> Self {
@@ -365,16 +370,6 @@ impl JsonWebKey<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse> 
             )),
         }
     }
-
-    fn signing_alg(&self) -> JsonWebKeyAlgorithm<&CoreJwsSigningAlgorithm> {
-        match self.alg {
-            None => JsonWebKeyAlgorithm::Unspecified,
-            Some(JsonWebTokenAlgorithm::Signature(ref alg, _)) => {
-                JsonWebKeyAlgorithm::Algorithm(alg)
-            }
-            Some(_) => JsonWebKeyAlgorithm::Unsupported,
-        }
-    }
 }
 
 /// HMAC secret key.
@@ -396,14 +391,9 @@ impl CoreHmacKey {
         }
     }
 }
-impl
-    PrivateSigningKey<
-        CoreJwsSigningAlgorithm,
-        CoreJsonWebKeyType,
-        CoreJsonWebKeyUse,
-        CoreJsonWebKey,
-    > for CoreHmacKey
-{
+impl PrivateSigningKey for CoreHmacKey {
+    type VerificationKey = CoreJsonWebKey;
+
     fn sign(
         &self,
         signature_alg: &CoreJwsSigningAlgorithm,
@@ -487,14 +477,9 @@ impl CoreEdDsaPrivateSigningKey {
         })
     }
 }
-impl
-    PrivateSigningKey<
-        CoreJwsSigningAlgorithm,
-        CoreJsonWebKeyType,
-        CoreJsonWebKeyUse,
-        CoreJsonWebKey,
-    > for CoreEdDsaPrivateSigningKey
-{
+impl PrivateSigningKey for CoreEdDsaPrivateSigningKey {
+    type VerificationKey = CoreJsonWebKey;
+
     fn sign(
         &self,
         signature_alg: &CoreJwsSigningAlgorithm,
@@ -564,14 +549,9 @@ impl CoreRsaPrivateSigningKey {
         Ok(Self { key_pair, rng, kid })
     }
 }
-impl
-    PrivateSigningKey<
-        CoreJwsSigningAlgorithm,
-        CoreJsonWebKeyType,
-        CoreJsonWebKeyUse,
-        CoreJsonWebKey,
-    > for CoreRsaPrivateSigningKey
-{
+impl PrivateSigningKey for CoreRsaPrivateSigningKey {
+    type VerificationKey = CoreJsonWebKey;
+
     fn sign(
         &self,
         signature_alg: &CoreJwsSigningAlgorithm,

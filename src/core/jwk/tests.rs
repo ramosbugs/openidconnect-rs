@@ -1056,9 +1056,8 @@ fn test_jwks_same_kid_different_alg() {
         assert_eq!(keys.len(), 1);
         assert_eq!(
             keys[0].alg,
-            Some(crate::jwt::JsonWebTokenAlgorithm::Signature(
-                CoreJwsSigningAlgorithm::RsaSsaPssSha384,
-                std::marker::PhantomData
+            Some(JsonWebTokenAlgorithm::Signature(
+                CoreJwsSigningAlgorithm::RsaSsaPssSha384
             ))
         );
     }

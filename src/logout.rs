@@ -1,14 +1,13 @@
 use crate::core::{
     CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClientAuthMethod, CoreGrantType,
-    CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm,
-    CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm, CoreResponseMode, CoreResponseType,
-    CoreSubjectIdentifierType,
+    CoreJsonWebKey, CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm,
+    CoreResponseMode, CoreResponseType, CoreSubjectIdentifierType,
 };
 use crate::helpers::join_vec;
 use crate::types::{LogoutHint, PostLogoutRedirectUrl};
 use crate::{
     AdditionalClaims, AdditionalProviderMetadata, ClientId, CsrfToken,
-    EmptyAdditionalProviderMetadata, EndSessionUrl, GenderClaim, IdToken, JsonWebKeyType,
+    EmptyAdditionalProviderMetadata, EndSessionUrl, GenderClaim, IdToken,
     JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, ProviderMetadata,
 };
 
@@ -47,9 +46,6 @@ pub type ProviderMetadataWithLogout = ProviderMetadata<
     CoreGrantType,
     CoreJweContentEncryptionAlgorithm,
     CoreJweKeyManagementAlgorithm,
-    CoreJwsSigningAlgorithm,
-    CoreJsonWebKeyType,
-    CoreJsonWebKeyUse,
     CoreJsonWebKey,
     CoreResponseMode,
     CoreResponseType,
@@ -84,16 +80,15 @@ impl From<EndSessionUrl> for LogoutRequest {
 impl LogoutRequest {
     /// Provides an ID token previously issued by this OpenID Connect Provider as a hint about
     /// the user's identity.
-    pub fn set_id_token_hint<AC, GC, JE, JS, JT>(
+    pub fn set_id_token_hint<AC, GC, JE, JS>(
         mut self,
-        id_token_hint: &IdToken<AC, GC, JE, JS, JT>,
+        id_token_hint: &IdToken<AC, GC, JE, JS>,
     ) -> Self
     where
         AC: AdditionalClaims,
         GC: GenderClaim,
-        JE: JweContentEncryptionAlgorithm<JT>,
-        JS: JwsSigningAlgorithm<JT>,
-        JT: JsonWebKeyType,
+        JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+        JS: JwsSigningAlgorithm,
     {
         self.parameters.id_token_hint = Some(id_token_hint.to_string());
         self
@@ -176,8 +171,7 @@ impl LogoutRequest {
 #[cfg(test)]
 mod tests {
     use crate::core::{
-        CoreGenderClaim, CoreJsonWebKeyType, CoreJweContentEncryptionAlgorithm,
-        CoreJwsSigningAlgorithm,
+        CoreGenderClaim, CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm,
     };
     use crate::types::{LogoutHint, PostLogoutRedirectUrl};
     use crate::{
@@ -278,7 +272,6 @@ mod tests {
                     CoreGenderClaim,
                     CoreJweContentEncryptionAlgorithm,
                     CoreJwsSigningAlgorithm,
-                    CoreJsonWebKeyType,
                 >::from_str(
                     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwcz\
                     ovL3JwLmNlcnRpZmljYXRpb24ub3BlbmlkLm5ldDo4MDgwLyIsImV4c\

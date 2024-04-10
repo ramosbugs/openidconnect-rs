@@ -63,9 +63,6 @@ pub type CoreClient<
     CoreAuthDisplay,
     CoreGenderClaim,
     CoreJweContentEncryptionAlgorithm,
-    CoreJwsSigningAlgorithm,
-    CoreJsonWebKeyType,
-    CoreJsonWebKeyUse,
     CoreJsonWebKey,
     CoreAuthPrompt,
     StandardErrorResponse<CoreErrorResponseType>,
@@ -90,9 +87,6 @@ pub type CoreClientMetadata = ClientMetadata<
     CoreGrantType,
     CoreJweContentEncryptionAlgorithm,
     CoreJweKeyManagementAlgorithm,
-    CoreJwsSigningAlgorithm,
-    CoreJsonWebKeyType,
-    CoreJsonWebKeyUse,
     CoreJsonWebKey,
     CoreResponseType,
     CoreSubjectIdentifierType,
@@ -108,9 +102,6 @@ pub type CoreClientRegistrationRequest = ClientRegistrationRequest<
     CoreGrantType,
     CoreJweContentEncryptionAlgorithm,
     CoreJweKeyManagementAlgorithm,
-    CoreJwsSigningAlgorithm,
-    CoreJsonWebKeyType,
-    CoreJsonWebKeyUse,
     CoreJsonWebKey,
     CoreResponseType,
     CoreSubjectIdentifierType,
@@ -125,9 +116,6 @@ pub type CoreClientRegistrationResponse = ClientRegistrationResponse<
     CoreGrantType,
     CoreJweContentEncryptionAlgorithm,
     CoreJweKeyManagementAlgorithm,
-    CoreJwsSigningAlgorithm,
-    CoreJsonWebKeyType,
-    CoreJsonWebKeyUse,
     CoreJsonWebKey,
     CoreResponseType,
     CoreSubjectIdentifierType,
@@ -139,7 +127,6 @@ pub type CoreIdToken = IdToken<
     CoreGenderClaim,
     CoreJweContentEncryptionAlgorithm,
     CoreJwsSigningAlgorithm,
-    CoreJsonWebKeyType,
 >;
 
 /// OpenID Connect Core ID token claims.
@@ -152,24 +139,16 @@ pub type CoreIdTokenFields = IdTokenFields<
     CoreGenderClaim,
     CoreJweContentEncryptionAlgorithm,
     CoreJwsSigningAlgorithm,
-    CoreJsonWebKeyType,
 >;
 
 /// OpenID Connect Core ID token verifier.
-pub type CoreIdTokenVerifier<'a> = IdTokenVerifier<
-    'a,
-    CoreJwsSigningAlgorithm,
-    CoreJsonWebKeyType,
-    CoreJsonWebKeyUse,
-    CoreJsonWebKey,
->;
+pub type CoreIdTokenVerifier<'a> = IdTokenVerifier<'a, CoreJsonWebKey>;
 
 /// OpenID Connect Core token response.
 pub type CoreTokenResponse = StandardTokenResponse<CoreIdTokenFields, CoreTokenType>;
 
 /// OpenID Connect Core JSON Web Key Set.
-pub type CoreJsonWebKeySet =
-    JsonWebKeySet<CoreJwsSigningAlgorithm, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJsonWebKey>;
+pub type CoreJsonWebKeySet = JsonWebKeySet<CoreJsonWebKey>;
 
 /// OpenID Connect Core provider metadata.
 pub type CoreProviderMetadata = ProviderMetadata<
@@ -181,9 +160,6 @@ pub type CoreProviderMetadata = ProviderMetadata<
     CoreGrantType,
     CoreJweContentEncryptionAlgorithm,
     CoreJweKeyManagementAlgorithm,
-    CoreJwsSigningAlgorithm,
-    CoreJsonWebKeyType,
-    CoreJsonWebKeyUse,
     CoreJsonWebKey,
     CoreResponseMode,
     CoreResponseType,
@@ -199,18 +175,11 @@ pub type CoreUserInfoJsonWebToken = UserInfoJsonWebToken<
     CoreGenderClaim,
     CoreJweContentEncryptionAlgorithm,
     CoreJwsSigningAlgorithm,
-    CoreJsonWebKeyType,
 >;
 
 /// OpenID Connect Core user info verifier.
-pub type CoreUserInfoVerifier<'a> = UserInfoVerifier<
-    'a,
-    CoreJweContentEncryptionAlgorithm,
-    CoreJwsSigningAlgorithm,
-    CoreJsonWebKeyType,
-    CoreJsonWebKeyUse,
-    CoreJsonWebKey,
->;
+pub type CoreUserInfoVerifier<'a> =
+    UserInfoVerifier<'a, CoreJweContentEncryptionAlgorithm, CoreJsonWebKey>;
 
 /// OpenID Connect Core client application type.
 ///
@@ -565,7 +534,9 @@ pub enum CoreJweContentEncryptionAlgorithm {
     #[serde(rename = "A256GCM")]
     Aes256Gcm,
 }
-impl JweContentEncryptionAlgorithm<CoreJsonWebKeyType> for CoreJweContentEncryptionAlgorithm {
+impl JweContentEncryptionAlgorithm for CoreJweContentEncryptionAlgorithm {
+    type KeyType = CoreJsonWebKeyType;
+
     fn key_type(&self) -> Result<CoreJsonWebKeyType, String> {
         Ok(CoreJsonWebKeyType::Symmetric)
     }
@@ -694,7 +665,9 @@ pub enum CoreJwsSigningAlgorithm {
     #[serde(rename = "none")]
     None,
 }
-impl JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
+impl JwsSigningAlgorithm for CoreJwsSigningAlgorithm {
+    type KeyType = CoreJsonWebKeyType;
+
     fn key_type(&self) -> Option<CoreJsonWebKeyType> {
         match *self {
             CoreJwsSigningAlgorithm::HmacSha256

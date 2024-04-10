@@ -1,8 +1,8 @@
 use crate::http_utils::{check_content_type, MIME_TYPE_JSON, MIME_TYPE_JWKS};
-use crate::types::jwk::{
-    JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse, JwsSigningAlgorithm,
+use crate::types::jwk::{JsonWebKey, JsonWebKeyId, JwsSigningAlgorithm};
+use crate::{
+    AsyncHttpClient, DiscoveryError, HttpRequest, HttpResponse, JsonWebKeyUse, SyncHttpClient,
 };
-use crate::{AsyncHttpClient, DiscoveryError, HttpRequest, HttpResponse, SyncHttpClient};
 
 use http::header::ACCEPT;
 use http::{HeaderValue, Method, StatusCode};
@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, VecSkipError};
 
 use std::future::Future;
-use std::marker::PhantomData;
 use std::pin::Pin;
 
 new_url_type![
@@ -21,34 +20,26 @@ new_url_type![
 /// JSON Web Key Set.
 #[serde_as]
 #[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
-pub struct JsonWebKeySet<JS, JT, JU, K>
+pub struct JsonWebKeySet<K>
 where
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    K: JsonWebKey,
 {
     // FIXME: write a test that ensures duplicate object member names cause an error
     // (see https://tools.ietf.org/html/rfc7517#section-5)
-    #[serde(bound = "K: JsonWebKey<JS, JT, JU>")]
+    #[serde(bound = "K: JsonWebKey")]
     // Ignores invalid keys rather than failing. That way, clients can function using the keys that
     // they do understand, which is fine if they only ever get JWTs signed with those keys.
     #[serde_as(as = "VecSkipError<_>")]
     keys: Vec<K>,
-    #[serde(skip)]
-    _phantom: PhantomData<(JS, JT, JU)>,
 }
 
 /// Checks whether a JWK key can be used with a given signing algorithm.
-pub(crate) fn check_key_compatibility<JS, JT, JU, K>(
+pub(crate) fn check_key_compatibility<K>(
     key: &K,
-    signing_algorithm: &JS,
+    signing_algorithm: &K::SigningAlgorithm,
 ) -> Result<(), &'static str>
 where
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    K: JsonWebKey,
 {
     // if this key isn't suitable for signing
     if let Some(use_) = key.key_use() {
@@ -71,23 +62,21 @@ where
     }
 }
 
-impl<JS, JT, JU, K> JsonWebKeySet<JS, JT, JU, K>
+impl<K> JsonWebKeySet<K>
 where
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    K: JsonWebKey,
 {
     /// Create a new JSON Web Key Set.
     pub fn new(keys: Vec<K>) -> Self {
-        Self {
-            keys,
-            _phantom: PhantomData,
-        }
+        Self { keys }
     }
 
     /// Return a list of suitable keys, given a key ID and signature algorithm
-    pub(crate) fn filter_keys(&self, key_id: &Option<JsonWebKeyId>, signature_alg: &JS) -> Vec<&K> {
+    pub(crate) fn filter_keys(
+        &self,
+        key_id: &Option<JsonWebKeyId>,
+        signature_alg: &K::SigningAlgorithm,
+    ) -> Vec<&K> {
         self.keys()
         .iter()
         .filter(|key|
@@ -189,23 +178,17 @@ where
         &self.keys
     }
 }
-impl<JS, JT, JU, K> Clone for JsonWebKeySet<JS, JT, JU, K>
+impl<K> Clone for JsonWebKeySet<K>
 where
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    K: JsonWebKey,
 {
     fn clone(&self) -> Self {
         Self::new(self.keys.clone())
     }
 }
-impl<JS, JT, JU, K> Default for JsonWebKeySet<JS, JT, JU, K>
+impl<K> Default for JsonWebKeySet<K>
 where
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    K: JsonWebKey,
 {
     fn default() -> Self {
         Self::new(Vec::new())

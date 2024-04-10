@@ -8,10 +8,10 @@ use crate::{
     EndUserFamilyName, EndUserGivenName, EndUserMiddleName, EndUserName, EndUserNickname,
     EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone, EndUserUsername,
     EndUserWebsiteUrl, EndpointState, ErrorResponse, GenderClaim, HttpRequest, HttpResponse,
-    IssuerClaim, IssuerUrl, JsonWebKey, JsonWebKeyType, JsonWebKeyUse, JsonWebToken,
-    JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, LocalizedClaim,
-    PrivateSigningKey, RevocableToken, StandardClaims, SubjectIdentifier, SyncHttpClient,
-    TokenIntrospectionResponse, TokenResponse, TokenType,
+    IssuerClaim, IssuerUrl, JsonWebKey, JsonWebToken, JweContentEncryptionAlgorithm,
+    JwsSigningAlgorithm, LanguageTag, LocalizedClaim, PrivateSigningKey, RevocableToken,
+    StandardClaims, SubjectIdentifier, SyncHttpClient, TokenIntrospectionResponse, TokenResponse,
+    TokenType,
 };
 
 use chrono::{DateTime, Utc};
@@ -30,9 +30,6 @@ impl<
         AD,
         GC,
         JE,
-        JS,
-        JT,
-        JU,
         K,
         P,
         TE,
@@ -53,9 +50,6 @@ impl<
         AD,
         GC,
         JE,
-        JS,
-        JT,
-        JU,
         K,
         P,
         TE,
@@ -75,14 +69,13 @@ where
     AC: AdditionalClaims,
     AD: AuthDisplay,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    JE: JweContentEncryptionAlgorithm<
+        KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
+    >,
+    K: JsonWebKey,
     P: AuthPrompt,
     TE: ErrorResponse + 'static,
-    TR: TokenResponse<AC, GC, JE, JS, JT, TT>,
+    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm, TT>,
     TT: TokenType + 'static,
     TIR: TokenIntrospectionResponse<TT>,
     RT: RevocableToken,
@@ -99,7 +92,7 @@ where
         userinfo_endpoint: &'a UserInfoUrl,
         access_token: AccessToken,
         expected_subject: Option<SubjectIdentifier>,
-    ) -> UserInfoRequest<'a, JE, JS, JT, JU, K> {
+    ) -> UserInfoRequest<'a, JE, K> {
         UserInfoRequest {
             url: userinfo_endpoint,
             access_token,
@@ -116,27 +109,25 @@ where
 }
 
 /// User info request.
-pub struct UserInfoRequest<'a, JE, JS, JT, JU, K>
+pub struct UserInfoRequest<'a, JE, K>
 where
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    JE: JweContentEncryptionAlgorithm<
+        KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
+    >,
+    K: JsonWebKey,
 {
     pub(crate) url: &'a UserInfoUrl,
     pub(crate) access_token: AccessToken,
     pub(crate) require_signed_response: bool,
-    pub(crate) signed_response_verifier: UserInfoVerifier<'static, JE, JS, JT, JU, K>,
+    pub(crate) signed_response_verifier: UserInfoVerifier<'static, JE, K>,
     pub(crate) response_type: UserInfoResponseType,
 }
-impl<'a, JE, JS, JT, JU, K> UserInfoRequest<'a, JE, JS, JT, JU, K>
+impl<'a, JE, K> UserInfoRequest<'a, JE, K>
 where
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    JE: JweContentEncryptionAlgorithm<
+        KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
+    >,
+    K: JsonWebKey,
 {
     /// Submits this request to the associated user info endpoint using the specified synchronous
     /// HTTP client.
@@ -245,9 +236,10 @@ where
                 let jwt_str = String::from_utf8(http_response.body().to_owned()).map_err(|_| {
                     UserInfoError::Other("response body has invalid UTF-8 encoding".to_string())
                 })?;
-                serde_path_to_error::deserialize::<_, UserInfoJsonWebToken<AC, GC, JE, JS, JT>>(
-                    serde_json::Value::String(jwt_str),
-                )
+                serde_path_to_error::deserialize::<
+                    _,
+                    UserInfoJsonWebToken<AC, GC, JE, K::SigningAlgorithm>,
+                >(serde_json::Value::String(jwt_str))
                 .map_err(UserInfoError::Parse)?
                 .claims(&self.signed_response_verifier)
                 .map_err(UserInfoError::ClaimsVerification)
@@ -472,44 +464,40 @@ where
 pub struct UserInfoJsonWebToken<
     AC: AdditionalClaims,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
 >(
     #[serde(bound = "AC: AdditionalClaims")]
-    JsonWebToken<JE, JS, JT, UserInfoClaimsImpl<AC, GC>, JsonWebTokenJsonPayloadSerde>,
+    JsonWebToken<JE, JS, UserInfoClaimsImpl<AC, GC>, JsonWebTokenJsonPayloadSerde>,
 );
-impl<AC, GC, JE, JS, JT> UserInfoJsonWebToken<AC, GC, JE, JS, JT>
+impl<AC, GC, JE, JS> UserInfoJsonWebToken<AC, GC, JE, JS>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
 {
     /// Initializes a new signed JWT containing the specified claims, signed with the specified key
     /// and signing algorithm.
-    pub fn new<JU, K, S>(
+    pub fn new<S>(
         claims: UserInfoClaims<AC, GC>,
         signing_key: &S,
         alg: JS,
     ) -> Result<Self, JsonWebTokenError>
     where
-        JU: JsonWebKeyUse,
-        K: JsonWebKey<JS, JT, JU>,
-        S: PrivateSigningKey<JS, JT, JU, K>,
+        S: PrivateSigningKey,
+        <S as PrivateSigningKey>::VerificationKey: JsonWebKey<SigningAlgorithm = JS>,
     {
         Ok(Self(JsonWebToken::new(claims.0, signing_key, &alg)?))
     }
 
     /// Verifies and returns the user info claims.
-    pub fn claims<JU, K>(
+    pub fn claims<K>(
         self,
-        verifier: &UserInfoVerifier<JE, JS, JT, JU, K>,
+        verifier: &UserInfoVerifier<JE, K>,
     ) -> Result<UserInfoClaims<AC, GC>, ClaimsVerificationError>
     where
-        JU: JsonWebKeyUse,
-        K: JsonWebKey<JS, JT, JU>,
+        K: JsonWebKey<SigningAlgorithm = JS>,
     {
         Ok(UserInfoClaims(verifier.verified_claims(self.0)?))
     }

@@ -2,8 +2,8 @@ use crate::core::CoreResponseType;
 use crate::helpers::join_vec;
 use crate::{
     AdditionalClaims, AuthDisplay, AuthPrompt, AuthenticationContextClass, CsrfToken, GenderClaim,
-    IdToken, JsonWebKeyType, JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag,
-    LoginHint, Nonce, PkceCodeChallenge, RedirectUrl, ResponseType, Scope,
+    IdToken, JweContentEncryptionAlgorithm, JwsSigningAlgorithm, LanguageTag, LoginHint, Nonce,
+    PkceCodeChallenge, RedirectUrl, ResponseType, Scope,
 };
 
 use url::Url;
@@ -146,16 +146,15 @@ where
     /// [`CoreAuthPrompt::None`](crate::core::CoreAuthPrompt::None) is used (see
     /// [`AuthorizationRequest::add_prompt`]), it but may be provided for any authorization
     /// request.
-    pub fn set_id_token_hint<AC, GC, JE, JS, JT>(
+    pub fn set_id_token_hint<AC, GC, JE, JS>(
         mut self,
-        id_token_hint: &'a IdToken<AC, GC, JE, JS, JT>,
+        id_token_hint: &'a IdToken<AC, GC, JE, JS>,
     ) -> Self
     where
         AC: AdditionalClaims,
         GC: GenderClaim,
-        JE: JweContentEncryptionAlgorithm<JT>,
-        JS: JwsSigningAlgorithm<JT>,
-        JT: JsonWebKeyType,
+        JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+        JS: JwsSigningAlgorithm,
     {
         self.id_token_hint = Some(id_token_hint.to_string());
         self

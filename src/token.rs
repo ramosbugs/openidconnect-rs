@@ -1,38 +1,36 @@
 use crate::{
-    AdditionalClaims, ExtraTokenFields, GenderClaim, IdToken, IdTokenFields, JsonWebKeyType,
+    AdditionalClaims, ExtraTokenFields, GenderClaim, IdToken, IdTokenFields,
     JweContentEncryptionAlgorithm, JwsSigningAlgorithm, OAuth2TokenResponse, StandardTokenResponse,
     TokenType,
 };
 
 /// Extends the base OAuth2 token response with an ID token.
-pub trait TokenResponse<AC, GC, JE, JS, JT, TT>: OAuth2TokenResponse<TT>
+pub trait TokenResponse<AC, GC, JE, JS, TT>: OAuth2TokenResponse<TT>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
     TT: TokenType,
 {
     /// Returns the ID token provided by the token response.
     ///
     /// OpenID Connect authorization servers should always return this field, but it is optional
     /// to allow for interoperability with authorization servers that only support OAuth2.
-    fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS, JT>>;
+    fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS>>;
 }
 
-impl<AC, EF, GC, JE, JS, JT, TT> TokenResponse<AC, GC, JE, JS, JT, TT>
-    for StandardTokenResponse<IdTokenFields<AC, EF, GC, JE, JS, JT>, TT>
+impl<AC, EF, GC, JE, JS, TT> TokenResponse<AC, GC, JE, JS, TT>
+    for StandardTokenResponse<IdTokenFields<AC, EF, GC, JE, JS>, TT>
 where
     AC: AdditionalClaims,
     EF: ExtraTokenFields,
     GC: GenderClaim,
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
     TT: TokenType,
 {
-    fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS, JT>> {
+    fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS>> {
         self.extra_fields().id_token()
     }
 }

@@ -9,9 +9,9 @@ use crate::types::{
 };
 use crate::{
     AccessToken, AsyncHttpClient, ClientId, ClientSecret, ErrorResponseType, HttpRequest,
-    HttpResponse, JsonWebKey, JsonWebKeySet, JsonWebKeySetUrl, JsonWebKeyType, JsonWebKeyUse,
-    JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LocalizedClaim,
-    RedirectUrl, StandardErrorResponse, SyncHttpClient,
+    HttpResponse, JsonWebKey, JsonWebKeySet, JsonWebKeySetUrl, JweContentEncryptionAlgorithm,
+    JweKeyManagementAlgorithm, JwsSigningAlgorithm, LocalizedClaim, RedirectUrl,
+    StandardErrorResponse, SyncHttpClient,
 };
 
 use chrono::{DateTime, Utc};
@@ -44,42 +44,39 @@ impl AdditionalClientMetadata for EmptyAdditionalClientMetadata {}
 
 /// Client metadata used in dynamic client registration.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct ClientMetadata<A, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+pub struct ClientMetadata<A, AT, CA, G, JE, JK, K, RT, S>
 where
     A: AdditionalClientMetadata,
     AT: ApplicationType,
     CA: ClientAuthMethod,
     G: GrantType,
-    JE: JweContentEncryptionAlgorithm<JT>,
+    JE: JweContentEncryptionAlgorithm<
+        KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
+    >,
     JK: JweKeyManagementAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    K: JsonWebKey,
     RT: ResponseType,
     S: SubjectIdentifierType,
 {
     // To avoid implementing a custom deserializer that handles both language tags and flatten,
     // we wrap the language tag handling in its own flattened struct.
     #[serde(bound = "AT: ApplicationType", flatten)]
-    standard_metadata: StandardClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+    standard_metadata: StandardClientMetadata<AT, CA, G, JE, JK, K, RT, S>,
 
     #[serde(bound = "A: AdditionalClientMetadata", flatten)]
     additional_metadata: A,
 }
-impl<A, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
-    ClientMetadata<A, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+impl<A, AT, CA, G, JE, JK, K, RT, S> ClientMetadata<A, AT, CA, G, JE, JK, K, RT, S>
 where
     A: AdditionalClientMetadata,
     AT: ApplicationType,
     CA: ClientAuthMethod,
     G: GrantType,
-    JE: JweContentEncryptionAlgorithm<JT>,
+    JE: JweContentEncryptionAlgorithm<
+        KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
+    >,
     JK: JweKeyManagementAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    K: JsonWebKey,
     RT: ResponseType,
     S: SubjectIdentifierType,
 {
@@ -134,20 +131,20 @@ where
             set_policy_uri -> policy_uri[Option<LocalizedClaim<PolicyUrl>>],
             set_tos_uri -> tos_uri[Option<LocalizedClaim<ToSUrl>>],
             set_jwks_uri -> jwks_uri[Option<JsonWebKeySetUrl>],
-            set_jwks -> jwks[Option<JsonWebKeySet<JS, JT, JU, K>>],
+            set_jwks -> jwks[Option<JsonWebKeySet<K>>],
             set_sector_identifier_uri -> sector_identifier_uri[Option<SectorIdentifierUrl>],
             set_subject_type -> subject_type[Option<S>],
-            set_id_token_signed_response_alg -> id_token_signed_response_alg[Option<JS>],
+            set_id_token_signed_response_alg -> id_token_signed_response_alg[Option<K::SigningAlgorithm>],
             set_id_token_encrypted_response_alg -> id_token_encrypted_response_alg[Option<JK>],
             set_id_token_encrypted_response_enc -> id_token_encrypted_response_enc[Option<JE>],
-            set_userinfo_signed_response_alg -> userinfo_signed_response_alg[Option<JS>],
+            set_userinfo_signed_response_alg -> userinfo_signed_response_alg[Option<K::SigningAlgorithm>],
             set_userinfo_encrypted_response_alg -> userinfo_encrypted_response_alg[Option<JK>],
             set_userinfo_encrypted_response_enc -> userinfo_encrypted_response_enc[Option<JE>],
-            set_request_object_signing_alg -> request_object_signing_alg[Option<JS>],
+            set_request_object_signing_alg -> request_object_signing_alg[Option<K::SigningAlgorithm>],
             set_request_object_encryption_alg -> request_object_encryption_alg[Option<JK>],
             set_request_object_encryption_enc -> request_object_encryption_enc[Option<JE>],
             set_token_endpoint_auth_method -> token_endpoint_auth_method[Option<CA>],
-            set_token_endpoint_auth_signing_alg -> token_endpoint_auth_signing_alg[Option<JS>],
+            set_token_endpoint_auth_signing_alg -> token_endpoint_auth_signing_alg[Option<K::SigningAlgorithm>],
             set_default_max_age -> default_max_age[Option<Duration>],
             set_require_auth_time -> require_auth_time[Option<bool>],
             set_default_acr_values -> default_acr_values[Option<Vec<AuthenticationContextClass>>],
@@ -167,17 +164,16 @@ where
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct StandardClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+struct StandardClientMetadata<AT, CA, G, JE, JK, K, RT, S>
 where
     AT: ApplicationType,
     CA: ClientAuthMethod,
     G: GrantType,
-    JE: JweContentEncryptionAlgorithm<JT>,
+    JE: JweContentEncryptionAlgorithm<
+        KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
+    >,
     JK: JweKeyManagementAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    K: JsonWebKey,
     RT: ResponseType,
     S: SubjectIdentifierType,
 {
@@ -192,38 +188,37 @@ where
     policy_uri: Option<LocalizedClaim<PolicyUrl>>,
     tos_uri: Option<LocalizedClaim<ToSUrl>>,
     jwks_uri: Option<JsonWebKeySetUrl>,
-    jwks: Option<JsonWebKeySet<JS, JT, JU, K>>,
+    jwks: Option<JsonWebKeySet<K>>,
     sector_identifier_uri: Option<SectorIdentifierUrl>,
     subject_type: Option<S>,
-    id_token_signed_response_alg: Option<JS>,
+    id_token_signed_response_alg: Option<K::SigningAlgorithm>,
     id_token_encrypted_response_alg: Option<JK>,
     id_token_encrypted_response_enc: Option<JE>,
-    userinfo_signed_response_alg: Option<JS>,
+    userinfo_signed_response_alg: Option<K::SigningAlgorithm>,
     userinfo_encrypted_response_alg: Option<JK>,
     userinfo_encrypted_response_enc: Option<JE>,
-    request_object_signing_alg: Option<JS>,
+    request_object_signing_alg: Option<K::SigningAlgorithm>,
     request_object_encryption_alg: Option<JK>,
     request_object_encryption_enc: Option<JE>,
     token_endpoint_auth_method: Option<CA>,
-    token_endpoint_auth_signing_alg: Option<JS>,
+    token_endpoint_auth_signing_alg: Option<K::SigningAlgorithm>,
     default_max_age: Option<Duration>,
     require_auth_time: Option<bool>,
     default_acr_values: Option<Vec<AuthenticationContextClass>>,
     initiate_login_uri: Option<InitiateLoginUrl>,
     request_uris: Option<Vec<RequestUrl>>,
 }
-impl<'de, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S> Deserialize<'de>
-    for StandardClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+impl<'de, AT, CA, G, JE, JK, K, RT, S> Deserialize<'de>
+    for StandardClientMetadata<AT, CA, G, JE, JK, K, RT, S>
 where
     AT: ApplicationType,
     CA: ClientAuthMethod,
     G: GrantType,
-    JE: JweContentEncryptionAlgorithm<JT>,
+    JE: JweContentEncryptionAlgorithm<
+        KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
+    >,
     JK: JweKeyManagementAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    K: JsonWebKey,
     RT: ResponseType,
     S: SubjectIdentifierType,
 {
@@ -237,12 +232,11 @@ where
             AT: ApplicationType,
             CA: ClientAuthMethod,
             G: GrantType,
-            JE: JweContentEncryptionAlgorithm<JT>,
+            JE: JweContentEncryptionAlgorithm<
+                KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
+            >,
             JK: JweKeyManagementAlgorithm,
-            JS: JwsSigningAlgorithm<JT>,
-            JT: JsonWebKeyType,
-            JU: JsonWebKeyUse,
-            K: JsonWebKey<JS, JT, JU>,
+            K: JsonWebKey,
             RT: ResponseType,
             S: SubjectIdentifierType,
         >(
@@ -251,29 +245,24 @@ where
             PhantomData<G>,
             PhantomData<JE>,
             PhantomData<JK>,
-            PhantomData<JS>,
-            PhantomData<JT>,
-            PhantomData<JU>,
             PhantomData<K>,
             PhantomData<RT>,
             PhantomData<S>,
         );
-        impl<'de, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S> Visitor<'de>
-            for MetadataVisitor<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+        impl<'de, AT, CA, G, JE, JK, K, RT, S> Visitor<'de> for MetadataVisitor<AT, CA, G, JE, JK, K, RT, S>
         where
             AT: ApplicationType,
             CA: ClientAuthMethod,
             G: GrantType,
-            JE: JweContentEncryptionAlgorithm<JT>,
+            JE: JweContentEncryptionAlgorithm<
+                KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
+            >,
             JK: JweKeyManagementAlgorithm,
-            JS: JwsSigningAlgorithm<JT>,
-            JT: JsonWebKeyType,
-            JU: JsonWebKeyUse,
-            K: JsonWebKey<JS, JT, JU>,
+            K: JsonWebKey,
             RT: ResponseType,
             S: SubjectIdentifierType,
         {
-            type Value = StandardClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>;
+            type Value = StandardClientMetadata<AT, CA, G, JE, JK, K, RT, S>;
 
             fn expecting(&self, formatter: &mut Formatter) -> FormatterResult {
                 formatter.write_str("struct StandardClientMetadata")
@@ -327,24 +316,19 @@ where
             PhantomData,
             PhantomData,
             PhantomData,
-            PhantomData,
-            PhantomData,
-            PhantomData,
         ))
     }
 }
-impl<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S> Serialize
-    for StandardClientMetadata<AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+impl<AT, CA, G, JE, JK, K, RT, S> Serialize for StandardClientMetadata<AT, CA, G, JE, JK, K, RT, S>
 where
     AT: ApplicationType,
     CA: ClientAuthMethod,
     G: GrantType,
-    JE: JweContentEncryptionAlgorithm<JT>,
+    JE: JweContentEncryptionAlgorithm<
+        KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
+    >,
     JK: JweKeyManagementAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    K: JsonWebKey,
     RT: ResponseType,
     S: SubjectIdentifierType,
 {
@@ -392,7 +376,7 @@ where
 
 /// Dynamic client registration request.
 #[derive(Clone, Debug)]
-pub struct ClientRegistrationRequest<AC, AR, AT, CA, ET, G, JE, JK, JS, JT, JU, K, RT, S>
+pub struct ClientRegistrationRequest<AC, AR, AT, CA, ET, G, JE, JK, K, RT, S>
 where
     AC: AdditionalClientMetadata,
     AR: AdditionalClientRegistrationResponse,
@@ -400,21 +384,20 @@ where
     CA: ClientAuthMethod,
     ET: RegisterErrorResponseType,
     G: GrantType,
-    JE: JweContentEncryptionAlgorithm<JT>,
+    JE: JweContentEncryptionAlgorithm<
+        KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
+    >,
     JK: JweKeyManagementAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    K: JsonWebKey,
     RT: ResponseType,
     S: SubjectIdentifierType,
 {
-    client_metadata: ClientMetadata<AC, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+    client_metadata: ClientMetadata<AC, AT, CA, G, JE, JK, K, RT, S>,
     initial_access_token: Option<AccessToken>,
     _phantom: PhantomData<(AR, ET)>,
 }
-impl<AC, AR, AT, CA, ET, G, JE, JK, JS, JT, JU, K, RT, S>
-    ClientRegistrationRequest<AC, AR, AT, CA, ET, G, JE, JK, JS, JT, JU, K, RT, S>
+impl<AC, AR, AT, CA, ET, G, JE, JK, K, RT, S>
+    ClientRegistrationRequest<AC, AR, AT, CA, ET, G, JE, JK, K, RT, S>
 where
     AC: AdditionalClientMetadata,
     AR: AdditionalClientRegistrationResponse,
@@ -422,12 +405,11 @@ where
     CA: ClientAuthMethod,
     ET: RegisterErrorResponseType + Send + Sync,
     G: GrantType,
-    JE: JweContentEncryptionAlgorithm<JT>,
+    JE: JweContentEncryptionAlgorithm<
+        KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
+    >,
     JK: JweKeyManagementAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    K: JsonWebKey,
     RT: ResponseType,
     S: SubjectIdentifierType + Send + Sync,
 {
@@ -447,7 +429,7 @@ where
         registration_endpoint: &RegistrationUrl,
         http_client: &C,
     ) -> Result<
-        ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+        ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, K, RT, S>,
         ClientRegistrationError<ET, <C as SyncHttpClient>::Error>,
     >
     where
@@ -472,7 +454,7 @@ where
         Box<
             dyn Future<
                     Output = Result<
-                        ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+                        ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, K, RT, S>,
                         ClientRegistrationError<ET, <C as AsyncHttpClient<'c>>::Error>,
                     >,
                 > + 'c,
@@ -522,7 +504,7 @@ where
     fn register_response<RE>(
         http_response: HttpResponse,
     ) -> Result<
-        ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+        ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, K, RT, S>,
         ClientRegistrationError<ET, RE>,
     >
     where
@@ -574,7 +556,7 @@ where
     }
 
     /// Returns the client metadata associated with this registration request.
-    pub fn client_metadata(&self) -> &ClientMetadata<AC, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S> {
+    pub fn client_metadata(&self) -> &ClientMetadata<AC, AT, CA, G, JE, JK, K, RT, S> {
         &self.client_metadata
     }
 
@@ -601,20 +583,20 @@ where
             set_policy_uri -> policy_uri[Option<LocalizedClaim<PolicyUrl>>],
             set_tos_uri -> tos_uri[Option<LocalizedClaim<ToSUrl>>],
             set_jwks_uri -> jwks_uri[Option<JsonWebKeySetUrl>],
-            set_jwks -> jwks[Option<JsonWebKeySet<JS, JT, JU, K>>],
+            set_jwks -> jwks[Option<JsonWebKeySet<K>>],
             set_sector_identifier_uri -> sector_identifier_uri[Option<SectorIdentifierUrl>],
             set_subject_type -> subject_type[Option<S>],
-            set_id_token_signed_response_alg -> id_token_signed_response_alg[Option<JS>],
+            set_id_token_signed_response_alg -> id_token_signed_response_alg[Option<K::SigningAlgorithm>],
             set_id_token_encrypted_response_alg -> id_token_encrypted_response_alg[Option<JK>],
             set_id_token_encrypted_response_enc -> id_token_encrypted_response_enc[Option<JE>],
-            set_userinfo_signed_response_alg -> userinfo_signed_response_alg[Option<JS>],
+            set_userinfo_signed_response_alg -> userinfo_signed_response_alg[Option<K::SigningAlgorithm>],
             set_userinfo_encrypted_response_alg -> userinfo_encrypted_response_alg[Option<JK>],
             set_userinfo_encrypted_response_enc -> userinfo_encrypted_response_enc[Option<JE>],
-            set_request_object_signing_alg -> request_object_signing_alg[Option<JS>],
+            set_request_object_signing_alg -> request_object_signing_alg[Option<K::SigningAlgorithm>],
             set_request_object_encryption_alg -> request_object_encryption_alg[Option<JK>],
             set_request_object_encryption_enc -> request_object_encryption_enc[Option<JE>],
             set_token_endpoint_auth_method -> token_endpoint_auth_method[Option<CA>],
-            set_token_endpoint_auth_signing_alg -> token_endpoint_auth_signing_alg[Option<JS>],
+            set_token_endpoint_auth_signing_alg -> token_endpoint_auth_signing_alg[Option<K::SigningAlgorithm>],
             set_default_max_age -> default_max_age[Option<Duration>],
             set_require_auth_time -> require_auth_time[Option<bool>],
             set_default_acr_values -> default_acr_values[Option<Vec<AuthenticationContextClass>>],
@@ -645,19 +627,18 @@ impl AdditionalClientRegistrationResponse for EmptyAdditionalClientRegistrationR
 
 /// Response to a dynamic client registration request.
 #[derive(Debug, Deserialize, Serialize)]
-pub struct ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+pub struct ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, K, RT, S>
 where
     AC: AdditionalClientMetadata,
     AR: AdditionalClientRegistrationResponse,
     AT: ApplicationType,
     CA: ClientAuthMethod,
     G: GrantType,
-    JE: JweContentEncryptionAlgorithm<JT>,
+    JE: JweContentEncryptionAlgorithm<
+        KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
+    >,
     JK: JweKeyManagementAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    K: JsonWebKey,
     RT: ResponseType,
     S: SubjectIdentifierType,
 {
@@ -681,25 +662,24 @@ where
     )]
     client_secret_expires_at: Option<DateTime<Utc>>,
     #[serde(bound = "AC: AdditionalClientMetadata", flatten)]
-    client_metadata: ClientMetadata<AC, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+    client_metadata: ClientMetadata<AC, AT, CA, G, JE, JK, K, RT, S>,
 
     #[serde(bound = "AR: AdditionalClientRegistrationResponse", flatten)]
     additional_response: AR,
 }
-impl<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
-    ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>
+impl<AC, AR, AT, CA, G, JE, JK, K, RT, S>
+    ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, K, RT, S>
 where
     AC: AdditionalClientMetadata,
     AR: AdditionalClientRegistrationResponse,
     AT: ApplicationType,
     CA: ClientAuthMethod,
     G: GrantType,
-    JE: JweContentEncryptionAlgorithm<JT>,
+    JE: JweContentEncryptionAlgorithm<
+        KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
+    >,
     JK: JweKeyManagementAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    K: JsonWebKey,
     RT: ResponseType,
     S: SubjectIdentifierType,
 {
@@ -725,7 +705,7 @@ where
     /// Instantiates a new dynamic client registration response using the specified client metadata.
     pub fn from_client_metadata(
         client_id: ClientId,
-        client_metadata: ClientMetadata<AC, AT, CA, G, JE, JK, JS, JT, JU, K, RT, S>,
+        client_metadata: ClientMetadata<AC, AT, CA, G, JE, JK, K, RT, S>,
         additional_response: AR,
     ) -> Self {
         Self {
@@ -765,20 +745,20 @@ where
             set_policy_uri -> policy_uri[Option<LocalizedClaim<PolicyUrl>>],
             set_tos_uri -> tos_uri[Option<LocalizedClaim<ToSUrl>>],
             set_jwks_uri -> jwks_uri[Option<JsonWebKeySetUrl>],
-            set_jwks -> jwks[Option<JsonWebKeySet<JS, JT, JU, K>>],
+            set_jwks -> jwks[Option<JsonWebKeySet<K>>],
             set_sector_identifier_uri -> sector_identifier_uri[Option<SectorIdentifierUrl>],
             set_subject_type -> subject_type[Option<S>],
-            set_id_token_signed_response_alg -> id_token_signed_response_alg[Option<JS>],
+            set_id_token_signed_response_alg -> id_token_signed_response_alg[Option<K::SigningAlgorithm>],
             set_id_token_encrypted_response_alg -> id_token_encrypted_response_alg[Option<JK>],
             set_id_token_encrypted_response_enc -> id_token_encrypted_response_enc[Option<JE>],
-            set_userinfo_signed_response_alg -> userinfo_signed_response_alg[Option<JS>],
+            set_userinfo_signed_response_alg -> userinfo_signed_response_alg[Option<K::SigningAlgorithm>],
             set_userinfo_encrypted_response_alg -> userinfo_encrypted_response_alg[Option<JK>],
             set_userinfo_encrypted_response_enc -> userinfo_encrypted_response_enc[Option<JE>],
-            set_request_object_signing_alg -> request_object_signing_alg[Option<JS>],
+            set_request_object_signing_alg -> request_object_signing_alg[Option<K::SigningAlgorithm>],
             set_request_object_encryption_alg -> request_object_encryption_alg[Option<JK>],
             set_request_object_encryption_enc -> request_object_encryption_enc[Option<JE>],
             set_token_endpoint_auth_method -> token_endpoint_auth_method[Option<CA>],
-            set_token_endpoint_auth_signing_alg -> token_endpoint_auth_signing_alg[Option<JS>],
+            set_token_endpoint_auth_signing_alg -> token_endpoint_auth_signing_alg[Option<K::SigningAlgorithm>],
             set_default_max_age -> default_max_age[Option<Duration>],
             set_require_auth_time -> require_auth_time[Option<bool>],
             set_default_acr_values -> default_acr_values[Option<Vec<AuthenticationContextClass>>],

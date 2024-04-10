@@ -19,19 +19,10 @@ use serde::{Deserialize, Serialize};
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-type CoreJsonWebTokenHeader = JsonWebTokenHeader<
-    CoreJweContentEncryptionAlgorithm,
-    CoreJwsSigningAlgorithm,
-    CoreJsonWebKeyType,
->;
+type CoreJsonWebTokenHeader =
+    JsonWebTokenHeader<CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm>;
 
-type CoreJwtClaimsVerifier<'a> = JwtClaimsVerifier<
-    'a,
-    CoreJwsSigningAlgorithm,
-    CoreJsonWebKeyType,
-    CoreJsonWebKeyUse,
-    CoreJsonWebKey,
->;
+type CoreJwtClaimsVerifier<'a> = JwtClaimsVerifier<'a, CoreJsonWebKey>;
 
 fn assert_unsupported<T>(result: Result<T, ClaimsVerificationError>, expected_substr: &str) {
     match result {
@@ -109,7 +100,6 @@ impl IssuerClaim for TestClaims {
 type TestClaimsJsonWebToken = JsonWebToken<
     CoreJweContentEncryptionAlgorithm,
     CoreJwsSigningAlgorithm,
-    CoreJsonWebKeyType,
     TestClaims,
     JsonWebTokenJsonPayloadSerde,
 >;
@@ -594,7 +584,6 @@ fn test_jwt_verified_claims() {
 type CoreIdTokenJwt = JsonWebToken<
     CoreJweContentEncryptionAlgorithm,
     CoreJwsSigningAlgorithm,
-    CoreJsonWebKeyType,
     CoreIdTokenClaims,
     JsonWebTokenJsonPayloadSerde,
 >;

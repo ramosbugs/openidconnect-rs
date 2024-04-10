@@ -1,5 +1,5 @@
 use crate::core::{
-    CoreJsonWebKey, CoreJsonWebKeyType, CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm,
+    CoreJsonWebKey, CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm,
     CoreRsaPrivateSigningKey,
 };
 use crate::jwt::{
@@ -10,14 +10,10 @@ use crate::JsonWebKeyId;
 
 use serde::{Deserialize, Serialize};
 
-use std::marker::PhantomData;
 use std::string::ToString;
 
-type CoreAlgorithm = JsonWebTokenAlgorithm<
-    CoreJweContentEncryptionAlgorithm,
-    CoreJwsSigningAlgorithm,
-    CoreJsonWebKeyType,
->;
+type CoreAlgorithm =
+    JsonWebTokenAlgorithm<CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm>;
 
 pub const TEST_JWT: &str =
     "eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9.SXTigJlzIGEgZ\
@@ -115,14 +111,11 @@ fn test_jwt_algorithm_deserialization() {
     );
     assert_eq!(
         serde_json::from_str::<CoreAlgorithm>("\"HS256\"").expect("failed to deserialize"),
-        JsonWebTokenAlgorithm::Signature(CoreJwsSigningAlgorithm::HmacSha256, PhantomData),
+        JsonWebTokenAlgorithm::Signature(CoreJwsSigningAlgorithm::HmacSha256),
     );
     assert_eq!(
         serde_json::from_str::<CoreAlgorithm>("\"RS256\"").expect("failed to deserialize"),
-        JsonWebTokenAlgorithm::Signature(
-            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
-            PhantomData,
-        ),
+        JsonWebTokenAlgorithm::Signature(CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256),
     );
     assert_eq!(
         serde_json::from_str::<CoreAlgorithm>("\"none\"").expect("failed to deserialize"),
@@ -151,16 +144,14 @@ fn test_jwt_algorithm_serialization() {
     );
     assert_eq!(
         serde_json::to_string::<CoreAlgorithm>(&JsonWebTokenAlgorithm::Signature(
-            CoreJwsSigningAlgorithm::HmacSha256,
-            PhantomData,
+            CoreJwsSigningAlgorithm::HmacSha256
         ))
         .expect("failed to serialize"),
         "\"HS256\"",
     );
     assert_eq!(
         serde_json::to_string::<CoreAlgorithm>(&JsonWebTokenAlgorithm::Signature(
-            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
-            PhantomData,
+            CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256
         ))
         .expect("failed to serialize"),
         "\"RS256\"",
@@ -187,22 +178,14 @@ impl JsonWebTokenPayloadSerde<String> for JsonWebTokenStringPayloadSerde {
 fn test_jwt_basic() {
     fn verify_jwt<A>(jwt_access: A, key: &CoreJsonWebKey, expected_payload: &str)
     where
-        A: JsonWebTokenAccess<
-            CoreJweContentEncryptionAlgorithm,
-            CoreJwsSigningAlgorithm,
-            CoreJsonWebKeyType,
-            String,
-        >,
+        A: JsonWebTokenAccess<CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm, String>,
         A::ReturnType: ToString,
     {
         {
             let header = jwt_access.unverified_header();
             assert_eq!(
                 header.alg,
-                JsonWebTokenAlgorithm::Signature(
-                    CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
-                    PhantomData,
-                )
+                JsonWebTokenAlgorithm::Signature(CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256)
             );
             assert_eq!(header.crit, None);
             assert_eq!(header.cty, None);
@@ -231,7 +214,6 @@ fn test_jwt_basic() {
     let jwt: JsonWebToken<
         CoreJweContentEncryptionAlgorithm,
         CoreJwsSigningAlgorithm,
-        CoreJsonWebKeyType,
         String,
         JsonWebTokenStringPayloadSerde,
     > = serde_json::from_value(serde_json::Value::String(TEST_JWT.to_string()))
@@ -261,7 +243,6 @@ fn test_new_jwt() {
         CoreJweContentEncryptionAlgorithm,
         _,
         _,
-        _,
         JsonWebTokenStringPayloadSerde,
     >::new(
         TEST_JWT_PAYLOAD.to_owned(),
@@ -286,7 +267,6 @@ fn test_invalid_signature() {
     let jwt: JsonWebToken<
         CoreJweContentEncryptionAlgorithm,
         CoreJwsSigningAlgorithm,
-        CoreJsonWebKeyType,
         String,
         JsonWebTokenStringPayloadSerde,
     > = serde_json::from_value(serde_json::Value::String(corrupted_jwt_str))
@@ -316,7 +296,6 @@ fn test_invalid_deserialization() {
             JsonWebToken<
                 CoreJweContentEncryptionAlgorithm,
                 CoreJwsSigningAlgorithm,
-                CoreJsonWebKeyType,
                 TestPayload,
                 JsonWebTokenJsonPayloadSerde,
             >,
@@ -375,7 +354,6 @@ fn test_invalid_deserialization() {
         JsonWebToken<
             CoreJweContentEncryptionAlgorithm,
             CoreJwsSigningAlgorithm,
-            CoreJsonWebKeyType,
             TestPayload,
             JsonWebTokenJsonPayloadSerde,
         >,

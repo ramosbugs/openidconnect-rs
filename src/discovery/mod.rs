@@ -2,10 +2,10 @@ use crate::http_utils::{check_content_type, MIME_TYPE_JSON};
 use crate::{
     AsyncHttpClient, AuthDisplay, AuthUrl, AuthenticationContextClass, ClaimName, ClaimType,
     ClientAuthMethod, GrantType, HttpRequest, HttpResponse, IssuerUrl, JsonWebKey, JsonWebKeySet,
-    JsonWebKeySetUrl, JsonWebKeyType, JsonWebKeyUse, JweContentEncryptionAlgorithm,
-    JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag, OpPolicyUrl, OpTosUrl,
-    RegistrationUrl, ResponseMode, ResponseType, ResponseTypes, Scope, ServiceDocUrl,
-    SubjectIdentifierType, SyncHttpClient, TokenUrl, UserInfoUrl,
+    JsonWebKeySetUrl, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm,
+    JwsSigningAlgorithm, LanguageTag, OpPolicyUrl, OpTosUrl, RegistrationUrl, ResponseMode,
+    ResponseType, ResponseTypes, Scope, ServiceDocUrl, SubjectIdentifierType, SyncHttpClient,
+    TokenUrl, UserInfoUrl,
 };
 
 use http::header::{HeaderValue, ACCEPT};
@@ -18,7 +18,6 @@ use thiserror::Error;
 
 use std::fmt::Debug;
 use std::future::Future;
-use std::marker::PhantomData;
 use std::pin::Pin;
 
 #[cfg(test)]
@@ -42,7 +41,7 @@ impl AdditionalProviderMetadata for EmptyAdditionalProviderMetadata {}
 #[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[allow(clippy::type_complexity)]
-pub struct ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RT, S>
+pub struct ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, K, RM, RT, S>
 where
     A: AdditionalProviderMetadata,
     AD: AuthDisplay,
@@ -50,12 +49,11 @@ where
     CN: ClaimName,
     CT: ClaimType,
     G: GrantType,
-    JE: JweContentEncryptionAlgorithm<JT>,
+    JE: JweContentEncryptionAlgorithm<
+        KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
+    >,
     JK: JweKeyManagementAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    K: JsonWebKey,
     RM: ResponseMode,
     RT: ResponseType,
     S: SubjectIdentifierType,
@@ -66,7 +64,7 @@ where
     userinfo_endpoint: Option<UserInfoUrl>,
     jwks_uri: JsonWebKeySetUrl,
     #[serde(default = "JsonWebKeySet::default", skip)]
-    jwks: JsonWebKeySet<JS, JT, JU, K>,
+    jwks: JsonWebKeySet<K>,
     registration_endpoint: Option<RegistrationUrl>,
     scopes_supported: Option<Vec<Scope>>,
     #[serde(bound(deserialize = "RT: ResponseType"))]
@@ -78,9 +76,9 @@ where
     acr_values_supported: Option<Vec<AuthenticationContextClass>>,
     #[serde(bound(deserialize = "S: SubjectIdentifierType"))]
     subject_types_supported: Vec<S>,
-    #[serde(bound(deserialize = "JS: JwsSigningAlgorithm<JT>"))]
+    #[serde(bound(deserialize = "K: JsonWebKey"))]
     #[serde_as(as = "VecSkipError<_>")]
-    id_token_signing_alg_values_supported: Vec<JS>,
+    id_token_signing_alg_values_supported: Vec<K::SigningAlgorithm>,
     #[serde(
         bound(deserialize = "JK: JweKeyManagementAlgorithm"),
         default = "Option::default"
@@ -88,17 +86,16 @@ where
     #[serde_as(as = "Option<VecSkipError<_>>")]
     id_token_encryption_alg_values_supported: Option<Vec<JK>>,
     #[serde(
-        bound(deserialize = "JE: JweContentEncryptionAlgorithm<JT>"),
+        bound(
+            deserialize = "JE: JweContentEncryptionAlgorithm<KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType>"
+        ),
         default = "Option::default"
     )]
     #[serde_as(as = "Option<VecSkipError<_>>")]
     id_token_encryption_enc_values_supported: Option<Vec<JE>>,
-    #[serde(
-        bound(deserialize = "JS: JwsSigningAlgorithm<JT>"),
-        default = "Option::default"
-    )]
+    #[serde(bound(deserialize = "K: JsonWebKey"), default = "Option::default")]
     #[serde_as(as = "Option<VecSkipError<_>>")]
-    userinfo_signing_alg_values_supported: Option<Vec<JS>>,
+    userinfo_signing_alg_values_supported: Option<Vec<K::SigningAlgorithm>>,
     #[serde(
         bound(deserialize = "JK: JweKeyManagementAlgorithm"),
         default = "Option::default"
@@ -106,17 +103,16 @@ where
     #[serde_as(as = "Option<VecSkipError<_>>")]
     userinfo_encryption_alg_values_supported: Option<Vec<JK>>,
     #[serde(
-        bound(deserialize = "JE: JweContentEncryptionAlgorithm<JT>"),
+        bound(
+            deserialize = "JE: JweContentEncryptionAlgorithm<KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType>"
+        ),
         default = "Option::default"
     )]
     #[serde_as(as = "Option<VecSkipError<_>>")]
     userinfo_encryption_enc_values_supported: Option<Vec<JE>>,
-    #[serde(
-        bound(deserialize = "JS: JwsSigningAlgorithm<JT>"),
-        default = "Option::default"
-    )]
+    #[serde(bound(deserialize = "K: JsonWebKey"), default = "Option::default")]
     #[serde_as(as = "Option<VecSkipError<_>>")]
-    request_object_signing_alg_values_supported: Option<Vec<JS>>,
+    request_object_signing_alg_values_supported: Option<Vec<K::SigningAlgorithm>>,
     #[serde(
         bound(deserialize = "JK: JweKeyManagementAlgorithm"),
         default = "Option::default"
@@ -124,19 +120,18 @@ where
     #[serde_as(as = "Option<VecSkipError<_>>")]
     request_object_encryption_alg_values_supported: Option<Vec<JK>>,
     #[serde(
-        bound(deserialize = "JE: JweContentEncryptionAlgorithm<JT>"),
+        bound(
+            deserialize = "JE: JweContentEncryptionAlgorithm<KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType>"
+        ),
         default = "Option::default"
     )]
     #[serde_as(as = "Option<VecSkipError<_>>")]
     request_object_encryption_enc_values_supported: Option<Vec<JE>>,
     #[serde(bound(deserialize = "CA: ClientAuthMethod"))]
     token_endpoint_auth_methods_supported: Option<Vec<CA>>,
-    #[serde(
-        bound(deserialize = "JS: JwsSigningAlgorithm<JT>"),
-        default = "Option::default"
-    )]
+    #[serde(bound(deserialize = "K: JsonWebKey"), default = "Option::default")]
     #[serde_as(as = "Option<VecSkipError<_>>")]
-    token_endpoint_auth_signing_alg_values_supported: Option<Vec<JS>>,
+    token_endpoint_auth_signing_alg_values_supported: Option<Vec<K::SigningAlgorithm>>,
     #[serde(bound(deserialize = "AD: AuthDisplay"))]
     display_values_supported: Option<Vec<AD>>,
     #[serde(bound(deserialize = "CT: ClaimType"))]
@@ -155,12 +150,9 @@ where
 
     #[serde(bound(deserialize = "A: AdditionalProviderMetadata"), flatten)]
     additional_metadata: A,
-
-    #[serde(skip)]
-    _phantom_jt: PhantomData<JT>,
 }
-impl<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RT, S>
-    ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RT, S>
+impl<A, AD, CA, CN, CT, G, JE, JK, K, RM, RT, S>
+    ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, K, RM, RT, S>
 where
     A: AdditionalProviderMetadata,
     AD: AuthDisplay,
@@ -168,12 +160,11 @@ where
     CN: ClaimName,
     CT: ClaimType,
     G: GrantType,
-    JE: JweContentEncryptionAlgorithm<JT>,
+    JE: JweContentEncryptionAlgorithm<
+        KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
+    >,
     JK: JweKeyManagementAlgorithm,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
-    JU: JsonWebKeyUse,
-    K: JsonWebKey<JS, JT, JU>,
+    K: JsonWebKey,
     RM: ResponseMode,
     RT: ResponseType,
     S: SubjectIdentifierType,
@@ -185,7 +176,7 @@ where
         jwks_uri: JsonWebKeySetUrl,
         response_types_supported: Vec<ResponseTypes<RT>>,
         subject_types_supported: Vec<S>,
-        id_token_signing_alg_values_supported: Vec<JS>,
+        id_token_signing_alg_values_supported: Vec<K::SigningAlgorithm>,
         additional_metadata: A,
     ) -> Self {
         Self {
@@ -226,7 +217,6 @@ where
             op_policy_uri: None,
             op_tos_uri: None,
             additional_metadata,
-            _phantom_jt: PhantomData,
         }
     }
 
@@ -237,7 +227,7 @@ where
             set_token_endpoint -> token_endpoint[Option<TokenUrl>],
             set_userinfo_endpoint -> userinfo_endpoint[Option<UserInfoUrl>],
             set_jwks_uri -> jwks_uri[JsonWebKeySetUrl],
-            set_jwks -> jwks[JsonWebKeySet<JS, JT, JU, K>],
+            set_jwks -> jwks[JsonWebKeySet<K>],
             set_registration_endpoint -> registration_endpoint[Option<RegistrationUrl>],
             set_scopes_supported -> scopes_supported[Option<Vec<Scope>>],
             set_response_types_supported -> response_types_supported[Vec<ResponseTypes<RT>>],
@@ -247,19 +237,19 @@ where
                 -> acr_values_supported[Option<Vec<AuthenticationContextClass>>],
             set_subject_types_supported -> subject_types_supported[Vec<S>],
             set_id_token_signing_alg_values_supported
-                -> id_token_signing_alg_values_supported[Vec<JS>],
+                -> id_token_signing_alg_values_supported[Vec<K::SigningAlgorithm>],
             set_id_token_encryption_alg_values_supported
                 -> id_token_encryption_alg_values_supported[Option<Vec<JK>>],
             set_id_token_encryption_enc_values_supported
                 -> id_token_encryption_enc_values_supported[Option<Vec<JE>>],
             set_userinfo_signing_alg_values_supported
-                -> userinfo_signing_alg_values_supported[Option<Vec<JS>>],
+                -> userinfo_signing_alg_values_supported[Option<Vec<K::SigningAlgorithm>>],
             set_userinfo_encryption_alg_values_supported
                 -> userinfo_encryption_alg_values_supported[Option<Vec<JK>>],
             set_userinfo_encryption_enc_values_supported
                 -> userinfo_encryption_enc_values_supported[Option<Vec<JE>>],
             set_request_object_signing_alg_values_supported
-                -> request_object_signing_alg_values_supported[Option<Vec<JS>>],
+                -> request_object_signing_alg_values_supported[Option<Vec<K::SigningAlgorithm>>],
             set_request_object_encryption_alg_values_supported
                 -> request_object_encryption_alg_values_supported[Option<Vec<JK>>],
             set_request_object_encryption_enc_values_supported
@@ -267,7 +257,7 @@ where
             set_token_endpoint_auth_methods_supported
                 -> token_endpoint_auth_methods_supported[Option<Vec<CA>>],
             set_token_endpoint_auth_signing_alg_values_supported
-                -> token_endpoint_auth_signing_alg_values_supported[Option<Vec<JS>>],
+                -> token_endpoint_auth_signing_alg_values_supported[Option<Vec<K::SigningAlgorithm>>],
             set_display_values_supported -> display_values_supported[Option<Vec<AD>>],
             set_claim_types_supported -> claim_types_supported[Option<Vec<CT>>],
             set_claims_supported -> claims_supported[Option<Vec<CN>>],

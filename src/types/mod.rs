@@ -1,4 +1,4 @@
-use crate::types::jwk::{JsonWebKeyType, JwsSigningAlgorithm};
+use crate::types::jwk::JwsSigningAlgorithm;
 use crate::{AccessToken, AuthorizationCode};
 
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
@@ -99,13 +99,12 @@ new_type![
     AccessTokenHash(String)
     impl {
         /// Initialize a new access token hash from an [`AccessToken`] and signature algorithm.
-        pub fn from_token<JS, JT>(
+        pub fn from_token<JS>(
             access_token: &AccessToken,
             alg: &JS
         ) -> Result<Self, SigningError>
         where
-            JS: JwsSigningAlgorithm<JT>,
-            JT: JsonWebKeyType,
+            JS: JwsSigningAlgorithm,
         {
             alg.hash_bytes(access_token.secret().as_bytes())
                 .map(|hash| Self::new(BASE64_URL_SAFE_NO_PAD.encode(&hash[0..hash.len() / 2])))
@@ -151,13 +150,12 @@ new_type![
     impl {
         /// Initialize a new authorization code hash from an [`AuthorizationCode`] and signature
         /// algorithm.
-        pub fn from_code<JS, JT>(
+        pub fn from_code<JS>(
             code: &AuthorizationCode,
             alg: &JS
         ) -> Result<Self, SigningError>
         where
-            JS: JwsSigningAlgorithm<JT>,
-            JT: JsonWebKeyType,
+            JS: JwsSigningAlgorithm,
         {
             alg.hash_bytes(code.secret().as_bytes())
                 .map(|hash| Self::new(BASE64_URL_SAFE_NO_PAD.encode(&hash[0..hash.len() / 2])))

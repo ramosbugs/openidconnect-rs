@@ -1,6 +1,6 @@
 use crate::{
-    JsonWebKey, JsonWebKeyId, JsonWebKeyType, JsonWebKeyUse, JweContentEncryptionAlgorithm,
-    JwsSigningAlgorithm, PrivateSigningKey, SignatureVerificationError, SigningError,
+    JsonWebKey, JsonWebKeyId, JweContentEncryptionAlgorithm, JwsSigningAlgorithm,
+    PrivateSigningKey, SignatureVerificationError, SigningError,
 };
 
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
@@ -27,15 +27,13 @@ new_type![
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum JsonWebTokenAlgorithm<JE, JS, JT>
+pub enum JsonWebTokenAlgorithm<JE, JS>
 where
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
 {
     Encryption(JE),
-    // This is ugly, but we don't expose this module via the public API, so it's fine.
-    Signature(JS, PhantomData<JT>),
+    Signature(JS),
     /// No digital signature or MAC performed.
     ///
     /// # Security Warning
@@ -47,11 +45,10 @@ where
     /// further discussion.
     None,
 }
-impl<'de, JE, JS, JT> Deserialize<'de> for JsonWebTokenAlgorithm<JE, JS, JT>
+impl<'de, JE, JS> Deserialize<'de> for JsonWebTokenAlgorithm<JE, JS>
 where
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -69,7 +66,7 @@ where
         } else if let Ok(val) = serde_json::from_value::<JE>(value.clone()) {
             Ok(JsonWebTokenAlgorithm::Encryption(val))
         } else if let Ok(val) = serde_json::from_value::<JS>(value) {
-            Ok(JsonWebTokenAlgorithm::Signature(val, PhantomData))
+            Ok(JsonWebTokenAlgorithm::Signature(val))
         } else {
             Err(D::Error::custom(format!(
                 "unrecognized JSON Web Algorithm `{}`",
@@ -78,11 +75,10 @@ where
         }
     }
 }
-impl<JE, JS, JT> Serialize for JsonWebTokenAlgorithm<JE, JS, JT>
+impl<JE, JS> Serialize for JsonWebTokenAlgorithm<JE, JS>
 where
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
 {
     fn serialize<SE>(&self, serializer: SE) -> Result<SE::Ok, SE::Error>
     where
@@ -90,23 +86,22 @@ where
     {
         match self {
             JsonWebTokenAlgorithm::Encryption(ref enc) => enc.serialize(serializer),
-            JsonWebTokenAlgorithm::Signature(ref sig, _) => sig.serialize(serializer),
+            JsonWebTokenAlgorithm::Signature(ref sig) => sig.serialize(serializer),
             JsonWebTokenAlgorithm::None => serializer.serialize_str("none"),
         }
     }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-pub struct JsonWebTokenHeader<JE, JS, JT>
+pub struct JsonWebTokenHeader<JE, JS>
 where
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
 {
     #[serde(
-        bound = "JE: JweContentEncryptionAlgorithm<JT>, JS: JwsSigningAlgorithm<JT>, JT: JsonWebKeyType"
+        bound = "JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>, JS: JwsSigningAlgorithm"
     )]
-    pub alg: JsonWebTokenAlgorithm<JE, JS, JT>,
+    pub alg: JsonWebTokenAlgorithm<JE, JS>,
     // Additional critical header parameters that must be understood by this implementation. Since
     // we don't understand any such extensions, we reject any JWT with this value present (the
     // spec specifically prohibits including public (standard) headers in this field).
@@ -122,8 +117,6 @@ where
     // Other JOSE header fields are omitted since the OpenID Connect spec specifically says that
     // the "x5u", "x5c", "jku", "jwk" header parameter fields SHOULD NOT be used.
     // See http://openid.net/specs/openid-connect-core-1_0-final.html#IDToken.
-    #[serde(skip)]
-    _phantom_jt: PhantomData<JT>,
 }
 
 pub trait JsonWebTokenPayloadSerde<P>: Debug
@@ -152,27 +145,25 @@ where
 
 // Helper trait so that we can get borrowed payload when we have a reference to the JWT and owned
 // payload when we own the JWT.
-pub trait JsonWebTokenAccess<JE, JS, JT, P>
+pub trait JsonWebTokenAccess<JE, JS, P>
 where
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
     P: Debug + DeserializeOwned + Serialize,
 {
     type ReturnType;
 
-    fn unverified_header(&self) -> &JsonWebTokenHeader<JE, JS, JT>;
+    fn unverified_header(&self) -> &JsonWebTokenHeader<JE, JS>;
     fn unverified_payload(self) -> Self::ReturnType;
     fn unverified_payload_ref(&self) -> &P;
 
-    fn payload<JU, JW>(
+    fn payload<K>(
         self,
         signature_alg: &JS,
-        key: &JW,
+        key: &K,
     ) -> Result<Self::ReturnType, SignatureVerificationError>
     where
-        JU: JsonWebKeyUse,
-        JW: JsonWebKey<JS, JT, JU>;
+        K: JsonWebKey<SigningAlgorithm = JS>;
 }
 
 /// Error creating a JSON Web Token.
@@ -188,41 +179,37 @@ pub enum JsonWebTokenError {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct JsonWebToken<JE, JS, JT, P, S>
+pub struct JsonWebToken<JE, JS, P, S>
 where
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
     P: Debug + DeserializeOwned + Serialize,
     S: JsonWebTokenPayloadSerde<P>,
 {
-    header: JsonWebTokenHeader<JE, JS, JT>,
+    header: JsonWebTokenHeader<JE, JS>,
     payload: P,
     signature: Vec<u8>,
     signing_input: String,
     _phantom: PhantomData<S>,
 }
-impl<JE, JS, JT, P, S> JsonWebToken<JE, JS, JT, P, S>
+impl<JE, JS, P, S> JsonWebToken<JE, JS, P, S>
 where
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
     P: Debug + DeserializeOwned + Serialize,
     S: JsonWebTokenPayloadSerde<P>,
 {
-    pub fn new<JU, K, SK>(payload: P, signing_key: &SK, alg: &JS) -> Result<Self, JsonWebTokenError>
+    pub fn new<SK>(payload: P, signing_key: &SK, alg: &JS) -> Result<Self, JsonWebTokenError>
     where
-        JU: JsonWebKeyUse,
-        K: JsonWebKey<JS, JT, JU>,
-        SK: PrivateSigningKey<JS, JT, JU, K>,
+        SK: PrivateSigningKey,
+        <SK as PrivateSigningKey>::VerificationKey: JsonWebKey<SigningAlgorithm = JS>,
     {
-        let header = JsonWebTokenHeader::<JE, _, _> {
-            alg: JsonWebTokenAlgorithm::Signature(alg.clone(), PhantomData),
+        let header = JsonWebTokenHeader::<JE, _> {
+            alg: JsonWebTokenAlgorithm::Signature(alg.clone()),
             crit: None,
             cty: None,
             kid: signing_key.as_verification_key().key_id().cloned(),
             typ: None,
-            _phantom_jt: PhantomData,
         };
 
         let header_json =
@@ -249,16 +236,15 @@ where
     }
 }
 // Owned JWT.
-impl<JE, JS, JT, P, S> JsonWebTokenAccess<JE, JS, JT, P> for JsonWebToken<JE, JS, JT, P, S>
+impl<JE, JS, P, S> JsonWebTokenAccess<JE, JS, P> for JsonWebToken<JE, JS, P, S>
 where
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
     P: Debug + DeserializeOwned + Serialize,
     S: JsonWebTokenPayloadSerde<P>,
 {
     type ReturnType = P;
-    fn unverified_header(&self) -> &JsonWebTokenHeader<JE, JS, JT> {
+    fn unverified_header(&self) -> &JsonWebTokenHeader<JE, JS> {
         &self.header
     }
     fn unverified_payload(self) -> Self::ReturnType {
@@ -267,14 +253,13 @@ where
     fn unverified_payload_ref(&self) -> &P {
         &self.payload
     }
-    fn payload<JU, JW>(
+    fn payload<K>(
         self,
         signature_alg: &JS,
-        key: &JW,
+        key: &K,
     ) -> Result<Self::ReturnType, SignatureVerificationError>
     where
-        JU: JsonWebKeyUse,
-        JW: JsonWebKey<JS, JT, JU>,
+        K: JsonWebKey<SigningAlgorithm = JS>,
     {
         key.verify_signature(
             signature_alg,
@@ -285,16 +270,15 @@ where
     }
 }
 // Borrowed JWT.
-impl<'a, JE, JS, JT, P, S> JsonWebTokenAccess<JE, JS, JT, P> for &'a JsonWebToken<JE, JS, JT, P, S>
+impl<'a, JE, JS, P, S> JsonWebTokenAccess<JE, JS, P> for &'a JsonWebToken<JE, JS, P, S>
 where
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
     P: Debug + DeserializeOwned + Serialize,
     S: JsonWebTokenPayloadSerde<P>,
 {
     type ReturnType = &'a P;
-    fn unverified_header(&self) -> &JsonWebTokenHeader<JE, JS, JT> {
+    fn unverified_header(&self) -> &JsonWebTokenHeader<JE, JS> {
         &self.header
     }
     fn unverified_payload(self) -> Self::ReturnType {
@@ -303,14 +287,13 @@ where
     fn unverified_payload_ref(&self) -> &P {
         &self.payload
     }
-    fn payload<JU, JW>(
+    fn payload<K>(
         self,
         signature_alg: &JS,
-        key: &JW,
+        key: &K,
     ) -> Result<Self::ReturnType, SignatureVerificationError>
     where
-        JU: JsonWebKeyUse,
-        JW: JsonWebKey<JS, JT, JU>,
+        K: JsonWebKey<SigningAlgorithm = JS>,
     {
         key.verify_signature(
             signature_alg,
@@ -320,11 +303,10 @@ where
         Ok(&self.payload)
     }
 }
-impl<'de, JE, JS, JT, P, S> Deserialize<'de> for JsonWebToken<JE, JS, JT, P, S>
+impl<'de, JE, JS, P, S> Deserialize<'de> for JsonWebToken<JE, JS, P, S>
 where
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
     P: Debug + DeserializeOwned + Serialize,
     S: JsonWebTokenPayloadSerde<P>,
 {
@@ -333,27 +315,24 @@ where
         D: Deserializer<'de>,
     {
         struct JsonWebTokenVisitor<
-            JE: JweContentEncryptionAlgorithm<JT>,
-            JS: JwsSigningAlgorithm<JT>,
-            JT: JsonWebKeyType,
+            JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+            JS: JwsSigningAlgorithm,
             P: Debug + DeserializeOwned + Serialize,
             S: JsonWebTokenPayloadSerde<P>,
         >(
             PhantomData<JE>,
             PhantomData<JS>,
-            PhantomData<JT>,
             PhantomData<P>,
             PhantomData<S>,
         );
-        impl<'de, JE, JS, JT, P, S> Visitor<'de> for JsonWebTokenVisitor<JE, JS, JT, P, S>
+        impl<'de, JE, JS, P, S> Visitor<'de> for JsonWebTokenVisitor<JE, JS, P, S>
         where
-            JE: JweContentEncryptionAlgorithm<JT>,
-            JS: JwsSigningAlgorithm<JT>,
-            JT: JsonWebKeyType,
+            JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+            JS: JwsSigningAlgorithm,
             P: Debug + DeserializeOwned + Serialize,
             S: JsonWebTokenPayloadSerde<P>,
         {
-            type Value = JsonWebToken<JE, JS, JT, P, S>;
+            type Value = JsonWebToken<JE, JS, P, S>;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 formatter.write_str("JsonWebToken")
@@ -364,7 +343,7 @@ where
                 DE: serde::de::Error,
             {
                 let raw_token = v.to_string();
-                let header: JsonWebTokenHeader<JE, JS, JT>;
+                let header: JsonWebTokenHeader<JE, JS>;
                 let payload: P;
                 let signature;
                 let signing_input;
@@ -420,15 +399,13 @@ where
             PhantomData,
             PhantomData,
             PhantomData,
-            PhantomData,
         ))
     }
 }
-impl<JE, JS, JT, P, S> Serialize for JsonWebToken<JE, JS, JT, P, S>
+impl<JE, JS, P, S> Serialize for JsonWebToken<JE, JS, P, S>
 where
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JS: JwsSigningAlgorithm<JT>,
-    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
+    JS: JwsSigningAlgorithm,
     P: Debug + DeserializeOwned + Serialize,
     S: JsonWebTokenPayloadSerde<P>,
 {
