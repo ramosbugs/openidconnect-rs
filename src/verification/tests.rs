@@ -735,15 +735,16 @@ fn test_id_token_verified_claims() {
             other => panic!("unexpected result: {:?}", other),
         }
 
-        // Invalid AuthenticationContextClass reference
-        match public_client_verifier
+        let verified_claims = public_client_verifier
             .clone()
             .set_auth_context_verifier_fn(|acr| {
                 assert_eq!(**acr.unwrap(), "the_acr");
                 Err("Invalid acr claim".to_string())
             })
-            .verified_claims(&test_jwt_with_nonce, &valid_nonce)
-        {
+            .verified_claims(&test_jwt_with_nonce, &valid_nonce);
+
+        // Invalid AuthenticationContextClass reference
+        match verified_claims {
             Err(ClaimsVerificationError::InvalidAuthContext(_)) => {}
             other => panic!("unexpected result: {:?}", other),
         }
@@ -766,21 +767,21 @@ fn test_id_token_verified_claims() {
             .verified_claims(&test_jwt_without_auth_time, |_: Option<&Nonce>| Ok(()))
             .expect("verification should succeed");
 
-        // Missing auth_time (error)
-        match public_client_verifier
+        let verified_claims = public_client_verifier
             .clone()
             .set_auth_time_verifier_fn(|auth_time| {
                 assert!(auth_time.is_none());
                 Err("Invalid auth_time claim".to_string())
             })
-            .verified_claims(&test_jwt_without_auth_time, |_: Option<&Nonce>| Ok(()))
-        {
+            .verified_claims(&test_jwt_without_auth_time, |_: Option<&Nonce>| Ok(()));
+
+        // Missing auth_time (error)
+        match verified_claims {
             Err(ClaimsVerificationError::InvalidAuthTime(_)) => {}
             other => panic!("unexpected result: {:?}", other),
         }
 
-        // Invalid auth_time
-        match public_client_verifier
+        let verified_claims = public_client_verifier
             .clone()
             .set_auth_time_verifier_fn(|auth_time| {
                 assert_eq!(
@@ -789,8 +790,10 @@ fn test_id_token_verified_claims() {
                 );
                 Err("Invalid auth_time claim".to_string())
             })
-            .verified_claims(&test_jwt_with_nonce, &valid_nonce)
-        {
+            .verified_claims(&test_jwt_with_nonce, &valid_nonce);
+
+        // Invalid auth_time
+        match verified_claims {
             Err(ClaimsVerificationError::InvalidAuthTime(_)) => {}
             other => panic!("unexpected result: {:?}", other),
         }

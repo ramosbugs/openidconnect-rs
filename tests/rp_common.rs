@@ -22,7 +22,7 @@ pub const RP_REDIRECT_URI: &str = "http://localhost:8080";
 static INIT_LOG: Once = Once::new();
 
 thread_local! {
-    static TEST_ID: RefCell<&'static str> = RefCell::new("UNINITIALIZED_TEST_ID");
+    static TEST_ID: RefCell<&'static str> = const { RefCell::new("UNINITIALIZED_TEST_ID") };
 }
 
 pub fn get_test_id() -> &'static str {
