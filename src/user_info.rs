@@ -11,7 +11,7 @@ use crate::{
     IssuerClaim, IssuerUrl, JsonWebKey, JsonWebToken, JweContentEncryptionAlgorithm,
     JwsSigningAlgorithm, LanguageTag, LocalizedClaim, PrivateSigningKey, RevocableToken,
     SignatureVerificationError, StandardClaims, SubjectIdentifier, SyncHttpClient,
-    TokenIntrospectionResponse, TokenResponse, TokenType,
+    TokenIntrospectionResponse, TokenResponse,
 };
 
 use chrono::{DateTime, Utc};
@@ -34,7 +34,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -54,7 +53,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -75,9 +73,8 @@ where
     K: JsonWebKey,
     P: AuthPrompt,
     TE: ErrorResponse + 'static,
-    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm, TT>,
-    TT: TokenType + 'static,
-    TIR: TokenIntrospectionResponse<TT>,
+    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm>,
+    TIR: TokenIntrospectionResponse,
     RT: RevocableToken,
     TRE: ErrorResponse + 'static,
     HasAuthUrl: EndpointState,

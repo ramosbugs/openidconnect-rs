@@ -5,13 +5,12 @@ use crate::{
 };
 
 /// Extends the base OAuth2 token response with an ID token.
-pub trait TokenResponse<AC, GC, JE, JS, TT>: OAuth2TokenResponse<TT>
+pub trait TokenResponse<AC, GC, JE, JS>: OAuth2TokenResponse
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
     JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
     JS: JwsSigningAlgorithm,
-    TT: TokenType,
 {
     /// Returns the ID token provided by the token response.
     ///
@@ -20,7 +19,7 @@ where
     fn id_token(&self) -> Option<&IdToken<AC, GC, JE, JS>>;
 }
 
-impl<AC, EF, GC, JE, JS, TT> TokenResponse<AC, GC, JE, JS, TT>
+impl<AC, EF, GC, JE, JS, TT> TokenResponse<AC, GC, JE, JS>
     for StandardTokenResponse<IdTokenFields<AC, EF, GC, JE, JS>, TT>
 where
     AC: AdditionalClaims,

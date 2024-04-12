@@ -1041,9 +1041,9 @@ dependencies = [
 
 [[package]]
 name = "oauth2"
-version = "5.0.0-alpha.3"
+version = "5.0.0-alpha.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "622320af955f1df37b4268c186acbb2889f646e16ba363b0634aeaaa04cfb219"
+checksum = "098af5a5110b4deacf3200682963713b143ae9d28762b739bdb7b98429dfaf68"
 dependencies = [
  "base64",
  "chrono",

@@ -67,7 +67,6 @@ pub type CoreClient<
     CoreAuthPrompt,
     StandardErrorResponse<CoreErrorResponseType>,
     CoreTokenResponse,
-    CoreTokenType,
     CoreTokenIntrospectionResponse,
     CoreRevocableToken,
     CoreRevocationErrorResponse,

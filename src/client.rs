@@ -10,7 +10,7 @@ use crate::{
     Nonce, PasswordTokenRequest, ProviderMetadata, RedirectUrl, RefreshToken, RefreshTokenRequest,
     ResourceOwnerPassword, ResourceOwnerUsername, ResponseMode, ResponseType, RevocableToken,
     RevocationRequest, RevocationUrl, Scope, SubjectIdentifier, SubjectIdentifierType,
-    TokenIntrospectionResponse, TokenResponse, TokenType, TokenUrl, UserInfoRequest, UserInfoUrl,
+    TokenIntrospectionResponse, TokenResponse, TokenUrl, UserInfoRequest, UserInfoUrl,
 };
 
 use std::marker::PhantomData;
@@ -99,7 +99,6 @@ pub struct Client<
     P,
     TE,
     TR,
-    TT,
     TIR,
     RT,
     TRE,
@@ -119,9 +118,8 @@ pub struct Client<
     K: JsonWebKey,
     P: AuthPrompt,
     TE: ErrorResponse,
-    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm, TT>,
-    TT: TokenType + 'static,
-    TIR: TokenIntrospectionResponse<TT>,
+    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm>,
+    TIR: TokenIntrospectionResponse,
     RT: RevocableToken,
     TRE: ErrorResponse,
     HasAuthUrl: EndpointState,
@@ -134,7 +132,6 @@ pub struct Client<
     oauth2_client: oauth2::Client<
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -153,7 +150,7 @@ pub struct Client<
     use_openid_scope: bool,
     _phantom: PhantomData<(AC, AD, GC, JE, P, HasUserInfoUrl)>,
 }
-impl<AC, AD, GC, JE, K, P, TE, TR, TT, TIR, RT, TRE>
+impl<AC, AD, GC, JE, K, P, TE, TR, TIR, RT, TRE>
     Client<
         AC,
         AD,
@@ -163,7 +160,6 @@ impl<AC, AD, GC, JE, K, P, TE, TR, TT, TIR, RT, TRE>
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -184,9 +180,8 @@ where
     K: JsonWebKey,
     P: AuthPrompt,
     TE: ErrorResponse + 'static,
-    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm, TT>,
-    TT: TokenType + 'static,
-    TIR: TokenIntrospectionResponse<TT>,
+    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm>,
+    TIR: TokenIntrospectionResponse,
     RT: RevocableToken,
     TRE: ErrorResponse + 'static,
 {
@@ -205,7 +200,7 @@ where
         }
     }
 }
-impl<AC, AD, GC, JE, K, P, TE, TR, TT, TIR, RT, TRE>
+impl<AC, AD, GC, JE, K, P, TE, TR, TIR, RT, TRE>
     Client<
         AC,
         AD,
@@ -215,7 +210,6 @@ impl<AC, AD, GC, JE, K, P, TE, TR, TT, TIR, RT, TRE>
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -236,9 +230,8 @@ where
     K: JsonWebKey,
     P: AuthPrompt,
     TE: ErrorResponse + 'static,
-    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm, TT>,
-    TT: TokenType + 'static,
-    TIR: TokenIntrospectionResponse<TT>,
+    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm>,
+    TIR: TokenIntrospectionResponse,
     RT: RevocableToken,
     TRE: ErrorResponse + 'static,
 {
@@ -295,7 +288,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -315,7 +307,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -336,9 +327,8 @@ where
     K: JsonWebKey,
     P: AuthPrompt,
     TE: ErrorResponse + 'static,
-    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm, TT>,
-    TT: TokenType + 'static,
-    TIR: TokenIntrospectionResponse<TT>,
+    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm>,
+    TIR: TokenIntrospectionResponse,
     RT: RevocableToken,
     TRE: ErrorResponse + 'static,
     HasAuthUrl: EndpointState,
@@ -385,7 +375,6 @@ where
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -442,7 +431,6 @@ where
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -483,7 +471,6 @@ where
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -533,7 +520,6 @@ where
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -575,7 +561,6 @@ where
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -614,7 +599,6 @@ where
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -689,7 +673,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -708,7 +691,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -729,9 +711,8 @@ where
     K: JsonWebKey,
     P: AuthPrompt,
     TE: ErrorResponse + 'static,
-    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm, TT>,
-    TT: TokenType + 'static,
-    TIR: TokenIntrospectionResponse<TT>,
+    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm>,
+    TIR: TokenIntrospectionResponse,
     RT: RevocableToken,
     TRE: ErrorResponse + 'static,
     HasDeviceAuthUrl: EndpointState,
@@ -818,7 +799,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -837,7 +817,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -858,9 +837,8 @@ where
     K: JsonWebKey,
     P: AuthPrompt,
     TE: ErrorResponse + 'static,
-    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm, TT>,
-    TT: TokenType + 'static,
-    TIR: TokenIntrospectionResponse<TT>,
+    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm>,
+    TIR: TokenIntrospectionResponse,
     RT: RevocableToken,
     TRE: ErrorResponse + 'static,
     HasAuthUrl: EndpointState,
@@ -874,7 +852,7 @@ where
     ///
     /// Requires [`set_token_uri()`](Self::set_token_uri) to have been previously
     /// called to set the token endpoint.
-    pub fn exchange_client_credentials(&self) -> ClientCredentialsTokenRequest<TE, TR, TT> {
+    pub fn exchange_client_credentials(&self) -> ClientCredentialsTokenRequest<TE, TR> {
         self.oauth2_client.exchange_client_credentials()
     }
 
@@ -887,7 +865,7 @@ where
     ///
     /// Requires [`set_token_uri()`](Self::set_token_uri) to have been previously
     /// called to set the token endpoint.
-    pub fn exchange_code(&self, code: AuthorizationCode) -> CodeTokenRequest<TE, TR, TT> {
+    pub fn exchange_code(&self, code: AuthorizationCode) -> CodeTokenRequest<TE, TR> {
         self.oauth2_client.exchange_code(code)
     }
 
@@ -900,7 +878,7 @@ where
     pub fn exchange_device_access_token<'a, EF>(
         &'a self,
         auth_response: &'a DeviceAuthorizationResponse<EF>,
-    ) -> DeviceAccessTokenRequest<'a, 'static, TR, TT, EF>
+    ) -> DeviceAccessTokenRequest<'a, 'static, TR, EF>
     where
         EF: ExtraDeviceAuthorizationFields,
     {
@@ -918,7 +896,7 @@ where
         &'a self,
         username: &'a ResourceOwnerUsername,
         password: &'a ResourceOwnerPassword,
-    ) -> PasswordTokenRequest<'a, TE, TR, TT> {
+    ) -> PasswordTokenRequest<'a, TE, TR> {
         self.oauth2_client.exchange_password(username, password)
     }
 
@@ -932,7 +910,7 @@ where
     pub fn exchange_refresh_token<'a>(
         &'a self,
         refresh_token: &'a RefreshToken,
-    ) -> RefreshTokenRequest<'a, TE, TR, TT> {
+    ) -> RefreshTokenRequest<'a, TE, TR> {
         self.oauth2_client.exchange_refresh_token(refresh_token)
     }
 
@@ -953,7 +931,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -972,7 +949,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -993,9 +969,8 @@ where
     K: JsonWebKey,
     P: AuthPrompt,
     TE: ErrorResponse + 'static,
-    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm, TT>,
-    TT: TokenType + 'static,
-    TIR: TokenIntrospectionResponse<TT>,
+    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm>,
+    TIR: TokenIntrospectionResponse,
     RT: RevocableToken,
     TRE: ErrorResponse + 'static,
     HasAuthUrl: EndpointState,
@@ -1011,7 +986,7 @@ where
     /// called to construct the client.
     pub fn exchange_client_credentials(
         &self,
-    ) -> Result<ClientCredentialsTokenRequest<TE, TR, TT>, ConfigurationError> {
+    ) -> Result<ClientCredentialsTokenRequest<TE, TR>, ConfigurationError> {
         self.oauth2_client.exchange_client_credentials()
     }
 
@@ -1027,7 +1002,7 @@ where
     pub fn exchange_code(
         &self,
         code: AuthorizationCode,
-    ) -> Result<CodeTokenRequest<TE, TR, TT>, ConfigurationError> {
+    ) -> Result<CodeTokenRequest<TE, TR>, ConfigurationError> {
         self.oauth2_client.exchange_code(code)
     }
 
@@ -1040,7 +1015,7 @@ where
     pub fn exchange_device_access_token<'a, EF>(
         &'a self,
         auth_response: &'a DeviceAuthorizationResponse<EF>,
-    ) -> Result<DeviceAccessTokenRequest<'a, 'static, TR, TT, EF>, ConfigurationError>
+    ) -> Result<DeviceAccessTokenRequest<'a, 'static, TR, EF>, ConfigurationError>
     where
         EF: ExtraDeviceAuthorizationFields,
     {
@@ -1057,7 +1032,7 @@ where
         &'a self,
         username: &'a ResourceOwnerUsername,
         password: &'a ResourceOwnerPassword,
-    ) -> Result<PasswordTokenRequest<'a, TE, TR, TT>, ConfigurationError> {
+    ) -> Result<PasswordTokenRequest<'a, TE, TR>, ConfigurationError> {
         self.oauth2_client.exchange_password(username, password)
     }
 
@@ -1070,7 +1045,7 @@ where
     pub fn exchange_refresh_token<'a>(
         &'a self,
         refresh_token: &'a RefreshToken,
-    ) -> Result<RefreshTokenRequest<'a, TE, TR, TT>, ConfigurationError> {
+    ) -> Result<RefreshTokenRequest<'a, TE, TR>, ConfigurationError> {
         self.oauth2_client.exchange_refresh_token(refresh_token)
     }
 
@@ -1090,7 +1065,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -1109,7 +1083,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -1130,9 +1103,8 @@ where
     K: JsonWebKey,
     P: AuthPrompt,
     TE: ErrorResponse + 'static,
-    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm, TT>,
-    TT: TokenType + 'static,
-    TIR: TokenIntrospectionResponse<TT>,
+    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm>,
+    TIR: TokenIntrospectionResponse,
     RT: RevocableToken,
     TRE: ErrorResponse + 'static,
     HasAuthUrl: EndpointState,
@@ -1177,7 +1149,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -1196,7 +1167,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -1217,9 +1187,8 @@ where
     K: JsonWebKey,
     P: AuthPrompt,
     TE: ErrorResponse + 'static,
-    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm, TT>,
-    TT: TokenType + 'static,
-    TIR: TokenIntrospectionResponse<TT>,
+    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm>,
+    TIR: TokenIntrospectionResponse,
     RT: RevocableToken,
     TRE: ErrorResponse + 'static,
     HasAuthUrl: EndpointState,
@@ -1233,10 +1202,7 @@ where
     ///
     /// Requires [`set_introspection_url()`](Self::set_introspection_url) to have been previously
     /// called to set the introspection endpoint.
-    pub fn introspect<'a>(
-        &'a self,
-        token: &'a AccessToken,
-    ) -> IntrospectionRequest<'a, TE, TIR, TT> {
+    pub fn introspect<'a>(&'a self, token: &'a AccessToken) -> IntrospectionRequest<'a, TE, TIR> {
         self.oauth2_client.introspect(token)
     }
 
@@ -1256,7 +1222,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -1275,7 +1240,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -1296,9 +1260,8 @@ where
     K: JsonWebKey,
     P: AuthPrompt,
     TE: ErrorResponse + 'static,
-    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm, TT>,
-    TT: TokenType + 'static,
-    TIR: TokenIntrospectionResponse<TT>,
+    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm>,
+    TIR: TokenIntrospectionResponse,
     RT: RevocableToken,
     TRE: ErrorResponse + 'static,
     HasAuthUrl: EndpointState,
@@ -1337,7 +1300,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -1356,7 +1318,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -1377,9 +1338,8 @@ where
     K: JsonWebKey,
     P: AuthPrompt,
     TE: ErrorResponse + 'static,
-    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm, TT>,
-    TT: TokenType + 'static,
-    TIR: TokenIntrospectionResponse<TT>,
+    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm>,
+    TIR: TokenIntrospectionResponse,
     RT: RevocableToken,
     TRE: ErrorResponse + 'static,
     HasAuthUrl: EndpointState,
@@ -1428,7 +1388,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -1447,7 +1406,6 @@ impl<
         P,
         TE,
         TR,
-        TT,
         TIR,
         RT,
         TRE,
@@ -1468,9 +1426,8 @@ where
     K: JsonWebKey,
     P: AuthPrompt,
     TE: ErrorResponse + 'static,
-    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm, TT>,
-    TT: TokenType + 'static,
-    TIR: TokenIntrospectionResponse<TT>,
+    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm>,
+    TIR: TokenIntrospectionResponse,
     RT: RevocableToken,
     TRE: ErrorResponse + 'static,
     HasAuthUrl: EndpointState,
