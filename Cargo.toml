@@ -25,7 +25,7 @@ native-tls = ["oauth2/native-tls"]
 reqwest = ["oauth2/reqwest"]
 reqwest-blocking = ["oauth2/reqwest-blocking"]
 rustls-tls = ["oauth2/rustls-tls"]
-timing-resistant-secret-traits = []
+timing-resistant-secret-traits = ["oauth2/timing-resistant-secret-traits"]
 ureq = ["oauth2/ureq"]
 
 [[example]]
