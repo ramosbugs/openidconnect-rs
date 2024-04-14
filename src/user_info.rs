@@ -22,7 +22,6 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use std::future::Future;
-use std::pin::Pin;
 use std::str;
 
 impl<
@@ -152,16 +151,9 @@ where
     pub fn request_async<'c, AC, C, GC>(
         self,
         http_client: &'c C,
-    ) -> Pin<
-        Box<
-            dyn Future<
-                    Output = Result<
-                        UserInfoClaims<AC, GC>,
-                        UserInfoError<<C as AsyncHttpClient<'c>>::Error>,
-                    >,
-                > + 'c,
-        >,
-    >
+    ) -> impl Future<
+        Output = Result<UserInfoClaims<AC, GC>, UserInfoError<<C as AsyncHttpClient<'c>>::Error>>,
+    > + 'c
     where
         Self: 'c,
         AC: AdditionalClaims,

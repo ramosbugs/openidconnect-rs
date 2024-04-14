@@ -18,7 +18,6 @@ use thiserror::Error;
 
 use std::fmt::Debug;
 use std::future::Future;
-use std::pin::Pin;
 
 #[cfg(test)]
 mod tests;
@@ -309,12 +308,7 @@ where
     pub fn discover_async<'c, C>(
         issuer_url: IssuerUrl,
         http_client: &'c C,
-    ) -> Pin<
-        Box<
-            dyn Future<Output = Result<Self, DiscoveryError<<C as AsyncHttpClient<'c>>::Error>>>
-                + 'c,
-        >,
-    >
+    ) -> impl Future<Output = Result<Self, DiscoveryError<<C as AsyncHttpClient<'c>>::Error>>> + 'c
     where
         Self: 'c,
         C: AsyncHttpClient<'c>,
