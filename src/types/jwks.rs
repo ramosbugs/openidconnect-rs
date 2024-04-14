@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, VecSkipError};
 
 use std::future::Future;
-use std::pin::Pin;
 
 new_url_type![
     /// JSON Web Key Set URL.
@@ -114,12 +113,7 @@ where
     pub fn fetch_async<'c, C>(
         url: &JsonWebKeySetUrl,
         http_client: &'c C,
-    ) -> Pin<
-        Box<
-            dyn Future<Output = Result<Self, DiscoveryError<<C as AsyncHttpClient<'c>>::Error>>>
-                + 'c,
-        >,
-    >
+    ) -> impl Future<Output = Result<Self, DiscoveryError<<C as AsyncHttpClient<'c>>::Error>>> + 'c
     where
         Self: 'c,
         C: AsyncHttpClient<'c>,

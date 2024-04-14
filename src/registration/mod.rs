@@ -26,7 +26,6 @@ use thiserror::Error;
 use std::fmt::{Debug, Formatter, Result as FormatterResult};
 use std::future::Future;
 use std::marker::PhantomData;
-use std::pin::Pin;
 use std::time::Duration;
 
 #[cfg(test)]
@@ -450,16 +449,12 @@ where
         &'c self,
         registration_endpoint: &'c RegistrationUrl,
         http_client: &'c C,
-    ) -> Pin<
-        Box<
-            dyn Future<
-                    Output = Result<
-                        ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, K, RT, S>,
-                        ClientRegistrationError<ET, <C as AsyncHttpClient<'c>>::Error>,
-                    >,
-                > + 'c,
+    ) -> impl Future<
+        Output = Result<
+            ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, K, RT, S>,
+            ClientRegistrationError<ET, <C as AsyncHttpClient<'c>>::Error>,
         >,
-    >
+    > + 'c
     where
         Self: 'c,
         C: AsyncHttpClient<'c>,
