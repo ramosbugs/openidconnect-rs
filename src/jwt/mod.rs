@@ -21,6 +21,7 @@ new_type![
 ];
 
 new_type![
+    /// JSON web token type field (typ)
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
     JsonWebTokenType(String)
 ];
