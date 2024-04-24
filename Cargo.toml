@@ -19,6 +19,7 @@ maintenance = { status = "actively-developed" }
 [features]
 accept-rfc3339-timestamps = []
 accept-string-booleans = []
+accept-string-epoch = []
 curl = ["oauth2/curl"]
 default = ["reqwest", "rustls-tls"]
 native-tls = ["oauth2/native-tls"]
