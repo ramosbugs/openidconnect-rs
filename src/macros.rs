@@ -933,7 +933,7 @@ macro_rules! deserialize_from_str {
                 D: serde::de::Deserializer<'de>,
             {
                 let variant_str = String::deserialize(deserializer)?;
-                Ok(Self::from_str(&variant_str))
+                Ok(Self::from(variant_str.as_str()))
             }
         }
     };

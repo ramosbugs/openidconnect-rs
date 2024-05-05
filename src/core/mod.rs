@@ -202,8 +202,8 @@ pub enum CoreApplicationType {
 // supports unit variants.
 deserialize_from_str!(CoreApplicationType);
 serialize_as_str!(CoreApplicationType);
-impl CoreApplicationType {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreApplicationType {
+    fn from(s: &str) -> Self {
         match s {
             "native" => CoreApplicationType::Native,
             "web" => CoreApplicationType::Web,
@@ -249,8 +249,8 @@ pub enum CoreAuthDisplay {
 }
 deserialize_from_str!(CoreAuthDisplay);
 serialize_as_str!(CoreAuthDisplay);
-impl CoreAuthDisplay {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreAuthDisplay {
+    fn from(s: &str) -> Self {
         match s {
             "page" => CoreAuthDisplay::Page,
             "popup" => CoreAuthDisplay::Popup,
@@ -311,8 +311,8 @@ pub enum CoreAuthPrompt {
 }
 deserialize_from_str!(CoreAuthPrompt);
 serialize_as_str!(CoreAuthPrompt);
-impl CoreAuthPrompt {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreAuthPrompt {
+    fn from(s: &str) -> Self {
         match s {
             "none" => CoreAuthPrompt::None,
             "login" => CoreAuthPrompt::Login,
@@ -374,8 +374,8 @@ pub enum CoreClaimType {
 }
 deserialize_from_str!(CoreClaimType);
 serialize_as_str!(CoreClaimType);
-impl CoreClaimType {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreClaimType {
+    fn from(s: &str) -> Self {
         match s {
             "normal" => CoreClaimType::Normal,
             "aggregated" => CoreClaimType::Aggregated,
@@ -418,8 +418,8 @@ pub enum CoreClientAuthMethod {
 }
 deserialize_from_str!(CoreClientAuthMethod);
 serialize_as_str!(CoreClientAuthMethod);
-impl CoreClientAuthMethod {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreClientAuthMethod {
+    fn from(s: &str) -> Self {
         match s {
             "client_secret_basic" => CoreClientAuthMethod::ClientSecretBasic,
             "client_secret_jwt" => CoreClientAuthMethod::ClientSecretJwt,
@@ -476,8 +476,8 @@ pub enum CoreGrantType {
 }
 deserialize_from_str!(CoreGrantType);
 serialize_as_str!(CoreGrantType);
-impl CoreGrantType {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreGrantType {
+    fn from(s: &str) -> Self {
         match s {
             "authorization_code" => CoreGrantType::AuthorizationCode,
             "client_credentials" => CoreGrantType::ClientCredentials,
@@ -761,8 +761,8 @@ pub enum CoreAuthErrorResponseType {
 }
 deserialize_from_str!(CoreAuthErrorResponseType);
 serialize_as_str!(CoreAuthErrorResponseType);
-impl CoreAuthErrorResponseType {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreAuthErrorResponseType {
+    fn from(s: &str) -> Self {
         match s {
             "access_denied" => CoreAuthErrorResponseType::AccessDenied,
             "account_selection_required" => CoreAuthErrorResponseType::AccountSelectionRequired,
@@ -822,8 +822,8 @@ pub enum CoreRegisterErrorResponseType {
 }
 deserialize_from_str!(CoreRegisterErrorResponseType);
 serialize_as_str!(CoreRegisterErrorResponseType);
-impl CoreRegisterErrorResponseType {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreRegisterErrorResponseType {
+    fn from(s: &str) -> Self {
         match s {
             "invalid_client_metadata" => CoreRegisterErrorResponseType::InvalidClientMetadata,
             "invalid_redirect_uri" => CoreRegisterErrorResponseType::InvalidRedirectUri,
@@ -891,8 +891,8 @@ pub enum CoreResponseMode {
 }
 deserialize_from_str!(CoreResponseMode);
 serialize_as_str!(CoreResponseMode);
-impl CoreResponseMode {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreResponseMode {
+    fn from(s: &str) -> Self {
         match s {
             "query" => CoreResponseMode::Query,
             "fragment" => CoreResponseMode::Fragment,
@@ -947,8 +947,8 @@ pub enum CoreResponseType {
 }
 deserialize_from_str!(CoreResponseType);
 serialize_as_str!(CoreResponseType);
-impl CoreResponseType {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreResponseType {
+    fn from(s: &str) -> Self {
         match s {
             "code" => CoreResponseType::Code,
             "id_token" => CoreResponseType::IdToken,
@@ -995,8 +995,8 @@ pub enum CoreSubjectIdentifierType {
 }
 deserialize_from_str!(CoreSubjectIdentifierType);
 serialize_as_str!(CoreSubjectIdentifierType);
-impl CoreSubjectIdentifierType {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreSubjectIdentifierType {
+    fn from(s: &str) -> Self {
         match s {
             "pairwise" => CoreSubjectIdentifierType::Pairwise,
             "public" => CoreSubjectIdentifierType::Public,

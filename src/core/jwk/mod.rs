@@ -760,8 +760,8 @@ pub enum CoreJsonWebKeyUse {
     /// Fallback case for other key uses not understood by this library.
     Other(String),
 }
-impl CoreJsonWebKeyUse {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreJsonWebKeyUse {
+    fn from(s: &str) -> Self {
         match s {
             "sig" => Self::Signature,
             "enc" => Self::Encryption,
