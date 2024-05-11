@@ -390,7 +390,7 @@ macro_rules! new_url_type {
                     where
                         E: ::serde::de::Error,
                     {
-                        $name::new(v.to_string()).map_err(E::custom)
+                        $name::new(v).map_err(E::custom)
                     }
                 }
                 deserializer.deserialize_str(UrlVisitor {})

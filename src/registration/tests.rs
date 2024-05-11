@@ -65,8 +65,8 @@ fn test_metadata_serialization() {
     assert_eq!(
         *client_metadata.redirect_uris(),
         vec![
-            RedirectUrl::new("https://example.com/redirect-1".to_string()).unwrap(),
-            RedirectUrl::new("https://example.com/redirect-2".to_string()).unwrap(),
+            RedirectUrl::new("https://example.com/redirect-1").unwrap(),
+            RedirectUrl::new("https://example.com/redirect-2").unwrap(),
         ]
     );
     assert_eq!(
@@ -97,32 +97,26 @@ fn test_metadata_serialization() {
     assert_eq!(
         *client_metadata.contacts().unwrap(),
         vec![
-            ClientContactEmail::new("user@example.com".to_string()),
-            ClientContactEmail::new("admin@openidconnect.local".to_string()),
+            ClientContactEmail::new("user@example.com"),
+            ClientContactEmail::new("admin@openidconnect.local"),
         ]
     );
     assert_eq!(
         sorted(client_metadata.client_name().unwrap().clone())
             .collect::<Vec<(Option<LanguageTag>, ClientName)>>(),
         vec![
-            (None, ClientName::new("Example".to_string())),
-            (
-                Some(LanguageTag::new("es".to_string())),
-                ClientName::new("Ejemplo".to_string()),
-            ),
+            (None, ClientName::new("Example")),
+            (Some(LanguageTag::new("es")), ClientName::new("Ejemplo"),),
         ]
     );
     assert_eq!(
         sorted(client_metadata.logo_uri().unwrap().clone())
             .collect::<Vec<(Option<LanguageTag>, LogoUrl)>>(),
         vec![
+            (None, LogoUrl::new("https://example.com/logo.png").unwrap(),),
             (
-                None,
-                LogoUrl::new("https://example.com/logo.png".to_string()).unwrap(),
-            ),
-            (
-                Some(LanguageTag::new("fr".to_string())),
-                LogoUrl::new("https://example.com/logo-fr.png".to_string()).unwrap(),
+                Some(LanguageTag::new("fr")),
+                LogoUrl::new("https://example.com/logo-fr.png").unwrap(),
             ),
         ]
     );
@@ -132,11 +126,11 @@ fn test_metadata_serialization() {
         vec![
             (
                 None,
-                ClientUrl::new("https://example.com/client-app".to_string()).unwrap(),
+                ClientUrl::new("https://example.com/client-app").unwrap(),
             ),
             (
-                Some(LanguageTag::new("de".to_string())),
-                ClientUrl::new("https://example.com/client-app-de".to_string()).unwrap(),
+                Some(LanguageTag::new("de")),
+                ClientUrl::new("https://example.com/client-app-de").unwrap(),
             ),
         ]
     );
@@ -144,13 +138,10 @@ fn test_metadata_serialization() {
         sorted(client_metadata.policy_uri().unwrap().clone())
             .collect::<Vec<(Option<LanguageTag>, PolicyUrl)>>(),
         vec![
+            (None, PolicyUrl::new("https://example.com/policy").unwrap(),),
             (
-                None,
-                PolicyUrl::new("https://example.com/policy".to_string()).unwrap(),
-            ),
-            (
-                Some(LanguageTag::new("sr-Latn".to_string())),
-                PolicyUrl::new("https://example.com/policy-sr-latin".to_string()).unwrap(),
+                Some(LanguageTag::new("sr-Latn")),
+                PolicyUrl::new("https://example.com/policy-sr-latin").unwrap(),
             ),
         ]
     );
@@ -158,19 +149,16 @@ fn test_metadata_serialization() {
         sorted(client_metadata.tos_uri().unwrap().clone())
             .collect::<Vec<(Option<LanguageTag>, ToSUrl)>>(),
         vec![
+            (None, ToSUrl::new("https://example.com/tos").unwrap(),),
             (
-                None,
-                ToSUrl::new("https://example.com/tos".to_string()).unwrap(),
-            ),
-            (
-                Some(LanguageTag::new("sr-Cyrl".to_string())),
-                ToSUrl::new("https://example.com/tos-sr-cyrl".to_string()).unwrap(),
+                Some(LanguageTag::new("sr-Cyrl")),
+                ToSUrl::new("https://example.com/tos-sr-cyrl").unwrap(),
             ),
         ]
     );
     assert_eq!(
         *client_metadata.jwks_uri().unwrap(),
-        JsonWebKeySetUrl::new("https://example.com/jwks".to_string()).unwrap()
+        JsonWebKeySetUrl::new("https://example.com/jwks").unwrap()
     );
     assert_eq!(
         client_metadata.jwks(),
@@ -181,7 +169,7 @@ fn test_metadata_serialization() {
     );
     assert_eq!(
         *client_metadata.sector_identifier_uri().unwrap(),
-        SectorIdentifierUrl::new("https://example.com/sector".to_string()).unwrap()
+        SectorIdentifierUrl::new("https://example.com/sector").unwrap()
     );
     assert_eq!(
         *client_metadata.subject_type().unwrap(),
@@ -239,20 +227,20 @@ fn test_metadata_serialization() {
     assert_eq!(
         *client_metadata.default_acr_values().unwrap(),
         vec![
-            AuthenticationContextClass::new("0".to_string()),
-            AuthenticationContextClass::new("urn:mace:incommon:iap:silver".to_string()),
-            AuthenticationContextClass::new("urn:mace:incommon:iap:bronze".to_string()),
+            AuthenticationContextClass::new("0"),
+            AuthenticationContextClass::new("urn:mace:incommon:iap:silver"),
+            AuthenticationContextClass::new("urn:mace:incommon:iap:bronze"),
         ]
     );
     assert_eq!(
         *client_metadata.sector_identifier_uri().unwrap(),
-        SectorIdentifierUrl::new("https://example.com/sector".to_string()).unwrap()
+        SectorIdentifierUrl::new("https://example.com/sector").unwrap()
     );
     assert_eq!(
         *client_metadata.request_uris().unwrap(),
         vec![
-            RequestUrl::new("https://example.com/request-1".to_string()).unwrap(),
-            RequestUrl::new("https://example.com/request-2".to_string()).unwrap(),
+            RequestUrl::new("https://example.com/request-1").unwrap(),
+            RequestUrl::new("https://example.com/request-2").unwrap(),
         ]
     );
     let serialized_json = serde_json::to_string(&client_metadata).unwrap();
@@ -271,7 +259,7 @@ fn test_metadata_serialization_minimal() {
 
     assert_eq!(
         *client_metadata.redirect_uris(),
-        vec![RedirectUrl::new("https://example.com/redirect-1".to_string()).unwrap(),]
+        vec![RedirectUrl::new("https://example.com/redirect-1").unwrap(),]
     );
     assert_eq!(client_metadata.response_types(), None);
     assert_eq!(client_metadata.grant_types(), None);
@@ -364,7 +352,7 @@ fn test_response_serialization() {
 
     assert_eq!(
         *registration_response.client_id(),
-        ClientId::new("abcdefgh".to_string())
+        ClientId::new("abcdefgh")
     );
     assert_eq!(
         *registration_response.client_secret().unwrap().secret(),
@@ -379,7 +367,7 @@ fn test_response_serialization() {
     );
     assert_eq!(
         *registration_response.registration_client_uri().unwrap(),
-        ClientConfigUrl::new("https://example-provider.com/registration".to_string()).unwrap()
+        ClientConfigUrl::new("https://example-provider.com/registration").unwrap()
     );
     assert_eq!(
         registration_response.client_id_issued_at().unwrap(),
@@ -396,8 +384,8 @@ fn test_response_serialization() {
     assert_eq!(
         *registration_response.redirect_uris(),
         vec![
-            RedirectUrl::new("https://example.com/redirect-1".to_string()).unwrap(),
-            RedirectUrl::new("https://example.com/redirect-2".to_string()).unwrap(),
+            RedirectUrl::new("https://example.com/redirect-1").unwrap(),
+            RedirectUrl::new("https://example.com/redirect-2").unwrap(),
         ]
     );
     assert_eq!(
@@ -428,32 +416,26 @@ fn test_response_serialization() {
     assert_eq!(
         *registration_response.contacts().unwrap(),
         vec![
-            ClientContactEmail::new("user@example.com".to_string()),
-            ClientContactEmail::new("admin@openidconnect.local".to_string()),
+            ClientContactEmail::new("user@example.com"),
+            ClientContactEmail::new("admin@openidconnect.local"),
         ]
     );
     assert_eq!(
         sorted(registration_response.client_name().unwrap().clone())
             .collect::<Vec<(Option<LanguageTag>, ClientName)>>(),
         vec![
-            (None, ClientName::new("Example".to_string())),
-            (
-                Some(LanguageTag::new("es".to_string())),
-                ClientName::new("Ejemplo".to_string()),
-            ),
+            (None, ClientName::new("Example")),
+            (Some(LanguageTag::new("es")), ClientName::new("Ejemplo"),),
         ]
     );
     assert_eq!(
         sorted(registration_response.logo_uri().unwrap().clone())
             .collect::<Vec<(Option<LanguageTag>, LogoUrl)>>(),
         vec![
+            (None, LogoUrl::new("https://example.com/logo.png").unwrap(),),
             (
-                None,
-                LogoUrl::new("https://example.com/logo.png".to_string()).unwrap(),
-            ),
-            (
-                Some(LanguageTag::new("fr".to_string())),
-                LogoUrl::new("https://example.com/logo-fr.png".to_string()).unwrap(),
+                Some(LanguageTag::new("fr")),
+                LogoUrl::new("https://example.com/logo-fr.png").unwrap(),
             ),
         ]
     );
@@ -463,11 +445,11 @@ fn test_response_serialization() {
         vec![
             (
                 None,
-                ClientUrl::new("https://example.com/client-app".to_string()).unwrap(),
+                ClientUrl::new("https://example.com/client-app").unwrap(),
             ),
             (
-                Some(LanguageTag::new("de".to_string())),
-                ClientUrl::new("https://example.com/client-app-de".to_string()).unwrap(),
+                Some(LanguageTag::new("de")),
+                ClientUrl::new("https://example.com/client-app-de").unwrap(),
             ),
         ]
     );
@@ -475,13 +457,10 @@ fn test_response_serialization() {
         sorted(registration_response.policy_uri().unwrap().clone())
             .collect::<Vec<(Option<LanguageTag>, PolicyUrl)>>(),
         vec![
+            (None, PolicyUrl::new("https://example.com/policy").unwrap(),),
             (
-                None,
-                PolicyUrl::new("https://example.com/policy".to_string()).unwrap(),
-            ),
-            (
-                Some(LanguageTag::new("sr-Latn".to_string())),
-                PolicyUrl::new("https://example.com/policy-sr-latin".to_string()).unwrap(),
+                Some(LanguageTag::new("sr-Latn")),
+                PolicyUrl::new("https://example.com/policy-sr-latin").unwrap(),
             ),
         ]
     );
@@ -489,19 +468,16 @@ fn test_response_serialization() {
         sorted(registration_response.tos_uri().unwrap().clone())
             .collect::<Vec<(Option<LanguageTag>, ToSUrl)>>(),
         vec![
+            (None, ToSUrl::new("https://example.com/tos").unwrap(),),
             (
-                None,
-                ToSUrl::new("https://example.com/tos".to_string()).unwrap(),
-            ),
-            (
-                Some(LanguageTag::new("sr-Cyrl".to_string())),
-                ToSUrl::new("https://example.com/tos-sr-cyrl".to_string()).unwrap(),
+                Some(LanguageTag::new("sr-Cyrl")),
+                ToSUrl::new("https://example.com/tos-sr-cyrl").unwrap(),
             ),
         ]
     );
     assert_eq!(
         *registration_response.jwks_uri().unwrap(),
-        JsonWebKeySetUrl::new("https://example.com/jwks".to_string()).unwrap()
+        JsonWebKeySetUrl::new("https://example.com/jwks").unwrap()
     );
     assert_eq!(
         registration_response.jwks(),
@@ -512,7 +488,7 @@ fn test_response_serialization() {
     );
     assert_eq!(
         *registration_response.sector_identifier_uri().unwrap(),
-        SectorIdentifierUrl::new("https://example.com/sector".to_string()).unwrap()
+        SectorIdentifierUrl::new("https://example.com/sector").unwrap()
     );
     assert_eq!(
         *registration_response.subject_type().unwrap(),
@@ -588,20 +564,20 @@ fn test_response_serialization() {
     assert_eq!(
         *registration_response.default_acr_values().unwrap(),
         vec![
-            AuthenticationContextClass::new("0".to_string()),
-            AuthenticationContextClass::new("urn:mace:incommon:iap:silver".to_string()),
-            AuthenticationContextClass::new("urn:mace:incommon:iap:bronze".to_string()),
+            AuthenticationContextClass::new("0"),
+            AuthenticationContextClass::new("urn:mace:incommon:iap:silver"),
+            AuthenticationContextClass::new("urn:mace:incommon:iap:bronze"),
         ]
     );
     assert_eq!(
         *registration_response.sector_identifier_uri().unwrap(),
-        SectorIdentifierUrl::new("https://example.com/sector".to_string()).unwrap()
+        SectorIdentifierUrl::new("https://example.com/sector").unwrap()
     );
     assert_eq!(
         *registration_response.request_uris().unwrap(),
         vec![
-            RequestUrl::new("https://example.com/request-1".to_string()).unwrap(),
-            RequestUrl::new("https://example.com/request-2".to_string()).unwrap(),
+            RequestUrl::new("https://example.com/request-1").unwrap(),
+            RequestUrl::new("https://example.com/request-2").unwrap(),
         ]
     );
     let serialized_json = serde_json::to_string(&registration_response).unwrap();

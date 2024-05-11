@@ -4,7 +4,7 @@ use crate::IssuerUrl;
 fn test_issuer_url_append() {
     assert_eq!(
         "http://example.com/.well-known/openid-configuration",
-        IssuerUrl::new("http://example.com".to_string())
+        IssuerUrl::new("http://example.com")
             .unwrap()
             .join(".well-known/openid-configuration")
             .unwrap()
@@ -12,7 +12,7 @@ fn test_issuer_url_append() {
     );
     assert_eq!(
         "http://example.com/.well-known/openid-configuration",
-        IssuerUrl::new("http://example.com/".to_string())
+        IssuerUrl::new("http://example.com/")
             .unwrap()
             .join(".well-known/openid-configuration")
             .unwrap()
@@ -20,7 +20,7 @@ fn test_issuer_url_append() {
     );
     assert_eq!(
         "http://example.com/x/.well-known/openid-configuration",
-        IssuerUrl::new("http://example.com/x".to_string())
+        IssuerUrl::new("http://example.com/x")
             .unwrap()
             .join(".well-known/openid-configuration")
             .unwrap()
@@ -28,7 +28,7 @@ fn test_issuer_url_append() {
     );
     assert_eq!(
         "http://example.com/x/.well-known/openid-configuration",
-        IssuerUrl::new("http://example.com/x/".to_string())
+        IssuerUrl::new("http://example.com/x/")
             .unwrap()
             .join(".well-known/openid-configuration")
             .unwrap()
@@ -38,8 +38,7 @@ fn test_issuer_url_append() {
 
 #[test]
 fn test_url_serialize() {
-    let issuer_url =
-        IssuerUrl::new("http://example.com/.well-known/openid-configuration".to_string()).unwrap();
+    let issuer_url = IssuerUrl::new("http://example.com/.well-known/openid-configuration").unwrap();
     let serialized_url = serde_json::to_string(&issuer_url).unwrap();
 
     assert_eq!(
@@ -51,7 +50,7 @@ fn test_url_serialize() {
     assert_eq!(issuer_url, deserialized_url);
 
     assert_eq!(
-        serde_json::to_string(&IssuerUrl::new("http://example.com".to_string()).unwrap()).unwrap(),
+        serde_json::to_string(&IssuerUrl::new("http://example.com").unwrap()).unwrap(),
         "\"http://example.com\"",
     );
 }
