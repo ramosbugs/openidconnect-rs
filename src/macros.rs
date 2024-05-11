@@ -129,8 +129,8 @@ macro_rules! new_type {
 
             #[allow(dead_code)]
             #[doc = $new_doc]
-            pub fn new(s: $type) -> Self {
-                $name(s)
+            pub fn new(s: impl Into<$type>) -> Self {
+                $name(s.into())
             }
         }
         impl std::ops::Deref for $name {
@@ -238,8 +238,8 @@ macro_rules! new_secret_type {
             $($item)*
 
             #[doc = $new_doc]
-            pub fn new(s: $type) -> Self {
-                $name(s)
+            pub fn new(s: impl Into<$type>) -> Self {
+                $name(s.into())
             }
             #[doc = $secret_doc]
             ///
@@ -332,7 +332,8 @@ macro_rules! new_url_type {
         pub struct $name(url::Url, String);
         impl $name {
             #[doc = $new_doc]
-            pub fn new(url: String) -> Result<Self, ::url::ParseError> {
+            pub fn new(url: impl Into<String>) -> Result<Self, ::url::ParseError> {
+                let url = url.into();
                 Ok($name(url::Url::parse(&url)?, url))
             }
             #[doc = $from_url_doc]
