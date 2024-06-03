@@ -563,6 +563,17 @@ pub struct CoreRsaPrivateSigningKey {
     kid: Option<JsonWebKeyId>,
 }
 impl CoreRsaPrivateSigningKey {
+    /// Generate a new `CoreRsaPrivateSigningKey` where N denotes its bit size.
+    pub fn generate<const N: usize>(kid: Option<JsonWebKeyId>) -> Result<Self, rsa::Error> {
+        let mut rng = rand::rngs::OsRng;
+
+        Ok(Self {
+            key_pair: rsa::RsaPrivateKey::new(&mut rng, 2048)?,
+            rng: Box::new(rng),
+            kid,
+        })
+    }
+
     /// Converts an RSA private key (in PEM format) to a JWK representing its public key.
     pub fn from_pem(pem: &str, kid: Option<JsonWebKeyId>) -> Result<Self, String> {
         Self::from_pem_internal(pem, Box::new(rand::rngs::OsRng), kid)
