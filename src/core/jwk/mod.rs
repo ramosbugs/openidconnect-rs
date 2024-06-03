@@ -7,7 +7,8 @@ use crate::{
 };
 
 use ed25519_dalek::pkcs8::DecodePrivateKey;
-use ed25519_dalek::Signer;
+use ed25519_dalek::{Signer, SigningKey};
+use rand::RngCore;
 use rsa::pkcs1::DecodeRsaPrivateKey;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256, Sha384, Sha512};
@@ -493,6 +494,19 @@ pub struct CoreEdDsaPrivateSigningKey {
     key_pair: ed25519_dalek::SigningKey,
 }
 impl CoreEdDsaPrivateSigningKey {
+    /// Generate a new `CoreEdDsaPrivateSigningKey`
+    pub fn generate(kid: Option<JsonWebKeyId>) -> Self {
+        let mut rng = rand::rngs::OsRng;
+
+        let mut secret = ed25519_dalek::SecretKey::default();
+        rng.fill_bytes(&mut secret);
+
+        Self {
+            kid,
+            key_pair: SigningKey::from_bytes(&secret),
+        }
+    }
+
     /// Converts an EdDSA private key (in PEM format) to a JWK representing its public key.
     pub fn from_ed25519_pem(pem: &str, kid: Option<JsonWebKeyId>) -> Result<Self, String> {
         Ok(Self {
