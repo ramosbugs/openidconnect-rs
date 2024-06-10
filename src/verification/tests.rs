@@ -36,9 +36,25 @@ fn assert_unsupported<T>(result: Result<T, ClaimsVerificationError>, expected_su
 
 #[test]
 fn test_jose_header() {
+    let client_id = ClientId::new("my_client".to_string());
+    let issuer = IssuerUrl::new("https://example.com".to_string()).unwrap();
+    let verifier = CoreJwtClaimsVerifier::new(
+        client_id.clone(),
+        issuer.clone(),
+        CoreJsonWebKeySet::new(vec![]),
+    );
+
+    // No typ
+    verifier
+        .validate_jose_header(
+            &serde_json::from_str::<CoreJsonWebTokenHeader>("{\"alg\":\"RS256\"}")
+                .expect("failed to deserialize"),
+        )
+        .expect("JWT typ field was required");
+
     // Unexpected JWT type.
     assert_unsupported(
-        CoreJwtClaimsVerifier::validate_jose_header(
+        verifier.validate_jose_header(
             &serde_json::from_str::<CoreJsonWebTokenHeader>(
                 "{\"alg\":\"RS256\",\"typ\":\"NOT_A_JWT\"}",
             )
@@ -49,14 +65,14 @@ fn test_jose_header() {
 
     // Nested JWTs.
     assert_unsupported(
-        CoreJwtClaimsVerifier::validate_jose_header(
+        verifier.validate_jose_header(
             &serde_json::from_str::<CoreJsonWebTokenHeader>("{\"alg\":\"RS256\",\"cty\":\"JWT\"}")
                 .expect("failed to deserialize"),
         ),
         "nested JWT",
     );
     assert_unsupported(
-        CoreJwtClaimsVerifier::validate_jose_header(
+        verifier.validate_jose_header(
             &serde_json::from_str::<CoreJsonWebTokenHeader>(
                 "{\"alg\":\"RS256\",\"cty\":\"NOT_A_JWT\"}",
             )
@@ -67,7 +83,7 @@ fn test_jose_header() {
 
     // Critical fields. Adapted from https://tools.ietf.org/html/rfc7515#appendix-E
     assert_unsupported(
-        CoreJwtClaimsVerifier::validate_jose_header(
+        verifier.validate_jose_header(
             &serde_json::from_str::<CoreJsonWebTokenHeader>(
                 "{\
                      \"alg\":\"RS256\",\
@@ -79,6 +95,38 @@ fn test_jose_header() {
         ),
         "critical JWT header fields are unsupported",
     );
+}
+
+#[test]
+fn test_jose_header_typ_check_disabled() {
+    let client_id = ClientId::new("my_client".to_string());
+    let issuer = IssuerUrl::new("https://example.com".to_string()).unwrap();
+
+    // Build a verifier that does *not* check the value of `typ`.
+    let verifier = CoreJwtClaimsVerifier::new(
+        client_id.clone(),
+        issuer.clone(),
+        CoreJsonWebKeySet::new(vec![]),
+    )
+    .require_typ_check(false);
+
+    // No typ
+    verifier
+        .validate_jose_header(
+            &serde_json::from_str::<CoreJsonWebTokenHeader>("{\"alg\":\"RS256\"}")
+                .expect("failed to deserialize"),
+        )
+        .expect("JWT typ field was required");
+
+    // Unsupported typ value
+    verifier
+        .validate_jose_header(
+            &serde_json::from_str::<CoreJsonWebTokenHeader>(
+                "{\"alg\":\"RS256\",\"typ\":\"NOT_A_JWT\"}",
+            )
+            .expect("failed to deserialize"),
+        )
+        .expect("any typ value is allowed");
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
