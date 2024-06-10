@@ -125,7 +125,6 @@ where
     iss_required: bool,
     issuer: IssuerUrl,
     is_signature_check_enabled: bool,
-    is_typ_check_enabled: bool,
     other_aud_verifier_fn: Arc<dyn Fn(&Audience) -> bool + 'a + Send + Sync>,
     signature_keys: JsonWebKeySet<K>,
 }
@@ -147,7 +146,6 @@ where
             iss_required: true,
             issuer,
             is_signature_check_enabled: true,
-            is_typ_check_enabled: true,
             // Secure default: reject all other audiences as untrusted, since any other audience
             // can potentially impersonate the user when by sending its copy of these claims
             // to this relying party.
@@ -168,11 +166,6 @@ where
 
     pub fn require_signature_check(mut self, sig_required: bool) -> Self {
         self.is_signature_check_enabled = sig_required;
-        self
-    }
-
-    pub fn require_typ_check(mut self, typ_check_required: bool) -> Self {
-        self.is_typ_check_enabled = typ_check_required;
         self
     }
 
@@ -202,7 +195,6 @@ where
     }
 
     fn validate_jose_header<JE>(
-        &self,
         jose_header: &JsonWebTokenHeader<JE, K::SigningAlgorithm>,
     ) -> Result<(), ClaimsVerificationError>
     where
@@ -210,15 +202,13 @@ where
             KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
         >,
     {
-        if self.is_typ_check_enabled {
-            // The 'typ' header field must either be omitted or have the canonicalized value JWT.
-            if let Some(ref jwt_type) = jose_header.typ {
-                if jwt_type.to_uppercase() != "JWT" {
-                    return Err(ClaimsVerificationError::Unsupported(format!(
-                        "unexpected or unsupported JWT type `{}`",
-                        **jwt_type
-                    )));
-                }
+        // The 'typ' header field must either be omitted or have the canonicalized value JWT.
+        if let Some(ref jwt_type) = jose_header.typ {
+            if jwt_type.to_uppercase() != "JWT" {
+                return Err(ClaimsVerificationError::Unsupported(format!(
+                    "unexpected or unsupported JWT type `{}`",
+                    **jwt_type
+                )));
             }
         }
         // The 'cty' header field must be omitted, since it's only used for JWTs that contain
@@ -260,7 +250,7 @@ where
     {
         {
             let jose_header = jwt.unverified_header();
-            self.validate_jose_header(jose_header)?;
+            Self::validate_jose_header(jose_header)?;
 
             // The code below roughly follows the validation steps described in
             // https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
@@ -621,14 +611,6 @@ where
     /// information.
     pub fn insecure_disable_signature_check(mut self) -> Self {
         self.jwt_verifier = self.jwt_verifier.require_signature_check(false);
-        self
-    }
-
-    /// Specifies whether the `typ` field in the [JOSE header](
-    /// https://tools.ietf.org/html/rfc7519#section-5) should be validated against supported
-    /// values.
-    pub fn require_typ_check(mut self, typ_check_required: bool) -> Self {
-        self.jwt_verifier = self.jwt_verifier.require_typ_check(typ_check_required);
         self
     }
 
