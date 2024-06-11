@@ -1,10 +1,10 @@
-use crate::jwt::{JsonWebToken, JsonWebTokenJsonPayloadSerde, JsonWebTokenType};
+use crate::jwt::{JsonWebToken, JsonWebTokenJsonPayloadSerde, NormalizedJsonWebTokenType};
 use crate::user_info::UserInfoClaimsImpl;
 use crate::{
     AdditionalClaims, Audience, AuthenticationContextClass, ClientId, ClientSecret, GenderClaim,
     IdTokenClaims, IssuerUrl, JsonWebKey, JsonWebKeyId, JsonWebKeySet, JsonWebTokenAccess,
-    JsonWebTokenAlgorithm, JsonWebTokenHeader, JweContentEncryptionAlgorithm, JwsSigningAlgorithm,
-    Nonce, SubjectIdentifier,
+    JsonWebTokenAlgorithm, JsonWebTokenHeader, JsonWebTokenType, JweContentEncryptionAlgorithm,
+    JwsSigningAlgorithm, Nonce, SubjectIdentifier,
 };
 
 use chrono::{DateTime, Utc};
@@ -118,7 +118,7 @@ pub(crate) struct JwtClaimsVerifier<'a, K>
 where
     K: JsonWebKey,
 {
-    allowed_jose_types: Option<HashSet<JsonWebTokenType>>,
+    allowed_jose_types: Option<HashSet<NormalizedJsonWebTokenType>>,
     allowed_algs: Option<HashSet<K::SigningAlgorithm>>,
     aud_match_required: bool,
     client_id: ClientId,
@@ -142,9 +142,13 @@ where
                     .collect(),
             ),
             allowed_jose_types: Some(HashSet::from([
-                JsonWebTokenType::new("application/jwt".to_string()), // used by many IdP, but not standardized
-                JsonWebTokenType::new("application/jose".to_string()), // standard as defined in https://tools.ietf.org/html/rfc7515#section-4.1.9
-                                                                       // we do not support JOSE+JSON, so we omit this here in the default configuration
+                JsonWebTokenType::new("application/jwt".to_string())
+                    .normalize()
+                    .expect("application/jwt should be a valid JWT type"), // used by many IdP, but not standardized
+                JsonWebTokenType::new("application/jose".to_string())
+                    .normalize()
+                    .expect("application/jose should be a valid JWT type"), // standard as defined in https://tools.ietf.org/html/rfc7515#section-4.1.9
+                                                                            // we do not support JOSE+JSON, so we omit this here in the default configuration
             ])),
             aud_match_required: true,
             client_id,
@@ -190,21 +194,11 @@ where
     /// Allows setting specific JOSE types. The verifier will check against them during verification.
     ///
     /// See [RFC 7515 section 4.1.9](https://tools.ietf.org/html/rfc7515#section-4.1.9) for more details.
-    ///
-    /// You can pass allowed types as an Iterator while always using the content type spec of [RFC 2045 section 5.1](https://tools.ietf.org/html/rfc2045#section-5.1)
-    /// (always prepend `application/`, e.g. you have to pass `application/jwt` instead of just `jwt`.)
-    ///
-    /// The check passes if one element of the Iterator matches case insensitively.
     pub fn set_allowed_jose_types<I>(mut self, types: I) -> Self
     where
-        I: IntoIterator<Item = JsonWebTokenType>,
+        I: IntoIterator<Item = NormalizedJsonWebTokenType>,
     {
-        self.allowed_jose_types = Some(
-            types
-                .into_iter()
-                .map(|val| JsonWebTokenType::new(val.to_lowercase()))
-                .collect(),
-        );
+        self.allowed_jose_types = Some(types.into_iter().collect());
         self
     }
     pub fn allow_all_jose_types(mut self) -> Self {
@@ -240,16 +234,12 @@ where
             if let Some(allowed_jose_types) = &self.allowed_jose_types {
                 // Check according to https://tools.ietf.org/html/rfc7515#section-4.1.9
                 // See https://tools.ietf.org/html/rfc2045#section-5.1 for the full Content-Type Header Field spec.
-                let valid_jwt_type = if jwt_type.contains('/') {
-                    allowed_jose_types.contains(&JsonWebTokenType::new(jwt_type.to_lowercase()))
-                } else if !jwt_type.contains(';') {
-                    allowed_jose_types.contains(&JsonWebTokenType::new(format!(
-                        "application/{}",
-                        jwt_type.to_lowercase()
-                    )))
+                //
+                // For sake of simplicity, we do not support matching on application types with parameters like
+                // application/example;part="1/2". If you know your parameters exactly, just set the whole Content Type manually.
+                let valid_jwt_type = if let Ok(normalized_jwt_type) = jwt_type.normalize() {
+                    allowed_jose_types.contains(&normalized_jwt_type)
                 } else {
-                    // For sake of simplicity, we do not support matching on application types with parameters like
-                    // application/example;part="1/2". If you know your parameters exactly, just set the whole Content Type manually.
                     false
                 };
 
@@ -623,14 +613,9 @@ where
     /// Allows setting specific JOSE types. The verifier will check against them during verification.
     ///
     /// See [RFC 7515 section 4.1.9](https://tools.ietf.org/html/rfc7515#section-4.1.9) for more details.
-    ///
-    /// You can pass allowed types as an Iterator while always using the content type spec of [RFC 2045 section 5.1](https://tools.ietf.org/html/rfc2045#section-5.1)
-    /// (always prepend `application/`, e.g. you have to pass `application/jwt` instead of just `jwt`.)
-    ///
-    /// The check passes if one element of the Iterator matches case insensitively.
     pub fn set_allowed_jose_types<I>(mut self, types: I) -> Self
     where
-        I: IntoIterator<Item = JsonWebTokenType>,
+        I: IntoIterator<Item = NormalizedJsonWebTokenType>,
     {
         self.jwt_verifier = self.jwt_verifier.set_allowed_jose_types(types);
         self

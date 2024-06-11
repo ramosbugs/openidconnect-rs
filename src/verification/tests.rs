@@ -116,8 +116,18 @@ fn test_jose_header() {
             CoreJsonWebKeySet::new(vec![]),
         )
         .set_allowed_jose_types(vec![
-            JsonWebTokenType::new("application/NOT_A_JWT".to_string()),
-            JsonWebTokenType::new("APPLICATION/AT+jwt".to_string()),
+            JsonWebTokenType::new("application/NOT_A_JWT".to_string())
+                .normalize()
+                .unwrap(),
+            JsonWebTokenType::new("APPLICATION/AT+jwt".to_string())
+                .normalize()
+                .unwrap(),
+            JsonWebTokenType::new("X-special-app/jwt;param=some".to_string())
+                .normalize()
+                .unwrap(),
+            JsonWebTokenType::new("X-special-app/jwt".to_string())
+                .normalize()
+                .unwrap(),
         ]);
 
         custom_verifier
@@ -166,6 +176,34 @@ fn test_jose_header() {
             ),
             "unsupported JWT type",
         );
+
+        custom_verifier
+            .validate_jose_header(
+                &serde_json::from_str::<CoreJsonWebTokenHeader>(
+                    "{\"alg\":\"RS256\",\"typ\":\"X-special-app/jwt\"}",
+                )
+                .expect("failed to deserialize"),
+            )
+            .expect("JWT type should be allowed but is not");
+
+        custom_verifier
+            .validate_jose_header(
+                &serde_json::from_str::<CoreJsonWebTokenHeader>(
+                    "{\"alg\":\"RS256\",\"typ\":\"X-special-app/jwt;param=some\"}",
+                )
+                .expect("failed to deserialize"),
+            )
+            .expect("JWT type should be allowed but is not");
+
+        assert_unsupported(
+            custom_verifier.validate_jose_header(
+                &serde_json::from_str::<CoreJsonWebTokenHeader>(
+                    "{\"alg\":\"RS256\",\"typ\":\"X-special-app/jwt;param=other\"}",
+                )
+                .expect("failed to deserialize"),
+            ),
+            "unsupported JWT type",
+        );
     }
 
     // Allow all JWT types.
@@ -190,6 +228,15 @@ fn test_jose_header() {
             .validate_jose_header(
                 &serde_json::from_str::<CoreJsonWebTokenHeader>(
                     "{\"alg\":\"RS256\",\"typ\":\"application/at+jwt\"}",
+                )
+                .expect("failed to deserialize"),
+            )
+            .expect("JWT type should be allowed but is not");
+
+        custom_verifier
+            .validate_jose_header(
+                &serde_json::from_str::<CoreJsonWebTokenHeader>(
+                    "{\"alg\":\"RS256\",\"typ\":\"application/at+jwt;oidc=cool\"}",
                 )
                 .expect("failed to deserialize"),
             )

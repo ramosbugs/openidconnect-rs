@@ -3,10 +3,10 @@ use crate::core::{
     CoreRsaPrivateSigningKey,
 };
 use crate::jwt::{
-    JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenJsonPayloadSerde,
-    JsonWebTokenPayloadSerde,
+    InvalidJsonWebTokenTypeError, JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm,
+    JsonWebTokenJsonPayloadSerde, JsonWebTokenPayloadSerde,
 };
-use crate::JsonWebKeyId;
+use crate::{JsonWebKeyId, JsonWebTokenType};
 
 use serde::{Deserialize, Serialize};
 
@@ -363,4 +363,33 @@ fn test_invalid_deserialization() {
     )))
     .expect("failed to deserialize");
     assert_eq!(deserialized.unverified_payload().foo, "bar");
+}
+
+#[test]
+fn test_json_web_token_type_normalization() {
+    fn assert_token_type_normalization(
+        jwt_type_string: &str,
+        expected_normalized_jwt_type_string: &str,
+    ) -> Result<(), InvalidJsonWebTokenTypeError> {
+        let jwt_type = JsonWebTokenType::new(jwt_type_string.to_string());
+        let normalized_jwt_type = jwt_type.normalize()?;
+
+        assert_eq!(*normalized_jwt_type, expected_normalized_jwt_type_string);
+        Ok(())
+    }
+
+    assert_token_type_normalization("jwt", "application/jwt").unwrap();
+    assert_token_type_normalization("jwt;arg=some", "application/jwt;arg=some").unwrap();
+    assert!(assert_token_type_normalization("jwt;arg=some/other", "").is_err());
+    assert!(assert_token_type_normalization("/jwt;arg=some/other", "").is_err());
+    assert!(assert_token_type_normalization("application/;arg=some/other", "").is_err());
+    assert_token_type_normalization("application/jwt", "application/jwt").unwrap();
+    assert_token_type_normalization(
+        "application/jwt;arg=some/other",
+        "application/jwt;arg=some/other",
+    )
+    .unwrap();
+    assert_token_type_normalization("special/type", "special/type").unwrap();
+    assert_token_type_normalization("special/type;arg=some", "special/type;arg=some").unwrap();
+    assert_token_type_normalization("s/t;arg=some/o", "s/t;arg=some/o").unwrap();
 }
