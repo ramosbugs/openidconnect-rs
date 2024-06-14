@@ -78,11 +78,10 @@ fn main() {
         env::var("GOOGLE_CLIENT_SECRET")
             .expect("Missing the GOOGLE_CLIENT_SECRET environment variable."),
     );
-    let issuer_url =
-        IssuerUrl::new("https://accounts.google.com".to_string()).unwrap_or_else(|err| {
-            handle_error(&err, "Invalid issuer URL");
-            unreachable!();
-        });
+    let issuer_url = IssuerUrl::new("https://accounts.google.com").unwrap_or_else(|err| {
+        handle_error(&err, "Invalid issuer URL");
+        unreachable!();
+    });
 
     let http_client = reqwest::blocking::ClientBuilder::new()
         // Following redirects opens the client up to SSRF vulnerabilities.
@@ -128,7 +127,7 @@ fn main() {
     // This example will be running its own server at localhost:8080.
     // See below for the server implementation.
     .set_redirect_uri(
-        RedirectUrl::new("http://localhost:8080".to_string()).unwrap_or_else(|err| {
+        RedirectUrl::new("http://localhost:8080").unwrap_or_else(|err| {
             handle_error(&err, "Invalid redirect URL");
             unreachable!();
         }),
@@ -149,8 +148,8 @@ fn main() {
             Nonce::new_random,
         )
         // This example is requesting access to the "calendar" features and the user's profile.
-        .add_scope(Scope::new("email".to_string()))
-        .add_scope(Scope::new("profile".to_string()))
+        .add_scope(Scope::new("email"))
+        .add_scope(Scope::new("profile"))
         .url();
 
     println!("Open this URL in your browser:\n{}\n", authorize_url);

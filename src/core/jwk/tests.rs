@@ -34,7 +34,7 @@ fn test_core_jwk_deserialization_rsa() {
     let key: CoreJsonWebKey = serde_json::from_str(json).expect("deserialization failed");
     assert_eq!(key.kty, CoreJsonWebKeyType::RSA);
     assert_eq!(key.use_, Some(CoreJsonWebKeyUse::Signature));
-    assert_eq!(key.kid, Some(JsonWebKeyId::new("2011-04-29".to_string())));
+    assert_eq!(key.kid, Some(JsonWebKeyId::new("2011-04-29")));
     assert_eq!(
         key.n,
         Some(Base64UrlEncodedBytes::new(vec![
@@ -71,7 +71,7 @@ fn test_core_jwk_deserialization_ec() {
     let key: CoreJsonWebKey = serde_json::from_str(json).expect("deserialization failed");
     assert_eq!(key.kty, CoreJsonWebKeyType::EllipticCurve);
     assert_eq!(key.use_, Some(CoreJsonWebKeyUse::Signature));
-    assert_eq!(key.kid, Some(JsonWebKeyId::new("2011-04-29".to_string())));
+    assert_eq!(key.kid, Some(JsonWebKeyId::new("2011-04-29")));
     assert_eq!(key.crv, Some(CoreJsonCurveType::P256));
     assert_eq!(
         key.y,
@@ -970,17 +970,11 @@ fn test_jwks_unsupported_key() {
 
     assert_eq!(jwks.keys()[0].kty, CoreJsonWebKeyType::RSA);
     assert_eq!(jwks.keys()[0].use_, Some(CoreJsonWebKeyUse::Signature));
-    assert_eq!(
-        jwks.keys()[0].kid,
-        Some(JsonWebKeyId::new("2011-04-29".to_string()))
-    );
+    assert_eq!(jwks.keys()[0].kid, Some(JsonWebKeyId::new("2011-04-29")));
 
     assert_eq!(jwks.keys()[1].kty, CoreJsonWebKeyType::EllipticCurve);
     assert_eq!(jwks.keys()[1].use_, Some(CoreJsonWebKeyUse::Signature));
-    assert_eq!(
-        jwks.keys()[1].kid,
-        Some(JsonWebKeyId::new("2011-05-01".to_string()))
-    );
+    assert_eq!(jwks.keys()[1].kid, Some(JsonWebKeyId::new("2011-05-01")));
     assert_eq!(jwks.keys()[1].crv, Some(CoreJsonCurveType::P256));
 }
 
@@ -1010,7 +1004,7 @@ fn test_jwks_unsupported_alg() {
         .expect("deserialization should succeed");
     assert_eq!(jwks.keys().len(), 1);
     let key = &jwks.keys()[0];
-    assert_eq!(&key.kid, &Some(JsonWebKeyId::new("2011-05-01".to_string())));
+    assert_eq!(&key.kid, &Some(JsonWebKeyId::new("2011-05-01")));
 }
 
 // Test filtering keys by algorithm
@@ -1050,7 +1044,7 @@ fn test_jwks_same_kid_different_alg() {
 
     {
         let keys = jwks.filter_keys(
-            Some(&JsonWebKeyId::new("2011-04-29".to_string())),
+            Some(&JsonWebKeyId::new("2011-04-29")),
             &CoreJwsSigningAlgorithm::RsaSsaPssSha384,
         );
         assert_eq!(keys.len(), 1);
@@ -1064,7 +1058,7 @@ fn test_jwks_same_kid_different_alg() {
 
     {
         let keys = jwks.filter_keys(
-            Some(&JsonWebKeyId::new("2011-04-29".to_string())),
+            Some(&JsonWebKeyId::new("2011-04-29")),
             &CoreJwsSigningAlgorithm::RsaSsaPssSha512,
         );
         assert_eq!(keys.len(), 0);

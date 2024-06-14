@@ -525,8 +525,8 @@ where
     /// Initializes a no-op verifier that performs no signature, audience, or issuer verification.
     /// The token's expiration time is still checked, and the token is otherwise required to conform to the expected format.
     pub fn new_insecure_without_verification() -> Self {
-        let empty_issuer = IssuerUrl::new("https://0.0.0.0".to_owned())
-            .expect("Creating empty issuer url mustn't fail");
+        let empty_issuer =
+            IssuerUrl::new("https://0.0.0.0").expect("Creating empty issuer url mustn't fail");
         Self::new_public_client(
             ClientId::new(String::new()),
             empty_issuer,

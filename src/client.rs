@@ -51,14 +51,14 @@ const OPENID_SCOPE: &str = "openid";
 /// #
 /// # let client =
 /// #     CoreClient::new(
-/// #         ClientId::new("aaa".to_string()),
-/// #         IssuerUrl::new("https://example".to_string()).unwrap(),
+/// #         ClientId::new("aaa"),
+/// #         IssuerUrl::new("https://example").unwrap(),
 /// #         JsonWebKeySet::default(),
 /// #     )
-/// #     .set_client_secret(ClientSecret::new("bbb".to_string()))
-/// #     .set_auth_uri(AuthUrl::new("https://example/authorize".to_string()).unwrap())
-/// #     .set_token_uri(TokenUrl::new("https://example/token".to_string()).unwrap())
-/// #     .set_revocation_url(RevocationUrl::new("https://revocation/url".to_string()).unwrap());
+/// #     .set_client_secret(ClientSecret::new("bbb"))
+/// #     .set_auth_uri(AuthUrl::new("https://example/authorize").unwrap())
+/// #     .set_token_uri(TokenUrl::new("https://example/token").unwrap())
+/// #     .set_revocation_url(RevocationUrl::new("https://revocation/url").unwrap());
 /// #
 /// # #[derive(Debug, Error)]
 /// # enum FakeError {
@@ -81,7 +81,7 @@ const OPENID_SCOPE: &str = "openid";
 /// # };
 /// #
 /// let res = client
-///     .revoke_token(AccessToken::new("some token".to_string()).into())
+///     .revoke_token(AccessToken::new("some token").into())
 ///     .unwrap()
 ///     .request(&http_client);
 ///
@@ -782,7 +782,7 @@ where
             ui_locales: Vec::new(),
         };
         if self.use_openid_scope {
-            request.add_scope(Scope::new(OPENID_SCOPE.to_string()))
+            request.add_scope(Scope::new(OPENID_SCOPE))
         } else {
             request
         }
@@ -1124,7 +1124,7 @@ where
     pub fn exchange_device_code(&self) -> DeviceAuthorizationRequest<TE> {
         let request = self.oauth2_client.exchange_device_code();
         if self.use_openid_scope {
-            request.add_scope(Scope::new(OPENID_SCOPE.to_string()))
+            request.add_scope(Scope::new(OPENID_SCOPE))
         } else {
             request
         }
