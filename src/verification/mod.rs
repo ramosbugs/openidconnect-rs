@@ -1,10 +1,10 @@
-use crate::jwt::{JsonWebToken, JsonWebTokenJsonPayloadSerde};
+use crate::jwt::{JsonWebToken, JsonWebTokenJsonPayloadSerde, NormalizedJsonWebTokenType};
 use crate::user_info::UserInfoClaimsImpl;
 use crate::{
     AdditionalClaims, Audience, AuthenticationContextClass, ClientId, ClientSecret, GenderClaim,
     IdTokenClaims, IssuerUrl, JsonWebKey, JsonWebKeyId, JsonWebKeySet, JsonWebTokenAccess,
-    JsonWebTokenAlgorithm, JsonWebTokenHeader, JweContentEncryptionAlgorithm, JwsSigningAlgorithm,
-    Nonce, SubjectIdentifier,
+    JsonWebTokenAlgorithm, JsonWebTokenHeader, JsonWebTokenType, JweContentEncryptionAlgorithm,
+    JwsSigningAlgorithm, Nonce, SubjectIdentifier,
 };
 
 use chrono::{DateTime, Utc};
@@ -118,6 +118,7 @@ pub(crate) struct JwtClaimsVerifier<'a, K>
 where
     K: JsonWebKey,
 {
+    allowed_jose_types: Option<HashSet<NormalizedJsonWebTokenType>>,
     allowed_algs: Option<HashSet<K::SigningAlgorithm>>,
     aud_match_required: bool,
     client_id: ClientId,
@@ -140,6 +141,15 @@ where
                     .cloned()
                     .collect(),
             ),
+            allowed_jose_types: Some(HashSet::from([
+                JsonWebTokenType::new("application/jwt".to_string())
+                    .normalize()
+                    .expect("application/jwt should be a valid JWT type"), // used by many IdP, but not standardized
+                JsonWebTokenType::new("application/jose".to_string())
+                    .normalize()
+                    .expect("application/jose should be a valid JWT type"), // standard as defined in https://tools.ietf.org/html/rfc7515#section-4.1.9
+                                                                            // we do not support JOSE+JSON, so we omit this here in the default configuration
+            ])),
             aud_match_required: true,
             client_id,
             client_secret: None,
@@ -181,6 +191,21 @@ where
         self
     }
 
+    /// Allows setting specific JOSE types. The verifier will check against them during verification.
+    ///
+    /// See [RFC 7515 section 4.1.9](https://tools.ietf.org/html/rfc7515#section-4.1.9) for more details.
+    pub fn set_allowed_jose_types<I>(mut self, types: I) -> Self
+    where
+        I: IntoIterator<Item = NormalizedJsonWebTokenType>,
+    {
+        self.allowed_jose_types = Some(types.into_iter().collect());
+        self
+    }
+    pub fn allow_all_jose_types(mut self) -> Self {
+        self.allowed_jose_types = None;
+        self
+    }
+
     pub fn set_client_secret(mut self, client_secret: ClientSecret) -> Self {
         self.client_secret = Some(client_secret);
         self
@@ -195,6 +220,7 @@ where
     }
 
     fn validate_jose_header<JE>(
+        &self,
         jose_header: &JsonWebTokenHeader<JE, K::SigningAlgorithm>,
     ) -> Result<(), ClaimsVerificationError>
     where
@@ -203,14 +229,29 @@ where
         >,
     {
         // The 'typ' header field must either be omitted or have the canonicalized value JWT.
+        // see https://tools.ietf.org/html/rfc7519#section-5.1
         if let Some(ref jwt_type) = jose_header.typ {
-            if jwt_type.to_uppercase() != "JWT" {
-                return Err(ClaimsVerificationError::Unsupported(format!(
-                    "unexpected or unsupported JWT type `{}`",
-                    **jwt_type
-                )));
+            if let Some(allowed_jose_types) = &self.allowed_jose_types {
+                // Check according to https://tools.ietf.org/html/rfc7515#section-4.1.9
+                // See https://tools.ietf.org/html/rfc2045#section-5.1 for the full Content-Type Header Field spec.
+                //
+                // For sake of simplicity, we do not support matching on application types with parameters like
+                // application/example;part="1/2". If you know your parameters exactly, just set the whole Content Type manually.
+                let valid_jwt_type = if let Ok(normalized_jwt_type) = jwt_type.normalize() {
+                    allowed_jose_types.contains(&normalized_jwt_type)
+                } else {
+                    false
+                };
+
+                if !valid_jwt_type {
+                    return Err(ClaimsVerificationError::Unsupported(format!(
+                        "unexpected or unsupported JWT type `{}`",
+                        **jwt_type
+                    )));
+                }
             }
         }
+
         // The 'cty' header field must be omitted, since it's only used for JWTs that contain
         // content types other than JSON-encoded claims. This may include nested JWTs, such as if
         // JWE encryption is used. This is currently unsupported.
@@ -250,7 +291,7 @@ where
     {
         {
             let jose_header = jwt.unverified_header();
-            Self::validate_jose_header(jose_header)?;
+            self.validate_jose_header(jose_header)?;
 
             // The code below roughly follows the validation steps described in
             // https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
@@ -566,6 +607,23 @@ where
     /// Specifies that any signature algorithm is supported.
     pub fn allow_any_alg(mut self) -> Self {
         self.jwt_verifier = self.jwt_verifier.allow_any_alg();
+        self
+    }
+
+    /// Allows setting specific JOSE types. The verifier will check against them during verification.
+    ///
+    /// See [RFC 7515 section 4.1.9](https://tools.ietf.org/html/rfc7515#section-4.1.9) for more details.
+    pub fn set_allowed_jose_types<I>(mut self, types: I) -> Self
+    where
+        I: IntoIterator<Item = NormalizedJsonWebTokenType>,
+    {
+        self.jwt_verifier = self.jwt_verifier.set_allowed_jose_types(types);
+        self
+    }
+
+    /// Allow all JSON Web Token Header types.
+    pub fn allow_all_jose_types(mut self) -> Self {
+        self.jwt_verifier = self.jwt_verifier.allow_all_jose_types();
         self
     }
 

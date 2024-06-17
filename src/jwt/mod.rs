@@ -20,10 +20,107 @@ new_type![
     JsonWebTokenContentType(String)
 ];
 
+/// Error type used when normalizing [`JsonWebTokenType`] objects
+#[derive(Error, Debug)]
+#[error("Invalid JWT type: {typ}")]
+pub struct InvalidJsonWebTokenTypeError {
+    typ: String,
+}
+
 new_type![
-    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    /// JSON Web Token type field (typ)
+    ///
+    /// This type stores the raw (deserialized) value.
+    ///
+    /// To compare two different JSON Web Token types, please use the normalized version via [`JsonWebTokenType::normalize`].
+    #[derive(Deserialize, Hash, Serialize)]
     JsonWebTokenType(String)
+
+    impl {
+        /// Expands a [`JsonWebTokenType`] and produces a [`NormalizedJsonWebTokenType`] according to RFC2045 and RFC7515.
+        ///
+        /// See [RFC 2045 section 5.1](https://tools.ietf.org/html/rfc2045#section-5.1) for the full Content-Type Header Field spec.
+        /// See [RFC 7515 section 4.19](https://tools.ietf.org/html/rfc7515#section-4.1.9) for specific requirements of JSON Web Token Types.
+        pub fn normalize(&self) -> Result<NormalizedJsonWebTokenType, InvalidJsonWebTokenTypeError> {
+            self.try_into()
+        }
+    }
 ];
+
+/// Normalized JSON Web Token type field (typ)
+///
+/// This type stores the normalized value of a [`JsonWebTokenType`].
+/// To retrieve a normalized value according to RFC2045 and RFC7515 see [`JsonWebTokenType::normalize`]
+///
+/// See [RFC 2045 section 5.1](https://tools.ietf.org/html/rfc2045#section-5.1) for the full Content-Type Header Field spec.
+/// See [RFC 7515 section 4.1.9](https://tools.ietf.org/html/rfc7515#section-4.1.9) for specific requirements of JSON Web Token Types.
+///
+/// It is recommended to instantiate `NormalizedJsonWebTokenType` objects via [`JsonWebTokenType`] and then call [`JsonWebTokenType::normalize`].
+///
+/// ```rust
+/// # use openidconnect::{NormalizedJsonWebTokenType, JsonWebTokenType};
+/// let token_type = JsonWebTokenType::new("jwt+at".to_string()).normalize();
+/// // normalized value looks like "application/jwt+at"
+/// # assert_eq!(*token_type.unwrap(), "application/jwt+at")
+/// ```
+#[derive(Clone, Debug, Deserialize, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize)]
+pub struct NormalizedJsonWebTokenType(String);
+
+impl std::ops::Deref for NormalizedJsonWebTokenType {
+    type Target = String;
+    fn deref(&self) -> &String {
+        &self.0
+    }
+}
+impl From<NormalizedJsonWebTokenType> for String {
+    fn from(t: NormalizedJsonWebTokenType) -> String {
+        t.0
+    }
+}
+
+impl From<NormalizedJsonWebTokenType> for JsonWebTokenType {
+    fn from(t: NormalizedJsonWebTokenType) -> JsonWebTokenType {
+        JsonWebTokenType::new(t.0)
+    }
+}
+
+impl TryFrom<&JsonWebTokenType> for NormalizedJsonWebTokenType {
+    type Error = InvalidJsonWebTokenTypeError;
+
+    /// Normalizes a [`JsonWebTokenType`] and produces a [`NormalizedJsonWebTokenType`] according to RFC2045.
+    ///
+    /// See [RFC 2045 section 5.1](https://tools.ietf.org/html/rfc2045#section-5.1) for the full Content-Type Header Field spec.
+    /// See [RFC 7515 section 4.19](https://tools.ietf.org/html/rfc7515#section-4.1.9) for specific requirements of JSON Web Token Types.
+    fn try_from(t: &JsonWebTokenType) -> Result<NormalizedJsonWebTokenType, Self::Error> {
+        let lowercase_jwt_type = t.0.to_lowercase();
+        if let Some(slash_location) = lowercase_jwt_type.find('/') {
+            if let Some(semicolon_location) = lowercase_jwt_type.find(';') {
+                // If '/' is not before ';' as then the MIME type is invalid
+                // e.g. some;arg="1/2" is invalid, but application/some;arg=1 is valid
+                // OR
+                // If MIME type has not at least one character
+                // OR
+                // If MIME subtype has not at least one character
+                if slash_location > semicolon_location
+                    || slash_location == 0
+                    || slash_location.saturating_add(1) >= semicolon_location
+                {
+                    Err(InvalidJsonWebTokenTypeError {
+                        typ: lowercase_jwt_type,
+                    })
+                } else {
+                    Ok(NormalizedJsonWebTokenType(lowercase_jwt_type))
+                }
+            } else {
+                Ok(NormalizedJsonWebTokenType(lowercase_jwt_type))
+            }
+        } else {
+            Ok(NormalizedJsonWebTokenType(format!(
+                "application/{lowercase_jwt_type}"
+            )))
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
