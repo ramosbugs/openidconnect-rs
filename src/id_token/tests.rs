@@ -490,6 +490,38 @@ fn test_accept_rfc3339_timestamp() {
 }
 
 #[test]
+#[cfg(feature = "accept-string-epoch")]
+fn test_accept_string_updated_at() {
+    for (updated_at, sec, nsec) in [
+        ("1713963222.5", 1713963222, 500_000_000),
+        ("42.5", 42, 500_000_000),
+        ("42", 42, 0),
+        ("-42", -42, 0),
+    ] {
+        let payload = format!(
+            "{{
+            \"iss\": \"https://server.example.com\",
+            \"sub\": \"24400320\",
+            \"aud\": \"s6BhdRkqt3\",
+            \"exp\": 1311281970,
+            \"iat\": 1311280970,
+            \"updated_at\": \"{updated_at}\"
+            }}"
+        );
+        let claims: CoreIdTokenClaims =
+            serde_json::from_str(payload.as_str()).expect("failed to deserialize");
+        assert_eq!(
+            claims.updated_at(),
+            Some(
+                Utc.timestamp_opt(sec, nsec)
+                    .single()
+                    .expect("valid timestamp")
+            )
+        );
+    }
+}
+
+#[test]
 fn test_unknown_claims_serde() {
     let expected_serialized_claims = "{\
                                           \"iss\":\"https://server.example.com\",\
