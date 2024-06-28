@@ -77,6 +77,7 @@ new_type![
     /// Set of authentication methods or procedures that are considered to be equivalent to each
     /// other in a particular context.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     AuthenticationContextClass(String)
 ];
 impl AsRef<str> for AuthenticationContextClass {
@@ -90,12 +91,14 @@ new_type![
     ///
     /// Defining specific AMR identifiers is beyond the scope of the OpenID Connect Core spec.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     AuthenticationMethodReference(String)
 ];
 
 new_type![
     /// Access token hash.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     AccessTokenHash(String)
     impl {
         /// Initialize a new access token hash from an [`AccessToken`] and signature algorithm.
@@ -117,36 +120,42 @@ new_type![
 new_type![
     /// Country portion of address.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     AddressCountry(String)
 ];
 
 new_type![
     /// Locality portion of address.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     AddressLocality(String)
 ];
 
 new_type![
     /// Postal code portion of address.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     AddressPostalCode(String)
 ];
 
 new_type![
     /// Region portion of address.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     AddressRegion(String)
 ];
 
 new_type![
     /// Audience claim value.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     Audience(String)
 ];
 
 new_type![
     /// Authorization code hash.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     AuthorizationCodeHash(String)
     impl {
         /// Initialize a new authorization code hash from an [`AuthorizationCode`] and signature
@@ -169,6 +178,7 @@ new_type![
 new_type![
     /// OpenID Connect client name.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     ClientName(String)
 ];
 
@@ -185,6 +195,7 @@ new_url_type![
 new_type![
     /// Client contact e-mail address.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     ClientContactEmail(String)
 ];
 
@@ -203,60 +214,70 @@ new_type![
     /// providing just year can result in varying month and day, so the implementers need to take
     /// this factor into account to correctly process the dates.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     EndUserBirthday(String)
 ];
 
 new_type![
     /// End user's e-mail address.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     EndUserEmail(String)
 ];
 
 new_type![
     /// End user's family name.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     EndUserFamilyName(String)
 ];
 
 new_type![
     /// End user's given name.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     EndUserGivenName(String)
 ];
 
 new_type![
     /// End user's middle name.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     EndUserMiddleName(String)
 ];
 
 new_type![
     /// End user's name.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     EndUserName(String)
 ];
 
 new_type![
     /// End user's nickname.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     EndUserNickname(String)
 ];
 
 new_type![
     /// End user's phone number.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     EndUserPhoneNumber(String)
 ];
 
 new_type![
     /// URL of end user's profile picture.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     EndUserPictureUrl(String)
 ];
 
 new_type![
     /// URL of end user's profile page.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     EndUserProfileUrl(String)
 ];
 
@@ -264,18 +285,21 @@ new_type![
     /// End user's time zone as a string from the
     /// [time zone database](https://www.iana.org/time-zones).
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     EndUserTimezone(String)
 ];
 
 new_type![
     /// URL of end user's website.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     EndUserWebsiteUrl(String)
 ];
 
 new_type![
     /// End user's username.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     EndUserUsername(String)
 ];
 
@@ -286,6 +310,7 @@ new_type![
     /// either as a carriage return/line feed pair (`"\r\n"`) or as a single line feed character
     /// (`"\n"`).
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     FormattedAddress(String)
 ];
 
@@ -439,6 +464,7 @@ new_type![
     /// separated by newlines. Newlines can be represented either as a carriage return/line feed
     /// pair (`\r\n`) or as a single line feed character (`\n`).
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     StreetAddress(String)
 ];
 
@@ -446,6 +472,7 @@ new_type![
     /// Locally unique and never reassigned identifier within the Issuer for the End-User, which is
     /// intended to be consumed by the client application.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     SubjectIdentifier(String)
 ];
 

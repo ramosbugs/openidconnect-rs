@@ -17,6 +17,7 @@ pub(crate) mod tests;
 
 new_type![
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     JsonWebTokenContentType(String)
 ];
 
@@ -34,6 +35,7 @@ new_type![
     ///
     /// To compare two different JSON Web Token types, please use the normalized version via [`JsonWebTokenType::normalize`].
     #[derive(Deserialize, Hash, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     JsonWebTokenType(String)
 
     impl {
