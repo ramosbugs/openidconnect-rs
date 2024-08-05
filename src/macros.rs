@@ -233,6 +233,7 @@ macro_rules! new_secret_type {
             #[$attr]
         )*
         #[cfg_attr(feature = "timing-resistant-secret-traits", derive(Eq))]
+        #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
         pub struct $name($type);
         impl $name {
             $($item)*
@@ -984,6 +985,20 @@ mod tests {
             });
 
             let schema = schema_for!(crate::ClientUrl);
+            let actual_schema = serde_json::to_value(&schema).unwrap();
+            assert_eq!(expected_schema, actual_schema);
+        }
+
+        #[test]
+        fn generates_new_secret_type_json_schema() {
+            let expected_schema = json!({
+              "$schema": "http://json-schema.org/draft-07/schema#",
+              "title": "Nonce",
+              "description": "String value used to associate a client session with an ID Token, and to mitigate replay attacks.",
+              "type": "string"
+            });
+
+            let schema = schema_for!(crate::Nonce);
             let actual_schema = serde_json::to_value(&schema).unwrap();
             assert_eq!(expected_schema, actual_schema);
         }
