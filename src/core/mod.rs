@@ -23,8 +23,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
 pub use crate::core::jwk::{
-    CoreEdDsaPrivateSigningKey, CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse,
-    CoreRsaPrivateSigningKey,
+    CoreEdDsaPrivateSigningKey, CoreHmacKey, CoreJsonCurveType, CoreJsonWebKey, CoreJsonWebKeyType,
+    CoreJsonWebKeyUse, CoreRsaPrivateSigningKey,
 };
 
 pub use oauth2::basic::{
