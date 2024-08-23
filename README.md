@@ -57,8 +57,3 @@ and will not happen in patch releases.
 * [OAuth 2.0 Token Introspection](https://tools.ietf.org/html/rfc7662)
 * [OAuth 2.0 Token Revocation](https://tools.ietf.org/html/rfc7009)
 * [OAuth 2.0 Device Authorization Grant](https://www.rfc-editor.org/rfc/rfc8628)
-
-## Sponsorship
-
-This project is sponsored by [Unflakable](https://unflakable.com), a service
-for tracking and quarantining flaky tests.
