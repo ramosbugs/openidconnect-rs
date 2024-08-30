@@ -62,6 +62,59 @@ where
     }
 }
 
+// Some providers return numbers as strings
+#[cfg(feature = "accept-string-epoch")]
+pub(crate) mod serde_string_number {
+    use serde::{de, Deserializer};
+
+    use std::fmt;
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<serde_json::Number, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct StringLikeNumberVisitor;
+
+        impl<'de> de::Visitor<'de> for StringLikeNumberVisitor {
+            type Value = serde_json::Number;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a JSON number")
+            }
+
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(v.into())
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(v.into())
+            }
+
+            fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                serde_json::Number::from_f64(v)
+                    .ok_or_else(|| de::Error::custom("not a JSON number"))
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                serde_json::from_str(v).map_err(|_| de::Error::custom("not a JSON number"))
+            }
+        }
+        deserializer.deserialize_any(StringLikeNumberVisitor)
+    }
+}
+
 // Some providers return boolean values as strings. Provide support for
 // parsing using stdlib.
 #[cfg(feature = "accept-string-booleans")]
@@ -331,7 +384,13 @@ impl Display for Boolean {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub(crate) enum Timestamp {
-    Seconds(serde_json::Number),
+    Seconds(
+        #[cfg_attr(
+            feature = "accept-string-epoch",
+            serde(deserialize_with = "crate::helpers::serde_string_number::deserialize")
+        )]
+        serde_json::Number,
+    ),
     #[cfg(feature = "accept-rfc3339-timestamps")]
     Rfc3339(String),
 }
