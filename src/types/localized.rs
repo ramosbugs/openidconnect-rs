@@ -5,6 +5,7 @@ use std::collections::HashMap;
 new_type![
     /// Language tag adhering to RFC 5646 (e.g., `fr` or `fr-CA`).
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     LanguageTag(String)
 ];
 impl AsRef<str> for LanguageTag {
