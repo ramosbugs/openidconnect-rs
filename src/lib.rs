@@ -702,6 +702,7 @@ pub use crate::claims::{
 pub use crate::client::Client;
 pub use crate::discovery::{
     AdditionalProviderMetadata, DiscoveryError, EmptyAdditionalProviderMetadata, ProviderMetadata,
+    ProviderMetadataDiscoveryOptions,
 };
 pub use crate::id_token::IdTokenFields;
 pub use crate::id_token::{IdToken, IdTokenClaims};
