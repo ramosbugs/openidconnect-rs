@@ -121,6 +121,7 @@
 //!
 //! ## Examples
 //!
+//! * [Entra](https://github.com/ramosbugs/openidconnect-rs/tree/main/examples/entra.rs)
 //! * [Google](https://github.com/ramosbugs/openidconnect-rs/tree/main/examples/google.rs)
 //!
 //! ## Getting started: Authorization Code Grant w/ PKCE
