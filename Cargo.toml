@@ -1,6 +1,6 @@
 [package]
 name = "openidconnect"
-version = "4.0.0-alpha.2"
+version = "4.0.0-rc.1"
 authors = ["David A. Ramos <ramos@cs.stanford.edu>"]
 description = "OpenID Connect library"
 keywords = ["openid", "oidc", "oauth2", "authentication", "auth"]
