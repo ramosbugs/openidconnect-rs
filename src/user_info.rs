@@ -19,6 +19,7 @@ use http::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
 use http::method::Method;
 use http::status::StatusCode;
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 use thiserror::Error;
 
 use std::future::Future;
@@ -389,20 +390,20 @@ where
     }
 }
 
+#[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct UserInfoClaimsImpl<AC, GC>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
 {
-    #[serde(rename = "iss", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "iss")]
     pub issuer: Option<IssuerUrl>,
     // We always serialize as an array, which is valid according to the spec.
     #[serde(
         default,
         rename = "aud",
-        deserialize_with = "deserialize_string_or_vec_opt",
-        skip_serializing_if = "Option::is_none"
+        deserialize_with = "deserialize_string_or_vec_opt"
     )]
     pub audiences: Option<Vec<Audience>>,
 

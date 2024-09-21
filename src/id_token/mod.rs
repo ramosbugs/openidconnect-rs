@@ -19,6 +19,7 @@ use crate::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use serde_with::skip_serializing_none;
 
 use std::fmt::Debug;
 use std::str::FromStr;
@@ -197,6 +198,7 @@ where
     any(test, feature = "timing-resistant-secret-traits"),
     derive(PartialEq)
 )]
+#[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct IdTokenClaims<AC, GC>
 where
@@ -218,23 +220,18 @@ where
     expiration: DateTime<Utc>,
     #[serde(rename = "iat", with = "serde_utc_seconds")]
     issue_time: DateTime<Utc>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "serde_utc_seconds_opt"
-    )]
+    #[serde(default, with = "serde_utc_seconds_opt")]
     auth_time: Option<DateTime<Utc>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     nonce: Option<Nonce>,
-    #[serde(rename = "acr", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "acr")]
     auth_context_ref: Option<AuthenticationContextClass>,
-    #[serde(rename = "amr", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "amr")]
     auth_method_refs: Option<Vec<AuthenticationMethodReference>>,
-    #[serde(rename = "azp", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "azp")]
     authorized_party: Option<ClientId>,
-    #[serde(rename = "at_hash", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "at_hash")]
     access_token_hash: Option<AccessTokenHash>,
-    #[serde(rename = "c_hash", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "c_hash")]
     code_hash: Option<AuthorizationCodeHash>,
 
     #[serde(bound = "GC: GenderClaim")]

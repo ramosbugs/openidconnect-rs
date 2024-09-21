@@ -10,6 +10,7 @@ use ed25519_dalek::pkcs8::DecodePrivateKey;
 use ed25519_dalek::Signer;
 use rsa::pkcs1::DecodeRsaPrivateKey;
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 use sha2::{Digest, Sha256, Sha384, Sha512};
 
 #[cfg(test)]
@@ -23,19 +24,18 @@ mod tests;
 // impl would probably need to involve first deserializing the raw values to access the 'kty'
 // parameter, and then deserializing the fields and types appropriate for that key type.
 /// Public or symmetric key expressed as a JSON Web Key.
+#[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct CoreJsonWebKey {
     pub(crate) kty: CoreJsonWebKeyType,
-    #[serde(rename = "use", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "use")]
     pub(crate) use_: Option<CoreJsonWebKeyUse>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) kid: Option<JsonWebKeyId>,
 
     /// The algorithm intended to be used with this key (see
     /// [RFC 7517](https://www.rfc-editor.org/rfc/rfc7517#section-4.4)).
     ///
     /// It can either be an algorithm intended for use with JWS or JWE, or something different.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) alg:
         Option<JsonWebTokenAlgorithm<CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm>>,
 
@@ -43,53 +43,25 @@ pub struct CoreJsonWebKey {
     // by implementations encountering them, they MUST be ignored.  Member names used for
     // representing key parameters for different keys types need not be distinct."
     // Hence, we set fields we fail to deserialize (understand) as None.
-    #[serde(
-        default,
-        deserialize_with = "deserialize_option_or_none",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, deserialize_with = "deserialize_option_or_none")]
     pub(crate) n: Option<Base64UrlEncodedBytes>,
-    #[serde(
-        default,
-        deserialize_with = "deserialize_option_or_none",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, deserialize_with = "deserialize_option_or_none")]
     pub(crate) e: Option<Base64UrlEncodedBytes>,
 
     //Elliptic Curve
-    #[serde(
-        default,
-        deserialize_with = "deserialize_option_or_none",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, deserialize_with = "deserialize_option_or_none")]
     pub(crate) crv: Option<CoreJsonCurveType>,
-    #[serde(
-        default,
-        deserialize_with = "deserialize_option_or_none",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, deserialize_with = "deserialize_option_or_none")]
     pub(crate) x: Option<Base64UrlEncodedBytes>,
-    #[serde(
-        default,
-        deserialize_with = "deserialize_option_or_none",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, deserialize_with = "deserialize_option_or_none")]
     pub(crate) y: Option<Base64UrlEncodedBytes>,
 
-    #[serde(
-        default,
-        deserialize_with = "deserialize_option_or_none",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, deserialize_with = "deserialize_option_or_none")]
     pub(crate) d: Option<Base64UrlEncodedBytes>,
 
     // Used for symmetric keys, which we only generate internally from the client secret; these
     // are never part of the JWK set.
-    #[serde(
-        default,
-        deserialize_with = "deserialize_option_or_none",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, deserialize_with = "deserialize_option_or_none")]
     pub(crate) k: Option<Base64UrlEncodedBytes>,
 }
 impl CoreJsonWebKey {

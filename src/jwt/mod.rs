@@ -7,6 +7,7 @@ use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use serde::de::{DeserializeOwned, Error as _, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_with::skip_serializing_none;
 use thiserror::Error;
 
 use std::fmt::Debug;
@@ -189,6 +190,7 @@ where
     }
 }
 
+#[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct JsonWebTokenHeader<JE, JS>
 where
@@ -203,13 +205,9 @@ where
     // we don't understand any such extensions, we reject any JWT with this value present (the
     // spec specifically prohibits including public (standard) headers in this field).
     // See https://tools.ietf.org/html/rfc7515#section-4.1.11.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub crit: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub cty: Option<JsonWebTokenContentType>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub kid: Option<JsonWebKeyId>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub typ: Option<JsonWebTokenType>,
     // Other JOSE header fields are omitted since the OpenID Connect spec specifically says that
     // the "x5u", "x5c", "jku", "jwk" header parameter fields SHOULD NOT be used.
