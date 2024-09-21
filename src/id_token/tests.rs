@@ -15,6 +15,7 @@ use crate::{
 
 use chrono::{TimeZone, Utc};
 use oauth2::TokenResponse;
+use pretty_assertions::assert_eq;
 use serde::{Deserialize, Serialize};
 use url::Url;
 

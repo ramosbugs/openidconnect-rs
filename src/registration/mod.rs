@@ -1,4 +1,4 @@
-use crate::helpers::serde_utc_seconds_opt;
+use crate::helpers::{DeserializeMapField, Timestamp};
 use crate::http_utils::{auth_bearer, check_content_type, MIME_TYPE_JSON};
 use crate::types::localized::split_language_tag_key;
 use crate::types::{
@@ -21,7 +21,7 @@ use http::status::StatusCode;
 use serde::de::{DeserializeOwned, Deserializer, MapAccess, Visitor};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
-use serde_with::skip_serializing_none;
+use serde_with::{serde_as, skip_serializing_none};
 use thiserror::Error;
 
 use std::fmt::{Debug, Formatter, Result as FormatterResult};
@@ -239,16 +239,7 @@ where
             K: JsonWebKey,
             RT: ResponseType,
             S: SubjectIdentifierType,
-        >(
-            PhantomData<AT>,
-            PhantomData<CA>,
-            PhantomData<G>,
-            PhantomData<JE>,
-            PhantomData<JK>,
-            PhantomData<K>,
-            PhantomData<RT>,
-            PhantomData<S>,
-        );
+        >(PhantomData<(AT, CA, G, JE, JK, K, RT, S)>);
         impl<'de, AT, CA, G, JE, JK, K, RT, S> Visitor<'de> for MetadataVisitor<AT, CA, G, JE, JK, K, RT, S>
         where
             AT: ApplicationType,
@@ -271,52 +262,172 @@ where
             where
                 V: MapAccess<'de>,
             {
-                deserialize_fields! {
-                    map {
-                        [redirect_uris]
-                        [Option(response_types)]
-                        [Option(grant_types)]
-                        [Option(application_type)]
-                        [Option(contacts)]
-                        [LanguageTag(client_name)]
-                        [LanguageTag(logo_uri)]
-                        [LanguageTag(client_uri)]
-                        [LanguageTag(policy_uri)]
-                        [LanguageTag(tos_uri)]
-                        [Option(jwks_uri)]
-                        [Option(jwks)]
-                        [Option(sector_identifier_uri)]
-                        [Option(subject_type)]
-                        [Option(id_token_signed_response_alg)]
-                        [Option(id_token_encrypted_response_alg)]
-                        [Option(id_token_encrypted_response_enc)]
-                        [Option(userinfo_signed_response_alg)]
-                        [Option(userinfo_encrypted_response_alg)]
-                        [Option(userinfo_encrypted_response_enc)]
-                        [Option(request_object_signing_alg)]
-                        [Option(request_object_encryption_alg)]
-                        [Option(request_object_encryption_enc)]
-                        [Option(token_endpoint_auth_method)]
-                        [Option(token_endpoint_auth_signing_alg)]
-                        [Option(Seconds(default_max_age))]
-                        [Option(require_auth_time)]
-                        [Option(default_acr_values)]
-                        [Option(initiate_login_uri)]
-                        [Option(request_uris)]
-                    }
+                // NB: The non-localized fields are actually Option<Option<_>> here so that we can
+                // distinguish between omitted fields and fields explicitly set to `null`. The
+                // latter is necessary so that we can detect duplicate fields (e.g., if a key is
+                // present both with a null value and a non-null value, that's an error).
+                let mut redirect_uris = None;
+                let mut response_types = None;
+                let mut grant_types = None;
+                let mut application_type = None;
+                let mut contacts = None;
+                let mut client_name = None;
+                let mut logo_uri = None;
+                let mut client_uri = None;
+                let mut policy_uri = None;
+                let mut tos_uri = None;
+                let mut jwks_uri = None;
+                let mut jwks = None;
+                let mut sector_identifier_uri = None;
+                let mut subject_type = None;
+                let mut id_token_signed_response_alg = None;
+                let mut id_token_encrypted_response_alg = None;
+                let mut id_token_encrypted_response_enc = None;
+                let mut userinfo_signed_response_alg = None;
+                let mut userinfo_encrypted_response_alg = None;
+                let mut userinfo_encrypted_response_enc = None;
+                let mut request_object_signing_alg = None;
+                let mut request_object_encryption_alg = None;
+                let mut request_object_encryption_enc = None;
+                let mut token_endpoint_auth_method = None;
+                let mut token_endpoint_auth_signing_alg = None;
+                let mut default_max_age = None;
+                let mut require_auth_time = None;
+                let mut default_acr_values = None;
+                let mut initiate_login_uri = None;
+                let mut request_uris = None;
+
+                macro_rules! field_case {
+                    ($field:ident, $typ:ty, $language_tag:ident) => {{
+                        $field = Some(<$typ>::deserialize_map_field(
+                            &mut map,
+                            stringify!($field),
+                            $language_tag,
+                            $field,
+                        )?);
+                    }};
                 }
+
+                while let Some(key) = map.next_key::<String>()? {
+                    let (field_name, language_tag) = split_language_tag_key(&key);
+                    match field_name {
+                        "redirect_uris" => field_case!(redirect_uris, Vec<_>, language_tag),
+                        "response_types" => field_case!(response_types, Option<_>, language_tag),
+                        "grant_types" => field_case!(grant_types, Option<_>, language_tag),
+                        "application_type" => {
+                            field_case!(application_type, Option<_>, language_tag)
+                        }
+                        "contacts" => field_case!(contacts, Option<_>, language_tag),
+                        "client_name" => {
+                            field_case!(client_name, LocalizedClaim<Option<_>>, language_tag)
+                        }
+                        "logo_uri" => {
+                            field_case!(logo_uri, LocalizedClaim<Option<_>>, language_tag)
+                        }
+                        "client_uri" => {
+                            field_case!(client_uri, LocalizedClaim<Option<_>>, language_tag)
+                        }
+                        "policy_uri" => {
+                            field_case!(policy_uri, LocalizedClaim<Option<_>>, language_tag)
+                        }
+                        "tos_uri" => field_case!(tos_uri, LocalizedClaim<Option<_>>, language_tag),
+                        "jwks_uri" => field_case!(jwks_uri, Option<_>, language_tag),
+                        "jwks" => field_case!(jwks, Option<_>, language_tag),
+                        "sector_identifier_uri" => {
+                            field_case!(sector_identifier_uri, Option<_>, language_tag)
+                        }
+                        "subject_type" => field_case!(subject_type, Option<_>, language_tag),
+                        "id_token_signed_response_alg" => {
+                            field_case!(id_token_signed_response_alg, Option<_>, language_tag)
+                        }
+                        "id_token_encrypted_response_alg" => {
+                            field_case!(id_token_encrypted_response_alg, Option<_>, language_tag)
+                        }
+                        "id_token_encrypted_response_enc" => {
+                            field_case!(id_token_encrypted_response_enc, Option<_>, language_tag)
+                        }
+                        "userinfo_signed_response_alg" => {
+                            field_case!(userinfo_signed_response_alg, Option<_>, language_tag)
+                        }
+                        "userinfo_encrypted_response_alg" => {
+                            field_case!(userinfo_encrypted_response_alg, Option<_>, language_tag)
+                        }
+                        "userinfo_encrypted_response_enc" => {
+                            field_case!(userinfo_encrypted_response_enc, Option<_>, language_tag)
+                        }
+                        "request_object_signing_alg" => {
+                            field_case!(request_object_signing_alg, Option<_>, language_tag)
+                        }
+                        "request_object_encryption_alg" => {
+                            field_case!(request_object_encryption_alg, Option<_>, language_tag)
+                        }
+                        "request_object_encryption_enc" => {
+                            field_case!(request_object_encryption_enc, Option<_>, language_tag)
+                        }
+                        "token_endpoint_auth_method" => {
+                            field_case!(token_endpoint_auth_method, Option<_>, language_tag)
+                        }
+                        "token_endpoint_auth_signing_alg" => {
+                            field_case!(token_endpoint_auth_signing_alg, Option<_>, language_tag)
+                        }
+                        "default_max_age" => {
+                            field_case!(default_max_age, Option<u64>, language_tag)
+                        }
+                        "require_auth_time" => {
+                            field_case!(require_auth_time, Option<_>, language_tag)
+                        }
+                        "default_acr_values" => {
+                            field_case!(default_acr_values, Option<_>, language_tag)
+                        }
+                        "initiate_login_uri" => {
+                            field_case!(initiate_login_uri, Option<_>, language_tag)
+                        }
+                        "request_uris" => field_case!(request_uris, Option<_>, language_tag),
+
+                        // Ignore unknown fields.
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                            continue;
+                        }
+                    };
+                }
+
+                Ok(StandardClientMetadata {
+                    redirect_uris: redirect_uris
+                        .ok_or_else(|| serde::de::Error::missing_field("redirect_uris"))?,
+                    response_types: response_types.flatten(),
+                    grant_types: grant_types.flatten(),
+                    application_type: application_type.flatten(),
+                    contacts: contacts.flatten(),
+                    client_name: client_name.and_then(LocalizedClaim::flatten_or_none),
+                    logo_uri: logo_uri.and_then(LocalizedClaim::flatten_or_none),
+                    client_uri: client_uri.and_then(LocalizedClaim::flatten_or_none),
+                    policy_uri: policy_uri.and_then(LocalizedClaim::flatten_or_none),
+                    tos_uri: tos_uri.and_then(LocalizedClaim::flatten_or_none),
+                    jwks_uri: jwks_uri.flatten(),
+                    jwks: jwks.flatten(),
+                    sector_identifier_uri: sector_identifier_uri.flatten(),
+                    subject_type: subject_type.flatten(),
+                    id_token_signed_response_alg: id_token_signed_response_alg.flatten(),
+                    id_token_encrypted_response_alg: id_token_encrypted_response_alg.flatten(),
+                    id_token_encrypted_response_enc: id_token_encrypted_response_enc.flatten(),
+                    userinfo_signed_response_alg: userinfo_signed_response_alg.flatten(),
+                    userinfo_encrypted_response_alg: userinfo_encrypted_response_alg.flatten(),
+                    userinfo_encrypted_response_enc: userinfo_encrypted_response_enc.flatten(),
+                    request_object_signing_alg: request_object_signing_alg.flatten(),
+                    request_object_encryption_alg: request_object_encryption_alg.flatten(),
+                    request_object_encryption_enc: request_object_encryption_enc.flatten(),
+                    token_endpoint_auth_method: token_endpoint_auth_method.flatten(),
+                    token_endpoint_auth_signing_alg: token_endpoint_auth_signing_alg.flatten(),
+                    default_max_age: default_max_age.flatten().map(Duration::from_secs),
+                    require_auth_time: require_auth_time.flatten(),
+                    default_acr_values: default_acr_values.flatten(),
+                    initiate_login_uri: initiate_login_uri.flatten(),
+                    request_uris: request_uris.flatten(),
+                })
             }
         }
-        deserializer.deserialize_map(MetadataVisitor(
-            PhantomData,
-            PhantomData,
-            PhantomData,
-            PhantomData,
-            PhantomData,
-            PhantomData,
-            PhantomData,
-            PhantomData,
-        ))
+        deserializer.deserialize_map(MetadataVisitor(PhantomData))
     }
 }
 impl<AT, CA, G, JE, JK, K, RT, S> Serialize for StandardClientMetadata<AT, CA, G, JE, JK, K, RT, S>
@@ -622,6 +733,7 @@ pub struct EmptyAdditionalClientRegistrationResponse {}
 impl AdditionalClientRegistrationResponse for EmptyAdditionalClientRegistrationResponse {}
 
 /// Response to a dynamic client registration request.
+#[serde_as]
 #[skip_serializing_none]
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ClientRegistrationResponse<AC, AR, AT, CA, G, JE, JK, K, RT, S>
@@ -643,9 +755,9 @@ where
     client_secret: Option<ClientSecret>,
     registration_access_token: Option<RegistrationAccessToken>,
     registration_client_uri: Option<ClientConfigUrl>,
-    #[serde(with = "serde_utc_seconds_opt", default)]
+    #[serde_as(as = "Option<Timestamp>")]
     client_id_issued_at: Option<DateTime<Utc>>,
-    #[serde(with = "serde_utc_seconds_opt", default)]
+    #[serde_as(as = "Option<Timestamp>")]
     client_secret_expires_at: Option<DateTime<Utc>>,
     #[serde(bound = "AC: AdditionalClientMetadata", flatten)]
     client_metadata: ClientMetadata<AC, AT, CA, G, JE, JK, K, RT, S>,

@@ -1,6 +1,4 @@
-use crate::helpers::{
-    deserialize_string_or_vec, serde_utc_seconds, serde_utc_seconds_opt, FilteredFlatten,
-};
+use crate::helpers::{deserialize_string_or_vec, FilteredFlatten, Timestamp};
 use crate::jwt::JsonWebTokenAccess;
 use crate::jwt::{JsonWebTokenError, JsonWebTokenJsonPayloadSerde};
 use crate::types::jwk::JwsSigningAlgorithm;
@@ -19,7 +17,7 @@ use crate::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use serde_with::skip_serializing_none;
+use serde_with::{serde_as, skip_serializing_none};
 
 use std::fmt::Debug;
 use std::str::FromStr;
@@ -198,6 +196,7 @@ where
     any(test, feature = "timing-resistant-secret-traits"),
     derive(PartialEq)
 )]
+#[serde_as]
 #[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct IdTokenClaims<AC, GC>
@@ -216,11 +215,13 @@ where
         deserialize_with = "deserialize_string_or_vec"
     )]
     audiences: Vec<Audience>,
-    #[serde(rename = "exp", with = "serde_utc_seconds")]
+    #[serde_as(as = "Timestamp")]
+    #[serde(rename = "exp")]
     expiration: DateTime<Utc>,
-    #[serde(rename = "iat", with = "serde_utc_seconds")]
+    #[serde_as(as = "Timestamp")]
+    #[serde(rename = "iat")]
     issue_time: DateTime<Utc>,
-    #[serde(default, with = "serde_utc_seconds_opt")]
+    #[serde_as(as = "Option<Timestamp>")]
     auth_time: Option<DateTime<Utc>>,
     nonce: Option<Nonce>,
     #[serde(rename = "acr")]

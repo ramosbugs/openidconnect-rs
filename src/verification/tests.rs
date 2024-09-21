@@ -4,7 +4,7 @@ use crate::core::{
     CoreJwsSigningAlgorithm, CoreRsaPrivateSigningKey, CoreUserInfoClaims,
     CoreUserInfoJsonWebToken, CoreUserInfoVerifier,
 };
-use crate::helpers::{timestamp_to_utc, Base64UrlEncodedBytes, Timestamp};
+use crate::helpers::{Base64UrlEncodedBytes, Timestamp};
 use crate::jwt::tests::{TEST_RSA_PRIV_KEY, TEST_RSA_PUB_KEY};
 use crate::jwt::{
     JsonWebToken, JsonWebTokenHeader, JsonWebTokenJsonPayloadSerde, JsonWebTokenType,
@@ -814,10 +814,9 @@ fn test_id_token_verified_claims() {
             CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
         )
         .set_time_fn(|| {
-            timestamp_to_utc(&Timestamp::Seconds(
-                mock_current_time.load(Ordering::Relaxed).into(),
-            ))
-            .unwrap()
+            Timestamp::Seconds(mock_current_time.load(Ordering::Relaxed).into())
+                .to_utc()
+                .unwrap()
         })
         .set_issue_time_verifier_fn(|_| {
             if mock_is_valid_issue_time.load(Ordering::Relaxed) {
@@ -829,10 +828,9 @@ fn test_id_token_verified_claims() {
 
         let insecure_verifier = CoreIdTokenVerifier::new_insecure_without_verification()
             .set_time_fn(|| {
-                timestamp_to_utc(&Timestamp::Seconds(
-                    mock_current_time.load(Ordering::Relaxed).into(),
-                ))
-                .unwrap()
+                Timestamp::Seconds(mock_current_time.load(Ordering::Relaxed).into())
+                    .to_utc()
+                    .unwrap()
             });
 
         // This JWTs below have an issue time of 1544928549 and an expiration time of 1544932149.
@@ -991,7 +989,7 @@ fn test_id_token_verified_claims() {
             .set_auth_time_verifier_fn(|auth_time| {
                 assert_eq!(
                     auth_time.unwrap(),
-                    timestamp_to_utc(&Timestamp::Seconds(1544928548.into())).unwrap(),
+                    Timestamp::Seconds(1544928548.into()).to_utc().unwrap(),
                 );
                 Err("Invalid auth_time claim".to_string())
             })
@@ -1054,10 +1052,9 @@ fn test_id_token_verified_claims() {
             CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
         )
         .set_time_fn(|| {
-            timestamp_to_utc(&Timestamp::Seconds(
-                mock_current_time.load(Ordering::Relaxed).into(),
-            ))
-            .unwrap()
+            Timestamp::Seconds(mock_current_time.load(Ordering::Relaxed).into())
+                .to_utc()
+                .unwrap()
         });
         match private_client_verifier.verified_claims(&test_jwt_hs256, &valid_nonce) {
             Err(ClaimsVerificationError::SignatureVerification(_)) => {}
@@ -1092,10 +1089,9 @@ fn test_id_token_verified_claims() {
             )
             .allow_any_alg()
             .set_time_fn(|| {
-                timestamp_to_utc(&Timestamp::Seconds(
-                    mock_current_time.load(Ordering::Relaxed).into(),
-                ))
-                .unwrap()
+                Timestamp::Seconds(mock_current_time.load(Ordering::Relaxed).into())
+                    .to_utc()
+                    .unwrap()
             });
         match private_client_verifier_with_other_secret
             .verified_claims(&test_jwt_hs256, &valid_nonce)
@@ -1166,10 +1162,9 @@ fn test_new_id_token() {
 
     let mock_current_time = AtomicUsize::new(1544932148);
     let time_fn = || {
-        timestamp_to_utc(&Timestamp::Seconds(
-            mock_current_time.load(Ordering::Relaxed).into(),
-        ))
-        .unwrap()
+        Timestamp::Seconds(mock_current_time.load(Ordering::Relaxed).into())
+            .to_utc()
+            .unwrap()
     };
     let verifier = CoreIdTokenVerifier::new_public_client(
         client_id,

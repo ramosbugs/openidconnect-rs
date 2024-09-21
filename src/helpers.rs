@@ -1,9 +1,13 @@
+use crate::types::localized::join_language_tag_key;
+use crate::{LanguageTag, LocalizedClaim};
+
 use chrono::{DateTime, TimeZone, Utc};
 use serde::de::value::MapDeserializer;
-use serde::de::{DeserializeOwned, Deserializer, MapAccess, Visitor};
+use serde::de::{DeserializeOwned, Deserializer, Error, MapAccess, Visitor};
 use serde::{Deserialize, Serialize, Serializer};
 use serde_json::from_value;
 use serde_value::ValueDeserializer;
+use serde_with::{DeserializeAs, SerializeAs};
 
 use std::cmp::PartialEq;
 use std::fmt::{Debug, Display, Formatter, Result as FormatterResult};
@@ -14,8 +18,6 @@ where
     T: DeserializeOwned,
     D: Deserializer<'de>,
 {
-    use serde::de::Error;
-
     let value: serde_json::Value = Deserialize::deserialize(deserializer)?;
     match from_value::<Vec<T>>(value.clone()) {
         Ok(val) => Ok(val),
@@ -33,8 +35,6 @@ where
     T: DeserializeOwned,
     D: Deserializer<'de>,
 {
-    use serde::de::Error;
-
     let value: serde_json::Value = Deserialize::deserialize(deserializer)?;
     match from_value::<Option<Vec<T>>>(value.clone()) {
         Ok(val) => Ok(val),
@@ -59,6 +59,79 @@ where
     match from_value::<Option<T>>(value) {
         Ok(val) => Ok(val),
         Err(_) => Ok(None),
+    }
+}
+
+pub trait DeserializeMapField: Sized {
+    fn deserialize_map_field<'de, V>(
+        map: &mut V,
+        field_name: &'static str,
+        language_tag: Option<LanguageTag>,
+        field_value: Option<Self>,
+    ) -> Result<Self, V::Error>
+    where
+        V: MapAccess<'de>;
+}
+
+impl<T> DeserializeMapField for T
+where
+    T: DeserializeOwned,
+{
+    fn deserialize_map_field<'de, V>(
+        map: &mut V,
+        field_name: &'static str,
+        language_tag: Option<LanguageTag>,
+        field_value: Option<Self>,
+    ) -> Result<Self, V::Error>
+    where
+        V: MapAccess<'de>,
+    {
+        if field_value.is_some() {
+            return Err(serde::de::Error::duplicate_field(field_name));
+        } else if let Some(language_tag) = language_tag {
+            return Err(serde::de::Error::custom(format!(
+                "unexpected language tag `{language_tag}` for key `{field_name}`"
+            )));
+        }
+        map.next_value().map_err(|err| {
+            V::Error::custom(format!(
+                "{}: {err}",
+                join_language_tag_key(field_name, language_tag.as_ref())
+            ))
+        })
+    }
+}
+
+impl<T> DeserializeMapField for LocalizedClaim<T>
+where
+    T: DeserializeOwned,
+{
+    fn deserialize_map_field<'de, V>(
+        map: &mut V,
+        field_name: &'static str,
+        language_tag: Option<LanguageTag>,
+        field_value: Option<Self>,
+    ) -> Result<Self, V::Error>
+    where
+        V: MapAccess<'de>,
+    {
+        let mut localized_claim = field_value.unwrap_or_default();
+        if localized_claim.contains_key(language_tag.as_ref()) {
+            return Err(serde::de::Error::custom(format!(
+                "duplicate field `{}`",
+                join_language_tag_key(field_name, language_tag.as_ref())
+            )));
+        }
+
+        let localized_value = map.next_value().map_err(|err| {
+            V::Error::custom(format!(
+                "{}: {err}",
+                join_language_tag_key(field_name, language_tag.as_ref())
+            ))
+        })?;
+        localized_claim.insert(language_tag, localized_value);
+
+        Ok(localized_claim)
     }
 }
 
@@ -320,7 +393,11 @@ pub(crate) struct Boolean(
     )]
     pub bool,
 );
-
+impl Boolean {
+    pub(crate) fn into_inner(self) -> bool {
+        self.0
+    }
+}
 impl Display for Boolean {
     fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
         Display::fmt(&self.0, f)
@@ -335,6 +412,37 @@ pub(crate) enum Timestamp {
     #[cfg(feature = "accept-rfc3339-timestamps")]
     Rfc3339(String),
 }
+impl Timestamp {
+    // The spec is ambiguous about whether seconds should be expressed as integers, or
+    // whether floating-point values are allowed. For compatibility with a wide range of
+    // clients, we round down to the nearest second.
+    pub(crate) fn from_utc(utc: &DateTime<Utc>) -> Self {
+        Timestamp::Seconds(utc.timestamp().into())
+    }
+
+    pub(crate) fn to_utc(&self) -> Result<DateTime<Utc>, ()> {
+        match self {
+            Timestamp::Seconds(seconds) => {
+                let (secs, nsecs) = if seconds.is_i64() {
+                    (seconds.as_i64().ok_or(())?, 0u32)
+                } else {
+                    let secs_f64 = seconds.as_f64().ok_or(())?;
+                    let secs = secs_f64.floor();
+                    (
+                        secs as i64,
+                        ((secs_f64 - secs) * 1_000_000_000.).floor() as u32,
+                    )
+                };
+                Utc.timestamp_opt(secs, nsecs).single().ok_or(())
+            }
+            #[cfg(feature = "accept-rfc3339-timestamps")]
+            Timestamp::Rfc3339(iso) => {
+                let datetime = DateTime::parse_from_rfc3339(iso).map_err(|_| ())?;
+                Ok(datetime.into())
+            }
+        }
+    }
+}
 
 impl Display for Timestamp {
     fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
@@ -346,92 +454,28 @@ impl Display for Timestamp {
     }
 }
 
-pub(crate) fn timestamp_to_utc(timestamp: &Timestamp) -> Result<DateTime<Utc>, ()> {
-    match timestamp {
-        Timestamp::Seconds(seconds) => {
-            let (secs, nsecs) = if seconds.is_i64() {
-                (seconds.as_i64().ok_or(())?, 0u32)
-            } else {
-                let secs_f64 = seconds.as_f64().ok_or(())?;
-                let secs = secs_f64.floor();
-                (
-                    secs as i64,
-                    ((secs_f64 - secs) * 1_000_000_000.).floor() as u32,
-                )
-            };
-            Utc.timestamp_opt(secs, nsecs).single().ok_or(())
-        }
-        #[cfg(feature = "accept-rfc3339-timestamps")]
-        Timestamp::Rfc3339(iso) => {
-            let datetime = DateTime::parse_from_rfc3339(iso).map_err(|_| ())?;
-            Ok(datetime.into())
-        }
-    }
-}
-
-pub mod serde_utc_seconds {
-    use crate::helpers::{timestamp_to_utc, utc_to_seconds, Timestamp};
-
-    use chrono::{DateTime, Utc};
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+impl<'de> DeserializeAs<'de, DateTime<Utc>> for Timestamp {
+    fn deserialize_as<D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
     where
         D: Deserializer<'de>,
     {
         let seconds: Timestamp = Deserialize::deserialize(deserializer)?;
-        timestamp_to_utc(&seconds).map_err(|_| {
+        seconds.to_utc().map_err(|_| {
             serde::de::Error::custom(format!(
                 "failed to parse `{}` as UTC datetime (in seconds)",
                 seconds
             ))
         })
     }
+}
 
-    pub fn serialize<S>(v: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
+impl SerializeAs<DateTime<Utc>> for Timestamp {
+    fn serialize_as<S>(source: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        utc_to_seconds(v).serialize(serializer)
+        Timestamp::from_utc(source).serialize(serializer)
     }
-}
-
-pub mod serde_utc_seconds_opt {
-    use crate::helpers::{timestamp_to_utc, utc_to_seconds, Timestamp};
-
-    use chrono::{DateTime, Utc};
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<DateTime<Utc>>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let seconds: Option<Timestamp> = Deserialize::deserialize(deserializer)?;
-        seconds
-            .map(|sec| {
-                timestamp_to_utc(&sec).map_err(|_| {
-                    serde::de::Error::custom(format!(
-                        "failed to parse `{}` as UTC datetime (in seconds)",
-                        sec
-                    ))
-                })
-            })
-            .transpose()
-    }
-
-    pub fn serialize<S>(v: &Option<DateTime<Utc>>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        v.map(|sec| utc_to_seconds(&sec)).serialize(serializer)
-    }
-}
-
-// The spec is ambiguous about whether seconds should be expressed as integers, or
-// whether floating-point values are allowed. For compatibility with a wide range of
-// clients, we round down to the nearest second.
-pub(crate) fn utc_to_seconds(utc: &DateTime<Utc>) -> Timestamp {
-    Timestamp::Seconds(utc.timestamp().into())
 }
 
 new_type![
