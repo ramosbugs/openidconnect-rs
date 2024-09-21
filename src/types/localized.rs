@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+use std::borrow::Cow;
 use std::collections::HashMap;
+use std::fmt::Display;
 
 new_type![
     /// Language tag adhering to RFC 5646 (e.g., `fr` or `fr-CA`).
@@ -10,6 +12,11 @@ new_type![
 impl AsRef<str> for LanguageTag {
     fn as_ref(&self) -> &str {
         self
+    }
+}
+impl Display for LanguageTag {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        write!(f, "{}", self.as_ref())
     }
 }
 
@@ -25,6 +32,17 @@ pub(crate) fn split_language_tag_key(key: &str) -> (&str, Option<LanguageTag>) {
         .map(|language_tag| LanguageTag::new(language_tag.to_string()));
 
     (field_name, language_tag)
+}
+
+pub(crate) fn join_language_tag_key<'a>(
+    field_name: &'a str,
+    language_tag: Option<&LanguageTag>,
+) -> Cow<'a, str> {
+    if let Some(language_tag) = language_tag {
+        Cow::Owned(format!("{field_name}#{language_tag}"))
+    } else {
+        Cow::Borrowed(field_name)
+    }
 }
 
 /// A [locale-aware](https://openid.net/specs/openid-connect-core-1_0.html#IndividualClaimsLanguages)
@@ -90,6 +108,23 @@ impl<T> LocalizedClaim<T> {
         }
     }
 }
+impl<T> LocalizedClaim<Option<T>> {
+    pub(crate) fn flatten_or_none(self) -> Option<LocalizedClaim<T>> {
+        let flattened_tagged = self
+            .0
+            .into_iter()
+            .filter_map(|(k, v)| v.map(|v| (k, v)))
+            .collect::<HashMap<_, _>>();
+        let flattened_default = self.1.flatten();
+
+        if flattened_tagged.is_empty() && flattened_default.is_none() {
+            None
+        } else {
+            Some(LocalizedClaim(flattened_tagged, flattened_default))
+        }
+    }
+}
+
 impl<T> Default for LocalizedClaim<T> {
     fn default() -> Self {
         Self(HashMap::new(), None)

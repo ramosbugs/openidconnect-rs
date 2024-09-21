@@ -439,12 +439,7 @@ where
             JS: JwsSigningAlgorithm,
             P: Debug + DeserializeOwned + Serialize,
             S: JsonWebTokenPayloadSerde<P>,
-        >(
-            PhantomData<JE>,
-            PhantomData<JS>,
-            PhantomData<P>,
-            PhantomData<S>,
-        );
+        >(PhantomData<(JE, JS, P, S)>);
         impl<'de, JE, JS, P, S> Visitor<'de> for JsonWebTokenVisitor<JE, JS, P, S>
         where
             JE: JweContentEncryptionAlgorithm<KeyType = JS::KeyType>,
@@ -514,12 +509,7 @@ where
                 })
             }
         }
-        deserializer.deserialize_str(JsonWebTokenVisitor(
-            PhantomData,
-            PhantomData,
-            PhantomData,
-            PhantomData,
-        ))
+        deserializer.deserialize_str(JsonWebTokenVisitor(PhantomData))
     }
 }
 impl<JE, JS, P, S> Serialize for JsonWebToken<JE, JS, P, S>
