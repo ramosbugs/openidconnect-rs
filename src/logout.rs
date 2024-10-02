@@ -200,29 +200,15 @@ mod tests {
             \"version\":\"3.0\"}";
 
         let new_provider_metadata = ProviderMetadataWithLogout::new(
-            IssuerUrl::new(
-                "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code"
-                    .to_string(),
-            )
-            .unwrap(),
-            AuthUrl::new(
-                "https://rp.certification.openid.net:8080/openidconnect-rs/\
-                 rp-response_type-code/authorization"
-                    .to_string(),
-            )
-            .unwrap(),
-            JsonWebKeySetUrl::new(
-                "https://rp.certification.openid.net:8080/static/jwks_3INbZl52IrrPCp2j.json"
-                    .to_string(),
-            )
-            .unwrap(),
+            IssuerUrl::new("https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code").unwrap(),
+            AuthUrl::new("https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/authorization").unwrap(),
+            JsonWebKeySetUrl::new("https://rp.certification.openid.net:8080/static/jwks_3INbZl52IrrPCp2j.json").unwrap(),
             vec![],
             vec![],
             vec![],
             LogoutProviderMetadata {
                 end_session_endpoint: Some(EndSessionUrl::new(
                     "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/end_session"
-                        .to_string()
                 ).unwrap()),
                 additional_metadata: Default::default(),
             },
@@ -235,7 +221,6 @@ mod tests {
         assert_eq!(
             Some(EndSessionUrl::new(
                 "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/end_session"
-                    .to_string()
             ).unwrap()),
             provider_metadata.additional_metadata().end_session_endpoint
         );
@@ -245,7 +230,6 @@ mod tests {
     fn test_logout_request_with_no_parameters() {
         let endpoint = EndSessionUrl::new(
             "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/end_session"
-                .to_string()
         ).unwrap();
 
         let logout_url = LogoutRequest::from(endpoint).http_get_url();
@@ -262,7 +246,6 @@ mod tests {
     fn test_logout_request_with_all_parameters() {
         let endpoint = EndSessionUrl::new(
             "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/end_session"
-                .to_string()
         ).unwrap();
 
         let logout_url = LogoutRequest::from(endpoint)
@@ -280,14 +263,14 @@ mod tests {
                 )
                 .unwrap(),
             )
-            .set_logout_hint(LogoutHint::new("johndoe".to_string()))
-            .set_client_id(ClientId::new("asdf".to_string()))
+            .set_logout_hint(LogoutHint::new("johndoe"))
+            .set_client_id(ClientId::new("asdf"))
             .set_post_logout_redirect_uri(
-                PostLogoutRedirectUrl::new("https://localhost:8000/".to_string()).unwrap(),
+                PostLogoutRedirectUrl::new("https://localhost:8000/").unwrap(),
             )
-            .set_state(CsrfToken::new("asdf".to_string()))
-            .add_ui_locale(LanguageTag::new("en-US".to_string()))
-            .add_ui_locale(LanguageTag::new("fr-FR".to_string()))
+            .set_state(CsrfToken::new("asdf"))
+            .add_ui_locale(LanguageTag::new("en-US"))
+            .add_ui_locale(LanguageTag::new("fr-FR"))
             .http_get_url();
 
         assert_eq!(

@@ -165,18 +165,14 @@ where
     F: FnOnce(CoreClientRegistrationRequest) -> CoreClientRegistrationRequest,
 {
     let registration_request_pre = CoreClientRegistrationRequest::new(
-        vec![RedirectUrl::new(RP_REDIRECT_URI.to_string()).unwrap()],
+        vec![RedirectUrl::new(RP_REDIRECT_URI).unwrap()],
         Default::default(),
     )
     .set_application_type(Some(CoreApplicationType::Native))
     .set_client_name(Some(
-        vec![(None, ClientName::new(RP_NAME.to_string()))]
-            .into_iter()
-            .collect(),
+        vec![(None, ClientName::new(RP_NAME))].into_iter().collect(),
     ))
-    .set_contacts(Some(vec![ClientContactEmail::new(
-        RP_CONTACT_EMAIL.to_string(),
-    )]));
+    .set_contacts(Some(vec![ClientContactEmail::new(RP_CONTACT_EMAIL)]));
 
     let registration_request_post = request_fn(registration_request_pre);
 
