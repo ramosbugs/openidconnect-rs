@@ -6,8 +6,8 @@ edition = "2021"
 [features]
 default = ["async"]
 async = ["tokio"]
-blocking = []
+sync = []
 
 [dependencies]
-openidconnect = "2.3.2"
-tokio = { version = "1.19.2", features = ["full"], optional = true }
+openidconnect = { version = "4.0.0-rc.1", features = ["reqwest-blocking"] }
+tokio = { version = "1.41.0", features = ["full"], optional = true }

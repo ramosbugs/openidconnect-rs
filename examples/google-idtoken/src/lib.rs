@@ -18,14 +18,10 @@
 
 #[cfg(test)]
 mod test {
-    use openidconnect::{
-        core::{CoreClient, CoreIdToken},
-        reqwest, AuthUrl, ClientId, ClientSecret, IdToken, IssuerUrl, JsonWebKeySet,
-        JsonWebKeySetUrl, Nonce,
-    };
+    use openidconnect::{core::{CoreClient, CoreIdToken}, reqwest, AuthUrl, ClientId, ClientSecret, IdToken, IssuerUrl, JsonWebKeySet, JsonWebKeySetUrl, Nonce};
     use std::{env, str::FromStr};
 
-    #[cfg(feature = "blocking")]
+    #[cfg(feature = "sync")]
     #[test]
     fn verify_id_token() {
         let google_client_id = ClientSecret::new(
@@ -43,22 +39,19 @@ mod test {
 
         let client = CoreClient::new(
             ClientId::new(google_client_id),
-            None,
             IssuerUrl::new("https://accounts.google.com".to_string()).unwrap(),
-            AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string()).unwrap(),
-            None,
-            None,
             JsonWebKeySet::fetch(
                 &JsonWebKeySetUrl::new("https://www.googleapis.com/oauth2/v3/certs".to_string())
                     .unwrap(),
-                reqwest::http_client,
+                &reqwest::blocking::Client::new(),
             )
             .unwrap(),
-        );
+        )
+            .set_auth_uri(AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string()).unwrap());
 
         let id_token: CoreIdToken = IdToken::from_str(&google_id_token).unwrap();
 
-        let claims = id_token.claims(&client.id_token_verifier().allow_any_algs(), |_: Option<&Nonce>| Ok(()));
+        let claims = id_token.claims(&client.id_token_verifier().allow_any_alg(), |_: Option<&Nonce>| Ok(()));
 
         match claims {
             Ok(claims) => println!(
@@ -87,19 +80,16 @@ mod test {
 
         let client = CoreClient::new(
             ClientId::new(google_client_id),
-            None,
             IssuerUrl::new("https://accounts.google.com".to_string()).unwrap(),
-            AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string()).unwrap(),
-            None,
-            None,
             JsonWebKeySet::fetch_async(
                 &JsonWebKeySetUrl::new("https://www.googleapis.com/oauth2/v3/certs".to_string())
                     .unwrap(),
-                reqwest::async_http_client,
+                &crate::test::reqwest::Client::new(),
             )
             .await
             .unwrap(),
-        );
+        )
+            .set_auth_uri(AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string()).unwrap());
 
         let id_token: CoreIdToken = IdToken::from_str(&google_id_token).unwrap();
 
