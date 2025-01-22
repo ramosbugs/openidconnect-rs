@@ -9,6 +9,7 @@ use std::hash::Hash;
 new_type![
     /// ID of a JSON Web Key.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     JsonWebKeyId(String)
 ];
 
