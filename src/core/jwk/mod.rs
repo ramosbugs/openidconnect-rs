@@ -7,7 +7,8 @@ use crate::{
 };
 
 use ed25519_dalek::pkcs8::DecodePrivateKey;
-use ed25519_dalek::Signer;
+use ed25519_dalek::{Signer, SigningKey};
+use rand::RngCore;
 use rsa::pkcs1::DecodeRsaPrivateKey;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -406,6 +407,7 @@ impl CoreHmacKey {
 }
 impl PrivateSigningKey for CoreHmacKey {
     type VerificationKey = CoreJsonWebKey;
+    type InnerKey = Vec<u8>;
 
     fn sign(
         &self,
@@ -449,27 +451,9 @@ impl PrivateSigningKey for CoreHmacKey {
     fn as_verification_key(&self) -> CoreJsonWebKey {
         CoreJsonWebKey::new_symmetric(self.secret.clone())
     }
-}
 
-enum EdDsaSigningKey {
-    Ed25519(ed25519_dalek::SigningKey),
-}
-
-impl EdDsaSigningKey {
-    fn from_ed25519_pem(pem: &str) -> Result<Self, String> {
-        Ok(Self::Ed25519(
-            ed25519_dalek::SigningKey::from_pkcs8_pem(pem).map_err(|err| err.to_string())?,
-        ))
-    }
-
-    fn sign(&self, message: &[u8]) -> Vec<u8> {
-        match self {
-            Self::Ed25519(key) => {
-                let signature = key.sign(message);
-
-                signature.to_vec()
-            }
-        }
+    fn inner_key(&self) -> &Self::InnerKey {
+        &self.secret
     }
 }
 
@@ -479,19 +463,34 @@ impl EdDsaSigningKey {
 /// them.
 pub struct CoreEdDsaPrivateSigningKey {
     kid: Option<JsonWebKeyId>,
-    key_pair: EdDsaSigningKey,
+    key_pair: ed25519_dalek::SigningKey,
 }
 impl CoreEdDsaPrivateSigningKey {
+    /// Generate a new `CoreEdDsaPrivateSigningKey`
+    pub fn generate(kid: Option<JsonWebKeyId>) -> Self {
+        let mut rng = rand::rngs::OsRng;
+
+        let mut secret = ed25519_dalek::SecretKey::default();
+        rng.fill_bytes(&mut secret);
+
+        Self {
+            kid,
+            key_pair: SigningKey::from_bytes(&secret),
+        }
+    }
+
     /// Converts an EdDSA private key (in PEM format) to a JWK representing its public key.
     pub fn from_ed25519_pem(pem: &str, kid: Option<JsonWebKeyId>) -> Result<Self, String> {
         Ok(Self {
             kid,
-            key_pair: EdDsaSigningKey::from_ed25519_pem(pem)?,
+            key_pair: ed25519_dalek::SigningKey::from_pkcs8_pem(pem)
+                .map_err(|err| err.to_string())?,
         })
     }
 }
 impl PrivateSigningKey for CoreEdDsaPrivateSigningKey {
     type VerificationKey = CoreJsonWebKey;
+    type InnerKey = ed25519_dalek::SigningKey;
 
     fn sign(
         &self,
@@ -499,7 +498,7 @@ impl PrivateSigningKey for CoreEdDsaPrivateSigningKey {
         message: &[u8],
     ) -> Result<Vec<u8>, SigningError> {
         match *signature_alg {
-            CoreJwsSigningAlgorithm::EdDsa => Ok(self.key_pair.sign(message)),
+            CoreJwsSigningAlgorithm::EdDsa => Ok(self.key_pair.sign(message).to_vec()),
             ref other => Err(SigningError::UnsupportedAlg(
                 serde_plain::to_string(other).unwrap_or_else(|err| {
                     panic!(
@@ -512,23 +511,25 @@ impl PrivateSigningKey for CoreEdDsaPrivateSigningKey {
     }
 
     fn as_verification_key(&self) -> CoreJsonWebKey {
-        match &self.key_pair {
-            EdDsaSigningKey::Ed25519(key) => CoreJsonWebKey {
-                kty: CoreJsonWebKeyType::OctetKeyPair,
-                use_: Some(CoreJsonWebKeyUse::Signature),
-                kid: self.kid.clone(),
-                n: None,
-                e: None,
-                crv: Some(CoreJsonCurveType::Ed25519),
-                x: Some(Base64UrlEncodedBytes::new(
-                    key.verifying_key().as_bytes().to_vec(),
-                )),
-                y: None,
-                d: None,
-                k: None,
-                alg: None,
-            },
+        CoreJsonWebKey {
+            kty: CoreJsonWebKeyType::OctetKeyPair,
+            use_: Some(CoreJsonWebKeyUse::Signature),
+            kid: self.kid.clone(),
+            n: None,
+            e: None,
+            crv: Some(CoreJsonCurveType::Ed25519),
+            x: Some(Base64UrlEncodedBytes::new(
+                self.key_pair.verifying_key().as_bytes().to_vec(),
+            )),
+            y: None,
+            d: None,
+            k: None,
+            alg: None,
         }
+    }
+
+    fn inner_key(&self) -> &Self::InnerKey {
+        &self.key_pair
     }
 }
 
@@ -548,6 +549,17 @@ pub struct CoreRsaPrivateSigningKey {
     kid: Option<JsonWebKeyId>,
 }
 impl CoreRsaPrivateSigningKey {
+    /// Generate a new `CoreRsaPrivateSigningKey` where N denotes its bit size.
+    pub fn generate<const N: usize>(kid: Option<JsonWebKeyId>) -> Result<Self, rsa::Error> {
+        let mut rng = rand::rngs::OsRng;
+
+        Ok(Self {
+            key_pair: rsa::RsaPrivateKey::new(&mut rng, 2048)?,
+            rng: Box::new(rng),
+            kid,
+        })
+    }
+
     /// Converts an RSA private key (in PEM format) to a JWK representing its public key.
     pub fn from_pem(pem: &str, kid: Option<JsonWebKeyId>) -> Result<Self, String> {
         Self::from_pem_internal(pem, Box::new(rand::rngs::OsRng), kid)
@@ -564,6 +576,7 @@ impl CoreRsaPrivateSigningKey {
 }
 impl PrivateSigningKey for CoreRsaPrivateSigningKey {
     type VerificationKey = CoreJsonWebKey;
+    type InnerKey = rsa::RsaPrivateKey;
 
     fn sign(
         &self,
@@ -677,6 +690,10 @@ impl PrivateSigningKey for CoreRsaPrivateSigningKey {
             d: None,
             alg: None,
         }
+    }
+
+    fn inner_key(&self) -> &Self::InnerKey {
+        &self.key_pair
     }
 }
 
