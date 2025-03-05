@@ -1,0 +1,13 @@
+[package]
+name = "google-idtoken"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["async"]
+async = ["tokio"]
+sync = []
+
+[dependencies]
+openidconnect = { version = "4.0.0-rc.1", features = ["reqwest-blocking"] }
+tokio = { version = "1.41.0", features = ["full"], optional = true }
