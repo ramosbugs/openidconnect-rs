@@ -233,6 +233,7 @@ macro_rules! new_secret_type {
             #[$attr]
         )*
         #[cfg_attr(feature = "timing-resistant-secret-traits", derive(Eq))]
+        #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
         pub struct $name($type);
         impl $name {
             $($item)*
@@ -424,6 +425,22 @@ macro_rules! new_url_type {
             }
         }
         impl Eq for $name {}
+
+        #[cfg(feature = "schemars")]
+        impl schemars::JsonSchema for $name {
+            fn schema_name() -> String {
+                stringify!($name).to_owned()
+            }
+
+            fn schema_id() -> std::borrow::Cow<'static, str> {
+                std::borrow::Cow::Borrowed(concat!("openidconnect::", stringify!($name)))
+            }
+
+            fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+                // HELP(gibbz00): do we want to generate the schema for a URL or a String?
+                gen.subschema_for::<String>()
+            }
+        }
     };
 }
 
@@ -739,4 +756,40 @@ macro_rules! serialize_as_str {
             }
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(feature = "schemars")]
+    mod json_schema {
+        use schemars::schema_for;
+        use serde_json::json;
+
+        #[test]
+        fn generates_new_url_type_json_schema() {
+            let expected_schema = json!({
+              "$schema": "http://json-schema.org/draft-07/schema#",
+              "title": "ClientUrl",
+              "type": "string"
+            });
+
+            let schema = schema_for!(crate::ClientUrl);
+            let actual_schema = serde_json::to_value(&schema).unwrap();
+            assert_eq!(expected_schema, actual_schema);
+        }
+
+        #[test]
+        fn generates_new_secret_type_json_schema() {
+            let expected_schema = json!({
+              "$schema": "http://json-schema.org/draft-07/schema#",
+              "title": "Nonce",
+              "description": "String value used to associate a client session with an ID Token, and to mitigate replay attacks.",
+              "type": "string"
+            });
+
+            let schema = schema_for!(crate::Nonce);
+            let actual_schema = serde_json::to_value(&schema).unwrap();
+            assert_eq!(expected_schema, actual_schema);
+        }
+    }
 }
