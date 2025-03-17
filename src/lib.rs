@@ -169,7 +169,7 @@
 //!
 //! // Use OpenID Connect Discovery to fetch the provider metadata.
 //! let provider_metadata = CoreProviderMetadata::discover(
-//!     &IssuerUrl::new("https://accounts.example.com".to_string())?,
+//!     &IssuerUrl::new("https://accounts.example.com")?,
 //!     &http_client,
 //! )?;
 //!
@@ -178,11 +178,11 @@
 //! let client =
 //!     CoreClient::from_provider_metadata(
 //!         provider_metadata,
-//!         ClientId::new("client_id".to_string()),
-//!         Some(ClientSecret::new("client_secret".to_string())),
+//!         ClientId::new("client_id"),
+//!         Some(ClientSecret::new("client_secret")),
 //!     )
 //!     // Set the URL the user will be redirected to after the authorization process.
-//!     .set_redirect_uri(RedirectUrl::new("http://redirect".to_string())?);
+//!     .set_redirect_uri(RedirectUrl::new("http://redirect")?);
 //!
 //! // Generate a PKCE challenge.
 //! let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
@@ -195,8 +195,8 @@
 //!         Nonce::new_random,
 //!     )
 //!     // Set the desired scopes.
-//!     .add_scope(Scope::new("read".to_string()))
-//!     .add_scope(Scope::new("write".to_string()))
+//!     .add_scope(Scope::new("read"))
+//!     .add_scope(Scope::new("write"))
 //!     // Set the PKCE code challenge.
 //!     .set_pkce_challenge(pkce_challenge)
 //!     .url();
@@ -212,7 +212,7 @@
 //! // Now you can exchange it for an access token and ID token.
 //! let token_response =
 //!     client
-//!         .exchange_code(AuthorizationCode::new("some authorization code".to_string()))?
+//!         .exchange_code(AuthorizationCode::new("some authorization code"))?
 //!         // Set the PKCE code verifier.
 //!         .set_pkce_verifier(pkce_verifier)
 //!         .request(&http_client)?;
@@ -300,10 +300,10 @@
 //! # fn err_wrapper() -> Result<String, anyhow::Error> {
 //! let provider_metadata = CoreProviderMetadata::new(
 //!     // Parameters required by the OpenID Connect Discovery spec.
-//!     IssuerUrl::new("https://accounts.example.com".to_string())?,
-//!     AuthUrl::new("https://accounts.example.com/authorize".to_string())?,
+//!     IssuerUrl::new("https://accounts.example.com")?,
+//!     AuthUrl::new("https://accounts.example.com/authorize")?,
 //!     // Use the JsonWebKeySet struct to serve the JWK Set at this URL.
-//!     JsonWebKeySetUrl::new("https://accounts.example.com/jwk".to_string())?,
+//!     JsonWebKeySetUrl::new("https://accounts.example.com/jwk")?,
 //!     // Supported response types (flows).
 //!     vec![
 //!         // Recommended: support the code flow.
@@ -327,32 +327,32 @@
 //!     EmptyAdditionalProviderMetadata {},
 //! )
 //! // Specify the token endpoint (required for the code flow).
-//! .set_token_endpoint(Some(TokenUrl::new("https://accounts.example.com/token".to_string())?))
+//! .set_token_endpoint(Some(TokenUrl::new("https://accounts.example.com/token")?))
 //! // Recommended: support the user info endpoint.
 //! .set_userinfo_endpoint(
-//!     Some(UserInfoUrl::new("https://accounts.example.com/userinfo".to_string())?)
+//!     Some(UserInfoUrl::new("https://accounts.example.com/userinfo")?)
 //! )
 //! // Recommended: specify the supported scopes.
 //! .set_scopes_supported(Some(vec![
-//!     Scope::new("openid".to_string()),
-//!     Scope::new("email".to_string()),
-//!     Scope::new("profile".to_string()),
+//!     Scope::new("openid"),
+//!     Scope::new("email"),
+//!     Scope::new("profile"),
 //! ]))
 //! // Recommended: specify the supported ID token claims.
 //! .set_claims_supported(Some(vec![
 //!     // Providers may also define an enum instead of using CoreClaimName.
-//!     CoreClaimName::new("sub".to_string()),
-//!     CoreClaimName::new("aud".to_string()),
-//!     CoreClaimName::new("email".to_string()),
-//!     CoreClaimName::new("email_verified".to_string()),
-//!     CoreClaimName::new("exp".to_string()),
-//!     CoreClaimName::new("iat".to_string()),
-//!     CoreClaimName::new("iss".to_string()),
-//!     CoreClaimName::new("name".to_string()),
-//!     CoreClaimName::new("given_name".to_string()),
-//!     CoreClaimName::new("family_name".to_string()),
-//!     CoreClaimName::new("picture".to_string()),
-//!     CoreClaimName::new("locale".to_string()),
+//!     CoreClaimName::new("sub"),
+//!     CoreClaimName::new("aud"),
+//!     CoreClaimName::new("email"),
+//!     CoreClaimName::new("email_verified"),
+//!     CoreClaimName::new("exp"),
+//!     CoreClaimName::new("iat"),
+//!     CoreClaimName::new("iss"),
+//!     CoreClaimName::new("name"),
+//!     CoreClaimName::new("given_name"),
+//!     CoreClaimName::new("family_name"),
+//!     CoreClaimName::new("picture"),
+//!     CoreClaimName::new("locale"),
 //! ]));
 //!
 //! serde_json::to_string(&provider_metadata).map_err(From::from)
@@ -382,7 +382,7 @@
 //!         // JsonWebKey trait or submit a PR to add the desired support to this crate.
 //!         CoreRsaPrivateSigningKey::from_pem(
 //!             &rsa_pem,
-//!             Some(JsonWebKeyId::new("key1".to_string()))
+//!             Some(JsonWebKeyId::new("key1"))
 //!         )
 //!         .expect("Invalid RSA private key")
 //!         .as_verification_key()
@@ -435,14 +435,14 @@
 //!
 //! # fn err_wrapper() -> Result<CoreTokenResponse, anyhow::Error> {
 //! # let rsa_pem = "";
-//! # let access_token = AccessToken::new("".to_string());
+//! # let access_token = AccessToken::new("");
 //! let id_token = CoreIdToken::new(
 //!     CoreIdTokenClaims::new(
 //!         // Specify the issuer URL for the OpenID Connect Provider.
-//!         IssuerUrl::new("https://accounts.example.com".to_string())?,
+//!         IssuerUrl::new("https://accounts.example.com")?,
 //!         // The audience is usually a single entry with the client ID of the client for whom
 //!         // the ID token is intended. This is a required claim.
-//!         vec![Audience::new("client-id-123".to_string())],
+//!         vec![Audience::new("client-id-123")],
 //!         // The ID token expiration is usually much shorter than that of the access or refresh
 //!         // tokens issued to clients.
 //!         Utc::now() + Duration::seconds(300),
@@ -452,11 +452,11 @@
 //!         StandardClaims::new(
 //!             // Stable subject identifiers are recommended in place of e-mail addresses or other
 //!             // potentially unstable identifiers. This is the only required claim.
-//!             SubjectIdentifier::new("5f83e0ca-2b8e-4e8c-ba0a-f80fe9bc3632".to_string())
+//!             SubjectIdentifier::new("5f83e0ca-2b8e-4e8c-ba0a-f80fe9bc3632")
 //!         )
 //!         // Optional: specify the user's e-mail address. This should only be provided if the
 //!         // client has been granted the 'profile' or 'email' scopes.
-//!         .set_email(Some(EndUserEmail::new("bob@example.com".to_string())))
+//!         .set_email(Some(EndUserEmail::new("bob@example.com")))
 //!         // Optional: specify whether the provider has verified the user's e-mail address.
 //!         .set_email_verified(Some(true)),
 //!         // OpenID Connect Providers may supply custom claims by providing a struct that
@@ -472,7 +472,7 @@
 //!     // be used as the HMAC key.
 //!     &CoreRsaPrivateSigningKey::from_pem(
 //!             &rsa_pem,
-//!             Some(JsonWebKeyId::new("key1".to_string()))
+//!             Some(JsonWebKeyId::new("key1"))
 //!         )
 //!         .expect("Invalid RSA private key"),
 //!     // Uses the RS256 signature algorithm. This crate supports any RS*, PS*, or HS*
@@ -489,7 +489,7 @@
 //! )?;
 //!
 //! Ok(CoreTokenResponse::new(
-//!     AccessToken::new("some_secret".to_string()),
+//!     AccessToken::new("some_secret"),
 //!     CoreTokenType::Bearer,
 //!     CoreIdTokenFields::new(Some(id_token), EmptyExtraTokenFields {}),
 //! ))
@@ -540,7 +540,7 @@
 //!
 //! // Use OpenID Connect Discovery to fetch the provider metadata.
 //! let provider_metadata = CoreProviderMetadata::discover_async(
-//!     IssuerUrl::new("https://accounts.example.com".to_string())?,
+//!     IssuerUrl::new("https://accounts.example.com")?,
 //!     &http_client,
 //! )
 //! .await?;
@@ -550,11 +550,11 @@
 //! let client =
 //!     CoreClient::from_provider_metadata(
 //!         provider_metadata,
-//!         ClientId::new("client_id".to_string()),
-//!         Some(ClientSecret::new("client_secret".to_string())),
+//!         ClientId::new("client_id"),
+//!         Some(ClientSecret::new("client_secret")),
 //!     )
 //!     // Set the URL the user will be redirected to after the authorization process.
-//!     .set_redirect_uri(RedirectUrl::new("http://redirect".to_string())?);
+//!     .set_redirect_uri(RedirectUrl::new("http://redirect")?);
 //!
 //! // Generate a PKCE challenge.
 //! let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
@@ -567,8 +567,8 @@
 //!         Nonce::new_random,
 //!     )
 //!     // Set the desired scopes.
-//!     .add_scope(Scope::new("read".to_string()))
-//!     .add_scope(Scope::new("write".to_string()))
+//!     .add_scope(Scope::new("read"))
+//!     .add_scope(Scope::new("write"))
 //!     // Set the PKCE code challenge.
 //!     .set_pkce_challenge(pkce_challenge)
 //!     .url();
@@ -584,7 +584,7 @@
 //! // Now you can exchange it for an access token and ID token.
 //! let token_response =
 //!     client
-//!         .exchange_code(AuthorizationCode::new("some authorization code".to_string()))?
+//!         .exchange_code(AuthorizationCode::new("some authorization code"))?
 //!         // Set the PKCE code verifier.
 //!         .set_pkce_verifier(pkce_verifier)
 //!         .request_async(&http_client)
