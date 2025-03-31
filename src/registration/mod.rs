@@ -654,12 +654,12 @@ where
             let response_error: StandardErrorResponse<ET> = serde_path_to_error::deserialize(
                 &mut serde_json::Deserializer::from_str(&response_body),
             )
-            .map_err(ClientRegistrationError::Parse)?;
+            .map_err(|err_msg| ClientRegistrationError::Parse(response_body.into(), err_msg))?;
             return Err(ClientRegistrationError::ServerResponse(response_error));
         }
 
         serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_str(&response_body))
-            .map_err(ClientRegistrationError::Parse)
+            .map_err(|err_msg| ClientRegistrationError::Parse(response_body.into(), err_msg))
     }
 
     /// Returns the client metadata associated with this registration request.
@@ -902,7 +902,10 @@ where
     Other(String),
     /// Failed to parse server response.
     #[error("Failed to parse server response")]
-    Parse(#[source] serde_path_to_error::Error<serde_json::Error>),
+    Parse(
+        Vec<u8>,
+        #[source] serde_path_to_error::Error<serde_json::Error>,
+    ),
     /// An error occurred while sending the request or receiving the response (e.g., network
     /// connectivity failed).
     #[error("Request failed")]
