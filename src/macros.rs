@@ -346,6 +346,12 @@ macro_rules! new_url_type {
             }
             $($item)*
         }
+        impl std::str::FromStr for $name {
+            type Err = ::url::ParseError;
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                Self::new(s.to_string())
+            }
+        }
         impl std::ops::Deref for $name {
             type Target = String;
             fn deref(&self) -> &String {
