@@ -353,23 +353,33 @@ where
                     }
 
                     if let None = known_audience {
-                        let e_msg = if audiences.len() > 1 {
-                            let provided_audiences = audiences
-                                .iter()
-                                .map(|aud| format!("`{}`", Deref::deref(aud)))
-                                .collect::<Vec<_>>()
-                                .join(", ");
-                            format!("must contain `{expected_audience}` (found audiences {provided_audiences})")
-                        } else {
-                            // note that we already proved a check to see if audiences are empty
-                            // this expect() cannot occur
-                            let aud = audiences
-                                .first()
-                                .expect("must have 1 or more audience")
-                                .as_str();
-                            format!("`{aud}` is not a trusted audience")
-                        };
-                        return Err(ClaimsVerificationError::InvalidAudience(e_msg));
+                        // if the uadience is found, then we apply the other verifier function
+                        let found_audience = audiences
+                            .iter()
+                            // we apply the verifier function to each audience and filter on this
+                            .find(|aud| (self.other_aud_verifier_fn)(aud));
+
+                        if let None = found_audience {
+                            // craft the error message to be returned
+                            let e_msg = if audiences.len() > 1 {
+                                let provided_audiences = audiences
+                                    .iter()
+                                    .map(|aud| format!("`{}`", Deref::deref(aud)))
+                                    .collect::<Vec<_>>()
+                                    .join(", ");
+                                format!("must contain `{expected_audience}` (found audiences {provided_audiences})")
+                            } else {
+                                // note that we already proved a check to see if audiences are empty
+                                // this expect() cannot occur
+                                let aud = audiences
+                                    .first()
+                                    .expect("must have 1 or more audience")
+                                    .as_str();
+                                format!("`{aud}` is not a trusted audience")
+                            };
+
+                            return Err(ClaimsVerificationError::InvalidAudience(e_msg));
+                        }
                     }
                 } else {
                     return Err(ClaimsVerificationError::InvalidAudience(
