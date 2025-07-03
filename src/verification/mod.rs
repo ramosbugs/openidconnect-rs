@@ -339,10 +339,12 @@ where
             //    contains additional audiences not trusted by the Client.
             if self.aud_match_required {
                 if let Some(audiences) = unverified_claims.audiences() {
-                    if !audiences
+                    let audience_matched = audiences
                         .iter()
-                        .any(|aud| (**aud).deref() == self.client_id.deref())
-                    {
+                        .any(|aud| (**aud).deref() == self.client_id.deref());
+
+                    log::debug!("Audience found in audiences {audience_matched}");
+                    if !audience_matched {
                         return Err(ClaimsVerificationError::InvalidAudience(format!(
                             "must contain `{}` (found audiences: {})",
                             *self.client_id,
@@ -353,17 +355,25 @@ where
                                 .join(", ")
                         )));
                     } else if audiences.len() > 1 {
-                        audiences
+                        // first check that the audiences contains the client ID
+                        let found_audience = audiences
                             .iter()
-                            .filter(|aud| (**aud).deref() != self.client_id.deref())
-                            .find(|aud| !(self.other_aud_verifier_fn)(aud))
-                            .map(|aud| {
-                                Err(ClaimsVerificationError::InvalidAudience(format!(
-                                    "`{}` is not a trusted audience",
-                                    **aud,
-                                )))
-                            })
-                            .unwrap_or(Ok(()))?;
+                            .find(|aud| aud.as_str().eq(self.client_id.as_str()));
+
+                        // if not, then we apply the other audience verifier function
+                        if let None = found_audience {
+                            audiences
+                                .iter()
+                                .filter(|aud| (**aud).deref() != self.client_id.deref())
+                                .find(|aud| !(self.other_aud_verifier_fn)(aud))
+                                .map(|aud| {
+                                    Err(ClaimsVerificationError::InvalidAudience(format!(
+                                        "`{}` is not a trusted audience",
+                                        **aud,
+                                    )))
+                                })
+                                .unwrap_or(Ok(()))?;
+                        }
                     }
                 } else {
                     return Err(ClaimsVerificationError::InvalidAudience(
