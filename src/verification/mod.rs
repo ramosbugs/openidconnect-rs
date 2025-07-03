@@ -343,7 +343,6 @@ where
                         .iter()
                         .any(|aud| (**aud).deref() == self.client_id.deref());
 
-                    log::debug!("Audience found in audiences {audience_matched}");
                     if !audience_matched {
                         return Err(ClaimsVerificationError::InvalidAudience(format!(
                             "must contain `{}` (found audiences: {})",
