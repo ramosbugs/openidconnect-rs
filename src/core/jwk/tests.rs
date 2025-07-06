@@ -1070,3 +1070,75 @@ fn test_jwks_same_kid_different_alg() {
         assert_eq!(keys.len(), 0);
     }
 }
+
+#[test]
+fn test_hash_bytes_eddsa() {
+    let ed_key_json = "{
+            \"alg\": \"EdDSA\",
+            \"crv\": \"Ed25519\",
+            \"kty\": \"OKP\",
+            \"use\": \"sig\",
+            \"x\": \"vZ3CX884r0qNJ18pgXUTvFufK3ZmDzQfvMROJz6CLBc\"
+        }";
+
+    let key: CoreJsonWebKey = serde_json::from_str(ed_key_json).expect("deserialization failed");
+
+    let hash = key
+        .hash_bytes("justatest".as_bytes(), &CoreJwsSigningAlgorithm::EdDsa)
+        .expect("Hashing should succeed");
+
+    assert_eq!(
+        "2Kyc+bZQPseH8P3KAdKLu6D7stgxaNFXa/ckQX19RqZu9L65J0RmDlkULYCRExxRO77JW052i6r/+PK4rboICw==",
+        BASE64_STANDARD.encode(hash)
+    );
+}
+
+#[test]
+fn test_hash_bytes_rsa() {
+    let rsa_key_json = "{
+            \"kty\": \"RSA\",
+            \"use\": \"sig\",
+            \"kid\": \"2011-04-29\",
+            \"n\": \"0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhD\
+                     R1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6C\
+                     f0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1\
+                     n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1\
+                     jF44-csFCur-kEgU8awapJzKnqDKgw\",
+            \"e\": \"AQAB\"
+        }";
+
+    let key: CoreJsonWebKey = serde_json::from_str(rsa_key_json).expect("deserialization failed");
+
+    let hash = key
+        .hash_bytes(
+            "justatest".as_bytes(),
+            &CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
+        )
+        .expect("Hashing should succeed");
+    assert_eq!(
+        "erGZHWfaQ5DcuMr6dSkOJDb/4VcxpPazY9vMsVB8dLo=",
+        BASE64_STANDARD.encode(hash)
+    );
+
+    let hash = key
+        .hash_bytes(
+            "justatest".as_bytes(),
+            &CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384,
+        )
+        .expect("Hashing should succeed");
+    assert_eq!(
+        "JeQIV8/xLfKxSCCXuq7Hb/pIxnsjSZJM9+Dx23ah1oiEvra2q0Pm7eSS07gkl+Y2",
+        BASE64_STANDARD.encode(hash)
+    );
+
+    let hash = key
+        .hash_bytes(
+            "justatest".as_bytes(),
+            &CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512,
+        )
+        .expect("Hashing should succeed");
+    assert_eq!(
+        "2Kyc+bZQPseH8P3KAdKLu6D7stgxaNFXa/ckQX19RqZu9L65J0RmDlkULYCRExxRO77JW052i6r/+PK4rboICw==",
+        BASE64_STANDARD.encode(hash)
+    );
+}

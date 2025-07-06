@@ -368,8 +368,12 @@ impl JsonWebKey for CoreJsonWebKey {
             CoreJwsSigningAlgorithm::HmacSha512
             | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512
             | CoreJwsSigningAlgorithm::RsaSsaPssSha512
-            | CoreJwsSigningAlgorithm::EcdsaP521Sha512
-            | CoreJwsSigningAlgorithm::EdDsa => match self.crv {
+            | CoreJwsSigningAlgorithm::EcdsaP521Sha512 => {
+                let mut hasher = Sha512::new();
+                hasher.update(bytes);
+                Ok(hasher.finalize().to_vec())
+            }
+            CoreJwsSigningAlgorithm::EdDsa => match self.crv {
                 None => Err("EdDSA key must specify `crv`".to_string()),
                 Some(CoreJsonCurveType::Ed25519) => {
                     let mut hasher = Sha512::new();
