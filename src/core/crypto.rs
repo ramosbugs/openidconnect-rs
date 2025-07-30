@@ -81,8 +81,10 @@ pub fn verify_rsa_signature(
     // according to https://datatracker.ietf.org/doc/html/rfc7518#section-6.3.1.1
     // `n` is always unsigned (hence has sign plus)
 
-    let n_bigint = rsa::BigUint::from_bytes_be(n.deref());
-    let e_bigint = rsa::BigUint::from_bytes_be(e.deref());
+    let n_bigint = rsa::BoxedUint::from_be_slice(n.deref(), (n.len() * 8) as u32)
+        .map_err(|e| SignatureVerificationError::InvalidKey(e.to_string()))?;
+    let e_bigint = rsa::BoxedUint::from_be_slice(e.deref(), (e.len() * 8) as u32)
+        .map_err(|e| SignatureVerificationError::InvalidKey(e.to_string()))?;
     let public_key = rsa::RsaPublicKey::new(n_bigint, e_bigint)
         .map_err(|e| SignatureVerificationError::InvalidKey(e.to_string()))?;
 

@@ -744,9 +744,6 @@ impl RngCore for TestRng {
     fn fill_bytes(&mut self, dest: &mut [u8]) {
         self.0.fill_bytes(dest)
     }
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
-        self.0.try_fill_bytes(dest)
-    }
 }
 
 #[test]
@@ -794,8 +791,7 @@ fn test_ed_signing() {
 fn test_rsa_signing() {
     let private_key = CoreRsaPrivateSigningKey::from_pem_internal(
         TEST_RSA_KEY,
-        // Constant salt used for PSS test vectors below.
-        Box::new(TestRng(StepRng::new(127, 0))),
+        (), // No RNG parameter needed anymore
         Some(JsonWebKeyId::new("test_key".to_string())),
     )
     .unwrap();
