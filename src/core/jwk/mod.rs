@@ -9,6 +9,7 @@ use crate::{
 use ed25519_dalek::pkcs8::DecodePrivateKey;
 use ed25519_dalek::Signer;
 use hmac::KeyInit;
+use rand_chacha::{rand_core::SeedableRng as RandCoreSeedableRng, ChaCha8Rng};
 use rsa::pkcs1::DecodeRsaPrivateKey;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -577,7 +578,9 @@ impl PrivateSigningKey for CoreRsaPrivateSigningKey {
 
                 self.key_pair
                     .sign(rsa::Pkcs1v15Sign::new::<sha2::Sha256>(), &hash)
-                    .map_err(|_| SigningError::CryptoError)
+                    .map_err(|e| {
+                        SigningError::Other(format!("PKCS1v15 SHA256 signing error: {}", e))
+                    })
             }
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384 => {
                 let mut hasher = sha2::Sha384::new();
@@ -586,7 +589,9 @@ impl PrivateSigningKey for CoreRsaPrivateSigningKey {
 
                 self.key_pair
                     .sign(rsa::Pkcs1v15Sign::new::<sha2::Sha384>(), &hash)
-                    .map_err(|_| SigningError::CryptoError)
+                    .map_err(|e| {
+                        SigningError::Other(format!("PKCS1v15 SHA384 signing error: {}", e))
+                    })
             }
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512 => {
                 let mut hasher = sha2::Sha512::new();
@@ -595,34 +600,45 @@ impl PrivateSigningKey for CoreRsaPrivateSigningKey {
 
                 self.key_pair
                     .sign(rsa::Pkcs1v15Sign::new::<sha2::Sha512>(), &hash)
-                    .map_err(|_| SigningError::CryptoError)
+                    .map_err(|e| {
+                        SigningError::Other(format!("PKCS1v15 SHA512 signing error: {}", e))
+                    })
             }
             CoreJwsSigningAlgorithm::RsaSsaPssSha256 => {
                 let mut hasher = sha2::Sha256::new();
                 hasher.update(msg);
                 let hash = hasher.finalize().to_vec();
 
+                // Create a random seed for each PSS signature to ensure non-determinism
+                let seed: [u8; 32] = rand::random();
+                let mut rng = <ChaCha8Rng as RandCoreSeedableRng>::from_seed(seed);
                 self.key_pair
-                    .sign(rsa::Pss::new_with_salt::<sha2::Sha256>(hash.len()), &hash)
-                    .map_err(|_| SigningError::CryptoError)
+                    .sign_with_rng(&mut rng, rsa::Pss::new::<sha2::Sha256>(), &hash)
+                    .map_err(|e| SigningError::Other(format!("PSS SHA256 signing error: {}", e)))
             }
             CoreJwsSigningAlgorithm::RsaSsaPssSha384 => {
                 let mut hasher = sha2::Sha384::new();
                 hasher.update(msg);
                 let hash = hasher.finalize().to_vec();
 
+                // Create a random seed for each PSS signature to ensure non-determinism
+                let seed: [u8; 32] = rand::random();
+                let mut rng = <ChaCha8Rng as RandCoreSeedableRng>::from_seed(seed);
                 self.key_pair
-                    .sign(rsa::Pss::new_with_salt::<sha2::Sha384>(hash.len()), &hash)
-                    .map_err(|_| SigningError::CryptoError)
+                    .sign_with_rng(&mut rng, rsa::Pss::new::<sha2::Sha384>(), &hash)
+                    .map_err(|e| SigningError::Other(format!("PSS SHA384 signing error: {}", e)))
             }
             CoreJwsSigningAlgorithm::RsaSsaPssSha512 => {
                 let mut hasher = sha2::Sha512::new();
                 hasher.update(msg);
                 let hash = hasher.finalize().to_vec();
 
+                // Create a random seed for each PSS signature to ensure non-determinism
+                let seed: [u8; 32] = rand::random();
+                let mut rng = <ChaCha8Rng as RandCoreSeedableRng>::from_seed(seed);
                 self.key_pair
-                    .sign(rsa::Pss::new_with_salt::<sha2::Sha512>(hash.len()), &hash)
-                    .map_err(|_| SigningError::CryptoError)
+                    .sign_with_rng(&mut rng, rsa::Pss::new::<sha2::Sha512>(), &hash)
+                    .map_err(|e| SigningError::Other(format!("PSS SHA512 signing error: {}", e)))
             }
             ref other => Err(SigningError::UnsupportedAlg(
                 serde_plain::to_string(other).unwrap_or_else(|err| {
@@ -638,17 +654,30 @@ impl PrivateSigningKey for CoreRsaPrivateSigningKey {
     fn as_verification_key(&self) -> CoreJsonWebKey {
         use rsa::traits::PublicKeyParts;
 
+        fn strip_leading_zeros(bytes: Vec<u8>) -> Vec<u8> {
+            let start = bytes
+                .iter()
+                .position(|&b| b != 0)
+                .unwrap_or(bytes.len() - 1);
+            if start >= bytes.len() {
+                // If all bytes are zero, return a single zero byte
+                vec![0]
+            } else {
+                bytes[start..].to_vec()
+            }
+        }
+
         let public_key = self.key_pair.to_public_key();
         CoreJsonWebKey {
             kty: CoreJsonWebKeyType::RSA,
             use_: Some(CoreJsonWebKeyUse::Signature),
             kid: self.kid.clone(),
             n: Some(Base64UrlEncodedBytes::new(
-                public_key.n().clone().get().to_be_bytes().to_vec(),
+                public_key.n().to_be_bytes().to_vec(),
             )),
-            e: Some(Base64UrlEncodedBytes::new(
-                public_key.e().clone().to_be_bytes().to_vec(),
-            )),
+            e: Some(Base64UrlEncodedBytes::new(strip_leading_zeros(
+                public_key.e().to_be_bytes().to_vec(),
+            ))),
             k: None,
             crv: None,
             x: None,
