@@ -189,7 +189,7 @@ mod tests {
     fn test_leading_zeros_are_parsed_correctly() {
         // Test that we can parse and use RSA keys with leading zeros in the modulus
         let _msg = "THIS IS A SIGNATURE TEST";
-        
+
         // RSA pub key with leading 0 in the modulus (note the "AN0M..." start)
         let key : CoreJsonWebKey = serde_json::from_value(serde_json::json!(
             {
@@ -205,13 +205,14 @@ mod tests {
         let mut hasher = sha2::Sha256::new();
         hasher.update(_msg);
         let _hash = hasher.finalize().to_vec();
-        
+
         // Test that the key can be parsed correctly (modulus with leading zeros)
         // by checking that the key extraction doesn't fail
-        let (n, e) = super::rsa_public_key(&key).expect("Should be able to extract RSA key components");
+        let (n, e) =
+            super::rsa_public_key(&key).expect("Should be able to extract RSA key components");
         assert!(!n.is_empty(), "Modulus should not be empty");
         assert!(!e.is_empty(), "Exponent should not be empty");
-        
+
         // Verify that we can construct an RSA public key from components with leading zeros
         use std::ops::Deref;
         let n_bigint = rsa::BoxedUint::from_be_slice(n.deref(), (n.len() * 8) as u32)
@@ -220,7 +221,7 @@ mod tests {
             .expect("Should be able to parse exponent");
         let _public_key = rsa::RsaPublicKey::new(n_bigint, e_bigint)
             .expect("Should be able to create RSA public key with leading zeros in modulus");
-            
+
         // The main test: we can successfully parse a key with leading zeros
         // (The actual signature verification test would require the corresponding private key)
     }

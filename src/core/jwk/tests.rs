@@ -724,7 +724,7 @@ fn expect_rsa_sig(
 ) {
     let sig = private_key.sign(alg, message).unwrap();
     // Instead of comparing to hardcoded signature, verify the signature works
-    
+
     let public_key = private_key.as_verification_key();
     public_key.verify_signature(alg, message, &sig).unwrap();
 }
