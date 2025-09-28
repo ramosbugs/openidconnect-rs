@@ -1,0 +1,22 @@
+version: "3.9"
+
+services:
+
+  keycloak:
+    container_name: keycloak
+    image: quay.io/keycloak/keycloak
+    # start-dev and hostname-strict=false are required to run keycloak in test environment; not acceptable for production
+    # see https://www.keycloak.org/server/hostname for details
+    command: [ "start-dev", "--hostname-strict=false", "--hostname-debug=true" ]
+    ports:
+      - "8082:8080"
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin123456
+      - KEYCLOAK_DB=dev-file
+      #- KC_LOG_LEVEL=DEBUG  # debugging keycloak
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+
+volumes:
+  keycloak_data:
