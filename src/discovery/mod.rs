@@ -281,6 +281,23 @@ where
     where
         C: SyncHttpClient,
     {
+        Self::discover_with_options(
+            issuer_url,
+            http_client,
+            ProviderMetadataDiscoveryOptions::default(),
+        )
+    }
+
+    /// Fetches the OpenID Connect Discovery document and associated JSON Web Key Set from the
+    /// OpenID Connect Provider.
+    pub fn discover_with_options<C>(
+        issuer_url: &IssuerUrl,
+        http_client: &C,
+        options: ProviderMetadataDiscoveryOptions,
+    ) -> Result<Self, DiscoveryError<<C as SyncHttpClient>::Error>>
+    where
+        C: SyncHttpClient,
+    {
         let discovery_url = issuer_url
             .join(CONFIG_URL_SUFFIX)
             .map_err(DiscoveryError::UrlParse)?;
@@ -293,7 +310,7 @@ where
             )
             .map_err(DiscoveryError::Request)
             .and_then(|http_response| {
-                Self::discovery_response(issuer_url, &discovery_url, http_response)
+                Self::discovery_response(issuer_url, &discovery_url, http_response, options)
             })
             .and_then(|provider_metadata| {
                 JsonWebKeySet::fetch(provider_metadata.jwks_uri(), http_client).map(|jwks| Self {
@@ -313,6 +330,24 @@ where
         Self: 'c,
         C: AsyncHttpClient<'c>,
     {
+        Self::discover_async_with_options(
+            issuer_url,
+            http_client,
+            ProviderMetadataDiscoveryOptions::default(),
+        )
+    }
+
+    /// Asynchronously fetches the OpenID Connect Discovery document and associated JSON Web Key Set
+    /// from the OpenID Connect Provider.
+    pub fn discover_async_with_options<'c, C>(
+        issuer_url: IssuerUrl,
+        http_client: &'c C,
+        options: ProviderMetadataDiscoveryOptions,
+    ) -> impl Future<Output = Result<Self, DiscoveryError<<C as AsyncHttpClient<'c>>::Error>>> + 'c
+    where
+        Self: 'c,
+        C: AsyncHttpClient<'c>,
+    {
         Box::pin(async move {
             let discovery_url = issuer_url
                 .join(CONFIG_URL_SUFFIX)
@@ -327,7 +362,7 @@ where
                 .await
                 .map_err(DiscoveryError::Request)
                 .and_then(|http_response| {
-                    Self::discovery_response(&issuer_url, &discovery_url, http_response)
+                    Self::discovery_response(&issuer_url, &discovery_url, http_response, options)
                 })?;
 
             JsonWebKeySet::fetch_async(provider_metadata.jwks_uri(), http_client)
@@ -351,6 +386,7 @@ where
         issuer_url: &IssuerUrl,
         discovery_url: &url::Url,
         discovery_response: HttpResponse,
+        options: ProviderMetadataDiscoveryOptions,
     ) -> Result<Self, DiscoveryError<RE>>
     where
         RE: std::error::Error + 'static,
@@ -380,7 +416,7 @@ where
         )
         .map_err(DiscoveryError::Parse)?;
 
-        if provider_metadata.issuer() != issuer_url {
+        if options.validate_issuer_url && provider_metadata.issuer() != issuer_url {
             Err(DiscoveryError::Validation(format!(
                 "unexpected issuer URI `{}` (expected `{}`)",
                 provider_metadata.issuer().as_str(),
@@ -398,6 +434,29 @@ where
     /// Returns mutable additional provider metadata fields.
     pub fn additional_metadata_mut(&mut self) -> &mut A {
         &mut self.additional_metadata
+    }
+}
+
+/// Options for [`ProviderMetadata::discover_with_options`] for non-conforming implementations.
+#[derive(Clone, Debug)]
+pub struct ProviderMetadataDiscoveryOptions {
+    validate_issuer_url: bool,
+}
+
+impl ProviderMetadataDiscoveryOptions {
+    /// If the issuer in the discovered provider metadata should be checked against the
+    /// `issuer_url` used to fetch the provider metadata.
+    pub fn validate_issuer_url(mut self, value: bool) -> Self {
+        self.validate_issuer_url = value;
+        self
+    }
+}
+
+impl Default for ProviderMetadataDiscoveryOptions {
+    fn default() -> Self {
+        Self {
+            validate_issuer_url: true,
+        }
     }
 }
 

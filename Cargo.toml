@@ -29,6 +29,10 @@ timing-resistant-secret-traits = ["oauth2/timing-resistant-secret-traits"]
 ureq = ["oauth2/ureq"]
 
 [[example]]
+name = "entra"
+required-features = ["reqwest-blocking"]
+
+[[example]]
 name = "gitlab"
 required-features = ["reqwest-blocking"]
 
