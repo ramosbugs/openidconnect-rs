@@ -53,10 +53,11 @@ http = "1.0"
 itertools = "0.14"
 log = "0.4"
 oauth2 = { version = "5.0.0", default-features = false }
-rand = "0.8.5"
-hmac = "0.12.1"
-rsa = "0.9.2"
-sha2 = { version = "0.10.6", features = ["oid"] } # Object ID needed for pkcs1v15 padding
+rand = "0.8"
+rand_chacha = "0.9"
+hmac = "0.13.0-rc.0"
+rsa = { version = "0.10.0-rc.3", features = ["os_rng"] }
+sha2 = { version = "0.11.0-rc.0", features = ["oid"] } # Object ID needed for pkcs1v15 padding
 p256 = "0.13.2"
 p384 = "0.13.0"
 dyn-clone = "1.0.10"
