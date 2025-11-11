@@ -95,12 +95,7 @@ where
             access_token,
             require_signed_response: false,
             response_type: UserInfoResponseType::Json,
-            signed_response_verifier: UserInfoVerifier::new(
-                self.client_id.clone(),
-                self.issuer.clone(),
-                self.jwks.clone(),
-                expected_subject,
-            ),
+            signed_response_verifier: self.user_info_verifier(expected_subject),
         }
     }
 }
@@ -116,7 +111,7 @@ where
     pub(crate) url: &'a UserInfoUrl,
     pub(crate) access_token: AccessToken,
     pub(crate) require_signed_response: bool,
-    pub(crate) signed_response_verifier: UserInfoVerifier<'static, JE, K>,
+    pub(crate) signed_response_verifier: UserInfoVerifier<'a, JE, K>,
     pub(crate) response_type: UserInfoResponseType,
 }
 impl<'a, JE, K> UserInfoRequest<'a, JE, K>
