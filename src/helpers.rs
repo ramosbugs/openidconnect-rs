@@ -167,7 +167,7 @@ pub(crate) mod serde_string_bool {
             where
                 E: de::Error,
             {
-                v.parse().map_err(E::custom)
+                v.to_lowercase().parse().map_err(E::custom)
             }
         }
         deserializer.deserialize_any(BooleanLikeVisitor)
