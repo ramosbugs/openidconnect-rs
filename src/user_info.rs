@@ -232,7 +232,7 @@ where
                     _,
                     UserInfoJsonWebToken<AC, GC, JE, K::SigningAlgorithm>,
                 >(serde_json::Value::String(jwt_str))
-                .map_err(UserInfoError::Parse)?
+                .map_err(|err_msg| UserInfoError::Parse(http_response.body().to_owned(), err_msg))?
                 .claims(&self.signed_response_verifier)
                 .map_err(UserInfoError::ClaimsVerification)
             }
@@ -311,7 +311,7 @@ where
         let user_info = serde_path_to_error::deserialize::<_, UserInfoClaimsImpl<AC, GC>>(
             &mut serde_json::Deserializer::from_slice(user_info_json),
         )
-        .map_err(UserInfoError::Parse)?;
+        .map_err(|err_msg| UserInfoError::Parse(user_info_json.to_owned(), err_msg))?;
 
         // This is the only verification we need to do for JSON-based user info claims, so don't
         // bother with the complexity of a separate verifier object.
@@ -524,7 +524,10 @@ where
     ClaimsVerification(#[source] ClaimsVerificationError),
     /// Failed to parse server response.
     #[error("Failed to parse server response")]
-    Parse(#[source] serde_path_to_error::Error<serde_json::Error>),
+    Parse(
+        Vec<u8>,
+        #[source] serde_path_to_error::Error<serde_json::Error>,
+    ),
     /// An error occurred while sending the request or receiving the response (e.g., network
     /// connectivity failed).
     #[error("Request failed")]

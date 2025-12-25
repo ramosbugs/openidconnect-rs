@@ -164,7 +164,7 @@ where
         serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_slice(
             http_response.body(),
         ))
-        .map_err(DiscoveryError::Parse)
+        .map_err(|err_msg| DiscoveryError::Parse(http_response.body().to_owned(), err_msg))
     }
 
     /// Return the keys in this JSON Web Key Set.
