@@ -27,6 +27,7 @@ reqwest-blocking = ["oauth2/reqwest-blocking"]
 rustls-tls = ["oauth2/rustls-tls"]
 timing-resistant-secret-traits = ["oauth2/timing-resistant-secret-traits"]
 ureq = ["oauth2/ureq"]
+schemars = ["dep:schemars", "oauth2/schemars"]
 
 [[example]]
 name = "gitlab"
@@ -70,6 +71,9 @@ url = { version = "2.4", features = ["serde"] }
 subtle = "2.4"
 ed25519-dalek = { version = "2.0.0", features = ["pem"] }
 
+# Feature: schemars
+schemars = { version = "0.8", optional = true}
+
 [dev-dependencies]
 color-backtrace = { version = "0.5" }
 env_logger = "0.9"
@@ -77,3 +81,7 @@ pretty_assertions = "1.0"
 reqwest = { version = "0.12", features = ["blocking", "rustls-tls"], default-features = false }
 retry = "1.0"
 anyhow = "1.0"
+
+# TEMP: https://github.com/ramosbugs/oauth2-rs/pull/279
+[patch.crates-io]
+oauth2 = { git = "https://github.com/gibbz00/oauth2-rs", branch = "schemars" }

@@ -344,6 +344,7 @@ impl Display for CoreAuthPrompt {
 new_type![
     /// OpenID Connect Core claim name.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     CoreClaimName(String)
 ];
 impl ClaimName for CoreClaimName {}
@@ -447,6 +448,7 @@ impl ClientAuthMethod for CoreClientAuthMethod {}
 new_type![
     /// OpenID Connect Core gender claim.
     #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
     CoreGenderClaim(String)
 ];
 impl GenderClaim for CoreGenderClaim {}
