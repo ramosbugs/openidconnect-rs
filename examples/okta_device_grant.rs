@@ -109,7 +109,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     let details: CoreDeviceAuthorizationResponse = client
         .exchange_device_code()
-        .add_scope(Scope::new("profile".to_string()))
+        .add_scope(Scope::new("profile"))
         .request(&http_client)
         .unwrap_or_else(|err| {
             handle_error(&err, "Failed to get device code");

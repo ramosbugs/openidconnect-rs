@@ -242,19 +242,16 @@ fn test_discovery_deserialization() {
     ];
     let new_provider_metadata = CoreProviderMetadata::new(
         IssuerUrl::new(
-            "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code"
-                .to_string(),
+            "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code",
         )
         .unwrap(),
         AuthUrl::new(
             "https://rp.certification.openid.net:8080/openidconnect-rs/\
-                 rp-response_type-code/authorization"
-                .to_string(),
+                 rp-response_type-code/authorization",
         )
         .unwrap(),
         JsonWebKeySetUrl::new(
-            "https://rp.certification.openid.net:8080/static/jwks_3INbZl52IrrPCp2j.json"
-                .to_string(),
+            "https://rp.certification.openid.net:8080/static/jwks_3INbZl52IrrPCp2j.json",
         )
         .unwrap(),
         vec![ResponseTypes::new(vec![CoreResponseType::Code])],
@@ -281,13 +278,13 @@ fn test_discovery_deserialization() {
         CoreJwsSigningAlgorithm::RsaSsaPssSha512,
     ]))
     .set_scopes_supported(Some(vec![
-        Scope::new("email".to_string()),
-        Scope::new("phone".to_string()),
-        Scope::new("profile".to_string()),
-        Scope::new("openid".to_string()),
-        Scope::new("address".to_string()),
-        Scope::new("offline_access".to_string()),
-        Scope::new("openid".to_string()),
+        Scope::new("email"),
+        Scope::new("phone"),
+        Scope::new("profile"),
+        Scope::new("openid"),
+        Scope::new("address"),
+        Scope::new("offline_access"),
+        Scope::new("openid"),
     ]))
     .set_userinfo_signing_alg_values_supported(Some(all_signing_algs))
     .set_id_token_encryption_enc_values_supported(Some(vec![
@@ -313,8 +310,7 @@ fn test_discovery_deserialization() {
     .set_registration_endpoint(Some(
         RegistrationUrl::new(
             "https://rp.certification.openid.net:8080/openidconnect-rs/\
-                 rp-response_type-code/registration"
-                .to_string(),
+                 rp-response_type-code/registration",
         )
         .unwrap(),
     ))
@@ -330,8 +326,7 @@ fn test_discovery_deserialization() {
     .set_userinfo_endpoint(Some(
         UserInfoUrl::new(
             "https://rp.certification.openid.net:8080/openidconnect-rs/\
-                 rp-response_type-code/userinfo"
-                .to_string(),
+                 rp-response_type-code/userinfo",
         )
         .unwrap(),
     ))
@@ -365,7 +360,7 @@ fn test_discovery_deserialization() {
             "locale",
         ]
         .iter()
-        .map(|claim| CoreClaimName::new((*claim).to_string()))
+        .map(|claim| CoreClaimName::new(*claim))
         .collect(),
     ))
     .set_request_object_encryption_alg_values_supported(Some(all_encryption_algs.clone()))
@@ -379,8 +374,7 @@ fn test_discovery_deserialization() {
     .set_token_endpoint(Some(
         TokenUrl::new(
             "https://rp.certification.openid.net:8080/openidconnect-rs/\
-                 rp-response_type-code/token"
-                .to_string(),
+                 rp-response_type-code/token",
         )
         .unwrap(),
     ))
@@ -394,9 +388,7 @@ fn test_discovery_deserialization() {
         CoreJweContentEncryptionAlgorithm::Aes192Gcm,
         CoreJweContentEncryptionAlgorithm::Aes256Gcm,
     ]))
-    .set_acr_values_supported(Some(vec![AuthenticationContextClass::new(
-        "PASSWORD".to_string(),
-    )]));
+    .set_acr_values_supported(Some(vec![AuthenticationContextClass::new("PASSWORD")]));
 
     let provider_metadata: CoreProviderMetadata = serde_json::from_str(&json_response).unwrap();
     assert_eq!(provider_metadata, new_provider_metadata);
@@ -407,7 +399,6 @@ fn test_discovery_deserialization() {
     assert_eq!(
         IssuerUrl::new(
             "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code"
-                .to_string()
         )
         .unwrap(),
         *provider_metadata.issuer()
@@ -416,7 +407,6 @@ fn test_discovery_deserialization() {
         AuthUrl::new(
             "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
                  /authorization"
-                .to_string()
         )
         .unwrap(),
         *provider_metadata.authorization_endpoint()
@@ -426,7 +416,6 @@ fn test_discovery_deserialization() {
             &TokenUrl::new(
                 "https://rp.certification.openid.net:8080/openidconnect-rs\
                      /rp-response_type-code/token"
-                    .to_string()
             )
             .unwrap()
         ),
@@ -437,7 +426,6 @@ fn test_discovery_deserialization() {
             &UserInfoUrl::new(
                 "https://rp.certification.openid.net:8080/openidconnect-rs\
                      /rp-response_type-code/userinfo"
-                    .to_string()
             )
             .unwrap()
         ),
@@ -446,7 +434,6 @@ fn test_discovery_deserialization() {
     assert_eq!(
         &JsonWebKeySetUrl::new(
             "https://rp.certification.openid.net:8080/static/jwks_3INbZl52IrrPCp2j.json"
-                .to_string()
         )
         .unwrap(),
         provider_metadata.jwks_uri()
@@ -456,7 +443,6 @@ fn test_discovery_deserialization() {
             &RegistrationUrl::new(
                 "https://rp.certification.openid.net:8080/openidconnect-rs\
                      /rp-response_type-code/registration"
-                    .to_string()
             )
             .unwrap()
         ),
@@ -474,7 +460,7 @@ fn test_discovery_deserialization() {
                 "openid",
             ]
             .iter()
-            .map(|s| (*s).to_string())
+            .copied()
             .map(Scope::new)
             .collect::<Vec<_>>()
         ),
@@ -506,9 +492,7 @@ fn test_discovery_deserialization() {
         provider_metadata.grant_types_supported()
     );
     assert_eq!(
-        Some(&vec![AuthenticationContextClass::new(
-            "PASSWORD".to_string(),
-        )]),
+        Some(&vec![AuthenticationContextClass::new("PASSWORD",)]),
         provider_metadata.acr_values_supported()
     );
     assert_eq!(
@@ -687,26 +671,26 @@ fn test_discovery_deserialization() {
     );
     assert_eq!(
         Some(&vec![
-            CoreClaimName::new("name".to_string()),
-            CoreClaimName::new("given_name".to_string()),
-            CoreClaimName::new("middle_name".to_string()),
-            CoreClaimName::new("picture".to_string()),
-            CoreClaimName::new("email_verified".to_string()),
-            CoreClaimName::new("birthdate".to_string()),
-            CoreClaimName::new("sub".to_string()),
-            CoreClaimName::new("address".to_string()),
-            CoreClaimName::new("zoneinfo".to_string()),
-            CoreClaimName::new("email".to_string()),
-            CoreClaimName::new("gender".to_string()),
-            CoreClaimName::new("preferred_username".to_string()),
-            CoreClaimName::new("family_name".to_string()),
-            CoreClaimName::new("website".to_string()),
-            CoreClaimName::new("profile".to_string()),
-            CoreClaimName::new("phone_number_verified".to_string()),
-            CoreClaimName::new("nickname".to_string()),
-            CoreClaimName::new("updated_at".to_string()),
-            CoreClaimName::new("phone_number".to_string()),
-            CoreClaimName::new("locale".to_string()),
+            CoreClaimName::new("name"),
+            CoreClaimName::new("given_name"),
+            CoreClaimName::new("middle_name"),
+            CoreClaimName::new("picture"),
+            CoreClaimName::new("email_verified"),
+            CoreClaimName::new("birthdate"),
+            CoreClaimName::new("sub"),
+            CoreClaimName::new("address"),
+            CoreClaimName::new("zoneinfo"),
+            CoreClaimName::new("email"),
+            CoreClaimName::new("gender"),
+            CoreClaimName::new("preferred_username"),
+            CoreClaimName::new("family_name"),
+            CoreClaimName::new("website"),
+            CoreClaimName::new("profile"),
+            CoreClaimName::new("phone_number_verified"),
+            CoreClaimName::new("nickname"),
+            CoreClaimName::new("updated_at"),
+            CoreClaimName::new("phone_number"),
+            CoreClaimName::new("locale"),
         ]),
         provider_metadata.claims_supported()
     );
@@ -791,7 +775,6 @@ fn test_discovery_deserialization_other_fields() {
     assert_eq!(
         IssuerUrl::new(
             "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code"
-                .to_string()
         )
         .unwrap(),
         *provider_metadata.issuer()
@@ -800,7 +783,6 @@ fn test_discovery_deserialization_other_fields() {
         AuthUrl::new(
             "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
                  /authorization"
-                .to_string()
         )
         .unwrap(),
         *provider_metadata.authorization_endpoint()
@@ -810,7 +792,6 @@ fn test_discovery_deserialization_other_fields() {
     assert_eq!(
         JsonWebKeySetUrl::new(
             "https://rp.certification.openid.net:8080/static/jwks_oMXD5waO08Q1GEnv.json"
-                .to_string()
         )
         .unwrap(),
         *provider_metadata.jwks_uri()
@@ -914,7 +895,6 @@ fn test_discovery_deserialization_other_fields() {
             &ServiceDocUrl::new(
                 "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
                  /documentation"
-                    .to_string()
             )
             .unwrap()
         ),
@@ -922,17 +902,17 @@ fn test_discovery_deserialization_other_fields() {
     );
     assert_eq!(
         Some(&vec![
-            LanguageTag::new("de".to_string()),
-            LanguageTag::new("fr".to_string()),
-            LanguageTag::new("de-CH-1901".to_string()),
+            LanguageTag::new("de"),
+            LanguageTag::new("fr"),
+            LanguageTag::new("de-CH-1901"),
         ]),
         provider_metadata.claims_locales_supported()
     );
     assert_eq!(
         Some(&vec![
-            LanguageTag::new("ja".to_string()),
-            LanguageTag::new("sr-Latn".to_string()),
-            LanguageTag::new("yue-HK".to_string()),
+            LanguageTag::new("ja"),
+            LanguageTag::new("sr-Latn"),
+            LanguageTag::new("yue-HK"),
         ]),
         provider_metadata.ui_locales_supported()
     );
@@ -945,7 +925,6 @@ fn test_discovery_deserialization_other_fields() {
             &OpPolicyUrl::new(
                 "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
                  /op_policy"
-                    .to_string()
             )
             .unwrap()
         ),
@@ -956,7 +935,6 @@ fn test_discovery_deserialization_other_fields() {
             &OpTosUrl::new(
                 "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
                  /op_tos"
-                    .to_string()
             )
             .unwrap()
         ),
@@ -1036,7 +1014,6 @@ fn test_unsupported_enum_values() {
     assert_eq!(
         IssuerUrl::new(
             "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code"
-                .to_string()
         )
         .unwrap(),
         *provider_metadata.issuer()
@@ -1045,7 +1022,6 @@ fn test_unsupported_enum_values() {
         AuthUrl::new(
             "https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code\
                  /authorization"
-                .to_string()
         )
         .unwrap(),
         *provider_metadata.authorization_endpoint()
@@ -1055,7 +1031,6 @@ fn test_unsupported_enum_values() {
     assert_eq!(
         JsonWebKeySetUrl::new(
             "https://rp.certification.openid.net:8080/static/jwks_3INbZl52IrrPCp2j.json"
-                .to_string()
         )
         .unwrap(),
         *provider_metadata.jwks_uri()

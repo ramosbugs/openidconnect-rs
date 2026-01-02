@@ -133,7 +133,7 @@ impl TestState {
             log_info!("Successfully received authentication response from Authorization Server");
 
             let authorization_code =
-                AuthorizationCode::new(query_params.get("code").unwrap().to_string());
+                AuthorizationCode::new(query_params.get("code").unwrap().as_ref());
             log_debug!(
                 "Authorization Server returned authorization code: {}",
                 authorization_code.secret()
@@ -264,7 +264,7 @@ fn rp_response_type_code() {
 fn rp_scope_userinfo_claims() {
     let user_info_scopes = ["profile", "email", "address", "phone"]
         .iter()
-        .map(|scope| Scope::new((*scope).to_string()))
+        .map(|scope| Scope::new(*scope))
         .collect::<Vec<_>>();
     let test_state = TestState::init("rp-scope-userinfo-claims", |reg| reg)
         .authorize(&user_info_scopes)
@@ -555,7 +555,7 @@ fn rp_id_token_issuer_mismatch() {
 #[ignore]
 fn rp_userinfo_bad_sub_claim() {
     let test_state = TestState::init("rp-userinfo-bad-sub-claim", |reg| reg)
-        .authorize(&[Scope::new("profile".to_string())])
+        .authorize(&[Scope::new("profile")])
         .exchange_code();
     let id_token_claims = test_state.id_token_claims();
     log_debug!("ID token: {:?}", id_token_claims);
@@ -573,7 +573,7 @@ fn rp_userinfo_bad_sub_claim() {
 #[ignore]
 fn rp_userinfo_bearer_header() {
     let test_state = TestState::init("rp-userinfo-bearer-header", |reg| reg)
-        .authorize(&[Scope::new("profile".to_string())])
+        .authorize(&[Scope::new("profile")])
         .exchange_code();
     let id_token_claims = test_state.id_token_claims();
     log_debug!("ID token: {:?}", id_token_claims);
@@ -589,7 +589,7 @@ fn rp_userinfo_sig() {
     let test_state = TestState::init("rp-userinfo-sig", |reg| {
         reg.set_userinfo_signed_response_alg(Some(CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256))
     })
-    .authorize(&[Scope::new("profile".to_string())])
+    .authorize(&[Scope::new("profile")])
     .exchange_code();
     let id_token_claims = test_state.id_token_claims();
     log_debug!("ID token: {:?}", id_token_claims);

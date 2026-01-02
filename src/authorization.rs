@@ -285,13 +285,13 @@ mod tests {
     > {
         color_backtrace::install();
         CoreClient::new(
-            ClientId::new("aaa".to_string()),
-            IssuerUrl::new("https://example".to_string()).unwrap(),
+            ClientId::new("aaa"),
+            IssuerUrl::new("https://example").unwrap(),
             JsonWebKeySet::default(),
         )
-        .set_client_secret(ClientSecret::new("bbb".to_string()))
-        .set_auth_uri(AuthUrl::new("https://example/authorize".to_string()).unwrap())
-        .set_token_uri(TokenUrl::new("https://example/token".to_string()).unwrap())
+        .set_client_secret(ClientSecret::new("bbb"))
+        .set_auth_uri(AuthUrl::new("https://example/authorize").unwrap())
+        .set_token_uri(TokenUrl::new("https://example/token").unwrap())
     }
 
     #[test]
@@ -301,8 +301,8 @@ mod tests {
         let (authorize_url, _, _) = client
             .authorize_url(
                 AuthenticationFlow::AuthorizationCode::<CoreResponseType>,
-                || CsrfToken::new("CSRF123".to_string()),
-                || Nonce::new("NONCE456".to_string()),
+                || CsrfToken::new("CSRF123"),
+                || Nonce::new("NONCE456"),
             )
             .url();
 
@@ -320,8 +320,8 @@ mod tests {
         let (authorize_url, _, _) = client
             .authorize_url(
                 AuthenticationFlow::<CoreResponseType>::Implicit(true),
-                || CsrfToken::new("CSRF123".to_string()),
-                || Nonce::new("NONCE456".to_string()),
+                || CsrfToken::new("CSRF123"),
+                || Nonce::new("NONCE456"),
             )
             .url();
 
@@ -342,8 +342,8 @@ mod tests {
                     CoreResponseType::Code,
                     CoreResponseType::Extension("other".to_string()),
                 ]),
-                || CsrfToken::new("CSRF123".to_string()),
-                || Nonce::new("NONCE456".to_string()),
+                || CsrfToken::new("CSRF123"),
+                || Nonce::new("NONCE456"),
             )
             .url();
 
@@ -356,30 +356,30 @@ mod tests {
 
     #[test]
     fn test_authorize_url_full() {
-        let client = new_client()
-            .set_redirect_uri(RedirectUrl::new("http://localhost:8888/".to_string()).unwrap());
+        let client =
+            new_client().set_redirect_uri(RedirectUrl::new("http://localhost:8888/").unwrap());
 
         let flow = CoreAuthenticationFlow::AuthorizationCode;
 
         fn new_csrf() -> CsrfToken {
-            CsrfToken::new("CSRF123".to_string())
+            CsrfToken::new("CSRF123")
         }
         fn new_nonce() -> Nonce {
-            Nonce::new("NONCE456".to_string())
+            Nonce::new("NONCE456")
         }
 
         let (authorize_url, _, _) = client
             .authorize_url(flow.clone(), new_csrf, new_nonce)
-            .add_scope(Scope::new("email".to_string()))
+            .add_scope(Scope::new("email"))
             .set_display(CoreAuthDisplay::Touch)
             .add_prompt(CoreAuthPrompt::Login)
             .add_prompt(CoreAuthPrompt::Consent)
             .set_max_age(Duration::from_secs(1800))
-            .add_ui_locale(LanguageTag::new("fr-CA".to_string()))
-            .add_ui_locale(LanguageTag::new("fr".to_string()))
-            .add_ui_locale(LanguageTag::new("en".to_string()))
+            .add_ui_locale(LanguageTag::new("fr-CA"))
+            .add_ui_locale(LanguageTag::new("fr"))
+            .add_ui_locale(LanguageTag::new("en"))
             .add_auth_context_value(AuthenticationContextClass::new(
-                "urn:mace:incommon:iap:silver".to_string(),
+                "urn:mace:incommon:iap:silver",
             ))
             .url();
         assert_eq!(
@@ -405,18 +405,18 @@ mod tests {
 
         let (authorize_url, _, _) = client
             .authorize_url(flow.clone(), new_csrf, new_nonce)
-            .add_scope(Scope::new("email".to_string()))
+            .add_scope(Scope::new("email"))
             .set_display(CoreAuthDisplay::Touch)
             .set_id_token_hint(&id_token)
-            .set_login_hint(LoginHint::new("foo@bar.com".to_string()))
+            .set_login_hint(LoginHint::new("foo@bar.com"))
             .add_prompt(CoreAuthPrompt::Login)
             .add_prompt(CoreAuthPrompt::Consent)
             .set_max_age(Duration::from_secs(1800))
-            .add_ui_locale(LanguageTag::new("fr-CA".to_string()))
-            .add_ui_locale(LanguageTag::new("fr".to_string()))
-            .add_ui_locale(LanguageTag::new("en".to_string()))
+            .add_ui_locale(LanguageTag::new("fr-CA"))
+            .add_ui_locale(LanguageTag::new("fr"))
+            .add_ui_locale(LanguageTag::new("en"))
             .add_auth_context_value(AuthenticationContextClass::new(
-                "urn:mace:incommon:iap:silver".to_string(),
+                "urn:mace:incommon:iap:silver",
             ))
             .add_extra_param("foo", "bar")
             .url();
@@ -434,21 +434,18 @@ mod tests {
 
         let (authorize_url, _, _) = client
             .authorize_url(flow, new_csrf, new_nonce)
-            .add_scopes(vec![
-                Scope::new("email".to_string()),
-                Scope::new("profile".to_string()),
-            ])
+            .add_scopes(vec![Scope::new("email"), Scope::new("profile")])
             .set_display(CoreAuthDisplay::Touch)
             .set_id_token_hint(&id_token)
-            .set_login_hint(LoginHint::new("foo@bar.com".to_string()))
+            .set_login_hint(LoginHint::new("foo@bar.com"))
             .add_prompt(CoreAuthPrompt::Login)
             .add_prompt(CoreAuthPrompt::Consent)
             .set_max_age(Duration::from_secs(1800))
-            .add_ui_locale(LanguageTag::new("fr-CA".to_string()))
-            .add_ui_locale(LanguageTag::new("fr".to_string()))
-            .add_ui_locale(LanguageTag::new("en".to_string()))
+            .add_ui_locale(LanguageTag::new("fr-CA"))
+            .add_ui_locale(LanguageTag::new("fr"))
+            .add_ui_locale(LanguageTag::new("en"))
             .add_auth_context_value(AuthenticationContextClass::new(
-                "urn:mace:incommon:iap:silver".to_string(),
+                "urn:mace:incommon:iap:silver",
             ))
             .add_extra_param("foo", "bar")
             .url();
@@ -467,33 +464,33 @@ mod tests {
 
     #[test]
     fn test_authorize_url_redirect_url_override() {
-        let client = new_client()
-            .set_redirect_uri(RedirectUrl::new("http://localhost:8888/".to_string()).unwrap());
+        let client =
+            new_client().set_redirect_uri(RedirectUrl::new("http://localhost:8888/").unwrap());
 
         let flow = CoreAuthenticationFlow::AuthorizationCode;
 
         fn new_csrf() -> CsrfToken {
-            CsrfToken::new("CSRF123".to_string())
+            CsrfToken::new("CSRF123")
         }
         fn new_nonce() -> Nonce {
-            Nonce::new("NONCE456".to_string())
+            Nonce::new("NONCE456")
         }
 
         let (authorize_url, _, _) = client
             .authorize_url(flow, new_csrf, new_nonce)
-            .add_scope(Scope::new("email".to_string()))
+            .add_scope(Scope::new("email"))
             .set_display(CoreAuthDisplay::Touch)
             .add_prompt(CoreAuthPrompt::Login)
             .add_prompt(CoreAuthPrompt::Consent)
             .set_max_age(Duration::from_secs(1800))
-            .add_ui_locale(LanguageTag::new("fr-CA".to_string()))
-            .add_ui_locale(LanguageTag::new("fr".to_string()))
-            .add_ui_locale(LanguageTag::new("en".to_string()))
+            .add_ui_locale(LanguageTag::new("fr-CA"))
+            .add_ui_locale(LanguageTag::new("fr"))
+            .add_ui_locale(LanguageTag::new("en"))
             .add_auth_context_value(AuthenticationContextClass::new(
-                "urn:mace:incommon:iap:silver".to_string(),
+                "urn:mace:incommon:iap:silver",
             ))
             .set_redirect_uri(Cow::Owned(
-                RedirectUrl::new("http://localhost:8888/alternative".to_string()).unwrap(),
+                RedirectUrl::new("http://localhost:8888/alternative").unwrap(),
             ))
             .url();
         assert_eq!(

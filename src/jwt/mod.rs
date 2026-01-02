@@ -457,7 +457,7 @@ where
             where
                 DE: serde::de::Error,
             {
-                let raw_token = v.to_string();
+                let raw_token = v;
                 let header: JsonWebTokenHeader<JE, JS>;
                 let payload: P;
                 let signature;

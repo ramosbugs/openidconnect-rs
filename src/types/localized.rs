@@ -29,7 +29,7 @@ pub(crate) fn split_language_tag_key(key: &str) -> (&str, Option<LanguageTag>) {
     let language_tag = lang_tag_sep
         .next()
         .filter(|language_tag| !language_tag.is_empty())
-        .map(|language_tag| LanguageTag::new(language_tag.to_string()));
+        .map(LanguageTag::new);
 
     (field_name, language_tag)
 }
