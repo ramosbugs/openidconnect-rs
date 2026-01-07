@@ -380,7 +380,7 @@ where
         )
         .map_err(DiscoveryError::Parse)?;
 
-        if provider_metadata.issuer() != issuer_url {
+        if provider_metadata.issuer().url() != issuer_url.url() {
             Err(DiscoveryError::Validation(format!(
                 "unexpected issuer URI `{}` (expected `{}`)",
                 provider_metadata.issuer().as_str(),
