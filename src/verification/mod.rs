@@ -319,7 +319,7 @@ where
             let unverified_claims = jwt.unverified_payload_ref();
             if self.iss_required {
                 if let Some(issuer) = unverified_claims.issuer() {
-                    if *issuer != self.issuer {
+                    if issuer.url() != self.issuer.url() {
                         return Err(ClaimsVerificationError::InvalidIssuer(format!(
                             "expected `{}` (found `{}`)",
                             *self.issuer, **issuer
