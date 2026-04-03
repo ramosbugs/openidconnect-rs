@@ -9,6 +9,7 @@ use http::{HeaderValue, Method, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, VecSkipError};
 
+use std::collections::HashSet;
 use std::future::Future;
 
 new_url_type![
@@ -161,10 +162,16 @@ where
                 )
             })?;
 
-        serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_slice(
+        let mut key_set: Self = serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_slice(
             http_response.body(),
         ))
-        .map_err(DiscoveryError::Parse)
+        .map_err(DiscoveryError::Parse)?;
+
+        // Deduplicate keys in the JWKS.
+        // See: https://github.com/ramosbugs/openidconnect-rs/issues/235
+        key_set.keys = key_set.keys.into_iter().collect::<HashSet<_>>().into_iter().collect();
+
+        Ok(key_set)
     }
 
     /// Return the keys in this JSON Web Key Set.

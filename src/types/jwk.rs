@@ -13,7 +13,7 @@ new_type![
 ];
 
 /// JSON Web Key.
-pub trait JsonWebKey: Clone + Debug + DeserializeOwned + Serialize + 'static {
+pub trait JsonWebKey: Clone + Debug + Eq + Hash + DeserializeOwned + Serialize + 'static {
     /// Allowed key usage.
     type KeyUse: JsonWebKeyUse;
 
