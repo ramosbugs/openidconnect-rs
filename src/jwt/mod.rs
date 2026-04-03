@@ -123,7 +123,7 @@ impl TryFrom<&JsonWebTokenType> for NormalizedJsonWebTokenType {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum JsonWebTokenAlgorithm<JE, JS>
 where
