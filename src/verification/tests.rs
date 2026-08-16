@@ -1182,6 +1182,7 @@ fn test_new_id_token() {
     assert_eq!(claims, unverified);
 }
 
+#[cfg(any(feature = "reqwest", feature = "reqwest-blocking"))]
 #[test]
 fn test_user_info_verified_claims() {
     let rsa_key =
