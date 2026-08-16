@@ -107,10 +107,7 @@ pub fn http_client(request: HttpRequest) -> Result<HttpResponse, HttpClientError
             }
         },
     )
-    .map_err(|err| match err {
-        retry::Error::Operation { error, .. } => error,
-        retry::Error::Internal(msg) => panic!("unexpected error: {msg}"),
-    })
+    .map_err(|err| err.error)
 }
 
 pub trait PanicIfFail<T, F>
