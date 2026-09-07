@@ -22,9 +22,12 @@ use std::future::Future;
 #[cfg(test)]
 mod tests;
 
+mod workload;
+pub use workload::WorkloadProviderMetadata;
+
 const CONFIG_URL_SUFFIX: &str = ".well-known/openid-configuration";
 
-/// Trait for adding extra fields to [`ProviderMetadata`].
+/// Trait for adding extra fields to [`ProviderMetadata`] or [`WorkloadProviderMetadata`].
 pub trait AdditionalProviderMetadata: Clone + Debug + DeserializeOwned + Serialize {}
 
 // In order to support serde flatten, this must be an empty struct rather than an empty
@@ -286,14 +289,12 @@ where
             .map_err(DiscoveryError::UrlParse)?;
 
         http_client
-            .call(
-                Self::discovery_request(discovery_url.clone()).map_err(|err| {
-                    DiscoveryError::Other(format!("failed to prepare request: {err}"))
-                })?,
-            )
+            .call(discovery_request(discovery_url.clone()).map_err(|err| {
+                DiscoveryError::Other(format!("failed to prepare request: {err}"))
+            })?)
             .map_err(DiscoveryError::Request)
             .and_then(|http_response| {
-                Self::discovery_response(issuer_url, &discovery_url, http_response)
+                discovery_response(issuer_url, &discovery_url, http_response, Self::issuer)
             })
             .and_then(|provider_metadata| {
                 JsonWebKeySet::fetch(provider_metadata.jwks_uri(), http_client).map(|jwks| Self {
@@ -319,15 +320,13 @@ where
                 .map_err(DiscoveryError::UrlParse)?;
 
             let provider_metadata = http_client
-                .call(
-                    Self::discovery_request(discovery_url.clone()).map_err(|err| {
-                        DiscoveryError::Other(format!("failed to prepare request: {err}"))
-                    })?,
-                )
+                .call(discovery_request(discovery_url.clone()).map_err(|err| {
+                    DiscoveryError::Other(format!("failed to prepare request: {err}"))
+                })?)
                 .await
                 .map_err(DiscoveryError::Request)
                 .and_then(|http_response| {
-                    Self::discovery_response(&issuer_url, &discovery_url, http_response)
+                    discovery_response(&issuer_url, &discovery_url, http_response, Self::issuer)
                 })?;
 
             JsonWebKeySet::fetch_async(provider_metadata.jwks_uri(), http_client)
@@ -339,58 +338,6 @@ where
         })
     }
 
-    fn discovery_request(discovery_url: url::Url) -> Result<HttpRequest, http::Error> {
-        http::Request::builder()
-            .uri(discovery_url.to_string())
-            .method(Method::GET)
-            .header(ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON))
-            .body(Vec::new())
-    }
-
-    fn discovery_response<RE>(
-        issuer_url: &IssuerUrl,
-        discovery_url: &url::Url,
-        discovery_response: HttpResponse,
-    ) -> Result<Self, DiscoveryError<RE>>
-    where
-        RE: std::error::Error + 'static,
-    {
-        if discovery_response.status() != StatusCode::OK {
-            return Err(DiscoveryError::Response(
-                discovery_response.status(),
-                discovery_response.body().to_owned(),
-                format!(
-                    "HTTP status code {} at {}",
-                    discovery_response.status(),
-                    discovery_url
-                ),
-            ));
-        }
-
-        check_content_type(discovery_response.headers(), MIME_TYPE_JSON).map_err(|err_msg| {
-            DiscoveryError::Response(
-                discovery_response.status(),
-                discovery_response.body().to_owned(),
-                err_msg,
-            )
-        })?;
-
-        let provider_metadata = serde_path_to_error::deserialize::<_, Self>(
-            &mut serde_json::Deserializer::from_slice(discovery_response.body()),
-        )
-        .map_err(DiscoveryError::Parse)?;
-
-        if provider_metadata.issuer() != issuer_url {
-            Err(DiscoveryError::Validation(format!(
-                "unexpected issuer URI `{}` (expected `{}`)",
-                provider_metadata.issuer().as_str(),
-                issuer_url.as_str()
-            )))
-        } else {
-            Ok(provider_metadata)
-        }
-    }
-
     /// Returns additional provider metadata fields.
     pub fn additional_metadata(&self) -> &A {
         &self.additional_metadata
@@ -398,6 +345,61 @@ where
     /// Returns mutable additional provider metadata fields.
     pub fn additional_metadata_mut(&mut self) -> &mut A {
         &mut self.additional_metadata
+    }
+}
+
+fn discovery_request(discovery_url: url::Url) -> Result<HttpRequest, http::Error> {
+    http::Request::builder()
+        .uri(discovery_url.to_string())
+        .method(Method::GET)
+        .header(ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON))
+        .body(Vec::new())
+}
+
+fn discovery_response<RE, M>(
+    issuer_url: &IssuerUrl,
+    discovery_url: &url::Url,
+    discovery_response: HttpResponse,
+    metadata_issuer: fn(&M) -> &IssuerUrl,
+) -> Result<M, DiscoveryError<RE>>
+where
+    RE: std::error::Error + 'static,
+    M: DeserializeOwned,
+{
+    if discovery_response.status() != StatusCode::OK {
+        return Err(DiscoveryError::Response(
+            discovery_response.status(),
+            discovery_response.body().to_owned(),
+            format!(
+                "HTTP status code {} at {}",
+                discovery_response.status(),
+                discovery_url
+            ),
+        ));
+    }
+
+    check_content_type(discovery_response.headers(), MIME_TYPE_JSON).map_err(|err_msg| {
+        DiscoveryError::Response(
+            discovery_response.status(),
+            discovery_response.body().to_owned(),
+            err_msg,
+        )
+    })?;
+
+    let provider_metadata = serde_path_to_error::deserialize::<_, M>(
+        &mut serde_json::Deserializer::from_slice(discovery_response.body()),
+    )
+    .map_err(DiscoveryError::Parse)?;
+
+    let actual_issuer = metadata_issuer(&provider_metadata);
+    if actual_issuer != issuer_url {
+        Err(DiscoveryError::Validation(format!(
+            "unexpected issuer URI `{}` (expected `{}`)",
+            actual_issuer.as_str(),
+            issuer_url.as_str()
+        )))
+    } else {
+        Ok(provider_metadata)
     }
 }
 

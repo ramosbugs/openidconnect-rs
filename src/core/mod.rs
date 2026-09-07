@@ -11,7 +11,7 @@ use crate::{
     IdTokenVerifier, JsonWebKeySet, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm,
     JwsSigningAlgorithm, ProviderMetadata, ResponseMode, ResponseType, StandardErrorResponse,
     StandardTokenIntrospectionResponse, StandardTokenResponse, SubjectIdentifierType,
-    UserInfoClaims, UserInfoJsonWebToken, UserInfoVerifier,
+    UserInfoClaims, UserInfoJsonWebToken, UserInfoVerifier, WorkloadProviderMetadata,
 };
 
 use base64::alphabet::URL_SAFE;
@@ -164,6 +164,10 @@ pub type CoreProviderMetadata = ProviderMetadata<
     CoreResponseType,
     CoreSubjectIdentifierType,
 >;
+
+/// Workload provider metadata using the core JSON Web Key types.
+pub type CoreWorkloadProviderMetadata =
+    WorkloadProviderMetadata<EmptyAdditionalProviderMetadata, CoreJsonWebKey>;
 
 /// OpenID Connect Core user info claims.
 pub type CoreUserInfoClaims = UserInfoClaims<EmptyAdditionalClaims, CoreGenderClaim>;
