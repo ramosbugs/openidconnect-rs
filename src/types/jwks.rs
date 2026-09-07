@@ -5,7 +5,7 @@ use crate::{
 };
 
 use http::header::ACCEPT;
-use http::{HeaderValue, Method, StatusCode};
+use http::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, VecSkipError};
 
@@ -133,7 +133,7 @@ where
         http::Request::builder()
             .uri(url.to_string())
             .method(Method::GET)
-            .header(ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON))
+            .header(ACCEPT, format!("{MIME_TYPE_JSON}, {MIME_TYPE_JWKS}"))
             .body(Vec::new())
     }
 
