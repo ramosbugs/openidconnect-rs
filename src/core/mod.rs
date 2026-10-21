@@ -792,7 +792,7 @@ impl AsRef<str> for CoreAuthErrorResponseType {
             CoreAuthErrorResponseType::ConsentRequired => "consent_required",
             CoreAuthErrorResponseType::InteractionRequired => "interaction_required",
             CoreAuthErrorResponseType::InvalidRequest => "invalid_request",
-            CoreAuthErrorResponseType::InvalidRequestObject => "invalid_request_obbject",
+            CoreAuthErrorResponseType::InvalidRequestObject => "invalid_request_object",
             CoreAuthErrorResponseType::InvalidRequestUri => "invalid_request_uri",
             CoreAuthErrorResponseType::InvalidScope => "invalid_scope",
             CoreAuthErrorResponseType::LoginRequired => "login_required",
