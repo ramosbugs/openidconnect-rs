@@ -15,6 +15,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, skip_serializing_none, VecSkipError};
 use thiserror::Error;
+use url::Url;
 
 use std::fmt::Debug;
 use std::future::Future;
@@ -285,6 +286,32 @@ where
             .join(CONFIG_URL_SUFFIX)
             .map_err(DiscoveryError::UrlParse)?;
 
+        Self::discover_inner(&discovery_url, issuer_url, http_client)
+    }
+    ///
+    /// Fetches the OpenID Connect Discovery document and associated JSON Web Key Set from the
+    /// OpenID Connect Provider.
+    pub fn discover_with_doc_url<C>(
+        discovery_url: &Url,
+        issuer_url: &IssuerUrl,
+        http_client: &C,
+    ) -> Result<Self, DiscoveryError<<C as SyncHttpClient>::Error>>
+    where
+        C: SyncHttpClient,
+    {
+        Self::discover_inner(discovery_url, issuer_url, http_client)
+    }
+
+    /// Fetches the OpenID Connect Discovery document and associated JSON Web Key Set from the
+    /// OpenID Connect Provider.
+    pub fn discover_inner<C>(
+        discovery_url: &Url,
+        issuer_url: &IssuerUrl,
+        http_client: &C,
+    ) -> Result<Self, DiscoveryError<<C as SyncHttpClient>::Error>>
+    where
+        C: SyncHttpClient,
+    {
         http_client
             .call(
                 Self::discovery_request(discovery_url.clone()).map_err(|err| {
@@ -318,6 +345,34 @@ where
                 .join(CONFIG_URL_SUFFIX)
                 .map_err(DiscoveryError::UrlParse)?;
 
+            Self::discover_inner_async(discovery_url, issuer_url, http_client).await
+        })
+    }
+
+    /// Asynchronously fetches the OpenID Connect Discovery document and associated JSON Web Key Set
+    /// from the OpenID Connect Provider.
+    pub fn discover_from_doc_url_async<'c, C>(
+        discovery_url: Url,
+        issuer_url: IssuerUrl,
+        http_client: &'c C,
+    ) -> impl Future<Output = Result<Self, DiscoveryError<<C as AsyncHttpClient<'c>>::Error>>> + 'c
+    where
+        Self: 'c,
+        C: AsyncHttpClient<'c>,
+    {
+        Self::discover_inner_async(discovery_url, issuer_url, http_client)
+    }
+
+    fn discover_inner_async<'c, C>(
+        discovery_url: Url,
+        issuer_url: IssuerUrl,
+        http_client: &'c C,
+    ) -> impl Future<Output = Result<Self, DiscoveryError<<C as AsyncHttpClient<'c>>::Error>>> + 'c
+    where
+        Self: 'c,
+        C: AsyncHttpClient<'c>,
+    {
+        Box::pin(async move {
             let provider_metadata = http_client
                 .call(
                     Self::discovery_request(discovery_url.clone()).map_err(|err| {
