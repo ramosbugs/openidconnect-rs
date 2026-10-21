@@ -17,10 +17,10 @@ use crate::{
 use base64::alphabet::URL_SAFE;
 use base64::engine::general_purpose::NO_PAD;
 use base64::engine::GeneralPurpose;
-use oauth2::{EndpointNotSet, ResponseType as OAuth2ResponseType};
+use oauth2::{EndpointNotSet, ErrorResponse, ResponseType as OAuth2ResponseType};
 use serde::{Deserialize, Serialize};
 
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 
 pub use crate::core::jwk::{
     CoreEdDsaPrivateSigningKey, CoreHmacKey, CoreJsonCurveType, CoreJsonWebKey, CoreJsonWebKeyType,
@@ -847,6 +847,69 @@ impl Display for CoreRegisterErrorResponseType {
         write!(f, "{}", self.as_ref())
     }
 }
+
+/// Error response returned by server after attempting to register a client.
+///
+/// The fields in this structure are defined in
+/// [Section 3.2 of RFC 7591](https://www.rfc-editor.org/info/rfc7591/#section-3.2.2).
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct RegisterErrorResponse<T: ErrorResponseType> {
+    #[serde(bound = "T: ErrorResponseType")]
+    pub(crate) error: T,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) error_description: Option<String>,
+}
+
+impl<T: ErrorResponseType> RegisterErrorResponse<T> {
+    /// Instantiate a new `RegisterErrorResponse`.
+    ///
+    /// # Arguments
+    ///
+    /// * `error` - REQUIRED. A single ASCII error code deserialized to the generic parameter.
+    ///   `ErrorResponseType`.
+    /// * `error_description` - OPTIONAL. Human-readable ASCII text providing additional
+    ///   information, used to assist the client developer in understanding the error that
+    ///   occurred.
+    pub fn new(error: T, error_description: Option<String>) -> Self {
+        Self {
+            error,
+            error_description,
+        }
+    }
+
+    /// REQUIRED. A single ASCII error code deserialized to the generic parameter
+    /// `ErrorResponseType`.
+    pub fn error(&self) -> &T {
+        &self.error
+    }
+    /// OPTIONAL. Human-readable ASCII text providing additional information, used to assist
+    /// the client developer in understanding the error that occurred.
+    pub fn error_description(&self) -> Option<&String> {
+        self.error_description.as_ref()
+    }
+}
+
+impl<T> ErrorResponse for RegisterErrorResponse<T> where T: ErrorResponseType + Display + 'static {}
+
+impl<TE> Display for RegisterErrorResponse<TE>
+where
+    TE: ErrorResponseType + Display,
+{
+    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+        let mut formatted = self.error().to_string();
+
+        if let Some(error_description) = self.error_description() {
+            formatted.push_str(": ");
+            formatted.push_str(error_description);
+        }
+
+        write!(f, "{formatted}")
+    }
+}
+
+/// Error response specialization for basic OAuth2 dynamic client registration implementation.
+pub type CoreRegisterErrorResponse = RegisterErrorResponse<CoreRegisterErrorResponseType>;
 
 /// OpenID Connect Core response mode.
 ///
