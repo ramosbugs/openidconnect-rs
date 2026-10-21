@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+use std::str::FromStr;
 use crate::core::{crypto, CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm};
 use crate::helpers::{deserialize_option_or_none, Base64UrlEncodedBytes};
 use crate::types::jwks::check_key_compatibility;
@@ -736,13 +738,19 @@ pub enum CoreJsonWebKeyUse {
     /// Fallback case for other key uses not understood by this library.
     Other(String),
 }
-impl CoreJsonWebKeyUse {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreJsonWebKeyUse {
+    fn from(s: &str) -> Self {
         match s {
             "sig" => Self::Signature,
             "enc" => Self::Encryption,
             other => Self::Other(other.to_string()),
         }
+    }
+}
+impl FromStr for CoreJsonWebKeyUse {
+    type Err = Infallible;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(CoreJsonWebKeyUse::from(s))
     }
 }
 impl AsRef<str> for CoreJsonWebKeyUse {
