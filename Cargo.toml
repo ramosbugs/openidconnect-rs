@@ -37,6 +37,10 @@ name = "google"
 required-features = ["reqwest-blocking"]
 
 [[example]]
+name = "microsoft"
+required-features = ["reqwest-blocking"]
+
+[[example]]
 name = "okta_device_grant"
 required-features = ["reqwest-blocking"]
 
