@@ -314,8 +314,8 @@ fn test_jwt_verified_claims() {
     let rsa_key =
         serde_json::from_str::<CoreJsonWebKey>(TEST_RSA_PUB_KEY).expect("deserialization failed");
 
-    let client_id = ClientId::new("my_client".to_string());
-    let issuer = IssuerUrl::new("https://example.com".to_string()).unwrap();
+    let client_id = ClientId::new("my_client");
+    let issuer = IssuerUrl::new("https://example.com").unwrap();
     let verifier = CoreJwtClaimsVerifier::new(
         client_id.clone(),
         issuer.clone(),
@@ -534,7 +534,7 @@ fn test_jwt_verified_claims() {
         issuer.clone(),
         CoreJsonWebKeySet::new(vec![]),
     )
-    .set_client_secret(ClientSecret::new("my_secret".to_string()));
+    .set_client_secret(ClientSecret::new("my_secret"));
     let valid_hs256_jwt =
         serde_json::from_value::<TestClaimsJsonWebToken>(serde_json::Value::String(
             "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOlsibXlfY2xpZW50Il0sImlzcyI6Imh0dHBzOi8vZXhhbXBsZ\
@@ -633,7 +633,7 @@ fn test_jwt_verified_claims() {
         other => panic!("unexpected result: {:?}", other),
     }
 
-    let kid = JsonWebKeyId::new("bilbo.baggins@hobbiton.example".to_string());
+    let kid = JsonWebKeyId::new("bilbo.baggins@hobbiton.example");
     let n = Base64UrlEncodedBytes::new(vec![
         159, 129, 15, 180, 3, 130, 115, 208, 37, 145, 228, 7, 63, 49, 210, 182, 0, 27, 130, 206,
         219, 77, 146, 240, 80, 22, 93, 71, 207, 202, 184, 163, 196, 28, 183, 120, 172, 117, 83,
@@ -726,7 +726,7 @@ fn test_jwt_verified_claims() {
     // Client secret + public key
     verifier
         .clone()
-        .set_client_secret(ClientSecret::new("my_secret".to_string()))
+        .set_client_secret(ClientSecret::new("my_secret"))
         .verified_claims(valid_rs256_jwt.clone())
         .expect("verification should succeed");
 
@@ -802,8 +802,8 @@ fn test_id_token_verified_claims() {
     let rsa_key =
         serde_json::from_str::<CoreJsonWebKey>(TEST_RSA_PUB_KEY).expect("deserialization failed");
 
-    let client_id = ClientId::new("my_client".to_string());
-    let issuer = IssuerUrl::new("https://example.com".to_string()).unwrap();
+    let client_id = ClientId::new("my_client");
+    let issuer = IssuerUrl::new("https://example.com").unwrap();
     let mock_current_time = AtomicUsize::new(1544932149);
     let mock_is_valid_issue_time = AtomicBool::new(true);
     // Extra scope needed to ensure closures are destroyed before the values they borrow.
@@ -887,7 +887,7 @@ fn test_id_token_verified_claims() {
         }
         mock_is_valid_issue_time.store(true, Ordering::Relaxed);
 
-        let valid_nonce = Nonce::new("the_nonce".to_string());
+        let valid_nonce = Nonce::new("the_nonce");
 
         // Successful verification w/o checking nonce
         public_client_verifier
@@ -930,10 +930,9 @@ fn test_id_token_verified_claims() {
             .expect("failed to deserialize");
 
         // Invalid nonce
-        match public_client_verifier.verified_claims(
-            &test_jwt_with_nonce,
-            &Nonce::new("different_nonce".to_string()),
-        ) {
+        match public_client_verifier
+            .verified_claims(&test_jwt_with_nonce, &Nonce::new("different_nonce"))
+        {
             Err(ClaimsVerificationError::InvalidNonce(_)) => {}
             other => panic!("unexpected result: {:?}", other),
         }
@@ -1047,7 +1046,7 @@ fn test_id_token_verified_claims() {
         .expect("failed to deserialize");
         let private_client_verifier = CoreIdTokenVerifier::new_confidential_client(
             client_id.clone(),
-            ClientSecret::new("my_secret".to_string()),
+            ClientSecret::new("my_secret"),
             issuer.clone(),
             CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
         )
@@ -1083,7 +1082,7 @@ fn test_id_token_verified_claims() {
         let private_client_verifier_with_other_secret =
             CoreIdTokenVerifier::new_confidential_client(
                 client_id,
-                ClientSecret::new("other_secret".to_string()),
+                ClientSecret::new("other_secret"),
                 issuer,
                 CoreJsonWebKeySet::new(vec![rsa_key]),
             )
@@ -1111,9 +1110,9 @@ fn test_id_token_verified_claims() {
 
 #[test]
 fn test_new_id_token() {
-    let client_id = ClientId::new("my_client".to_string());
-    let issuer = IssuerUrl::new("https://example.com".to_string()).unwrap();
-    let nonce = Nonce::new("the_nonce".to_string());
+    let client_id = ClientId::new("my_client");
+    let issuer = IssuerUrl::new("https://example.com").unwrap();
+    let nonce = Nonce::new("the_nonce");
     let rsa_priv_key = CoreRsaPrivateSigningKey::from_pem(TEST_RSA_PRIV_KEY, None).unwrap();
 
     let id_token = CoreIdToken::new(
@@ -1126,11 +1125,11 @@ fn test_new_id_token() {
             Utc.timestamp_opt(1544928549, 0)
                 .single()
                 .expect("valid timestamp"),
-            StandardClaims::new(SubjectIdentifier::new("subject".to_string())),
+            StandardClaims::new(SubjectIdentifier::new("subject")),
             Default::default(),
         )
         .set_nonce(Some(nonce.clone()))
-        .set_auth_context_ref(Some(AuthenticationContextClass::new("the_acr".to_string())))
+        .set_auth_context_ref(Some(AuthenticationContextClass::new("the_acr")))
         .set_auth_time(Some(
             Utc.timestamp_opt(1544928548, 0)
                 .single()
@@ -1138,10 +1137,8 @@ fn test_new_id_token() {
         )),
         &rsa_priv_key,
         CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
-        Some(&AccessToken::new("the_access_token".to_string())),
-        Some(&AuthorizationCode::new(
-            "the_authorization_code".to_string(),
-        )),
+        Some(&AccessToken::new("the_access_token")),
+        Some(&AuthorizationCode::new("the_authorization_code")),
     )
     .unwrap();
 
@@ -1187,9 +1184,9 @@ fn test_user_info_verified_claims() {
     let rsa_key =
         serde_json::from_str::<CoreJsonWebKey>(TEST_RSA_PUB_KEY).expect("deserialization failed");
 
-    let client_id = ClientId::new("my_client".to_string());
-    let issuer = IssuerUrl::new("https://example.com".to_string()).unwrap();
-    let sub = SubjectIdentifier::new("the_subject".to_string());
+    let client_id = ClientId::new("my_client");
+    let issuer = IssuerUrl::new("https://example.com").unwrap();
+    let sub = SubjectIdentifier::new("the_subject");
 
     let verifier = CoreUserInfoVerifier::new(
         client_id.clone(),
@@ -1211,13 +1208,13 @@ fn test_user_info_verified_claims() {
             .unwrap()
             .iter()
             .collect::<Vec<_>>(),
-        vec![(None, &EndUserName::new("Jane Doe".to_string()))],
+        vec![(None, &EndUserName::new("Jane Doe"))],
     );
 
     // Invalid subject
     match CoreUserInfoClaims::from_json::<crate::reqwest::Error>(
         json_claims.as_bytes(),
-        Some(&SubjectIdentifier::new("wrong_subject".to_string())),
+        Some(&SubjectIdentifier::new("wrong_subject")),
     ) {
         Err(UserInfoError::ClaimsVerification(ClaimsVerificationError::InvalidSubject(_))) => {}
         other => panic!("unexpected result: {:?}", other),
@@ -1264,7 +1261,7 @@ fn test_user_info_verified_claims() {
     // JWT response with invalid issuer claim (error)
     match jwt_claims.clone().claims(&CoreUserInfoVerifier::new(
         client_id.clone(),
-        IssuerUrl::new("https://attacker.com".to_string()).unwrap(),
+        IssuerUrl::new("https://attacker.com").unwrap(),
         CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
         Some(sub.clone()),
     )) {
@@ -1278,7 +1275,7 @@ fn test_user_info_verified_claims() {
         .claims(
             &CoreUserInfoVerifier::new(
                 client_id,
-                IssuerUrl::new("https://attacker.com".to_string()).unwrap(),
+                IssuerUrl::new("https://attacker.com").unwrap(),
                 CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
                 Some(sub.clone()),
             )
@@ -1288,7 +1285,7 @@ fn test_user_info_verified_claims() {
 
     // JWT response with invalid audience claim (error)
     match jwt_claims.clone().claims(&CoreUserInfoVerifier::new(
-        ClientId::new("wrong_client".to_string()),
+        ClientId::new("wrong_client"),
         issuer.clone(),
         CoreJsonWebKeySet::new(vec![rsa_key.clone()]),
         Some(sub.clone()),
@@ -1301,7 +1298,7 @@ fn test_user_info_verified_claims() {
     jwt_claims
         .claims(
             &CoreUserInfoVerifier::new(
-                ClientId::new("wrong_client".to_string()),
+                ClientId::new("wrong_client"),
                 issuer,
                 CoreJsonWebKeySet::new(vec![rsa_key]),
                 Some(sub),
@@ -1315,8 +1312,8 @@ fn test_user_info_verified_claims() {
 fn test_new_user_info_claims() {
     let claims = CoreUserInfoClaims::new(
         StandardClaims {
-            sub: SubjectIdentifier::new("the_subject".to_string()),
-            name: Some(EndUserName::new("John Doe".to_string()).into()),
+            sub: SubjectIdentifier::new("the_subject"),
+            name: Some(EndUserName::new("John Doe").into()),
             given_name: None,
             family_name: None,
             middle_name: None,

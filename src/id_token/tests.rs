@@ -41,10 +41,7 @@ fn test_id_token() {
         *claims.issuer().url(),
         Url::parse("https://server.example.com").unwrap()
     );
-    assert_eq!(
-        *claims.audiences(),
-        vec![Audience::new("s6BhdRkqt3".to_string())]
-    );
+    assert_eq!(*claims.audiences(), vec![Audience::new("s6BhdRkqt3")]);
     assert_eq!(
         claims.expiration(),
         Utc.timestamp_opt(1311281970, 0)
@@ -57,10 +54,7 @@ fn test_id_token() {
             .single()
             .expect("valid timestamp")
     );
-    assert_eq!(
-        *claims.subject(),
-        SubjectIdentifier::new("24400320".to_string())
-    );
+    assert_eq!(*claims.subject(), SubjectIdentifier::new("24400320"));
 
     // test `ToString` implementation
     assert_eq!(&id_token.to_string(), ID_TOKEN);
@@ -92,10 +86,7 @@ fn test_oauth2_response() {
         *claims.issuer().url(),
         Url::parse("https://server.example.com").unwrap()
     );
-    assert_eq!(
-        *claims.audiences(),
-        vec![Audience::new("s6BhdRkqt3".to_string())]
-    );
+    assert_eq!(*claims.audiences(), vec![Audience::new("s6BhdRkqt3")]);
     assert_eq!(
         claims.expiration(),
         Utc.timestamp_opt(1311281970, 0)
@@ -108,10 +99,7 @@ fn test_oauth2_response() {
             .single()
             .expect("valid timestamp")
     );
-    assert_eq!(
-        *claims.subject(),
-        SubjectIdentifier::new("24400320".to_string())
-    );
+    assert_eq!(*claims.subject(), SubjectIdentifier::new("24400320"));
 
     assert_eq!(
         serde_json::to_string(&response).expect("failed to serialize"),
@@ -122,15 +110,15 @@ fn test_oauth2_response() {
 #[test]
 fn test_minimal_claims_serde() {
     let new_claims = CoreIdTokenClaims::new(
-        IssuerUrl::new("https://server.example.com".to_string()).unwrap(),
-        vec![Audience::new("s6BhdRkqt3".to_string())],
+        IssuerUrl::new("https://server.example.com").unwrap(),
+        vec![Audience::new("s6BhdRkqt3")],
         Utc.timestamp_opt(1311281970, 0)
             .single()
             .expect("valid timestamp"),
         Utc.timestamp_opt(1311280970, 0)
             .single()
             .expect("valid timestamp"),
-        StandardClaims::new(SubjectIdentifier::new("24400320".to_string())),
+        StandardClaims::new(SubjectIdentifier::new("24400320")),
         EmptyAdditionalClaims {},
     );
     let expected_serialized_claims = "\
@@ -251,8 +239,8 @@ fn test_complete_claims_serde() {
                            }";
 
     let new_claims = CoreIdTokenClaims::new(
-        IssuerUrl::new("https://server.example.com".to_string()).unwrap(),
-        vec![Audience::new("s6BhdRkqt3".to_string())],
+        IssuerUrl::new("https://server.example.com").unwrap(),
+        vec![Audience::new("s6BhdRkqt3")],
         Utc.timestamp_opt(1311281970, 0)
             .single()
             .expect("valid timestamp"),
@@ -260,13 +248,13 @@ fn test_complete_claims_serde() {
             .single()
             .expect("valid timestamp"),
         StandardClaims {
-            sub: SubjectIdentifier::new("24400320".to_string()),
+            sub: SubjectIdentifier::new("24400320"),
             name: Some(
                 vec![
-                    (None, EndUserName::new("Homer Simpson".to_string())),
+                    (None, EndUserName::new("Homer Simpson")),
                     (
-                        Some(LanguageTag::new("es".to_string())),
-                        EndUserName::new("Jomer Simpson".to_string()),
+                        Some(LanguageTag::new("es")),
+                        EndUserName::new("Jomer Simpson"),
                     ),
                 ]
                 .into_iter()
@@ -274,21 +262,18 @@ fn test_complete_claims_serde() {
             ),
             given_name: Some(
                 vec![
-                    (None, EndUserGivenName::new("Homer".to_string())),
-                    (
-                        Some(LanguageTag::new("es".to_string())),
-                        EndUserGivenName::new("Jomer".to_string()),
-                    ),
+                    (None, EndUserGivenName::new("Homer")),
+                    (Some(LanguageTag::new("es")), EndUserGivenName::new("Jomer")),
                 ]
                 .into_iter()
                 .collect(),
             ),
             family_name: Some(
                 vec![
-                    (None, EndUserFamilyName::new("Simpson".to_string())),
+                    (None, EndUserFamilyName::new("Simpson")),
                     (
-                        Some(LanguageTag::new("es".to_string())),
-                        EndUserFamilyName::new("Simpson".to_string()),
+                        Some(LanguageTag::new("es")),
+                        EndUserFamilyName::new("Simpson"),
                     ),
                 ]
                 .into_iter()
@@ -296,38 +281,30 @@ fn test_complete_claims_serde() {
             ),
             middle_name: Some(
                 vec![
-                    (None, EndUserMiddleName::new("Jay".to_string())),
-                    (
-                        Some(LanguageTag::new("es".to_string())),
-                        EndUserMiddleName::new("Jay".to_string()),
-                    ),
+                    (None, EndUserMiddleName::new("Jay")),
+                    (Some(LanguageTag::new("es")), EndUserMiddleName::new("Jay")),
                 ]
                 .into_iter()
                 .collect(),
             ),
             nickname: Some(
                 vec![
-                    (None, EndUserNickname::new("Homer".to_string())),
-                    (
-                        Some(LanguageTag::new("es".to_string())),
-                        EndUserNickname::new("Jomer".to_string()),
-                    ),
+                    (None, EndUserNickname::new("Homer")),
+                    (Some(LanguageTag::new("es")), EndUserNickname::new("Jomer")),
                 ]
                 .into_iter()
                 .collect(),
             ),
-            preferred_username: Some(EndUserUsername::new("homersimpson".to_string())),
+            preferred_username: Some(EndUserUsername::new("homersimpson")),
             profile: Some(
                 vec![
                     (
                         None,
-                        EndUserProfileUrl::new("https://example.com/profile?id=12345".to_string()),
+                        EndUserProfileUrl::new("https://example.com/profile?id=12345"),
                     ),
                     (
-                        Some(LanguageTag::new("es".to_string())),
-                        EndUserProfileUrl::new(
-                            "https://example.com/profile?id=12345&lang=es".to_string(),
-                        ),
+                        Some(LanguageTag::new("es")),
+                        EndUserProfileUrl::new("https://example.com/profile?id=12345&lang=es"),
                     ),
                 ]
                 .into_iter()
@@ -337,13 +314,11 @@ fn test_complete_claims_serde() {
                 vec![
                     (
                         None,
-                        EndUserPictureUrl::new("https://example.com/avatar?id=12345".to_string()),
+                        EndUserPictureUrl::new("https://example.com/avatar?id=12345"),
                     ),
                     (
-                        Some(LanguageTag::new("es".to_string())),
-                        EndUserPictureUrl::new(
-                            "https://example.com/avatar?id=12345&lang=es".to_string(),
-                        ),
+                        Some(LanguageTag::new("es")),
+                        EndUserPictureUrl::new("https://example.com/avatar?id=12345&lang=es"),
                     ),
                 ]
                 .into_iter()
@@ -351,36 +326,33 @@ fn test_complete_claims_serde() {
             ),
             website: Some(
                 vec![
+                    (None, EndUserWebsiteUrl::new("https://homersimpson.me")),
                     (
-                        None,
-                        EndUserWebsiteUrl::new("https://homersimpson.me".to_string()),
-                    ),
-                    (
-                        Some(LanguageTag::new("es".to_string())),
-                        EndUserWebsiteUrl::new("https://homersimpson.me/?lang=es".to_string()),
+                        Some(LanguageTag::new("es")),
+                        EndUserWebsiteUrl::new("https://homersimpson.me/?lang=es"),
                     ),
                 ]
                 .into_iter()
                 .collect(),
             ),
-            email: Some(EndUserEmail::new("homer@homersimpson.me".to_string())),
+            email: Some(EndUserEmail::new("homer@homersimpson.me")),
             email_verified: Some(true),
-            gender: Some(CoreGenderClaim::new("male".to_string())),
-            birthday: Some(EndUserBirthday::new("1956-05-12".to_string())),
-            birthdate: Some(EndUserBirthday::new("1956-07-12".to_string())),
-            zoneinfo: Some(EndUserTimezone::new("America/Los_Angeles".to_string())),
-            locale: Some(LanguageTag::new("en-US".to_string())),
-            phone_number: Some(EndUserPhoneNumber::new("+1 (555) 555-5555".to_string())),
+            gender: Some(CoreGenderClaim::new("male")),
+            birthday: Some(EndUserBirthday::new("1956-05-12")),
+            birthdate: Some(EndUserBirthday::new("1956-07-12")),
+            zoneinfo: Some(EndUserTimezone::new("America/Los_Angeles")),
+            locale: Some(LanguageTag::new("en-US")),
+            phone_number: Some(EndUserPhoneNumber::new("+1 (555) 555-5555")),
             phone_number_verified: Some(false),
             address: Some(AddressClaim {
                 formatted: Some(FormattedAddress::new(
-                    "1234 Hollywood Blvd., Los Angeles, CA 90210".to_string(),
+                    "1234 Hollywood Blvd., Los Angeles, CA 90210",
                 )),
-                street_address: Some(StreetAddress::new("1234 Hollywood Blvd.".to_string())),
-                locality: Some(AddressLocality::new("Los Angeles".to_string())),
-                region: Some(AddressRegion::new("CA".to_string())),
-                postal_code: Some(AddressPostalCode::new("90210".to_string())),
-                country: Some(AddressCountry::new("US".to_string())),
+                street_address: Some(StreetAddress::new("1234 Hollywood Blvd.")),
+                locality: Some(AddressLocality::new("Los Angeles")),
+                region: Some(AddressRegion::new("CA")),
+                postal_code: Some(AddressPostalCode::new("90210")),
+                country: Some(AddressCountry::new("US")),
             }),
             updated_at: Some(
                 Utc.timestamp_opt(1311283970, 0)
@@ -395,21 +367,17 @@ fn test_complete_claims_serde() {
             .single()
             .expect("valid timestamp"),
     ))
-    .set_nonce(Some(Nonce::new("Zm9vYmFy".to_string())))
+    .set_nonce(Some(Nonce::new("Zm9vYmFy")))
     .set_auth_context_ref(Some(AuthenticationContextClass::new(
-        "urn:mace:incommon:iap:silver".to_string(),
+        "urn:mace:incommon:iap:silver",
     )))
     .set_auth_method_refs(Some(vec![
-        AuthenticationMethodReference::new("password".to_string()),
-        AuthenticationMethodReference::new("totp".to_string()),
+        AuthenticationMethodReference::new("password"),
+        AuthenticationMethodReference::new("totp"),
     ]))
-    .set_authorized_party(Some(ClientId::new("dGhpc19jbGllbnQ".to_string())))
-    .set_access_token_hash(Some(AccessTokenHash::new(
-        "_JPLB-GtkomFJxAOWKHPHQ".to_string(),
-    )))
-    .set_code_hash(Some(AuthorizationCodeHash::new(
-        "VpTQii5T_8rgwxA-Wtb2Bw".to_string(),
-    )));
+    .set_authorized_party(Some(ClientId::new("dGhpc19jbGllbnQ")))
+    .set_access_token_hash(Some(AccessTokenHash::new("_JPLB-GtkomFJxAOWKHPHQ")))
+    .set_code_hash(Some(AuthorizationCodeHash::new("VpTQii5T_8rgwxA-Wtb2Bw")));
 
     let claims: CoreIdTokenClaims =
         serde_json::from_str(claims_json).expect("failed to deserialize");
@@ -534,7 +502,7 @@ fn test_audience() {
     .expect("failed to deserialize");
     assert_eq!(
         *single_aud_str_claims.audiences(),
-        vec![Audience::new("s6BhdRkqt3".to_string())],
+        vec![Audience::new("s6BhdRkqt3")],
     );
 
     // We always serialize aud as an array, which is valid according to the spec.
@@ -561,7 +529,7 @@ fn test_audience() {
     .expect("failed to deserialize");
     assert_eq!(
         *single_aud_vec_claims.audiences(),
-        vec![Audience::new("s6BhdRkqt3".to_string())],
+        vec![Audience::new("s6BhdRkqt3")],
     );
     assert_eq!(
         serde_json::to_string(&single_aud_vec_claims).expect("failed to serialize"),
@@ -586,10 +554,7 @@ fn test_audience() {
     .expect("failed to deserialize");
     assert_eq!(
         *multi_aud_claims.audiences(),
-        vec![
-            Audience::new("s6BhdRkqt3".to_string()),
-            Audience::new("aud2".to_string())
-        ],
+        vec![Audience::new("s6BhdRkqt3"), Audience::new("aud2")],
     );
     assert_eq!(
         serde_json::to_string(&multi_aud_claims).expect("failed to serialize"),
@@ -686,7 +651,7 @@ fn test_audiences_claim() {
     fn verify_audiences<A: AudiencesClaim>(audiences_claim: &A) {
         assert_eq!(
             (*audiences_claim).audiences(),
-            Some(&vec![Audience::new("s6BhdRkqt3".to_string())]),
+            Some(&vec![Audience::new("s6BhdRkqt3")]),
         )
     }
     verify_audiences(&claims);
@@ -709,7 +674,7 @@ fn test_issuer_claim() {
     fn verify_issuer<I: IssuerClaim>(issuer_claim: &I) {
         assert_eq!(
             (*issuer_claim).issuer(),
-            Some(&IssuerUrl::new("https://server.example.com".to_string()).unwrap()),
+            Some(&IssuerUrl::new("https://server.example.com").unwrap()),
         )
     }
     verify_issuer(&claims);
