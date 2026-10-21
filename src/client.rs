@@ -11,6 +11,7 @@ use crate::{
     ResourceOwnerPassword, ResourceOwnerUsername, ResponseMode, ResponseType, RevocableToken,
     RevocationRequest, RevocationUrl, Scope, SubjectIdentifier, SubjectIdentifierType,
     TokenIntrospectionResponse, TokenResponse, TokenUrl, UserInfoRequest, UserInfoUrl,
+    UserInfoVerifier,
 };
 
 use std::marker::PhantomData;
@@ -660,6 +661,20 @@ where
         } else {
             verifier
         }
+    }
+
+    /// Return an user info verifier for use with the [`UserInfoJsonWebToken::claims`](crate::UserInfoJsonWebToken::claims)
+    /// method.
+    pub fn user_info_verifier(
+        &self,
+        expected_subject: Option<SubjectIdentifier>,
+    ) -> UserInfoVerifier<JE, K> {
+        UserInfoVerifier::new(
+            self.client_id.clone(),
+            self.issuer.clone(),
+            self.jwks.clone(),
+            expected_subject,
+        )
     }
 }
 
