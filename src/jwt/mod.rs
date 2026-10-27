@@ -233,7 +233,8 @@ where
     }
 
     fn serialize(payload: &P) -> Result<String, serde_json::Error> {
-        serde_json::to_string(payload)}
+        serde_json::to_string(payload)
+    }
 }
 
 // Helper trait so that we can get borrowed payload when we have a reference to the JWT and owned
@@ -264,9 +265,7 @@ where
             JsonWebTokenAlgorithm::Encryption(ref other) => {
                 Err(SignatureVerificationError::UnsupportedAlg(
                     serde_plain::to_string(other).unwrap_or_else(|err| {
-                        panic!(
-                            "encryption alg {other:?} failed to serialize to a string: {err}"
-                        )
+                        panic!("encryption alg {other:?} failed to serialize to a string: {err}")
                     }),
                 ))
             }

@@ -336,9 +336,7 @@ impl JsonWebKey for CoreJsonWebKey {
             },
             ref other => Err(SignatureVerificationError::UnsupportedAlg(
                 serde_plain::to_string(other).unwrap_or_else(|err| {
-                    panic!(
-                        "signature alg {other:?} failed to serialize to a string: {err}"
-                    )
+                    panic!("signature alg {other:?} failed to serialize to a string: {err}")
                 }),
             )),
         }
@@ -440,9 +438,7 @@ impl PrivateSigningKey for CoreHmacKey {
             }
             ref other => Err(SigningError::UnsupportedAlg(
                 serde_plain::to_string(other).unwrap_or_else(|err| {
-                    panic!(
-                        "signature alg {other:?} failed to serialize to a string: {err}"
-                    )
+                    panic!("signature alg {other:?} failed to serialize to a string: {err}")
                 }),
             )),
         }
@@ -504,9 +500,7 @@ impl PrivateSigningKey for CoreEdDsaPrivateSigningKey {
             CoreJwsSigningAlgorithm::EdDsa => Ok(self.key_pair.sign(message)),
             ref other => Err(SigningError::UnsupportedAlg(
                 serde_plain::to_string(other).unwrap_or_else(|err| {
-                    panic!(
-                        "signature alg {other:?} failed to serialize to a string: {err}"
-                    )
+                    panic!("signature alg {other:?} failed to serialize to a string: {err}")
                 }),
             )),
         }
@@ -652,9 +646,7 @@ impl PrivateSigningKey for CoreRsaPrivateSigningKey {
             }
             ref other => Err(SigningError::UnsupportedAlg(
                 serde_plain::to_string(other).unwrap_or_else(|err| {
-                    panic!(
-                        "signature alg {other:?} failed to serialize to a string: {err}"
-                    )
+                    panic!("signature alg {other:?} failed to serialize to a string: {err}")
                 }),
             )),
         }
