@@ -639,7 +639,7 @@ where
 
     /// Return an ID token verifier for use with the [`IdToken::claims`](crate::IdToken::claims)
     /// method.
-    pub fn id_token_verifier(&self) -> IdTokenVerifier<K> {
+    pub fn id_token_verifier(&self) -> IdTokenVerifier<'_, K> {
         let verifier = if let Some(ref client_secret) = self.client_secret {
             IdTokenVerifier::new_confidential_client(
                 self.client_id.clone(),
@@ -762,7 +762,7 @@ where
         authentication_flow: AuthenticationFlow<RS>,
         state_fn: SF,
         nonce_fn: NF,
-    ) -> AuthorizationRequest<AD, P, RS>
+    ) -> AuthorizationRequest<'_, AD, P, RS>
     where
         NF: FnOnce() -> Nonce + 'static,
         RS: ResponseType,
@@ -852,7 +852,7 @@ where
     ///
     /// Requires [`set_token_uri()`](Self::set_token_uri) to have been previously
     /// called to set the token endpoint.
-    pub fn exchange_client_credentials(&self) -> ClientCredentialsTokenRequest<TE, TR> {
+    pub fn exchange_client_credentials(&self) -> ClientCredentialsTokenRequest<'_, TE, TR> {
         self.oauth2_client.exchange_client_credentials()
     }
 
@@ -865,7 +865,7 @@ where
     ///
     /// Requires [`set_token_uri()`](Self::set_token_uri) to have been previously
     /// called to set the token endpoint.
-    pub fn exchange_code(&self, code: AuthorizationCode) -> CodeTokenRequest<TE, TR> {
+    pub fn exchange_code(&self, code: AuthorizationCode) -> CodeTokenRequest<'_, TE, TR> {
         self.oauth2_client.exchange_code(code)
     }
 
@@ -986,7 +986,7 @@ where
     /// called to construct the client.
     pub fn exchange_client_credentials(
         &self,
-    ) -> Result<ClientCredentialsTokenRequest<TE, TR>, ConfigurationError> {
+    ) -> Result<ClientCredentialsTokenRequest<'_, TE, TR>, ConfigurationError> {
         self.oauth2_client.exchange_client_credentials()
     }
 
@@ -1002,7 +1002,7 @@ where
     pub fn exchange_code(
         &self,
         code: AuthorizationCode,
-    ) -> Result<CodeTokenRequest<TE, TR>, ConfigurationError> {
+    ) -> Result<CodeTokenRequest<'_, TE, TR>, ConfigurationError> {
         self.oauth2_client.exchange_code(code)
     }
 
@@ -1121,7 +1121,7 @@ where
     /// been previously called to set the device authorization endpoint.
     ///
     /// See [`exchange_device_access_token()`](Self::exchange_device_access_token).
-    pub fn exchange_device_code(&self) -> DeviceAuthorizationRequest<TE> {
+    pub fn exchange_device_code(&self) -> DeviceAuthorizationRequest<'_, TE> {
         let request = self.oauth2_client.exchange_device_code();
         if self.use_openid_scope {
             request.add_scope(Scope::new(OPENID_SCOPE.to_string()))
@@ -1278,7 +1278,7 @@ where
     pub fn revoke_token(
         &self,
         token: RT,
-    ) -> Result<RevocationRequest<RT, TRE>, ConfigurationError> {
+    ) -> Result<RevocationRequest<'_, RT, TRE>, ConfigurationError> {
         self.oauth2_client.revoke_token(token)
     }
 
@@ -1363,7 +1363,7 @@ where
         &self,
         access_token: AccessToken,
         expected_subject: Option<SubjectIdentifier>,
-    ) -> UserInfoRequest<JE, K> {
+    ) -> UserInfoRequest<'_, JE, K> {
         self.user_info_impl(self.user_info_url(), access_token, expected_subject)
     }
 
@@ -1451,7 +1451,7 @@ where
         &self,
         access_token: AccessToken,
         expected_subject: Option<SubjectIdentifier>,
-    ) -> Result<UserInfoRequest<JE, K>, ConfigurationError> {
+    ) -> Result<UserInfoRequest<'_, JE, K>, ConfigurationError> {
         Ok(self.user_info_impl(
             self.userinfo_endpoint
                 .as_ref()

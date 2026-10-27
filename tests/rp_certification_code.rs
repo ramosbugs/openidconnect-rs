@@ -180,7 +180,7 @@ impl TestState {
         self.id_token.as_ref().expect("no id_token")
     }
 
-    pub fn id_token_verifier(&self, jwks: CoreJsonWebKeySet) -> CoreIdTokenVerifier {
+    pub fn id_token_verifier(&self, jwks: CoreJsonWebKeySet) -> CoreIdTokenVerifier<'_> {
         CoreIdTokenVerifier::new_confidential_client(
             self.registration_response.client_id().clone(),
             self.registration_response
