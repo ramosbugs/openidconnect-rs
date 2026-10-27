@@ -208,7 +208,7 @@ fn verify_signature(
         .expect_err("signature verification should fail")
     {
         SignatureVerificationError::CryptoError(_) => {}
-        other => panic!("unexpected error: {:?}", other),
+        other => panic!("unexpected error: {other:?}"),
     }
 }
 
@@ -226,7 +226,7 @@ fn verify_invalid_signature(
         .expect_err("signature verification should fail")
     {
         SignatureVerificationError::CryptoError(_) => {}
-        other => panic!("unexpected error: {:?}", other),
+        other => panic!("unexpected error: {other:?}"),
     }
 }
 
@@ -434,7 +434,7 @@ fn test_rsa_pkcs1_verification() {
         .expect_err("signature verification should fail")
     {
         SignatureVerificationError::InvalidKey(_) => {}
-        other => panic!("unexpected error: {:?}", other),
+        other => panic!("unexpected error: {other:?}"),
     }
 
     // Wrong key usage
@@ -462,7 +462,7 @@ fn test_rsa_pkcs1_verification() {
         .expect_err("signature verification should fail")
     {
         SignatureVerificationError::InvalidKey(_) => {}
-        other => panic!("unexpected error: {:?}", other),
+        other => panic!("unexpected error: {other:?}"),
     }
 
     // Key without usage specified should work

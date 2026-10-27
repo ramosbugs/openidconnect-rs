@@ -306,7 +306,7 @@ fn rp_nonce_invalid() {
         ClaimsVerificationError::InvalidNonce(_) => {
             log_error!("ID token contains invalid nonce (expected result)")
         }
-        other => panic!("Unexpected result verifying ID token claims: {:?}", other),
+        other => panic!("Unexpected result verifying ID token claims: {other:?}"),
     }
 
     log_info!("SUCCESS");
@@ -377,7 +377,7 @@ fn rp_id_token_iat() {
         Err(RequestTokenError::Parse(_, _)) => {
             log_error!("ID token failed to parse without `iat` claim (expected result)")
         }
-        other => panic!("Unexpected result verifying ID token claims: {:?}", other),
+        other => panic!("Unexpected result verifying ID token claims: {other:?}"),
     }
     log_info!("SUCCESS");
 }
@@ -393,7 +393,7 @@ fn rp_id_token_aud() {
         ClaimsVerificationError::InvalidAudience(_) => {
             log_error!("ID token has invalid audience (expected result)")
         }
-        other => panic!("Unexpected result verifying ID token claims: {:?}", other),
+        other => panic!("Unexpected result verifying ID token claims: {other:?}"),
     }
 
     log_info!("SUCCESS");
@@ -410,7 +410,7 @@ fn rp_id_token_kid_absent_multiple_jwks() {
         ClaimsVerificationError::SignatureVerification(
             SignatureVerificationError::AmbiguousKeyId(_),
         ) => log_error!("ID token has ambiguous key identification without KID (expected result)"),
-        other => panic!("Unexpected result verifying ID token claims: {:?}", other),
+        other => panic!("Unexpected result verifying ID token claims: {other:?}"),
     }
 
     log_info!("SUCCESS");
@@ -488,7 +488,7 @@ fn rp_id_token_sub() {
         Err(RequestTokenError::Parse(_, _)) => {
             log_error!("ID token failed to parse without `sub` claim (expected result)")
         }
-        other => panic!("Unexpected result verifying ID token claims: {:?}", other),
+        other => panic!("Unexpected result verifying ID token claims: {other:?}"),
     }
     log_info!("SUCCESS");
 }
@@ -504,7 +504,7 @@ fn rp_id_token_bad_sig_rs256() {
         ClaimsVerificationError::SignatureVerification(
             SignatureVerificationError::CryptoError(_),
         ) => log_error!("ID token has invalid signature (expected result)"),
-        other => panic!("Unexpected result verifying ID token claims: {:?}", other),
+        other => panic!("Unexpected result verifying ID token claims: {other:?}"),
     }
 
     log_info!("SUCCESS");
@@ -528,7 +528,7 @@ fn rp_id_token_bad_sig_hs256() {
         ClaimsVerificationError::SignatureVerification(
             SignatureVerificationError::CryptoError(_),
         ) => log_error!("ID token has invalid signature (expected result)"),
-        other => panic!("Unexpected result verifying ID token claims: {:?}", other),
+        other => panic!("Unexpected result verifying ID token claims: {other:?}"),
     }
 
     log_info!("SUCCESS");
@@ -545,7 +545,7 @@ fn rp_id_token_issuer_mismatch() {
         ClaimsVerificationError::InvalidIssuer(_) => {
             log_error!("ID token has invalid issuer (expected result)")
         }
-        other => panic!("Unexpected result verifying ID token claims: {:?}", other),
+        other => panic!("Unexpected result verifying ID token claims: {other:?}"),
     }
 
     log_info!("SUCCESS");
@@ -564,7 +564,7 @@ fn rp_userinfo_bad_sub_claim() {
         UserInfoError::ClaimsVerification(ClaimsVerificationError::InvalidSubject(_)) => {
             log_error!("UserInfo response has invalid subject (expected result)")
         }
-        other => panic!("Unexpected result verifying ID token claims: {:?}", other),
+        other => panic!("Unexpected result verifying ID token claims: {other:?}"),
     }
     log_info!("SUCCESS");
 }

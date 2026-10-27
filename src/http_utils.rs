@@ -31,9 +31,7 @@ pub fn check_content_type(headers: &HeaderMap, expected_content_type: &str) -> R
             if !content_type_has_essence(content_type, expected_content_type) {
                 Err(
                     format!(
-                        "Unexpected response Content-Type: {:?}, should be `{}`",
-                        content_type,
-                        expected_content_type
+                        "Unexpected response Content-Type: {content_type:?}, should be `{expected_content_type}`"
                     )
                 )
             } else {

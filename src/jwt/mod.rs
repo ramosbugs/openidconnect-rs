@@ -167,8 +167,7 @@ where
             Ok(JsonWebTokenAlgorithm::Signature(val))
         } else {
             Err(D::Error::custom(format!(
-                "unrecognized JSON Web Algorithm `{}`",
-                s
+                "unrecognized JSON Web Algorithm `{s}`"
             )))
         }
     }
@@ -230,12 +229,11 @@ where
 {
     fn deserialize<DE: serde::de::Error>(payload: &[u8]) -> Result<P, DE> {
         serde_json::from_slice(payload)
-            .map_err(|err| DE::custom(format!("Failed to parse payload JSON: {:?}", err)))
+            .map_err(|err| DE::custom(format!("Failed to parse payload JSON: {err:?}")))
     }
 
     fn serialize(payload: &P) -> Result<String, serde_json::Error> {
-        serde_json::to_string(payload).map_err(Into::into)
-    }
+        serde_json::to_string(payload)}
 }
 
 // Helper trait so that we can get borrowed payload when we have a reference to the JWT and owned
@@ -267,8 +265,7 @@ where
                 Err(SignatureVerificationError::UnsupportedAlg(
                     serde_plain::to_string(other).unwrap_or_else(|err| {
                         panic!(
-                            "encryption alg {:?} failed to serialize to a string: {}",
-                            other, err
+                            "encryption alg {other:?} failed to serialize to a string: {err}"
                         )
                     }),
                 ))
@@ -340,7 +337,7 @@ where
             S::serialize(&payload).map_err(JsonWebTokenError::SerializationError)?;
         let payload_base64 = BASE64_URL_SAFE_NO_PAD.encode(serialized_payload);
 
-        let signing_input = format!("{}.{}", header_base64, payload_base64);
+        let signing_input = format!("{header_base64}.{payload_base64}");
 
         let signature = signing_key
             .sign(alg, signing_input.as_bytes())
@@ -478,23 +475,23 @@ where
                     let header_json = crate::core::base64_url_safe_no_pad()
                         .decode(parts[0])
                         .map_err(|err| {
-                            DE::custom(format!("Invalid base64url header encoding: {:?}", err))
+                            DE::custom(format!("Invalid base64url header encoding: {err:?}"))
                         })?;
                     header = serde_json::from_slice(&header_json).map_err(|err| {
-                        DE::custom(format!("Failed to parse header JSON: {:?}", err))
+                        DE::custom(format!("Failed to parse header JSON: {err:?}"))
                     })?;
 
                     let raw_payload = crate::core::base64_url_safe_no_pad()
                         .decode(parts[1])
                         .map_err(|err| {
-                            DE::custom(format!("Invalid base64url payload encoding: {:?}", err))
+                            DE::custom(format!("Invalid base64url payload encoding: {err:?}"))
                         })?;
                     payload = S::deserialize::<DE>(&raw_payload)?;
 
                     signature = crate::core::base64_url_safe_no_pad()
                         .decode(parts[2])
                         .map_err(|err| {
-                            DE::custom(format!("Invalid base64url signature encoding: {:?}", err))
+                            DE::custom(format!("Invalid base64url signature encoding: {err:?}"))
                         })?;
 
                     signing_input = format!("{}.{}", parts[0], parts[1]);

@@ -425,9 +425,8 @@ mod tests {
                 "https://example/authorize?response_type=code&client_id=aaa&state=CSRF123&\
                  redirect_uri=http%3A%2F%2Flocalhost%3A8888%2F&scope=openid+email&foo=bar&\
                  nonce=NONCE456&acr_values=urn%3Amace%3Aincommon%3Aiap%3Asilver&display=touch&\
-                 id_token_hint={}&login_hint=foo%40bar.com&\
-                 max_age=1800&prompt=login+consent&ui_locales=fr-CA+fr+en",
-                serialized_jwt
+                 id_token_hint={serialized_jwt}&login_hint=foo%40bar.com&\
+                 max_age=1800&prompt=login+consent&ui_locales=fr-CA+fr+en"
             ),
             authorize_url.to_string()
         );
@@ -457,9 +456,8 @@ mod tests {
                 "https://example/authorize?response_type=code&client_id=aaa&state=CSRF123&\
                  redirect_uri=http%3A%2F%2Flocalhost%3A8888%2F&scope=openid+email+profile&foo=bar&\
                  nonce=NONCE456&acr_values=urn%3Amace%3Aincommon%3Aiap%3Asilver&display=touch&\
-                 id_token_hint={}&login_hint=foo%40bar.com&\
-                 max_age=1800&prompt=login+consent&ui_locales=fr-CA+fr+en",
-                serialized_jwt
+                 id_token_hint={serialized_jwt}&login_hint=foo%40bar.com&\
+                 max_age=1800&prompt=login+consent&ui_locales=fr-CA+fr+en"
             ),
             authorize_url.to_string()
         );

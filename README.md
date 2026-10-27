@@ -16,7 +16,9 @@ API documentation and examples are available on [docs.rs](https://docs.rs/openid
 
 ## Minimum Supported Rust Version (MSRV)
 
-The MSRV for *3.3* and newer releases of this crate is Rust **1.65**.
+The MSRV for *4.1* and newer releases of this crate is Rust **1.88**.
+
+The MSRV for *3.3* to *4.0* releases of this crate is Rust **1.65**.
 
 The MSRV for *3.0* to *3.2* releases of this crate is Rust **1.57**.
 

@@ -462,8 +462,7 @@ impl<'de> DeserializeAs<'de, DateTime<Utc>> for Timestamp {
         let seconds: Timestamp = Deserialize::deserialize(deserializer)?;
         seconds.to_utc().map_err(|_| {
             serde::de::Error::custom(format!(
-                "failed to parse `{}` as UTC datetime (in seconds)",
-                seconds
+                "failed to parse `{seconds}` as UTC datetime (in seconds)"
             ))
         })
     }
@@ -506,8 +505,7 @@ mod serde_base64url_byte_array {
             .decode(&base64_encoded)
             .map_err(|err| {
                 D::Error::custom(format!(
-                    "invalid base64url encoding `{}`: {:?}",
-                    base64_encoded, err
+                    "invalid base64url encoding `{base64_encoded}`: {err:?}"
                 ))
             })
     }

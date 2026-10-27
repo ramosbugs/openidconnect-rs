@@ -402,7 +402,7 @@ fn test_discovery_deserialization() {
     assert_eq!(provider_metadata, new_provider_metadata);
 
     let serialized = serde_json::to_string(&provider_metadata).unwrap();
-    assert_eq!(serialized, format!("{{{}}}", json_response_standard));
+    assert_eq!(serialized, format!("{{{json_response_standard}}}"));
 
     assert_eq!(
         IssuerUrl::new(

@@ -269,7 +269,7 @@ impl JsonWebKey for CoreJsonWebKey {
                     })?,
                 )
                 .map_err(|e| {
-                    SignatureVerificationError::Other(format!("Could not create key: {}", e))
+                    SignatureVerificationError::Other(format!("Could not create key: {e}"))
                 })?;
                 mac.update(message);
                 mac.verify(signature.into())
@@ -284,7 +284,7 @@ impl JsonWebKey for CoreJsonWebKey {
                     })?,
                 )
                 .map_err(|e| {
-                    SignatureVerificationError::Other(format!("Could not create key: {}", e))
+                    SignatureVerificationError::Other(format!("Could not create key: {e}"))
                 })?;
                 mac.update(message);
                 mac.verify(signature.into())
@@ -299,7 +299,7 @@ impl JsonWebKey for CoreJsonWebKey {
                     })?,
                 )
                 .map_err(|e| {
-                    SignatureVerificationError::Other(format!("Could not create key: {}", e))
+                    SignatureVerificationError::Other(format!("Could not create key: {e}"))
                 })?;
                 mac.update(message);
                 mac.verify(signature.into())
@@ -337,8 +337,7 @@ impl JsonWebKey for CoreJsonWebKey {
             ref other => Err(SignatureVerificationError::UnsupportedAlg(
                 serde_plain::to_string(other).unwrap_or_else(|err| {
                     panic!(
-                        "signature alg {:?} failed to serialize to a string: {}",
-                        other, err
+                        "signature alg {other:?} failed to serialize to a string: {err}"
                     )
                 }),
             )),
@@ -420,21 +419,21 @@ impl PrivateSigningKey for CoreHmacKey {
         match *signature_alg {
             CoreJwsSigningAlgorithm::HmacSha256 => {
                 let mut mac = hmac::Hmac::<sha2::Sha256>::new_from_slice(&self.secret)
-                    .map_err(|e| SigningError::Other(format!("Could not create key: {}", e)))?;
+                    .map_err(|e| SigningError::Other(format!("Could not create key: {e}")))?;
                 mac.update(message);
                 let result = mac.finalize();
                 Ok(result.into_bytes().as_slice().to_vec())
             }
             CoreJwsSigningAlgorithm::HmacSha384 => {
                 let mut mac = hmac::Hmac::<sha2::Sha384>::new_from_slice(&self.secret)
-                    .map_err(|e| SigningError::Other(format!("Could not create key: {}", e)))?;
+                    .map_err(|e| SigningError::Other(format!("Could not create key: {e}")))?;
                 mac.update(message);
                 let result = mac.finalize();
                 Ok(result.into_bytes().as_slice().to_vec())
             }
             CoreJwsSigningAlgorithm::HmacSha512 => {
                 let mut mac = hmac::Hmac::<sha2::Sha512>::new_from_slice(&self.secret)
-                    .map_err(|e| SigningError::Other(format!("Could not create key: {}", e)))?;
+                    .map_err(|e| SigningError::Other(format!("Could not create key: {e}")))?;
                 mac.update(message);
                 let result = mac.finalize();
                 Ok(result.into_bytes().as_slice().to_vec())
@@ -442,8 +441,7 @@ impl PrivateSigningKey for CoreHmacKey {
             ref other => Err(SigningError::UnsupportedAlg(
                 serde_plain::to_string(other).unwrap_or_else(|err| {
                     panic!(
-                        "signature alg {:?} failed to serialize to a string: {}",
-                        other, err
+                        "signature alg {other:?} failed to serialize to a string: {err}"
                     )
                 }),
             )),
@@ -507,8 +505,7 @@ impl PrivateSigningKey for CoreEdDsaPrivateSigningKey {
             ref other => Err(SigningError::UnsupportedAlg(
                 serde_plain::to_string(other).unwrap_or_else(|err| {
                     panic!(
-                        "signature alg {:?} failed to serialize to a string: {}",
-                        other, err
+                        "signature alg {other:?} failed to serialize to a string: {err}"
                     )
                 }),
             )),
@@ -656,8 +653,7 @@ impl PrivateSigningKey for CoreRsaPrivateSigningKey {
             ref other => Err(SigningError::UnsupportedAlg(
                 serde_plain::to_string(other).unwrap_or_else(|err| {
                     panic!(
-                        "signature alg {:?} failed to serialize to a string: {}",
-                        other, err
+                        "signature alg {other:?} failed to serialize to a string: {err}"
                     )
                 }),
             )),

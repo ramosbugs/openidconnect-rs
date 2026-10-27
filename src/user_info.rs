@@ -239,7 +239,7 @@ where
             ref content_type => Err(UserInfoError::Response(
                 http_response.status(),
                 http_response.body().to_owned(),
-                format!("unexpected response Content-Type: `{:?}`", content_type),
+                format!("unexpected response Content-Type: `{content_type:?}`"),
             )),
         }
     }
@@ -422,7 +422,7 @@ where
         self.audiences.as_ref()
     }
 }
-impl<'a, AC, GC> AudiencesClaim for &'a UserInfoClaimsImpl<AC, GC>
+impl<AC, GC> AudiencesClaim for &UserInfoClaimsImpl<AC, GC>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,
@@ -441,7 +441,7 @@ where
         self.issuer.as_ref()
     }
 }
-impl<'a, AC, GC> IssuerClaim for &'a UserInfoClaimsImpl<AC, GC>
+impl<AC, GC> IssuerClaim for &UserInfoClaimsImpl<AC, GC>
 where
     AC: AdditionalClaims,
     GC: GenderClaim,

@@ -305,8 +305,7 @@ where
                 return Err(ClaimsVerificationError::Unsupported(format!(
                     "JWE encryption is not currently supported (found algorithm `{}`)",
                     serde_plain::to_string(encryption_alg).unwrap_or_else(|err| panic!(
-                        "encryption alg {:?} failed to serialize to a string: {}",
-                        encryption_alg, err
+                        "encryption alg {encryption_alg:?} failed to serialize to a string: {err}"
                     )),
                 )));
             }
@@ -398,15 +397,13 @@ where
                     SignatureVerificationError::DisallowedAlg(format!(
                         "algorithm `{}` is not one of: {}",
                         serde_plain::to_string(&signature_alg).unwrap_or_else(|err| panic!(
-                            "signature alg {:?} failed to serialize to a string: {}",
-                            signature_alg, err,
+                            "signature alg {signature_alg:?} failed to serialize to a string: {err}",
                         )),
                         allowed_algs
                             .iter()
                             .map(
                                 |alg| serde_plain::to_string(alg).unwrap_or_else(|err| panic!(
-                                    "signature alg {:?} failed to serialize to a string: {}",
-                                    alg, err,
+                                    "signature alg {alg:?} failed to serialize to a string: {err}",
                                 ))
                             )
                             .collect::<Vec<_>>()

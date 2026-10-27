@@ -127,11 +127,11 @@ where
         match self {
             Ok(ret) => ret,
             Err(fail) => {
-                let mut err_msg = format!("Panic: {}", msg);
+                let mut err_msg = format!("Panic: {msg}");
 
                 let mut cur_fail: Option<&dyn std::error::Error> = Some(&fail);
                 while let Some(cause) = cur_fail {
-                    err_msg += &format!("\n    caused by: {}", cause);
+                    err_msg += &format!("\n    caused by: {cause}");
                     cur_fail = cause.source();
                 }
                 error!("[{}] {}", get_test_id(), err_msg);
@@ -143,8 +143,7 @@ where
 
 pub fn issuer_url(test_id: &str) -> IssuerUrl {
     IssuerUrl::new(format!(
-        "{}/{}/{}",
-        CERTIFICATION_BASE_URL, RP_NAME, test_id
+        "{CERTIFICATION_BASE_URL}/{RP_NAME}/{test_id}"
     ))
     .expect("Failed to parse issuer URL")
 }
@@ -152,8 +151,7 @@ pub fn issuer_url(test_id: &str) -> IssuerUrl {
 pub fn get_provider_metadata(test_id: &str) -> CoreProviderMetadata {
     let _issuer_url = issuer_url(test_id);
     CoreProviderMetadata::discover(&_issuer_url, &http_client).expect(&format!(
-        "Failed to fetch provider metadata from {:?}",
-        _issuer_url
+        "Failed to fetch provider metadata from {_issuer_url:?}"
     ))
 }
 
@@ -186,7 +184,6 @@ where
     registration_request_post
         .register(registration_endpoint, &http_client)
         .expect(&format!(
-            "Failed to register client at {:?}",
-            registration_endpoint
+            "Failed to register client at {registration_endpoint:?}"
         ))
 }

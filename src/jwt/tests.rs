@@ -304,9 +304,7 @@ fn test_invalid_deserialization() {
 
         assert!(
             err.to_string().contains(pattern),
-            "Error `{}` must contain string `{}`",
-            err,
-            pattern,
+            "Error `{err}` must contain string `{pattern}`",
         );
     }
 
@@ -326,19 +324,19 @@ fn test_invalid_deserialization() {
 
     // Invalid payload base64
     expect_deserialization_err(
-        format!("{}.b!.c", valid_header),
+        format!("{valid_header}.b!.c"),
         "Invalid base64url payload encoding",
     );
 
     // Invalid payload utf-8 (after base64 decoding)
     expect_deserialization_err(
-        format!("{}.gA.c", valid_header),
+        format!("{valid_header}.gA.c"),
         "Error(\"expected value\", line: 1, column: 1)",
     );
 
     // Invalid payload JSON
     expect_deserialization_err(
-        format!("{}.bm90X2pzb24.c", valid_header),
+        format!("{valid_header}.bm90X2pzb24.c"),
         "Failed to parse payload JSON",
     );
 
@@ -346,7 +344,7 @@ fn test_invalid_deserialization() {
 
     // Invalid signature base64
     expect_deserialization_err(
-        format!("{}.{}.c!", valid_header, valid_body),
+        format!("{valid_header}.{valid_body}.c!"),
         "Invalid base64url signature encoding",
     );
 
@@ -358,8 +356,7 @@ fn test_invalid_deserialization() {
             JsonWebTokenJsonPayloadSerde,
         >,
     >(serde_json::Value::String(format!(
-        "{}.{}.e2FiY30",
-        valid_header, valid_body
+        "{valid_header}.{valid_body}.e2FiY30"
     )))
     .expect("failed to deserialize");
     assert_eq!(deserialized.unverified_payload().foo, "bar");

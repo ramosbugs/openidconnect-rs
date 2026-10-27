@@ -38,7 +38,7 @@ fn test_metadata_serialization() {
             \"tos_uri\": \"https://example.com/tos\",
             \"tos_uri#sr-Cyrl\": \"https://example.com/tos-sr-cyrl\",
             \"jwks_uri\": \"https://example.com/jwks\",
-            \"jwks\": {{\"keys\": [{}]}},
+            \"jwks\": {{\"keys\": [{TEST_RSA_PUB_KEY}]}},
             \"sector_identifier_uri\": \"https://example.com/sector\",
             \"subject_type\": \"pairwise\",
             \"id_token_signed_response_alg\": \"HS256\",
@@ -58,7 +58,7 @@ fn test_metadata_serialization() {
                 \"urn:mace:incommon:iap:bronze\"],
             \"initiate_login_uri\": \"https://example.com/login\",
             \"request_uris\": [\"https://example.com/request-1\", \"https://example.com/request-2\"]
-        }}", TEST_RSA_PUB_KEY);
+        }}");
 
     let client_metadata: CoreClientMetadata = serde_json::from_str(&json_response).unwrap();
 
@@ -337,7 +337,7 @@ fn test_response_serialization() {
             \"tos_uri\": \"https://example.com/tos\",
             \"tos_uri#sr-Cyrl\": \"https://example.com/tos-sr-cyrl\",
             \"jwks_uri\": \"https://example.com/jwks\",
-            \"jwks\": {{\"keys\": [{}]}},
+            \"jwks\": {{\"keys\": [{TEST_RSA_PUB_KEY}]}},
             \"sector_identifier_uri\": \"https://example.com/sector\",
             \"subject_type\": \"pairwise\",
             \"id_token_signed_response_alg\": \"HS256\",
@@ -357,7 +357,7 @@ fn test_response_serialization() {
                 \"urn:mace:incommon:iap:bronze\"],
             \"initiate_login_uri\": \"https://example.com/login\",
             \"request_uris\": [\"https://example.com/request-1\", \"https://example.com/request-2\"]
-        }}", TEST_RSA_PUB_KEY);
+        }}");
 
     let registration_response: CoreClientRegistrationResponse =
         serde_json::from_str(&json_response).unwrap();

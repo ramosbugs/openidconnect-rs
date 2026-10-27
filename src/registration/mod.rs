@@ -645,8 +645,7 @@ where
         let response_body =
             String::from_utf8(http_response.body().to_owned()).map_err(|parse_error| {
                 ClientRegistrationError::Other(format!(
-                    "couldn't parse response as UTF-8: {}",
-                    parse_error
+                    "couldn't parse response as UTF-8: {parse_error}"
                 ))
             })?;
 

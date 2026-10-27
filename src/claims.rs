@@ -427,9 +427,7 @@ mod tests {
         let err_str = result.expect_err("deserialization should fail").to_string();
         assert!(
             err_str.starts_with(expected_prefix),
-            "error message should begin with `{}`: {}",
-            expected_prefix,
-            err_str,
+            "error message should begin with `{expected_prefix}`: {err_str}",
         )
     }
 

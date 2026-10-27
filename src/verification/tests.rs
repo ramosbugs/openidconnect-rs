@@ -31,7 +31,7 @@ fn assert_unsupported<T>(result: Result<T, ClaimsVerificationError>, expected_su
         Err(ClaimsVerificationError::Unsupported(msg)) => {
             assert!(msg.contains(expected_substr))
         }
-        Err(err) => panic!("unexpected error: {:?}", err),
+        Err(err) => panic!("unexpected error: {err:?}"),
         Ok(_) => panic!("validation should fail"),
     }
 }
@@ -358,7 +358,7 @@ fn test_jwt_verified_claims() {
         .expect("failed to deserialize"),
     ) {
         Err(ClaimsVerificationError::InvalidIssuer(_)) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     // Missing issuer.
@@ -371,7 +371,7 @@ fn test_jwt_verified_claims() {
         .expect("failed to deserialize"),
     ) {
         Err(ClaimsVerificationError::InvalidIssuer(_)) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     // Ignore missing issuer.
@@ -400,7 +400,7 @@ fn test_jwt_verified_claims() {
         .expect("failed to deserialize"),
     ) {
         Err(ClaimsVerificationError::InvalidAudience(_)) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     // Missing audience.
@@ -413,7 +413,7 @@ fn test_jwt_verified_claims() {
         .expect("failed to deserialize"),
     ) {
         Err(ClaimsVerificationError::InvalidAudience(_)) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     // Ignore missing audience.
@@ -449,7 +449,7 @@ fn test_jwt_verified_claims() {
         .expect("failed to deserialize"),
     ) {
         Err(ClaimsVerificationError::InvalidAudience(_)) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     // Multiple audiences, where one is a match (allowed)
@@ -481,7 +481,7 @@ fn test_jwt_verified_claims() {
         .expect("failed to deserialize"),
     ) {
         Err(ClaimsVerificationError::InvalidAudience(_)) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     // Disable signature check.
@@ -510,7 +510,7 @@ fn test_jwt_verified_claims() {
         Err(ClaimsVerificationError::SignatureVerification(
             SignatureVerificationError::NoSignature,
         )) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     let valid_rs256_jwt =
@@ -549,7 +549,7 @@ fn test_jwt_verified_claims() {
         Err(ClaimsVerificationError::SignatureVerification(
             SignatureVerificationError::DisallowedAlg(_),
         )) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     // none algs + RS256 -> allowed
@@ -578,7 +578,7 @@ fn test_jwt_verified_claims() {
         Err(ClaimsVerificationError::SignatureVerification(
             SignatureVerificationError::NoSignature,
         )) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     // HS256 + no client secret -> disallowed
@@ -590,7 +590,7 @@ fn test_jwt_verified_claims() {
         Err(ClaimsVerificationError::SignatureVerification(
             SignatureVerificationError::DisallowedAlg(_),
         )) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     // HS256 + valid signature
@@ -616,7 +616,7 @@ fn test_jwt_verified_claims() {
         Err(ClaimsVerificationError::SignatureVerification(
             SignatureVerificationError::CryptoError(_),
         )) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     // No public keys
@@ -630,7 +630,7 @@ fn test_jwt_verified_claims() {
         Err(ClaimsVerificationError::SignatureVerification(
             SignatureVerificationError::NoMatchingKey,
         )) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     let kid = JsonWebKeyId::new("bilbo.baggins@hobbiton.example".to_string());
@@ -675,7 +675,7 @@ fn test_jwt_verified_claims() {
         Err(ClaimsVerificationError::SignatureVerification(
             SignatureVerificationError::NoMatchingKey,
         )) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     // Correct public key, but with signing disallowed
@@ -701,7 +701,7 @@ fn test_jwt_verified_claims() {
         Err(ClaimsVerificationError::SignatureVerification(
             SignatureVerificationError::NoMatchingKey,
         )) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     // Wrong key ID
@@ -720,7 +720,7 @@ fn test_jwt_verified_claims() {
         Err(ClaimsVerificationError::SignatureVerification(
             SignatureVerificationError::NoMatchingKey,
         )) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     // Client secret + public key
@@ -741,7 +741,7 @@ fn test_jwt_verified_claims() {
         Err(ClaimsVerificationError::SignatureVerification(
             SignatureVerificationError::AmbiguousKeyId(_),
         )) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     // Multiple matching public keys: KID specified
@@ -766,7 +766,7 @@ fn test_jwt_verified_claims() {
         Err(ClaimsVerificationError::SignatureVerification(
             SignatureVerificationError::AmbiguousKeyId(_),
         )) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     // RS256 + valid signature
@@ -786,7 +786,7 @@ fn test_jwt_verified_claims() {
         Err(ClaimsVerificationError::SignatureVerification(
             SignatureVerificationError::CryptoError(_),
         )) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 }
 
@@ -862,7 +862,7 @@ fn test_id_token_verified_claims() {
                 ))
                     .expect("failed to deserialize"), |_: Option<&Nonce>| Ok(())) {
                 Err(ClaimsVerificationError::InvalidIssuer(_)) => {}
-                other => panic!("unexpected result: {:?}", other),
+                other => panic!("unexpected result: {other:?}"),
             }
 
         // TODO: disallowed algs
@@ -873,7 +873,7 @@ fn test_id_token_verified_claims() {
             .verified_claims(&test_jwt_without_nonce, |_: Option<&Nonce>| Ok(()))
         {
             Err(ClaimsVerificationError::Expired(_)) => {}
-            other => panic!("unexpected result: {:?}", other),
+            other => panic!("unexpected result: {other:?}"),
         }
         mock_current_time.store(1544928549 + 1, Ordering::Relaxed);
 
@@ -883,7 +883,7 @@ fn test_id_token_verified_claims() {
             .verified_claims(&test_jwt_without_nonce, |_: Option<&Nonce>| Ok(()))
         {
             Err(ClaimsVerificationError::Expired(_)) => {}
-            other => panic!("unexpected result: {:?}", other),
+            other => panic!("unexpected result: {other:?}"),
         }
         mock_is_valid_issue_time.store(true, Ordering::Relaxed);
 
@@ -897,7 +897,7 @@ fn test_id_token_verified_claims() {
         // Missing nonce
         match public_client_verifier.verified_claims(&test_jwt_without_nonce, &valid_nonce) {
             Err(ClaimsVerificationError::InvalidNonce(_)) => {}
-            other => panic!("unexpected result: {:?}", other),
+            other => panic!("unexpected result: {other:?}"),
         }
 
         // Missing nonce w/ closure
@@ -912,7 +912,7 @@ fn test_id_token_verified_claims() {
             },
         ) {
             Err(ClaimsVerificationError::InvalidNonce(_)) => {}
-            other => panic!("unexpected result: {:?}", other),
+            other => panic!("unexpected result: {other:?}"),
         }
 
         let test_jwt_with_nonce =
@@ -935,7 +935,7 @@ fn test_id_token_verified_claims() {
             &Nonce::new("different_nonce".to_string()),
         ) {
             Err(ClaimsVerificationError::InvalidNonce(_)) => {}
-            other => panic!("unexpected result: {:?}", other),
+            other => panic!("unexpected result: {other:?}"),
         }
 
         let verified_claims = public_client_verifier
@@ -949,7 +949,7 @@ fn test_id_token_verified_claims() {
         // Invalid AuthenticationContextClass reference
         match verified_claims {
             Err(ClaimsVerificationError::InvalidAuthContext(_)) => {}
-            other => panic!("unexpected result: {:?}", other),
+            other => panic!("unexpected result: {other:?}"),
         }
 
         let test_jwt_without_auth_time =
@@ -981,7 +981,7 @@ fn test_id_token_verified_claims() {
         // Missing auth_time (error)
         match verified_claims {
             Err(ClaimsVerificationError::InvalidAuthTime(_)) => {}
-            other => panic!("unexpected result: {:?}", other),
+            other => panic!("unexpected result: {other:?}"),
         }
 
         let verified_claims = public_client_verifier
@@ -998,7 +998,7 @@ fn test_id_token_verified_claims() {
         // Invalid auth_time
         match verified_claims {
             Err(ClaimsVerificationError::InvalidAuthTime(_)) => {}
-            other => panic!("unexpected result: {:?}", other),
+            other => panic!("unexpected result: {other:?}"),
         }
 
         // Successful verification with nonce, acr, and auth_time specified (no expected Nonce)
@@ -1058,7 +1058,7 @@ fn test_id_token_verified_claims() {
         });
         match private_client_verifier.verified_claims(&test_jwt_hs256, &valid_nonce) {
             Err(ClaimsVerificationError::SignatureVerification(_)) => {}
-            other => panic!("unexpected result: {:?}", other),
+            other => panic!("unexpected result: {other:?}"),
         }
         insecure_verifier
             .clone()
@@ -1097,7 +1097,7 @@ fn test_id_token_verified_claims() {
             .verified_claims(&test_jwt_hs256, &valid_nonce)
         {
             Err(ClaimsVerificationError::SignatureVerification(_)) => {}
-            other => panic!("unexpected result: {:?}", other),
+            other => panic!("unexpected result: {other:?}"),
         }
 
         // Invalid signature w/ signature check disabled
@@ -1220,7 +1220,7 @@ fn test_user_info_verified_claims() {
         Some(&SubjectIdentifier::new("wrong_subject".to_string())),
     ) {
         Err(UserInfoError::ClaimsVerification(ClaimsVerificationError::InvalidSubject(_))) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     let jwt_claims = serde_json::from_value::<CoreUserInfoJsonWebToken>(serde_json::Value::String(
@@ -1258,7 +1258,7 @@ fn test_user_info_verified_claims() {
         Err(ClaimsVerificationError::SignatureVerification(
             SignatureVerificationError::CryptoError(_),
         )) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     // JWT response with invalid issuer claim (error)
@@ -1269,7 +1269,7 @@ fn test_user_info_verified_claims() {
         Some(sub.clone()),
     )) {
         Err(ClaimsVerificationError::InvalidIssuer(_)) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     // JWT response with invalid issuer claim (allowed)
@@ -1294,7 +1294,7 @@ fn test_user_info_verified_claims() {
         Some(sub.clone()),
     )) {
         Err(ClaimsVerificationError::InvalidAudience(_)) => {}
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 
     // JWT response with invalid audience claim (allowed)
