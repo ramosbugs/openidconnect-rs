@@ -70,6 +70,10 @@ url = { version = "2.4", features = ["serde"] }
 subtle = "2.4"
 ed25519-dalek = { version = "2.0.0", features = ["pem"] }
 
+# For backward compatibility with earlier 4.x releases, enables the `wasm_js` feature on WASM
+# targets.
+getrandom = { version = "0.4", features = ["wasm_js"] }
+
 [dev-dependencies]
 color-backtrace = { version = "0.5" }
 env_logger = "0.9"
