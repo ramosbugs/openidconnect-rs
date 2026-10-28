@@ -25,7 +25,7 @@ mod tests;
 // parameter, and then deserializing the fields and types appropriate for that key type.
 /// Public or symmetric key expressed as a JSON Web Key.
 #[skip_serializing_none]
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub struct CoreJsonWebKey {
     pub(crate) kty: CoreJsonWebKeyType,
     #[serde(rename = "use")]
@@ -673,7 +673,7 @@ impl PrivateSigningKey for CoreRsaPrivateSigningKey {
 }
 
 /// Type of JSON Web Key.
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 #[non_exhaustive]
 pub enum CoreJsonWebKeyType {
     /// Elliptic Curve Cryptography (ECC) key.
@@ -694,7 +694,7 @@ pub enum CoreJsonWebKeyType {
 impl JsonWebKeyType for CoreJsonWebKeyType {}
 
 /// Type of EC-Curve
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 #[non_exhaustive]
 pub enum CoreJsonCurveType {
     /// P-256 Curve
@@ -712,7 +712,7 @@ pub enum CoreJsonCurveType {
 }
 
 /// Usage restriction for a JSON Web key.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum CoreJsonWebKeyUse {
     /// Key may be used for digital signatures.
