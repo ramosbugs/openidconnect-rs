@@ -40,6 +40,10 @@ required-features = ["reqwest-blocking"]
 name = "okta_device_grant"
 required-features = ["reqwest-blocking"]
 
+[[example]]
+name = "twitch"
+required-features = ["reqwest-blocking"]
+
 [dependencies]
 base64 = "0.22"
 # Disable 'time' dependency since it triggers RUSTSEC-2020-0071 and we don't need it.
