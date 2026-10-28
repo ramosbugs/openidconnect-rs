@@ -552,6 +552,7 @@ mod tests {
     }
     impl AdditionalClaims for TestClaims {}
 
+    #[cfg(any(feature = "reqwest", feature = "reqwest-blocking"))]
     #[test]
     fn test_additional_claims() {
         let claims =
@@ -593,6 +594,7 @@ mod tests {
     struct AllOtherClaims(HashMap<String, serde_json::Value>);
     impl AdditionalClaims for AllOtherClaims {}
 
+    #[cfg(any(feature = "reqwest", feature = "reqwest-blocking"))]
     #[test]
     fn test_catch_all_additional_claims() {
         let claims =
