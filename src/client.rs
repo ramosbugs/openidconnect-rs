@@ -494,6 +494,46 @@ where
         }
     }
 
+    /// Set the [RFC 7662](https://tools.ietf.org/html/rfc7662) introspection endpoint.
+    ///
+    /// See [`introspect()`](Self::introspect).
+    pub fn set_introspection_url_option(
+        self,
+        introspection_url: Option<IntrospectionUrl>,
+    ) -> Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        K,
+        P,
+        TE,
+        TR,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        EndpointMaybeSet,
+        HasRevocationUrl,
+        HasTokenUrl,
+        HasUserInfoUrl,
+    > {
+        Client {
+            oauth2_client: self
+                .oauth2_client
+                .set_introspection_url_option(introspection_url),
+            client_id: self.client_id,
+            client_secret: self.client_secret,
+            issuer: self.issuer,
+            userinfo_endpoint: self.userinfo_endpoint,
+            jwks: self.jwks,
+            id_token_signing_algs: self.id_token_signing_algs,
+            use_openid_scope: self.use_openid_scope,
+            _phantom: PhantomData,
+        }
+    }
+
     /// Set the redirect URL used by the authorization endpoint.
     pub fn set_redirect_uri(mut self, redirect_url: RedirectUrl) -> Self {
         self.oauth2_client = self.oauth2_client.set_redirect_uri(redirect_url);
@@ -1208,6 +1248,82 @@ where
 
     /// Return the [RFC 7662](https://tools.ietf.org/html/rfc7662) introspection endpoint.
     pub fn introspection_url(&self) -> &IntrospectionUrl {
+        self.oauth2_client.introspection_url()
+    }
+}
+
+/// Methods requiring an optional introspection endpoint.
+impl<
+        AC,
+        AD,
+        GC,
+        JE,
+        K,
+        P,
+        TE,
+        TR,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        HasRevocationUrl,
+        HasTokenUrl,
+        HasUserInfoUrl,
+    >
+    Client<
+        AC,
+        AD,
+        GC,
+        JE,
+        K,
+        P,
+        TE,
+        TR,
+        TIR,
+        RT,
+        TRE,
+        HasAuthUrl,
+        HasDeviceAuthUrl,
+        EndpointMaybeSet,
+        HasRevocationUrl,
+        HasTokenUrl,
+        HasUserInfoUrl,
+    >
+where
+    AC: AdditionalClaims,
+    AD: AuthDisplay,
+    GC: GenderClaim,
+    JE: JweContentEncryptionAlgorithm<
+        KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
+    >,
+    K: JsonWebKey,
+    P: AuthPrompt,
+    TE: ErrorResponse + 'static,
+    TR: TokenResponse<AC, GC, JE, K::SigningAlgorithm>,
+    TIR: TokenIntrospectionResponse,
+    RT: RevocableToken,
+    TRE: ErrorResponse + 'static,
+    HasAuthUrl: EndpointState,
+    HasDeviceAuthUrl: EndpointState,
+    HasRevocationUrl: EndpointState,
+    HasTokenUrl: EndpointState,
+    HasUserInfoUrl: EndpointState,
+{
+    /// Retrieve metadata for an access token using the
+    /// [`RFC 7662`](https://tools.ietf.org/html/rfc7662) introspection endpoint.
+    ///
+    /// Requires [`set_introspection_url_option()`](Self::set_introspection_url_option) to have been previously
+    /// called to set the introspection endpoint.
+    pub fn introspect<'a>(
+        &'a self,
+        token: &'a AccessToken,
+    ) -> Result<IntrospectionRequest<'a, TE, TIR>, ConfigurationError> {
+        self.oauth2_client.introspect(token)
+    }
+
+    /// Return the [RFC 7662](https://tools.ietf.org/html/rfc7662) introspection endpoint.
+    pub fn introspection_url(&self) -> Option<&IntrospectionUrl> {
         self.oauth2_client.introspection_url()
     }
 }
