@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use crate::registration::{
     ClientMetadata, ClientRegistrationRequest, ClientRegistrationResponse,
     EmptyAdditionalClientMetadata, EmptyAdditionalClientRegistrationResponse,
@@ -21,7 +22,7 @@ use oauth2::{EndpointNotSet, ResponseType as OAuth2ResponseType};
 use serde::{Deserialize, Serialize};
 
 use std::fmt::Display;
-
+use std::str::FromStr;
 pub use crate::core::jwk::{
     CoreEdDsaPrivateSigningKey, CoreHmacKey, CoreJsonCurveType, CoreJsonWebKey, CoreJsonWebKeyType,
     CoreJsonWebKeyUse, CoreRsaPrivateSigningKey,
@@ -202,13 +203,19 @@ pub enum CoreApplicationType {
 // supports unit variants.
 deserialize_from_str!(CoreApplicationType);
 serialize_as_str!(CoreApplicationType);
-impl CoreApplicationType {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreApplicationType {
+    fn from(s: &str) -> Self {
         match s {
             "native" => CoreApplicationType::Native,
             "web" => CoreApplicationType::Web,
             ext => CoreApplicationType::Extension(ext.to_string()),
         }
+    }
+}
+impl FromStr for CoreApplicationType {
+    type Err = Infallible;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(CoreApplicationType::from(s))
     }
 }
 impl AsRef<str> for CoreApplicationType {
@@ -249,8 +256,8 @@ pub enum CoreAuthDisplay {
 }
 deserialize_from_str!(CoreAuthDisplay);
 serialize_as_str!(CoreAuthDisplay);
-impl CoreAuthDisplay {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreAuthDisplay {
+    fn from(s: &str) -> Self {
         match s {
             "page" => CoreAuthDisplay::Page,
             "popup" => CoreAuthDisplay::Popup,
@@ -258,6 +265,12 @@ impl CoreAuthDisplay {
             "wap" => CoreAuthDisplay::Wap,
             ext => CoreAuthDisplay::Extension(ext.to_string()),
         }
+    }
+}
+impl FromStr for CoreAuthDisplay {
+    type Err = Infallible;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(CoreAuthDisplay::from(s))
     }
 }
 impl AsRef<str> for CoreAuthDisplay {
@@ -311,8 +324,8 @@ pub enum CoreAuthPrompt {
 }
 deserialize_from_str!(CoreAuthPrompt);
 serialize_as_str!(CoreAuthPrompt);
-impl CoreAuthPrompt {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreAuthPrompt {
+    fn from(s: &str) -> Self {
         match s {
             "none" => CoreAuthPrompt::None,
             "login" => CoreAuthPrompt::Login,
@@ -320,6 +333,12 @@ impl CoreAuthPrompt {
             "select_account" => CoreAuthPrompt::SelectAccount,
             ext => CoreAuthPrompt::Extension(ext.to_string()),
         }
+    }
+}
+impl FromStr for CoreAuthPrompt {
+    type Err = Infallible;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(CoreAuthPrompt::from(s))
     }
 }
 impl AsRef<str> for CoreAuthPrompt {
@@ -374,14 +393,20 @@ pub enum CoreClaimType {
 }
 deserialize_from_str!(CoreClaimType);
 serialize_as_str!(CoreClaimType);
-impl CoreClaimType {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreClaimType {
+    fn from(s: &str) -> Self {
         match s {
             "normal" => CoreClaimType::Normal,
             "aggregated" => CoreClaimType::Aggregated,
             "distributed" => CoreClaimType::Distributed,
             ext => CoreClaimType::Extension(ext.to_string()),
         }
+    }
+}
+impl FromStr for CoreClaimType {
+    type Err = Infallible;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(CoreClaimType::from(s))
     }
 }
 impl AsRef<str> for CoreClaimType {
@@ -418,8 +443,8 @@ pub enum CoreClientAuthMethod {
 }
 deserialize_from_str!(CoreClientAuthMethod);
 serialize_as_str!(CoreClientAuthMethod);
-impl CoreClientAuthMethod {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreClientAuthMethod {
+    fn from(s: &str) -> Self {
         match s {
             "client_secret_basic" => CoreClientAuthMethod::ClientSecretBasic,
             "client_secret_jwt" => CoreClientAuthMethod::ClientSecretJwt,
@@ -428,6 +453,12 @@ impl CoreClientAuthMethod {
             "none" => CoreClientAuthMethod::None,
             ext => CoreClientAuthMethod::Extension(ext.to_string()),
         }
+    }
+}
+impl FromStr for CoreClientAuthMethod {
+    type Err = Infallible;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(CoreClientAuthMethod::from(s))
     }
 }
 impl AsRef<str> for CoreClientAuthMethod {
@@ -476,8 +507,8 @@ pub enum CoreGrantType {
 }
 deserialize_from_str!(CoreGrantType);
 serialize_as_str!(CoreGrantType);
-impl CoreGrantType {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreGrantType {
+    fn from(s: &str) -> Self {
         match s {
             "authorization_code" => CoreGrantType::AuthorizationCode,
             "client_credentials" => CoreGrantType::ClientCredentials,
@@ -488,6 +519,12 @@ impl CoreGrantType {
             "refresh_token" => CoreGrantType::RefreshToken,
             ext => CoreGrantType::Extension(ext.to_string()),
         }
+    }
+}
+impl FromStr for CoreGrantType {
+    type Err = Infallible;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(CoreGrantType::from(s))
     }
 }
 impl AsRef<str> for CoreGrantType {
@@ -761,8 +798,8 @@ pub enum CoreAuthErrorResponseType {
 }
 deserialize_from_str!(CoreAuthErrorResponseType);
 serialize_as_str!(CoreAuthErrorResponseType);
-impl CoreAuthErrorResponseType {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreAuthErrorResponseType {
+    fn from(s: &str) -> Self {
         match s {
             "access_denied" => CoreAuthErrorResponseType::AccessDenied,
             "account_selection_required" => CoreAuthErrorResponseType::AccountSelectionRequired,
@@ -782,6 +819,12 @@ impl CoreAuthErrorResponseType {
             "unsupported_response_type" => CoreAuthErrorResponseType::UnsupportedResponseType,
             ext => CoreAuthErrorResponseType::Extension(ext.to_string()),
         }
+    }
+}
+impl FromStr for CoreAuthErrorResponseType {
+    type Err = Infallible;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(CoreAuthErrorResponseType::from(s))
     }
 }
 impl AsRef<str> for CoreAuthErrorResponseType {
@@ -822,13 +865,19 @@ pub enum CoreRegisterErrorResponseType {
 }
 deserialize_from_str!(CoreRegisterErrorResponseType);
 serialize_as_str!(CoreRegisterErrorResponseType);
-impl CoreRegisterErrorResponseType {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreRegisterErrorResponseType {
+    fn from(s: &str) -> Self {
         match s {
             "invalid_client_metadata" => CoreRegisterErrorResponseType::InvalidClientMetadata,
             "invalid_redirect_uri" => CoreRegisterErrorResponseType::InvalidRedirectUri,
             ext => CoreRegisterErrorResponseType::Extension(ext.to_string()),
         }
+    }
+}
+impl FromStr for CoreRegisterErrorResponseType {
+    type Err = Infallible;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(CoreRegisterErrorResponseType::from(s))
     }
 }
 impl AsRef<str> for CoreRegisterErrorResponseType {
@@ -891,14 +940,20 @@ pub enum CoreResponseMode {
 }
 deserialize_from_str!(CoreResponseMode);
 serialize_as_str!(CoreResponseMode);
-impl CoreResponseMode {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreResponseMode {
+    fn from(s: &str) -> Self {
         match s {
             "query" => CoreResponseMode::Query,
             "fragment" => CoreResponseMode::Fragment,
             "form_post" => CoreResponseMode::FormPost,
             ext => CoreResponseMode::Extension(ext.to_string()),
         }
+    }
+}
+impl FromStr for CoreResponseMode {
+    type Err = Infallible;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(CoreResponseMode::from(s))
     }
 }
 impl AsRef<str> for CoreResponseMode {
@@ -947,8 +1002,8 @@ pub enum CoreResponseType {
 }
 deserialize_from_str!(CoreResponseType);
 serialize_as_str!(CoreResponseType);
-impl CoreResponseType {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreResponseType {
+    fn from(s: &str) -> Self {
         match s {
             "code" => CoreResponseType::Code,
             "id_token" => CoreResponseType::IdToken,
@@ -956,6 +1011,12 @@ impl CoreResponseType {
             "token" => CoreResponseType::Token,
             ext => CoreResponseType::Extension(ext.to_string()),
         }
+    }
+}
+impl FromStr for CoreResponseType {
+    type Err = Infallible;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(CoreResponseType::from(s))
     }
 }
 impl AsRef<str> for CoreResponseType {
@@ -995,13 +1056,19 @@ pub enum CoreSubjectIdentifierType {
 }
 deserialize_from_str!(CoreSubjectIdentifierType);
 serialize_as_str!(CoreSubjectIdentifierType);
-impl CoreSubjectIdentifierType {
-    fn from_str(s: &str) -> Self {
+impl From<&str> for CoreSubjectIdentifierType {
+    fn from(s: &str) -> Self {
         match s {
             "pairwise" => CoreSubjectIdentifierType::Pairwise,
             "public" => CoreSubjectIdentifierType::Public,
             ext => CoreSubjectIdentifierType::Extension(ext.to_string()),
         }
+    }
+}
+impl FromStr for CoreSubjectIdentifierType {
+    type Err = Infallible;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(CoreSubjectIdentifierType::from(s))
     }
 }
 impl AsRef<str> for CoreSubjectIdentifierType {
