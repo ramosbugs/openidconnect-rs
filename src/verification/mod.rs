@@ -18,6 +18,7 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[cfg(test)]
 mod tests;
@@ -532,6 +533,7 @@ where
         Arc<dyn Fn(Option<DateTime<Utc>>) -> Result<(), String> + 'a + Send + Sync>,
     iat_verifier_fn: Arc<dyn Fn(DateTime<Utc>) -> Result<(), String> + 'a + Send + Sync>,
     pub(crate) jwt_verifier: JwtClaimsVerifier<'a, K>,
+    max_age: Option<Duration>,
     time_fn: Arc<dyn Fn() -> DateTime<Utc> + 'a + Send + Sync>,
 }
 impl<'a, K> IdTokenVerifier<'a, K>
@@ -546,6 +548,8 @@ where
             // By default, accept any issued time (iat claim).
             iat_verifier_fn: Arc::new(|_| Ok(())),
             jwt_verifier,
+            // By default, don't require the auth_time claim.
+            max_age: None,
             // By default, use the current system time.
             time_fn: Arc::new(Utc::now),
         }
@@ -645,6 +649,23 @@ where
         T: Fn(Option<DateTime<Utc>>) -> Result<(), String> + 'a + Send + Sync,
     {
         self.auth_time_verifier_fn = Arc::new(auth_time_verifier_fn);
+        self
+    }
+
+    /// Specifies the `max_age` that was sent in the authorization request (see
+    /// [`AuthorizationRequest::set_max_age`](crate::AuthorizationRequest::set_max_age)).
+    ///
+    /// The ID token must then include the `auth_time` claim, and no more than `max_age` may have
+    /// elapsed since that time. Otherwise, verification fails with
+    /// [`ClaimsVerificationError::InvalidAuthTime`], and the End-User should be asked to
+    /// re-authenticate. See [Section 3.1.2.1](
+    /// https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest) and step 13 of
+    /// [Section 3.1.3.7](https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation).
+    ///
+    /// This check is in addition to any function specified with
+    /// [`IdTokenVerifier::set_auth_time_verifier_fn`].
+    pub fn set_max_age(mut self, max_age: Duration) -> Self {
+        self.max_age = Some(max_age);
         self
     }
 
@@ -856,6 +877,26 @@ where
         //     the last End-User authentication.
         (*self.auth_time_verifier_fn)(partially_verified_claims.auth_time())
             .map_err(ClaimsVerificationError::InvalidAuthTime)?;
+        if let Some(max_age) = self.max_age {
+            // When max_age is used, the ID Token returned MUST include an auth_time Claim Value
+            // (Section 3.1.2.1).
+            let auth_time = partially_verified_claims.auth_time().ok_or_else(|| {
+                ClaimsVerificationError::InvalidAuthTime(
+                    "missing auth_time claim, which is required when max_age is requested"
+                        .to_string(),
+                )
+            })?;
+            // An auth_time in the future counts as no time elapsed.
+            if let Ok(elapsed) = ((*self.time_fn)() - auth_time).to_std() {
+                if elapsed > max_age {
+                    return Err(ClaimsVerificationError::InvalidAuthTime(format!(
+                        "{}s elapsed since auth_time, which exceeds max_age of {}s",
+                        elapsed.as_secs(),
+                        max_age.as_secs()
+                    )));
+                }
+            }
+        }
 
         Ok(())
     }

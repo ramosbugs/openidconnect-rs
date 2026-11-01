@@ -20,6 +20,7 @@ use chrono::{TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::time::Duration;
 
 type CoreJsonWebTokenHeader =
     JsonWebTokenHeader<CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm>;
@@ -1000,6 +1001,34 @@ fn test_id_token_verified_claims() {
             Err(ClaimsVerificationError::InvalidAuthTime(_)) => {}
             other => panic!("unexpected result: {other:?}"),
         }
+
+        // The auth_time is 1544928548, two seconds before the mock current time.
+        // Missing auth_time with max_age
+        match public_client_verifier
+            .clone()
+            .set_max_age(Duration::from_secs(60))
+            .verified_claims(&test_jwt_without_auth_time, |_: Option<&Nonce>| Ok(()))
+        {
+            Err(ClaimsVerificationError::InvalidAuthTime(_)) => {}
+            other => panic!("unexpected result: {other:?}"),
+        }
+
+        // auth_time older than max_age
+        match public_client_verifier
+            .clone()
+            .set_max_age(Duration::from_secs(1))
+            .verified_claims(&test_jwt_with_nonce, &valid_nonce)
+        {
+            Err(ClaimsVerificationError::InvalidAuthTime(_)) => {}
+            other => panic!("unexpected result: {other:?}"),
+        }
+
+        // auth_time within max_age
+        public_client_verifier
+            .clone()
+            .set_max_age(Duration::from_secs(2))
+            .verified_claims(&test_jwt_with_nonce, &valid_nonce)
+            .expect("verification should succeed");
 
         // Successful verification with nonce, acr, and auth_time specified (no expected Nonce)
         public_client_verifier
