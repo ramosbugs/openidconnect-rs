@@ -191,9 +191,7 @@ fn test_jwt_basic() {
             assert_eq!(header.cty, None);
             assert_eq!(
                 header.kid,
-                Some(JsonWebKeyId::new(
-                    "bilbo.baggins@hobbiton.example".to_string()
-                ))
+                Some(JsonWebKeyId::new("bilbo.baggins@hobbiton.example"))
             );
             assert_eq!(header.typ, None);
         }
@@ -234,9 +232,7 @@ fn test_jwt_basic() {
 fn test_new_jwt() {
     let signing_key = CoreRsaPrivateSigningKey::from_pem(
         TEST_RSA_PRIV_KEY,
-        Some(JsonWebKeyId::new(
-            "bilbo.baggins@hobbiton.example".to_string(),
-        )),
+        Some(JsonWebKeyId::new("bilbo.baggins@hobbiton.example")),
     )
     .unwrap();
     let new_jwt = JsonWebToken::<
