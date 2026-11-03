@@ -79,6 +79,8 @@ pub enum JsonWebKeyAlgorithm<A: Debug> {
 pub trait PrivateSigningKey {
     /// Corresponding type of JSON Web Key used for verifying signatures produced by this key.
     type VerificationKey: JsonWebKey;
+    /// Internal singing key. Used in [`Self::inner_key`] to aid interopability.
+    type InnerKey;
 
     /// Signs the given `message` using the given signature algorithm.
     fn sign(
@@ -89,6 +91,9 @@ pub trait PrivateSigningKey {
 
     /// Converts this key to a JSON Web Key that can be used for verifying signatures.
     fn as_verification_key(&self) -> Self::VerificationKey;
+
+    #[allow(missing_docs)]
+    fn inner_key(&self) -> &Self::InnerKey;
 }
 
 /// Key type (e.g., RSA).
