@@ -4,7 +4,7 @@ use crate::{AccessToken, AuthorizationCode};
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use oauth2::helpers::deserialize_space_delimited_vec;
-use rand::{thread_rng, Rng};
+use rand::{rng, RngExt};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -349,8 +349,12 @@ new_secret_type![
         /// # Arguments
         ///
         /// * `num_bytes` - Number of random bytes to generate, prior to base64-encoding.
-        pub fn new_random_len(num_bytes: u32) -> Self {
-            let random_bytes: Vec<u8> = (0..num_bytes).map(|_| thread_rng().gen::<u8>()).collect();
+        pub fn new_random_len(num_bytes: usize) -> Self {
+            let random_bytes: Vec<u8> = {
+                let mut buf = vec![0; num_bytes];
+                rng().fill(&mut buf[..]);
+                buf
+            };
             Nonce::new(BASE64_URL_SAFE_NO_PAD.encode(random_bytes))
         }
     }
