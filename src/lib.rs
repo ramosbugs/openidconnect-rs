@@ -727,8 +727,8 @@ pub use crate::types::{
     EndUserUsername, EndUserWebsiteUrl, FormattedAddress, GrantType, InitiateLoginUrl, IssuerUrl,
     LoginHint, LogoUrl, LogoutHint, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl, PostLogoutRedirectUrl,
     RegistrationAccessToken, RegistrationUrl, RequestUrl, ResponseMode, ResponseType,
-    ResponseTypes, SectorIdentifierUrl, ServiceDocUrl, SigningError, StreetAddress,
-    SubjectIdentifier, SubjectIdentifierType, ToSUrl,
+    ResponseTypes, SectorIdentifierUrl, ServiceDocUrl, SessionIdentifier, SigningError,
+    StreetAddress, SubjectIdentifier, SubjectIdentifierType, ToSUrl,
 };
 pub use crate::user_info::{
     UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoRequest, UserInfoResponseType,
