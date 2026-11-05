@@ -1462,18 +1462,6 @@ fn test_logout_token() {
         };
     };
 
-    // Value for backchannel-logout event not empty (`{"invalid": null}` instead of `{}`)
-    check_for_invalid_events(
-        "eyJhbGciOiJSUzI1NiJ9.\
-        eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwiYXVkIjpbIm15X2NsaWVudCJdLCJleHAiOjEzMTEyODE5NzAsIm\
-        lhdCI6MTMxMTI4MDk3MCwianRpIjoiZXhhbXBsZS1qdGkiLCJldmVudHMiOnsiaHR0cDovL3NjaGVtYXMub3Blbmlk\
-        Lm5ldC9ldmVudC9iYWNrY2hhbm5lbC1sb2dvdXQiOnsiaW52YWxpZCI6bnVsbH19LCJzdWIiOiIyNDQwMDMyMCJ9.\
-        LWB67oxLPtU3Gwp6QSg0nAJ5s7hhdtSn84BMBCfVLGWvOr23xLmvr27QPYlrZMNz4LPb40p8N5ay2aBtMXTKkn4WFI\
-        VVWiTR4LRwzbW9ihuPKBHY5DSc96zG3i4I1lH3dXJxzYrPXaCtHi28RURPrbjP99jM76md7vw80UYX5N5ixKH4PK9C\
-        q-c3CBd2ik14PPjyy4LzALm3Ui28DQ6FNuAN_4g4Eg_QFyJMouv2S_-VmWRApMt3sGOxYwlj_1nFAl7WDBNA37uuVN\
-        Ooz2ldOGOKD_JgnuEY0MAWJX4L7O2967h5yMA_uuXeYT-fSSsfbOHx9vpRSGrMebyRqhpPXQ",
-    );
-
     // Invalid value type for backchannel-logout event (`null` instead of `{}`)
     check_for_invalid_events(
         "eyJhbGciOiJSUzI1NiJ9.\

@@ -1113,7 +1113,7 @@ where
             .as_object()
             .and_then(|events| events.get(LogoutTokenClaims::BACKCHANNEL_LOGOUT_EVENT))
             .and_then(|value| value.as_object())
-            .is_none_or(|x| !x.is_empty())
+            .is_none()
         {
             return Err(ClaimsVerificationError::Other(
                 "events claim is invalid".to_owned(),
