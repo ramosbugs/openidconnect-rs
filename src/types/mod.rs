@@ -460,6 +460,16 @@ new_type![
     SessionIdentifier(String)
 ];
 
+new_type![
+    /// JWT ID.
+    ///
+    /// A unique identifier for the token, which can be used to prevent reuse of the token.
+    /// These tokens MUST only be used once, unless conditions for reuse were negotiated
+    /// between the parties; any such negotiation is beyond the scope of this specification.
+    #[derive(Deserialize, Hash, Ord, PartialOrd, Serialize)]
+    JsonWebTokenIdentifier(String)
+];
+
 new_url_type![
     /// URL for the relying party's Terms of Service.
     ToSUrl
