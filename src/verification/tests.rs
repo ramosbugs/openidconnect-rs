@@ -12,13 +12,14 @@ use crate::jwt::{
 use crate::verification::{AudiencesClaim, IssuerClaim, JwtClaimsVerifier};
 use crate::{
     AccessToken, Audience, AuthenticationContextClass, AuthorizationCode, ClaimsVerificationError,
-    ClientId, ClientSecret, EndUserName, IssuerUrl, JsonWebKeyId, Nonce,
-    SignatureVerificationError, StandardClaims, SubjectIdentifier, UserInfoError,
+    ClientId, ClientSecret, EndUserName, IssuerUrl, JsonWebKeyId, LogoutToken, LogoutTokenVerifier,
+    Nonce, SignatureVerificationError, StandardClaims, SubjectIdentifier, UserInfoError,
 };
 
 use chrono::{TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 
+use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 type CoreJsonWebTokenHeader =
@@ -1365,4 +1366,167 @@ fn test_new_user_info_claims() {
              YeSLeErhb6oTQ0a5gQ",
         serde_json::to_value(claims_jwt).unwrap().as_str().unwrap()
     );
+}
+
+#[test]
+fn test_logout_token() {
+    let rsa_key =
+        serde_json::from_str::<CoreJsonWebKey>(TEST_RSA_PUB_KEY).expect("deserialization failed");
+    let client_id = ClientId::new("my_client".to_string());
+    let issuer = IssuerUrl::new("https://example.com".to_string()).unwrap();
+    let mock_current_time = AtomicUsize::new(1311281969);
+    let mock_is_valid_issue_time = AtomicBool::new(true);
+    let verifier = LogoutTokenVerifier::new_public_client(
+        client_id,
+        issuer,
+        CoreJsonWebKeySet::new(vec![rsa_key]),
+    )
+    .set_time_fn(|| {
+        Timestamp::Seconds(mock_current_time.load(Ordering::Relaxed).into())
+            .to_utc()
+            .unwrap()
+    })
+    .set_issue_time_verifier_fn(|_| {
+        if mock_is_valid_issue_time.load(Ordering::Relaxed) {
+            Ok(())
+        } else {
+            Err("Invalid iat claim".to_string())
+        }
+    });
+
+    // The token below has an issue time of 1311280970 and an expiry time of 1311281970
+    let token: LogoutToken = LogoutToken::from_str(
+        "eyJhbGciOiJSUzI1NiJ9.\
+        eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwiYXVkIjpbIm15X2NsaWVudCJdLCJleHAiOjEzMTEyODE5NzAsIm\
+        lhdCI6MTMxMTI4MDk3MCwianRpIjoiZXhhbXBsZS1qdGkiLCJldmVudHMiOnsiaHR0cDovL3NjaGVtYXMub3Blbmlk\
+        Lm5ldC9ldmVudC9iYWNrY2hhbm5lbC1sb2dvdXQiOnt9fSwic3ViIjoiMjQ0MDAzMjAifQ.\
+        WIdPy-WBTD0DzZWRarrIPW8ofDYmdQTHs9lQ9MTNZeAgRnuwyITznQxnT1idoF4q5eZKZUzH_9WgW50YRM3IaW5_OM\
+        KBCvQ7LmCTOOsPuVJcoQ1KiUEVupZfa9RMvi6trU6c5dlwW32ltFEWGKv4adN9LLA5ax0t3PzPa53985T4nT7Ri7ZT\
+        MZNbx6BBJAShZN0nDWXiev7VDPl0785ImMXF20mxwMkENhr7RzrqP9XhXeEud_WJSlAiEg6Beb07KbaxCt099j9Ypd\
+        gIztthmUYGbOIC3-qS4A6BoPgkUrUG9DqBURsHZpDo6iBSPhemT0kMuhiaSeDUXbkeiHrU0w",
+    )
+    .expect("failed to deserialize");
+
+    // Claims should verify successfully
+    if let Err(err) = token.claims(&verifier) {
+        panic!("verification error: {:?}", err);
+    }
+
+    // Test expired token
+    mock_current_time.fetch_add(2, Ordering::Relaxed);
+    match token.claims(&verifier) {
+        Err(ClaimsVerificationError::Expired(msg)) => {
+            assert!(msg.contains("Logout token expired"))
+        }
+        Err(err) => panic!("unexpected error: {:?}", err),
+        Ok(_) => panic!("token expired: verification should fail"),
+    }
+    mock_current_time.fetch_sub(2, Ordering::Relaxed);
+
+    // Test invalid issue time in token
+    mock_is_valid_issue_time.store(false, Ordering::Relaxed);
+    match token.claims(&verifier) {
+        Err(ClaimsVerificationError::Expired(msg)) => {
+            assert!(msg.contains("Invalid iat claim"))
+        }
+        Err(err) => panic!("unexpected error: {:?}", err),
+        Ok(_) => panic!("iat invalid: verification should fail"),
+    }
+    mock_is_valid_issue_time.store(true, Ordering::Relaxed);
+
+    // Test that token must contain a sub claim or a sid claim
+    LogoutToken::<CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm>::from_str(
+        "eyJhbGciOiJSUzI1NiJ9.\
+        eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwiYXVkIjpbIm15X2NsaWVudCJdLCJleHAiOjEzMTEyODE5NzAsIm\
+        lhdCI6MTMxMTI4MDk3MCwianRpIjoiZXhhbXBsZS1qdGkiLCJldmVudHMiOnsiaHR0cDovL3NjaGVtYXMub3Blbmlk\
+        Lm5ldC9ldmVudC9iYWNrY2hhbm5lbC1sb2dvdXQiOnt9fX0.\
+        D213RO-QRkL3Qr5DV9L80Dgx6H7tN5pvEXJ_BjNsMDpVQS2iz9IMZQtwyoIR3cZVrfE6GTscSYki1FxC17II_6LyXC\
+        dmnenYk9xz_6n0HtYI-xb7fMOjE7kmVO4Nc6mYhmdRPXSryQ5uWouGOTgDBtWY3ClQtI7PkBH_YfF1YWA-x3Ebo7xo\
+        chPvxqqrZGT0r-m4wpC-mUYvH_1JQKdDi01BAgr_r-nurQWRNyaLgmTOOtmF72Q6vQJWyZb_bKwOFfqNGBVoDvtGzq\
+        hYjsBYE1VLovc-3Qn41M1j34t7VAHK_yHuiIPgnuQy05e09vSFKf-fbOdxyMowuJU2xzK1BA",
+    )
+    .expect_err("deserialized logout token without sub or sid claim")
+    .to_string()
+    .contains("data did not match any variant of untagged enum LogoutTokenTarget");
+
+    // Helper function to test events claim verification
+    let check_for_invalid_events = |token_str: &str| {
+        let token_with_invalid_events: LogoutToken =
+            LogoutToken::from_str(token_str).expect("failed to deserialize");
+        match token_with_invalid_events.into_claims(&verifier) {
+            Err(ClaimsVerificationError::Other(msg)) => {
+                assert!(msg.contains("events claim is invalid"))
+            }
+            Err(err) => panic!("unexpected error: {:?}", err),
+            Ok(_) => panic!("events claim invalid: verification should fail"),
+        };
+    };
+
+    // Value for backchannel-logout event not empty (`{"invalid": null}` instead of `{}`)
+    check_for_invalid_events(
+        "eyJhbGciOiJSUzI1NiJ9.\
+        eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwiYXVkIjpbIm15X2NsaWVudCJdLCJleHAiOjEzMTEyODE5NzAsIm\
+        lhdCI6MTMxMTI4MDk3MCwianRpIjoiZXhhbXBsZS1qdGkiLCJldmVudHMiOnsiaHR0cDovL3NjaGVtYXMub3Blbmlk\
+        Lm5ldC9ldmVudC9iYWNrY2hhbm5lbC1sb2dvdXQiOnsiaW52YWxpZCI6bnVsbH19LCJzdWIiOiIyNDQwMDMyMCJ9.\
+        LWB67oxLPtU3Gwp6QSg0nAJ5s7hhdtSn84BMBCfVLGWvOr23xLmvr27QPYlrZMNz4LPb40p8N5ay2aBtMXTKkn4WFI\
+        VVWiTR4LRwzbW9ihuPKBHY5DSc96zG3i4I1lH3dXJxzYrPXaCtHi28RURPrbjP99jM76md7vw80UYX5N5ixKH4PK9C\
+        q-c3CBd2ik14PPjyy4LzALm3Ui28DQ6FNuAN_4g4Eg_QFyJMouv2S_-VmWRApMt3sGOxYwlj_1nFAl7WDBNA37uuVN\
+        Ooz2ldOGOKD_JgnuEY0MAWJX4L7O2967h5yMA_uuXeYT-fSSsfbOHx9vpRSGrMebyRqhpPXQ",
+    );
+
+    // Invalid value type for backchannel-logout event (`null` instead of `{}`)
+    check_for_invalid_events(
+        "eyJhbGciOiJSUzI1NiJ9.\
+        eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwiYXVkIjpbIm15X2NsaWVudCJdLCJleHAiOjEzMTEyODE5NzAsIm\
+        lhdCI6MTMxMTI4MDk3MCwianRpIjoiZXhhbXBsZS1qdGkiLCJldmVudHMiOnsiaHR0cDovL3NjaGVtYXMub3Blbmlk\
+        Lm5ldC9ldmVudC9iYWNrY2hhbm5lbC1sb2dvdXQiOm51bGx9LCJzdWIiOiIyNDQwMDMyMCJ9.\
+        Lm6T4gLGHTaSypQLNQaKvItopffsZEq5z1SC2ML1eReEKc25CNCV0FXFdWJH9rWx8XZw38Y2eksfDz2fhRDPEfu7ru\
+        ZL11z7DWhqA0L5Zq8nPVTmN1lul16nvlP_SXZbdx4oTWFLkZTScNoX6SHqv_z3a0FLXgf0vtbZqg9Zg_eMhlxlXYm7\
+        OeOWhC9LBWsLFUFEMyp5VwsqBalhn2jO8hYg7pf_YpkRedRvCKcb7KuH8834972bXZCBof8GU5phVquMYydIlYsu_-\
+        UFMLE_NKE7vjyCoy4k8cc5JDmrvV0dbR_soJR4dV_0P_5ofUqeeQyTQd8qBwPTX1PxBe7ANA",
+    );
+
+    // backchannel-logout key missing from events
+    check_for_invalid_events(
+        "eyJhbGciOiJSUzI1NiJ9.\
+        eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwiYXVkIjpbIm15X2NsaWVudCJdLCJleHAiOjEzMTEyODE5NzAsIm\
+        lhdCI6MTMxMTI4MDk3MCwianRpIjoiZXhhbXBsZS1qdGkiLCJldmVudHMiOnt9LCJzdWIiOiIyNDQwMDMyMCJ9.\
+        mOP67Olqeg3gALOOyyRfpsGENgCSBgAAD-8jlCjPElK9dL3BqVTC4mPHvWRJZCUz-1fk1pZbB9bmsQtxvLiDg-ZCww\
+        KxGZUf1IwNjaTFuFeIdDcoY-ye6Q5PnHo3vlO_5mO5IzMz0kT55JPK0bUeRULPZpIPb-AwJaN94JgXbfSVze_rUVdT\
+        16m4m3vX1Fj0xhUQp36u0KXnMRtTNzZP3U9AGadphabK5xTBUuiw3AfHfMjV5kJQcHMEnSND7o1za5CW9kEg9F-KRt\
+        JYrkjsccLVr9jq-i0k8nLvZrHC-k7Axw_OO7tLR3HZTfpwshKEAiPN35akCPrYt_svlrdIBQ",
+    );
+
+    // Bad type for events (`null` instead of object)
+    check_for_invalid_events(
+        "eyJhbGciOiJSUzI1NiJ9.\
+        eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwiYXVkIjpbIm15X2NsaWVudCJdLCJleHAiOjEzMTEyODE5NzAsIm\
+        lhdCI6MTMxMTI4MDk3MCwianRpIjoiZXhhbXBsZS1qdGkiLCJldmVudHMiOm51bGwsInN1YiI6IjI0NDAwMzIwIn0.\
+        JhnGjxh3E8hpSCFHjxZsS11kyxk_71dFkXZeyPm-hZTPBimY6MT6lI4uJZiNN-FGFM4tQG6zAuWIaO7xQWm2s-CYoR\
+        AIn2pDmIdoMSfKKmdwxLOkGOsLP6BQI8vOMILPe-q29d_lHS3ugPJDlPk3qIhRSlvuyXDnuW-TptFUCNcugToBvMeH\
+        6LGYx3Z-RWy-amAgXIn0rkIreF9yNnatMt_fvzkqEm2jJ7k5dNh-A71VmaiQqdAygkh61JO6bzCfieQ-UbpjuN_fDZ\
+        58vGK0_aq4RamBCgWDvDFN2V5rahwNMfnuP2LEv56ww1HLSSf_FrTxX_PDA2Iec9mUBRvQKw",
+    );
+
+    // Test token containing nonce claim is rejected
+    let token_with_nonce: LogoutToken = LogoutToken::from_str(
+        "eyJhbGciOiJSUzI1NiJ9.\
+        eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwiYXVkIjpbIm15X2NsaWVudCJdLCJleHAiOjEzMTEyODE5NzAsIm\
+        lhdCI6MTMxMTI4MDk3MCwianRpIjoiZXhhbXBsZS1qdGkiLCJldmVudHMiOnsiaHR0cDovL3NjaGVtYXMub3Blbmlk\
+        Lm5ldC9ldmVudC9iYWNrY2hhbm5lbC1sb2dvdXQiOnt9fSwic3ViIjoiMjQ0MDAzMjAiLCJub25jZSI6InRoaXMtbW\
+        FrZXMtdG9rZW4taW52YWxpZCJ9.\
+        Zu_MRBeM_R1qXNfMdX6PsXZb18Jcv0JTcznJ1j0uzEeyWYQXDNZVWs2S_xhQ76ZyejFtIVzhfyDx9hGVYcFHYSM5rR\
+        mKk1PfuONREOYynND3mSfH9t3qgmyf2Bq0Kg3_11oofRtq2BhXW4HGUf1VH8dM-GgOOAa7uTzH7Y82jv8g_P2a8GUG\
+        MNPBSHFesFyPJEqHH3e95MhgdqW4rR47JT-Y8xT8KyTKVzhLFjRBY7I1wLFtt-EBEqdYFZ4lBHJtGmhTSrMNsBQIGu\
+        lNG6R6NtXnz33Jxpcbf4jJ7jIn3TocPUXcWfekoKKN97wMuDz9IEgxjTbPsNn8VD2ZcvCU4Q",
+    )
+    .expect("failed to deserialize");
+
+    match token_with_nonce.claims(&verifier) {
+        Err(ClaimsVerificationError::Other(msg)) => {
+            assert!(msg.contains("nonce claim"))
+        }
+        Err(err) => panic!("unexpected error: {:?}", err),
+        Ok(_) => panic!("nonce present: verification should fail"),
+    }
 }

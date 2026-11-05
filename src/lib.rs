@@ -738,6 +738,6 @@ pub use crate::user_info::{
     UserInfoUrl,
 };
 pub use crate::verification::{
-    ClaimsVerificationError, IdTokenVerifier, NonceVerifier, SignatureVerificationError,
-    UserInfoVerifier,
+    ClaimsVerificationError, IdTokenVerifier, LogoutTokenVerifier, NonceVerifier,
+    SignatureVerificationError, UserInfoVerifier,
 };

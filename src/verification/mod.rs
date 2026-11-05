@@ -4,7 +4,7 @@ use crate::{
     AdditionalClaims, Audience, AuthenticationContextClass, ClientId, ClientSecret, GenderClaim,
     IdTokenClaims, IssuerUrl, JsonWebKey, JsonWebKeyId, JsonWebKeySet, JsonWebTokenAccess,
     JsonWebTokenAlgorithm, JsonWebTokenHeader, JsonWebTokenType, JweContentEncryptionAlgorithm,
-    JwsSigningAlgorithm, Nonce, SubjectIdentifier,
+    JwsSigningAlgorithm, LogoutTokenClaims, Nonce, SubjectIdentifier,
 };
 
 use chrono::{DateTime, Utc};
@@ -856,6 +856,278 @@ where
         //     the last End-User authentication.
         (*self.auth_time_verifier_fn)(partially_verified_claims.auth_time())
             .map_err(ClaimsVerificationError::InvalidAuthTime)?;
+
+        Ok(())
+    }
+}
+
+/// Back-channel logout token verifier.
+#[derive(Clone)]
+pub struct LogoutTokenVerifier<'a, K>
+where
+    K: JsonWebKey,
+{
+    iat_verifier_fn: Arc<dyn Fn(DateTime<Utc>) -> Result<(), String> + 'a + Send + Sync>,
+    pub(crate) jwt_verifier: JwtClaimsVerifier<'a, K>,
+    time_fn: Arc<dyn Fn() -> DateTime<Utc> + 'a + Send + Sync>,
+}
+impl<'a, K> LogoutTokenVerifier<'a, K>
+where
+    K: JsonWebKey,
+{
+    fn new(jwt_verifier: JwtClaimsVerifier<'a, K>) -> Self {
+        LogoutTokenVerifier {
+            // By default, accept any issued time (iat claim).
+            iat_verifier_fn: Arc::new(|_| Ok(())),
+            jwt_verifier,
+            // By default, use the current system time.
+            time_fn: Arc::new(Utc::now),
+        }
+    }
+
+    /// Initializes a new verifier for a public client (i.e., one without a client secret).
+    pub fn new_public_client(
+        client_id: ClientId,
+        issuer: IssuerUrl,
+        signature_keys: JsonWebKeySet<K>,
+    ) -> Self {
+        Self::new(JwtClaimsVerifier::new(client_id, issuer, signature_keys))
+    }
+
+    /// Initializes a no-op verifier that performs no signature, audience, or issuer verification.
+    /// The token's expiration time is still checked, and the token is otherwise required to conform to the expected format.
+    pub fn new_insecure_without_verification() -> Self {
+        let empty_issuer = IssuerUrl::new("https://0.0.0.0".to_owned())
+            .expect("Creating empty issuer url mustn't fail");
+        Self::new_public_client(
+            ClientId::new(String::new()),
+            empty_issuer,
+            JsonWebKeySet::new(vec![]),
+        )
+        .insecure_disable_signature_check()
+        .require_audience_match(false)
+        .require_issuer_match(false)
+    }
+
+    /// Initializes a new verifier for a confidential client (i.e., one with a client secret).
+    ///
+    /// A confidential client verifier is required in order to verify logout tokens signed using a
+    /// shared secret algorithm such as `HS256`, `HS384`, or `HS512`. For these algorithms, the
+    /// client secret is the shared secret.
+    pub fn new_confidential_client(
+        client_id: ClientId,
+        client_secret: ClientSecret,
+        issuer: IssuerUrl,
+        signature_keys: JsonWebKeySet<K>,
+    ) -> Self {
+        Self::new(
+            JwtClaimsVerifier::new(client_id, issuer, signature_keys)
+                .set_client_secret(client_secret),
+        )
+    }
+
+    /// Specifies which JSON Web Signature algorithms are supported.
+    ///
+    /// Note that an alg with the value `none` must not be used for Logout Tokens,
+    /// and will be silently ignored.
+    ///
+    /// See [Section 2.6 step 3](https://openid.net/specs/openid-connect-backchannel-1_0.html#Validation)
+    /// for more information.
+    pub fn set_allowed_algs<I>(mut self, algs: I) -> Self
+    where
+        I: IntoIterator<Item = K::SigningAlgorithm>,
+    {
+        let valid_algs = algs.into_iter().filter(|x| x.key_type().is_some());
+        self.jwt_verifier = self.jwt_verifier.set_allowed_algs(valid_algs);
+        self
+    }
+
+    /// Allows setting specific JOSE types. The verifier will check against them during verification.
+    ///
+    /// See [RFC 7515 section 4.1.9](https://tools.ietf.org/html/rfc7515#section-4.1.9) for more details.
+    pub fn set_allowed_jose_types<I>(mut self, types: I) -> Self
+    where
+        I: IntoIterator<Item = NormalizedJsonWebTokenType>,
+    {
+        self.jwt_verifier = self.jwt_verifier.set_allowed_jose_types(types);
+        self
+    }
+
+    /// Allow all JSON Web Token Header types.
+    pub fn allow_all_jose_types(mut self) -> Self {
+        self.jwt_verifier = self.jwt_verifier.allow_all_jose_types();
+        self
+    }
+
+    /// Enables signature verification.
+    ///
+    /// Signature verification is enabled by default, so this function is only useful if
+    /// [`LogoutTokenVerifier::insecure_disable_signature_check`] was previously invoked.
+    pub fn enable_signature_check(mut self) -> Self {
+        self.jwt_verifier = self.jwt_verifier.require_signature_check(true);
+        self
+    }
+
+    /// Disables signature verification.
+    ///
+    /// # Security Warning
+    ///
+    /// Unverified logout tokens may be subject to forgery. See [Section 16.3](
+    /// https://openid.net/specs/openid-connect-core-1_0.html#TokenManufacture) for more
+    /// information.
+    pub fn insecure_disable_signature_check(mut self) -> Self {
+        self.jwt_verifier = self.jwt_verifier.require_signature_check(false);
+        self
+    }
+
+    /// Specifies whether the issuer claim must match the expected issuer URL for the provider.
+    pub fn require_issuer_match(mut self, iss_required: bool) -> Self {
+        self.jwt_verifier = self.jwt_verifier.require_issuer_match(iss_required);
+        self
+    }
+
+    /// Specifies whether the audience claim must match this client's client ID.
+    pub fn require_audience_match(mut self, aud_required: bool) -> Self {
+        self.jwt_verifier = self.jwt_verifier.require_audience_match(aud_required);
+        self
+    }
+
+    /// Specifies a function for returning the current time.
+    ///
+    /// This function is used for verifying the logout token expiration time.
+    pub fn set_time_fn<T>(mut self, time_fn: T) -> Self
+    where
+        T: Fn() -> DateTime<Utc> + 'a + Send + Sync,
+    {
+        self.time_fn = Arc::new(time_fn);
+        self
+    }
+
+    /// Specifies a function for verifying the logout token issue time.
+    ///
+    /// The function should return `Ok(())` if the claim is valid, or a string describing the error
+    /// otherwise.
+    pub fn set_issue_time_verifier_fn<T>(mut self, iat_verifier_fn: T) -> Self
+    where
+        T: Fn(DateTime<Utc>) -> Result<(), String> + 'a + Send + Sync,
+    {
+        self.iat_verifier_fn = Arc::new(iat_verifier_fn);
+        self
+    }
+
+    /// Specifies a function for verifying audiences included in the `aud` claim that differ from
+    /// this client's client ID.
+    ///
+    /// The function should return `true` if the audience is trusted, or `false` otherwise.
+    ///
+    /// [Section 3.1.3.7](https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation)
+    /// states that *"The ID Token MUST be rejected if the ID Token does not list the Client as a
+    /// valid audience, or if it contains additional audiences not trusted by the Client."*
+    pub fn set_other_audience_verifier_fn<T>(mut self, other_aud_verifier_fn: T) -> Self
+    where
+        T: Fn(&Audience) -> bool + 'a + Send + Sync,
+    {
+        self.jwt_verifier = self
+            .jwt_verifier
+            .set_other_audience_verifier_fn(other_aud_verifier_fn);
+        self
+    }
+
+    pub(crate) fn verified_claims<'b, JE>(
+        &self,
+        jwt: &'b JsonWebToken<
+            JE,
+            K::SigningAlgorithm,
+            LogoutTokenClaims,
+            JsonWebTokenJsonPayloadSerde,
+        >,
+    ) -> Result<&'b LogoutTokenClaims, ClaimsVerificationError>
+    where
+        JE: JweContentEncryptionAlgorithm<
+            KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
+        >,
+    {
+        // The code below roughly follows the validation steps described in
+        // https://openid.net/specs/openid-connect-backchannel-1_0.html#Validation
+
+        // Steps 1--3 are handled by the generic JwtClaimsVerifier.
+        let partially_verified_claims = self.jwt_verifier.verified_claims(jwt)?;
+
+        self.verify_claims(partially_verified_claims)?;
+        Ok(partially_verified_claims)
+    }
+
+    pub(crate) fn verified_claims_owned<JE>(
+        &self,
+        jwt: JsonWebToken<JE, K::SigningAlgorithm, LogoutTokenClaims, JsonWebTokenJsonPayloadSerde>,
+    ) -> Result<LogoutTokenClaims, ClaimsVerificationError>
+    where
+        JE: JweContentEncryptionAlgorithm<
+            KeyType = <K::SigningAlgorithm as JwsSigningAlgorithm>::KeyType,
+        >,
+    {
+        // The code below roughly follows the validation steps described in
+        // https://openid.net/specs/openid-connect-backchannel-1_0.html#Validation
+
+        // Steps 1--3 are handled by the generic JwtClaimsVerifier.
+        let partially_verified_claims = self.jwt_verifier.verified_claims(jwt)?;
+
+        self.verify_claims(&partially_verified_claims)?;
+        Ok(partially_verified_claims)
+    }
+
+    fn verify_claims(
+        &self,
+        partially_verified_claims: &'_ LogoutTokenClaims,
+    ) -> Result<(), ClaimsVerificationError> {
+        // 4. Validate the iss, aud, iat, and exp Claims in the same way
+        //    they are validated in ID Tokens.
+        //
+        // The iss and aud Claims are handled by the generic JwtClaimsVerifier.
+        // The exp and iat Claims are handled below, following ID token verification steps 9 and 10.
+
+        // The current time MUST be before the time represented by the exp Claim.
+        let cur_time = (*self.time_fn)();
+        if cur_time >= partially_verified_claims.expiration() {
+            return Err(ClaimsVerificationError::Expired(format!(
+                "Logout token expired at {} (current time is {})",
+                partially_verified_claims.expiration(),
+                cur_time
+            )));
+        }
+
+        // The iat Claim can be used to reject tokens that were issued too far away from the
+        // current time, limiting the amount of time that nonces need to be stored to prevent
+        // attacks. The acceptable range is Client specific.
+        (*self.iat_verifier_fn)(partially_verified_claims.issue_time())
+            .map_err(ClaimsVerificationError::Expired)?;
+
+        // 5. Verify that the Logout Token contains a sub Claim, a sid Claim, or both.
+        //
+        // This is already verified by deserialisation of the target field to the LogoutTarget enum.
+
+        // 6. Verify that the Logout Token contains an events Claim whose value is JSON object
+        //    containing the member name http://schemas.openid.net/event/backchannel-logout.
+        if partially_verified_claims
+            .events()
+            .as_object()
+            .and_then(|events| events.get(LogoutTokenClaims::BACKCHANNEL_LOGOUT_EVENT))
+            .and_then(|value| value.as_object())
+            .is_none_or(|x| !x.is_empty())
+        {
+            return Err(ClaimsVerificationError::Other(
+                "events claim is invalid".to_owned(),
+            ));
+        }
+
+        // 7. Verify that the Logout Token does not contain a nonce Claim.
+        if partially_verified_claims.has_nonce {
+            return Err(ClaimsVerificationError::Other(
+                "logout token includes a nonce claim".to_owned(),
+            ));
+        }
+
+        // Steps 8--11 are optional and stateful - verification must be performed at higher level.
 
         Ok(())
     }
