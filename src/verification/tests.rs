@@ -1,6 +1,6 @@
 use crate::core::{
-    CoreIdToken, CoreIdTokenClaims, CoreIdTokenVerifier, CoreJsonWebKey, CoreJsonWebKeySet,
-    CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm,
+    CoreHmacKey, CoreIdToken, CoreIdTokenClaims, CoreIdTokenVerifier, CoreJsonWebKey,
+    CoreJsonWebKeySet, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm,
     CoreJwsSigningAlgorithm, CoreRsaPrivateSigningKey, CoreUserInfoClaims,
     CoreUserInfoJsonWebToken, CoreUserInfoVerifier,
 };
@@ -16,7 +16,7 @@ use crate::{
     Nonce, SignatureVerificationError, StandardClaims, SubjectIdentifier, UserInfoError,
 };
 
-use chrono::{TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 
 use std::str::FromStr;
@@ -1370,29 +1370,21 @@ fn test_new_user_info_claims() {
 
 #[test]
 fn test_logout_token() {
-    let rsa_key =
-        serde_json::from_str::<CoreJsonWebKey>(TEST_RSA_PUB_KEY).expect("deserialization failed");
-    let client_id = ClientId::new("my_client".to_string());
-    let issuer = IssuerUrl::new("https://example.com".to_string()).unwrap();
     let mock_current_time = AtomicUsize::new(1311281969);
     let mock_is_valid_issue_time = AtomicBool::new(true);
-    let verifier = LogoutTokenVerifier::new_public_client(
-        client_id,
-        issuer,
-        CoreJsonWebKeySet::new(vec![rsa_key]),
-    )
-    .set_time_fn(|| {
-        Timestamp::Seconds(mock_current_time.load(Ordering::Relaxed).into())
-            .to_utc()
-            .unwrap()
-    })
-    .set_issue_time_verifier_fn(|_| {
-        if mock_is_valid_issue_time.load(Ordering::Relaxed) {
-            Ok(())
-        } else {
-            Err("Invalid iat claim".to_string())
-        }
-    });
+    let verifier = LogoutTokenVerifier::<'_, CoreJsonWebKey>::new_insecure_without_verification()
+        .set_time_fn(|| {
+            Timestamp::Seconds(mock_current_time.load(Ordering::Relaxed).into())
+                .to_utc()
+                .unwrap()
+        })
+        .set_issue_time_verifier_fn(|_| {
+            if mock_is_valid_issue_time.load(Ordering::Relaxed) {
+                Ok(())
+            } else {
+                Err("Invalid iat claim".to_string())
+            }
+        });
 
     // The token below has an issue time of 1311280970 and an expiry time of 1311281970
     let token: LogoutToken = LogoutToken::from_str(
@@ -1517,4 +1509,108 @@ fn test_logout_token() {
         Err(err) => panic!("unexpected error: {:?}", err),
         Ok(_) => panic!("nonce present: verification should fail"),
     }
+}
+
+#[test]
+fn test_logout_token_public_client() {
+    let rsa_key =
+        serde_json::from_str::<CoreJsonWebKey>(TEST_RSA_PUB_KEY).expect("deserialization failed");
+    let client_id = ClientId::new("my_client".to_string());
+    let issuer = IssuerUrl::new("https://example.com".to_string()).unwrap();
+    let verifier = LogoutTokenVerifier::new_public_client(
+        client_id,
+        issuer,
+        CoreJsonWebKeySet::new(vec![rsa_key]),
+    )
+    .set_time_fn(|| DateTime::from_timestamp(1311281969, 0).unwrap());
+
+    // Signed token with typ header
+    let token: LogoutToken = LogoutToken::from_str(
+        "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.\
+        eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwiYXVkIjpbIm15X2NsaWVudCJdLCJleHAiOjEzMTEyODE5NzAsIm\
+        lhdCI6MTMxMTI4MDk3MCwianRpIjoiZXhhbXBsZS1qdGkiLCJldmVudHMiOnsiaHR0cDovL3NjaGVtYXMub3Blbmlk\
+        Lm5ldC9ldmVudC9iYWNrY2hhbm5lbC1sb2dvdXQiOnt9fSwic3ViIjoiMjQ0MDAzMjAifQ.E27jsdaS95mcg56H9nM\
+        i28OAHFUov80z8brgc9cg25276tQLjZO6tvP-EZSzq8XqT1TvoZ7ZUURkah14wpKs33TTPq1afjaUIzuUDOFSVngcm\
+        upHDj6-amj0WQUcHsEEUD332lJN27i27Qkkvm5LeAWXUmA6dypHkiaibvLBbUEar6XHinT9eKz2Lf5pXpj1y5L10m6\
+        b85fC37b1uSIF9tTv4RBdgrIsgzQOKZaDL5Z2RojtzP-WZ7WKGv4AkXftSEUb419WcysQVkHSl6KhvnTbjwvhFLWXx\
+        3FXijhxpHyFAFzp7lLv_cPjK9QUTyPTzQkII_le1mItkVGzYfiiqA",
+    )
+    .expect("failed to deserialize");
+
+    token
+        .signing_key(&verifier)
+        .expect("Could not get logout token signing key");
+
+    // Claims should verify successfully
+    if let Err(err) = token.clone().into_claims(&verifier) {
+        panic!("verification error: {:?}", err);
+    }
+
+    // Test disallowed JOSE type
+    let jose_typ_verifier = verifier.clone().set_allowed_jose_types([]);
+    assert!(token.claims(&jose_typ_verifier).is_err(), "should fail");
+    token
+        .claims(&jose_typ_verifier.allow_all_jose_types())
+        .expect("verification error");
+}
+
+#[test]
+fn test_logout_token_confidential_client() {
+    let rsa_key =
+        serde_json::from_str::<CoreJsonWebKey>(TEST_RSA_PUB_KEY).expect("deserialization failed");
+    let client_id = ClientId::new("my_client".to_string());
+    let client_secret = ClientSecret::new("a-256bit-client-secret-for-hs256".to_string());
+    let issuer = IssuerUrl::new("https://example.com".to_string()).unwrap();
+    let verifier = LogoutTokenVerifier::new_confidential_client(
+        client_id,
+        client_secret,
+        issuer,
+        CoreJsonWebKeySet::new(vec![rsa_key]),
+    )
+    .set_time_fn(|| DateTime::from_timestamp(1311281969, 0).unwrap())
+    .set_allowed_algs([CoreJwsSigningAlgorithm::HmacSha256])
+    // Methods that pass-through to JwtClaimsVerifier
+    .require_issuer_match(true)
+    .require_audience_match(true)
+    .set_other_audience_verifier_fn(|_| false);
+
+    // HS256-signed token
+    let token: LogoutToken = LogoutToken::from_str(
+        "eyJhbGciOiJIUzI1NiJ9.\
+        eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwiYXVkIjpbIm15X2NsaWVudCJdLCJleHAiOjEzMTEyODE5NzAsIm\
+        lhdCI6MTMxMTI4MDk3MCwianRpIjoiZXhhbXBsZS1qdGkiLCJldmVudHMiOnsiaHR0cDovL3NjaGVtYXMub3Blbmlk\
+        Lm5ldC9ldmVudC9iYWNrY2hhbm5lbC1sb2dvdXQiOnt9fSwic3ViIjoiMjQ0MDAzMjAifQ.\
+        r6sf1UXQ0-gn5zYtiS5gwvZY1IRVy4ZQ6_k2bY3_XtI",
+    )
+    .expect("failed to deserialize");
+
+    // Claims should verify successfully
+    token
+        .clone()
+        .into_claims(&verifier)
+        .expect("verification error");
+
+    // Test bad signature
+    let bad_sig_verifier = LogoutTokenVerifier::new(
+        verifier
+            .jwt_verifier
+            .clone()
+            .set_client_secret(ClientSecret::new("".to_string())),
+    )
+    .set_time_fn(|| DateTime::from_timestamp(1311281969, 0).unwrap());
+    assert!(token.claims(&bad_sig_verifier).is_err(), "should fail");
+
+    // Test ignoring bad signature, then re-enabling the check
+    let bad_sig_verifier = bad_sig_verifier.insecure_disable_signature_check();
+    token.claims(&bad_sig_verifier).expect("verification error");
+    let bad_sig_verifier = bad_sig_verifier.enable_signature_check();
+    assert!(token.claims(&bad_sig_verifier).is_err(), "should fail");
+
+    let new_token = LogoutToken::new(
+        token.claims(&verifier).unwrap().clone(),
+        &CoreHmacKey::new("a-256bit-client-secret-for-hs256"),
+        CoreJwsSigningAlgorithm::HmacSha256,
+    )
+    .expect("failed to create token");
+    assert_eq!(new_token, token);
 }

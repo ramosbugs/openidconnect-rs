@@ -1,6 +1,9 @@
 use crate::{
+    core::CoreJwsSigningAlgorithm,
+    verification::{AudiencesClaim, IssuerClaim},
     Audience, IssuerUrl, JsonWebTokenAccess, JsonWebTokenIdentifier, LogoutToken,
-    LogoutTokenClaims, LogoutTokenTarget, SessionIdentifier, SubjectIdentifier,
+    LogoutTokenClaims, LogoutTokenTarget, SessionIdentifier, SignatureVerificationError,
+    SubjectIdentifier,
 };
 
 use chrono::{TimeZone, Utc};
@@ -10,6 +13,7 @@ use url::Url;
 
 #[test]
 fn test_logout_token() {
+    // Token signed with RSA256
     static LOGOUT_TOKEN: &str = concat!(
         "eyJhbGciOiJIUzI1NiJ9.",
         "eyJpc3MiOiJodHRwczovL3NlcnZlci5leGFtcGxlLmNvbSIsImF1ZCI6WyJzNkJoZ",
@@ -29,8 +33,16 @@ fn test_logout_token() {
         Url::parse("https://server.example.com").unwrap()
     );
     assert_eq!(
+        <&LogoutTokenClaims as IssuerClaim>::issuer(&&claims),
+        Some(&IssuerUrl::new("https://server.example.com".to_string()).unwrap())
+    );
+    assert_eq!(
         *claims.audiences(),
         vec![Audience::new("s6BhdRkqt3".to_string())]
+    );
+    assert_eq!(
+        <&LogoutTokenClaims as AudiencesClaim>::audiences(&&claims),
+        Some(&vec![Audience::new("s6BhdRkqt3".to_string())])
     );
     assert_eq!(
         claims.expiration(),
@@ -43,6 +55,12 @@ fn test_logout_token() {
         Utc.timestamp_opt(1311280970, 0)
             .single()
             .expect("valid timestamp")
+    );
+    assert_eq!(
+        *claims.target(),
+        LogoutTokenTarget::Subject {
+            sub: SubjectIdentifier::new("24400320".to_string())
+        }
     );
     assert!(claims.subject().is_some());
     assert_eq!(
@@ -59,12 +77,47 @@ fn test_logout_token() {
         json!({"http://schemas.openid.net/event/backchannel-logout": {}})
     );
 
+    assert_eq!(
+        *logout_token.signing_alg().unwrap(),
+        CoreJwsSigningAlgorithm::HmacSha256
+    );
+
     // test `ToString` implementation
     assert_eq!(&logout_token.to_string(), LOGOUT_TOKEN);
 
     // test `serde::Serialize` implementation too
     let de = serde_json::to_string(&logout_token).expect("failed to serialize logout token");
     assert_eq!(de, format!("\"{}\"", LOGOUT_TOKEN));
+
+    // test unsigned token
+    let logout_token_unsigned: LogoutToken = "\
+        eyJhbGciOiJub25lIn0.\
+        eyJpc3MiOiJodHRwczovL3NlcnZlci5leGFtcGxlLmNvbSIsImF1ZCI6WyJzNkJoZFJrcXQzIl0sImV4cCI6MTMxMT\
+        I4MTk3MCwiaWF0IjoxMzExMjgwOTcwLCJqdGkiOiJleGFtcGxlLWp0aSIsImV2ZW50cyI6eyJodHRwOi8vc2NoZW1h\
+        cy5vcGVuaWQubmV0L2V2ZW50L2JhY2tjaGFubmVsLWxvZ291dCI6e319LCJzdWIiOiIyNDQwMDMyMCJ9."
+        .parse()
+        .expect("failed to parse unsigned token");
+
+    assert_eq!(
+        logout_token_unsigned
+            .signing_alg()
+            .expect_err("should error for unsigned token"),
+        SignatureVerificationError::NoSignature
+    );
+
+    // test token with encryption alg header
+    let logout_token_with_encryption_alg: LogoutToken = logout_token_unsigned
+        .to_string()
+        .replacen("eyJhbGciOiJub25lIn0", "eyJhbGciOiJBMjU2R0NNIn0", 1)
+        .parse()
+        .unwrap();
+
+    assert_eq!(
+        logout_token_with_encryption_alg
+            .signing_alg()
+            .expect_err("should error for encrypted token"),
+        SignatureVerificationError::UnsupportedAlg("A256GCM".to_string())
+    );
 }
 
 #[test]
