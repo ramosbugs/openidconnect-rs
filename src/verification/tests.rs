@@ -1,7 +1,7 @@
 use crate::core::{
-    CoreHmacKey, CoreIdToken, CoreIdTokenClaims, CoreIdTokenVerifier, CoreJsonWebKey,
+    CoreClient, CoreHmacKey, CoreIdToken, CoreIdTokenClaims, CoreIdTokenVerifier, CoreJsonWebKey,
     CoreJsonWebKeySet, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm,
-    CoreJwsSigningAlgorithm, CoreRsaPrivateSigningKey, CoreUserInfoClaims,
+    CoreJwsSigningAlgorithm, CoreProviderMetadata, CoreRsaPrivateSigningKey, CoreUserInfoClaims,
     CoreUserInfoJsonWebToken, CoreUserInfoVerifier,
 };
 use crate::helpers::{Base64UrlEncodedBytes, Timestamp};
@@ -12,11 +12,13 @@ use crate::jwt::{
 use crate::verification::{AudiencesClaim, IssuerClaim, JwtClaimsVerifier};
 use crate::{
     AccessToken, Audience, AuthenticationContextClass, AuthorizationCode, ClaimsVerificationError,
-    ClientId, ClientSecret, EndUserName, IssuerUrl, JsonWebKeyId, LogoutToken, LogoutTokenVerifier,
-    Nonce, SignatureVerificationError, StandardClaims, SubjectIdentifier, UserInfoError,
+    ClientId, ClientSecret, EndUserName, IssuerUrl, JsonWebKeyId, JsonWebKeySetUrl, LogoutToken,
+    LogoutTokenVerifier, Nonce, SignatureVerificationError, StandardClaims, SubjectIdentifier,
+    UserInfoError,
 };
 
 use chrono::{DateTime, TimeZone, Utc};
+use oauth2::AuthUrl;
 use serde::{Deserialize, Serialize};
 
 use std::str::FromStr;
@@ -1613,4 +1615,69 @@ fn test_logout_token_confidential_client() {
     )
     .expect("failed to create token");
     assert_eq!(new_token, token);
+}
+
+#[test]
+fn test_logout_token_verifier_from_client() {
+    let rsa_key =
+        serde_json::from_str::<CoreJsonWebKey>(TEST_RSA_PUB_KEY).expect("deserialization failed");
+
+    // HS256-signed token
+    let token: LogoutToken = LogoutToken::from_str(
+        "eyJhbGciOiJIUzI1NiJ9.\
+        eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwiYXVkIjpbIm15X2NsaWVudCJdLCJleHAiOjEzMTEyODE5NzAsIm\
+        lhdCI6MTMxMTI4MDk3MCwianRpIjoiZXhhbXBsZS1qdGkiLCJldmVudHMiOnsiaHR0cDovL3NjaGVtYXMub3Blbmlk\
+        Lm5ldC9ldmVudC9iYWNrY2hhbm5lbC1sb2dvdXQiOnt9fSwic3ViIjoiMjQ0MDAzMjAifQ.r6sf1UXQ0-gn5zYtiS5\
+        gwvZY1IRVy4ZQ6_k2bY3_XtI",
+    )
+    .expect("failed to deserialize");
+
+    // Verifier for public client should fail
+    let client_id = ClientId::new("my_client".to_string());
+    let issuer_url = IssuerUrl::new("https://example.com".to_string()).unwrap();
+    let client = CoreClient::new(
+        client_id.clone(),
+        issuer_url.clone(),
+        CoreJsonWebKeySet::new(vec![rsa_key]),
+    );
+    let public_verifier = client
+        .logout_token_verifier()
+        .set_allowed_algs([CoreJwsSigningAlgorithm::HmacSha256]);
+    assert!(matches!(
+        token.claims(&public_verifier),
+        Err(ClaimsVerificationError::SignatureVerification(
+            SignatureVerificationError::DisallowedAlg(message)
+        )) if message.contains("symmetric signatures are disallowed for public clients")
+    ));
+
+    // Verifier for confidential client should succeed
+    let client_secret = ClientSecret::new("a-256bit-client-secret-for-hs256".to_string());
+    let confidential_client = client.clone().set_client_secret(client_secret.clone());
+    let confidential_verifier = confidential_client
+        .logout_token_verifier()
+        .set_allowed_algs([CoreJwsSigningAlgorithm::HmacSha256])
+        .set_time_fn(|| DateTime::from_timestamp(1311281969, 0).unwrap());
+    assert!(token.claims(&confidential_verifier).is_ok());
+
+    // Create verifier using allowed_algs already set in client object
+    let client_with_allowed_algs = CoreClient::from_provider_metadata(
+        CoreProviderMetadata::new(
+            issuer_url,
+            AuthUrl::new("https://example.com/authorize".to_string()).unwrap(),
+            JsonWebKeySetUrl::new("https://example.com/jwks".to_string()).unwrap(),
+            vec![],
+            vec![],
+            vec![CoreJwsSigningAlgorithm::HmacSha256],
+            Default::default(),
+        ),
+        client_id,
+        Some(client_secret),
+    );
+    assert!(token
+        .claims(
+            &client_with_allowed_algs
+                .logout_token_verifier()
+                .set_time_fn(|| DateTime::from_timestamp(1311281969, 0).unwrap())
+        )
+        .is_ok());
 }
