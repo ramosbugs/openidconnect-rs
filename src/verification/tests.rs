@@ -1526,16 +1526,16 @@ fn test_logout_token_public_client() {
     )
     .set_time_fn(|| DateTime::from_timestamp(1311281969, 0).unwrap());
 
-    // Signed token with typ header
+    // Signed token with "logout+jwt" typ header
     let token: LogoutToken = LogoutToken::from_str(
-        "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.\
+        "eyJhbGciOiJSUzI1NiIsInR5cCI6ImxvZ291dCtqd3QifQ.\
         eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwiYXVkIjpbIm15X2NsaWVudCJdLCJleHAiOjEzMTEyODE5NzAsIm\
         lhdCI6MTMxMTI4MDk3MCwianRpIjoiZXhhbXBsZS1qdGkiLCJldmVudHMiOnsiaHR0cDovL3NjaGVtYXMub3Blbmlk\
-        Lm5ldC9ldmVudC9iYWNrY2hhbm5lbC1sb2dvdXQiOnt9fSwic3ViIjoiMjQ0MDAzMjAifQ.E27jsdaS95mcg56H9nM\
-        i28OAHFUov80z8brgc9cg25276tQLjZO6tvP-EZSzq8XqT1TvoZ7ZUURkah14wpKs33TTPq1afjaUIzuUDOFSVngcm\
-        upHDj6-amj0WQUcHsEEUD332lJN27i27Qkkvm5LeAWXUmA6dypHkiaibvLBbUEar6XHinT9eKz2Lf5pXpj1y5L10m6\
-        b85fC37b1uSIF9tTv4RBdgrIsgzQOKZaDL5Z2RojtzP-WZ7WKGv4AkXftSEUb419WcysQVkHSl6KhvnTbjwvhFLWXx\
-        3FXijhxpHyFAFzp7lLv_cPjK9QUTyPTzQkII_le1mItkVGzYfiiqA",
+        Lm5ldC9ldmVudC9iYWNrY2hhbm5lbC1sb2dvdXQiOnt9fSwic3ViIjoiMjQ0MDAzMjAifQ.\
+        jHlEMkXq6dqoYRR7Sda912hmKC0KUt0dOdkY_n8yOlaU8_1hZ57CaJGmB8zDCgRuyXkttJffXWvUx6Q5h6X4pdy8s2\
+        jxaublH3rk2F7G8icKu52ilzq8tbbF-a2i24tIeIKcopuJr9XEIL6-Aijf_s3TbJiKGtAeGjYpldJw_wUyWDn0qBfj\
+        bmJy4l-CVQRSlGhbMDVGNLic3dfx3hOPkUhN-nZxf6hulpxP9Qm_-OQgaCioIRiG29Tm8aMj22ovoaO_7eLbHO52ji\
+        s1O8pI6yOoATEsla-tIqaN_Vb72_zBDSN1vOe_aa_kN55L0op9255nJVReWzhgSXjxq-BJlQ",
     )
     .expect("failed to deserialize");
 
@@ -1548,12 +1548,23 @@ fn test_logout_token_public_client() {
         panic!("verification error: {:?}", err);
     }
 
-    // Test disallowed JOSE type
-    let jose_typ_verifier = verifier.clone().set_allowed_jose_types([]);
-    assert!(token.claims(&jose_typ_verifier).is_err(), "should fail");
-    token
-        .claims(&jose_typ_verifier.allow_all_jose_types())
-        .expect("verification error");
+    // Token with "JWT" typ header should be rejected
+    let token_typ_jwt: LogoutToken = LogoutToken::from_str(
+        "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.\
+        eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwiYXVkIjpbIm15X2NsaWVudCJdLCJleHAiOjEzMTEyODE5NzAsIm\
+        lhdCI6MTMxMTI4MDk3MCwianRpIjoiZXhhbXBsZS1qdGkiLCJldmVudHMiOnsiaHR0cDovL3NjaGVtYXMub3Blbmlk\
+        Lm5ldC9ldmVudC9iYWNrY2hhbm5lbC1sb2dvdXQiOnt9fSwic3ViIjoiMjQ0MDAzMjAifQ.E27jsdaS95mcg56H9nM\
+        i28OAHFUov80z8brgc9cg25276tQLjZO6tvP-EZSzq8XqT1TvoZ7ZUURkah14wpKs33TTPq1afjaUIzuUDOFSVngcm\
+        upHDj6-amj0WQUcHsEEUD332lJN27i27Qkkvm5LeAWXUmA6dypHkiaibvLBbUEar6XHinT9eKz2Lf5pXpj1y5L10m6\
+        b85fC37b1uSIF9tTv4RBdgrIsgzQOKZaDL5Z2RojtzP-WZ7WKGv4AkXftSEUb419WcysQVkHSl6KhvnTbjwvhFLWXx\
+        3FXijhxpHyFAFzp7lLv_cPjK9QUTyPTzQkII_le1mItkVGzYfiiqA",
+    )
+    .expect("failed to deserialize");
+    assert!(token_typ_jwt
+        .into_claims(&verifier)
+        .expect_err("Should fail to verify token with typ=\"JWT\"")
+        .to_string()
+        .contains("unsupported JWT type "));
 }
 
 #[test]

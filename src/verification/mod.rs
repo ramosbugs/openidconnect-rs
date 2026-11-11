@@ -891,7 +891,13 @@ where
         issuer: IssuerUrl,
         signature_keys: JsonWebKeySet<K>,
     ) -> Self {
-        Self::new(JwtClaimsVerifier::new(client_id, issuer, signature_keys))
+        Self::new(
+            JwtClaimsVerifier::new(client_id, issuer, signature_keys).set_allowed_jose_types([
+                JsonWebTokenType::new("logout+jwt".to_string())
+                    .normalize()
+                    .unwrap(),
+            ]),
+        )
     }
 
     /// Initializes a no-op verifier that performs no signature, audience, or issuer verification.
@@ -922,6 +928,9 @@ where
     ) -> Self {
         Self::new(
             JwtClaimsVerifier::new(client_id, issuer, signature_keys)
+                .set_allowed_jose_types([JsonWebTokenType::new("logout+jwt".to_string())
+                    .normalize()
+                    .unwrap()])
                 .set_client_secret(client_secret),
         )
     }
@@ -939,23 +948,6 @@ where
     {
         let valid_algs = algs.into_iter().filter(|x| x.key_type().is_some());
         self.jwt_verifier = self.jwt_verifier.set_allowed_algs(valid_algs);
-        self
-    }
-
-    /// Allows setting specific JOSE types. The verifier will check against them during verification.
-    ///
-    /// See [RFC 7515 section 4.1.9](https://tools.ietf.org/html/rfc7515#section-4.1.9) for more details.
-    pub fn set_allowed_jose_types<I>(mut self, types: I) -> Self
-    where
-        I: IntoIterator<Item = NormalizedJsonWebTokenType>,
-    {
-        self.jwt_verifier = self.jwt_verifier.set_allowed_jose_types(types);
-        self
-    }
-
-    /// Allow all JSON Web Token Header types.
-    pub fn allow_all_jose_types(mut self) -> Self {
-        self.jwt_verifier = self.jwt_verifier.allow_all_jose_types();
         self
     }
 
