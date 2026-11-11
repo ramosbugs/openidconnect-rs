@@ -7,10 +7,11 @@ use crate::{
     EndpointSet, EndpointState, ErrorResponse, ExtraDeviceAuthorizationFields, GenderClaim,
     GrantType, IdTokenVerifier, IntrospectionRequest, IntrospectionUrl, IssuerUrl, JsonWebKey,
     JsonWebKeySet, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm,
-    Nonce, PasswordTokenRequest, ProviderMetadata, RedirectUrl, RefreshToken, RefreshTokenRequest,
-    ResourceOwnerPassword, ResourceOwnerUsername, ResponseMode, ResponseType, RevocableToken,
-    RevocationRequest, RevocationUrl, Scope, SubjectIdentifier, SubjectIdentifierType,
-    TokenIntrospectionResponse, TokenResponse, TokenUrl, UserInfoRequest, UserInfoUrl,
+    LogoutTokenVerifier, Nonce, PasswordTokenRequest, ProviderMetadata, RedirectUrl, RefreshToken,
+    RefreshTokenRequest, ResourceOwnerPassword, ResourceOwnerUsername, ResponseMode, ResponseType,
+    RevocableToken, RevocationRequest, RevocationUrl, Scope, SubjectIdentifier,
+    SubjectIdentifierType, TokenIntrospectionResponse, TokenResponse, TokenUrl, UserInfoRequest,
+    UserInfoUrl,
 };
 
 use std::marker::PhantomData;
@@ -649,6 +650,31 @@ where
             )
         } else {
             IdTokenVerifier::new_public_client(
+                self.client_id.clone(),
+                self.issuer.clone(),
+                self.jwks.clone(),
+            )
+        };
+
+        if let Some(id_token_signing_algs) = self.id_token_signing_algs.clone() {
+            verifier.set_allowed_algs(id_token_signing_algs)
+        } else {
+            verifier
+        }
+    }
+
+    /// Return a logout token verifier for use with the
+    /// [`LogoutToken::claims`](crate::LogoutToken::claims) method.
+    pub fn logout_token_verifier(&self) -> LogoutTokenVerifier<'_, K> {
+        let verifier = if let Some(ref client_secret) = self.client_secret {
+            LogoutTokenVerifier::new_confidential_client(
+                self.client_id.clone(),
+                client_secret.clone(),
+                self.issuer.clone(),
+                self.jwks.clone(),
+            )
+        } else {
+            LogoutTokenVerifier::new_public_client(
                 self.client_id.clone(),
                 self.issuer.clone(),
                 self.jwks.clone(),

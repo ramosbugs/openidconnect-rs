@@ -725,6 +725,11 @@ fn test_discovery_deserialization() {
     );
     assert_eq!(None, provider_metadata.op_policy_uri());
     assert_eq!(None, provider_metadata.op_tos_uri());
+    assert_eq!(None, provider_metadata.backchannel_logout_supported());
+    assert_eq!(
+        None,
+        provider_metadata.backchannel_logout_session_supported()
+    );
 
     // Note: the following fields provided by the response above are not part of the OpenID
     // Connect Discovery 1.0 spec:
@@ -783,7 +788,9 @@ fn test_discovery_deserialization_other_fields() {
            \"yue-HK\"
         ],
         \"op_policy_uri\" : \"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/op_policy\",
-        \"op_tos_uri\" : \"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/op_tos\"
+        \"op_tos_uri\" : \"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/op_tos\",
+        \"backchannel_logout_supported\" : true,
+        \"backchannel_logout_session_supported\" : false
     }";
 
     let provider_metadata: CoreProviderMetadata = serde_json::from_str(json_response).unwrap();
@@ -961,6 +968,11 @@ fn test_discovery_deserialization_other_fields() {
             .unwrap()
         ),
         provider_metadata.op_tos_uri()
+    );
+    assert_eq!(Some(true), provider_metadata.backchannel_logout_supported());
+    assert_eq!(
+        Some(false),
+        provider_metadata.backchannel_logout_session_supported()
     );
 
     let serialized_json = serde_json::to_string(&provider_metadata).unwrap();
@@ -1151,6 +1163,11 @@ fn test_unsupported_enum_values() {
     assert_eq!(None, provider_metadata.require_request_uri_registration());
     assert_eq!(None, provider_metadata.op_policy_uri());
     assert_eq!(None, provider_metadata.op_tos_uri());
+    assert_eq!(None, provider_metadata.backchannel_logout_supported());
+    assert_eq!(
+        None,
+        provider_metadata.backchannel_logout_session_supported()
+    );
 
     let serialized_json = serde_json::to_string(&provider_metadata).unwrap();
 

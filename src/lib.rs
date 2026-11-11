@@ -648,6 +648,7 @@ mod discovery;
 mod helpers;
 mod id_token;
 mod logout;
+mod logout_token;
 mod token;
 mod types;
 mod user_info;
@@ -707,6 +708,7 @@ pub use crate::id_token::IdTokenFields;
 pub use crate::id_token::{IdToken, IdTokenClaims};
 pub use crate::jwt::{JsonWebTokenError, JsonWebTokenType, NormalizedJsonWebTokenType};
 pub use crate::logout::{LogoutProviderMetadata, LogoutRequest, ProviderMetadataWithLogout};
+pub use crate::logout_token::{LogoutToken, LogoutTokenClaims, LogoutTokenTarget};
 pub use crate::token::TokenResponse;
 // Flatten the module hierarchy involving types. They're only separated to improve code
 // organization.
@@ -725,16 +727,17 @@ pub use crate::types::{
     EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName, EndUserName,
     EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone,
     EndUserUsername, EndUserWebsiteUrl, FormattedAddress, GrantType, InitiateLoginUrl, IssuerUrl,
-    LoginHint, LogoUrl, LogoutHint, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl, PostLogoutRedirectUrl,
-    RegistrationAccessToken, RegistrationUrl, RequestUrl, ResponseMode, ResponseType,
-    ResponseTypes, SectorIdentifierUrl, ServiceDocUrl, SigningError, StreetAddress,
-    SubjectIdentifier, SubjectIdentifierType, ToSUrl,
+    JsonWebTokenIdentifier, LoginHint, LogoUrl, LogoutHint, Nonce, OpPolicyUrl, OpTosUrl,
+    PolicyUrl, PostLogoutRedirectUrl, RegistrationAccessToken, RegistrationUrl, RequestUrl,
+    ResponseMode, ResponseType, ResponseTypes, SectorIdentifierUrl, ServiceDocUrl,
+    SessionIdentifier, SigningError, StreetAddress, SubjectIdentifier, SubjectIdentifierType,
+    ToSUrl,
 };
 pub use crate::user_info::{
     UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoRequest, UserInfoResponseType,
     UserInfoUrl,
 };
 pub use crate::verification::{
-    ClaimsVerificationError, IdTokenVerifier, NonceVerifier, SignatureVerificationError,
-    UserInfoVerifier,
+    ClaimsVerificationError, IdTokenVerifier, LogoutTokenVerifier, NonceVerifier,
+    SignatureVerificationError, UserInfoVerifier,
 };
