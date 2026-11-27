@@ -14,7 +14,7 @@ use crate::{JsonWebKey, JsonWebKeyId, JsonWebTokenAlgorithm, PrivateSigningKey, 
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use rand::rngs::mock::StepRng;
-use rand::{CryptoRng, RngCore};
+use rand::RngCore;
 use rsa::rand_core;
 
 #[test]
@@ -733,19 +733,19 @@ fn expect_rsa_sig(
 #[derive(Clone)]
 struct TestRng(StepRng);
 
-impl CryptoRng for TestRng {}
-impl RngCore for TestRng {
-    fn next_u32(&mut self) -> u32 {
-        self.0.next_u32()
+impl rand_core::TryCryptoRng for TestRng {}
+impl rand_core::TryRng for TestRng {
+    type Error = getrandom::Error;
+
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+        Ok(self.0.next_u32())
     }
-    fn next_u64(&mut self) -> u64 {
-        self.0.next_u64()
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+        Ok(self.0.next_u64())
     }
-    fn fill_bytes(&mut self, dest: &mut [u8]) {
-        self.0.fill_bytes(dest)
-    }
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
-        self.0.try_fill_bytes(dest)
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Self::Error> {
+        self.0.fill_bytes(dest);
+        Ok(())
     }
 }
 
